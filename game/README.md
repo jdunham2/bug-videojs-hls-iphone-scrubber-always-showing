@@ -35,12 +35,23 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     hens, sends the cat running and has Biscuit whimpering.
   - *Fog* (autumn, winter): thick mist with a clear patch around you; villagers can barely see.
   - *Snowstorm* (winter): heavy, wind-blown snow and poor visibility. *Windy*: thrown things drift off course.
+  - *Hail* (spring, autumn): bouncing hailstones; villagers drop what they're doing and run home to shelter.
+  - *Heatwave* (summer): a hazy, sweltering day; villagers move slowly and doze off on benches, and a dozing
+    villager sees nothing (steal right from under their nose).
+  - The weather can change partway through the day; the morning card gives the forecast, and a toast tells you
+    when it turns. When rain clears up, a rainbow appears with a pot of gold at its end (+3 shinies).
 - **Animals**: ducks on the pond and river (they quack and flee, and eat any food dropped near them),
   sparrow flocks that scatter when you run at them (they shelter from bad weather), squirrels that dash up
   trees (and Biscuit barks up the tree, drawing villagers' eyes), frogs by the water in rain and spring, and
   seaside seagulls that swoop down and steal food out of your mouth (chitter to scare them off).
+- **The farm**: most villages have a fenced field with a gate and a trough. Sheep baa and bunch up when you run
+  at them (herd them out through the gate), a cow moos and plods off, and a goat by the gate eats anything
+  left lying around (newspapers, hats, washing) and charges if you chitter at it, headbutting you over.
+- **At dusk** (the last part of the day, not in winter): windows light up, hedgehogs snuffle out from the
+  bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
+  drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 81 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 91 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -99,7 +110,10 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   swat, sit, flee), `shatter()` for fragile items, `lookTowards()` for noises
 - **Seasons**: `SEASON_LOOK`, `placeSeasonal()` / `placeSeasonalItems()`, `updateSeason()`, hens (`updateHens()`),
   `pickWeather()`, `updateWeatherFx()` (puddles, lightning), `spawnCritters()` / `updateCritters()` (ducks,
-  sparrows, squirrels, frogs, gulls); tint; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
+  sparrows, squirrels, frogs, gulls); tint;
+  farm and night: `planWeather()` / `setWeather()` / `updateWeatherPlan()`, `startRainbow()` / `drawRainbow()`,
+  `buildPaddock()`, `spawnFarmNight()` / `updateFarmNight()` / `drawFarmNight()` (sheep, cow, goat, hedgehogs,
+  owl, fireflies), `updateDusk()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
   `subscribeScores()`/`postScore()`/`renderBoard()` (db `scores/<user id>`)
 - **Eating**: `FOOD` table, `startEating()`, `updateEating()` (bites, tummy, stuffed, sugar rush), `finishFood()`

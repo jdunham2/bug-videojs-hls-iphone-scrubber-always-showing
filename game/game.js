@@ -89,7 +89,7 @@
     const order = shuffled(['NW', 'NE', 'SW', 'SE']);
     return {
       name: pick(VILLAGE_A) + pick(kind === 'seaside' ? VILLAGE_B_SEA : kind === 'river' ? VILLAGE_B_RIVER : VILLAGE_B),
-      kind, season, weather: weatherName, roadY, roadX,
+      kind, season, weather: weatherName, weatherPlan: opts.plan || planWeather(season, weatherName), planIdx: 1, roadY, roadX,
       plaza: { x: roadX - 5, y: roadY - 5, w: 12, h: 12 },
       quads,
       pondQ: quads[order[0]], gardenQ: quads[order[1]], homeQs: [quads[order[2]], quads[order[3]]],
@@ -349,6 +349,7 @@
 
     placeHideBushes();
     placeSeasonal();
+    buildPaddock();
 
     // Forest border: dense trees around the edge
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
@@ -737,7 +738,7 @@
         for (const wx of slots) {
           ctx.fillStyle = '#5a3a24';
           ctx.fillRect(wx - 2, winY - 2, 22, 22);
-          ctx.fillStyle = '#9fd3e8';
+          ctx.fillStyle = duskK > 0.35 ? '#ffd98a' : '#9fd3e8'; // lamps on as evening falls
           ctx.fillRect(wx, winY, 18, 18);
           ctx.fillStyle = 'rgba(255,255,255,0.55)';
           ctx.fillRect(wx + 2, winY + 2, 5, 7);
@@ -2337,6 +2338,8 @@
     }
     if (it.kind === 'pie') completeTask('pie');
     it.touched = true;
+    if (it.kind === 'goldpot') { completeTask('gold'); run.earned += 3; updateRunBar(); setTimeout(() => toast('+3 \u2726 bonus', 'Pot of gold!', true), 1200); if (L.rainbow) L.rainbow.t = Math.min(L.rainbow.t, 4); }
+    if (it.owner && VILLAGER[it.owner] && VILLAGER[it.owner].dozing > 0 && Math.hypot(VILLAGER[it.owner].x - it.x, VILLAGER[it.owner].y - it.y) < 160) completeTask('dozing');
     if (it.kind === 'egg') completeTask('egg');
     if (it.kind === 'paintegg') { run.eggs = (run.eggs || 0) + 1; setProgress('eggs3', run.eggs); }
     if (it.kind === 'sock' || it.kind === 'shirt') completeTask('washing');
@@ -2843,6 +2846,7 @@
   const ownedKind = (v, kind) => items.find((it) => it.owner === v.id && it.kind === kind);
 
   function canSee(v, x, y) {
+    if (v.dozing > 0) return false; // fast asleep
     const dx = x - v.x, dy = y - v.y, d = Math.hypot(dx, dy);
     if (d > run.vision * visionMul() || areaOf(v.x, v.y) !== areaOf(x, y)) return false;
     if (d > 45) { const f = DIRV[v.dir]; if ((dx * f[0] + dy * f[1]) / d < 0.2) return false; }
@@ -2850,6 +2854,7 @@
   }
 
   function moveToward(v, x, y, speed, dt) {
+    if (v.stops && L && L.weather === 'heatwave') speed *= 0.75; // too hot to hurry
     const dx = x - v.x, dy = y - v.y, d = Math.hypot(dx, dy);
     if (d < 0.5) return true;
     const step = Math.min(d, speed * dt);
@@ -2941,6 +2946,7 @@
 
   // Startle: hop, shout, drop whatever they're carrying. `after` = what to do next.
   function startleV(v, text, after) {
+    v.dozing = 0;
     if (v.startleCD > 0 || v.state === 'startled') return false;
     v.startleCD = 1.2;
     v.hopV = 170; v.hop = 0.01;
@@ -3025,6 +3031,18 @@
           }
         }
       }
+      return;
+    }
+    // Hail: run home. Heatwave: nod off.
+    if (v.shelter) {
+      v.shelter = false;
+      const hi = v.stops.findIndex((s) => s.act === 'home');
+      if (hi >= 0 && v.stopIdx !== hi && areaOf(v.x, v.y) === 0) { v.stopIdx = hi; toRoute(v); say(v, rpick(['Ow! Hail!', 'Run for it!', 'Ouch, ouch!']), 1.4); return; }
+    }
+    if (L.weather === 'heatwave' && !(v.dozing > 0) && stop.act !== 'play' && Math.random() < dt * 0.06) { v.dozing = rr(7, 12); say(v, 'Zzz...', 1.5); }
+    if (v.dozing > 0) {
+      v.dozing -= dt; v.actT = Math.max(v.actT, 0.5);
+      if (!v.bubble && Math.random() < dt * 0.5) say(v, 'z z z', 1.2, false);
       return;
     }
     v.actT -= dt;
@@ -3375,6 +3393,10 @@
     { id: 'bed', tier: 'Easy', text: 'Hide under a bed' },
     { id: 'wardrobe', tier: 'Easy', text: 'Hide in a wardrobe' },
     { id: 'chicken', tier: 'Easy', text: 'Chase a chicken' },
+    { id: 'baa', tier: 'Easy', text: 'Make the sheep baa', req: ['farm'] },
+    { id: 'moo', tier: 'Easy', text: 'Get a moo out of the cow', req: ['farm'] },
+    { id: 'headbutt', tier: 'Easy', text: 'Get headbutted by the goat', hint: 'chitter at it', req: ['farm'] },
+    { id: 'hedgehog', tier: 'Easy', text: 'Make a hedgehog curl up', hint: 'after dusk' },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3401,6 +3423,11 @@
     { id: 'fetch', tier: 'Medium', text: 'Get Biscuit to fetch something you threw' },
     { id: 'outrun', tier: 'Medium', text: 'Outrun Biscuit' },
     { id: 'smash', tier: 'Medium', text: 'Smash something fragile' },
+    { id: 'goat', tier: 'Medium', text: "Feed the goat something that isn't food", hint: 'drop it near the goat', req: ['farm'] },
+    { id: 'owl', tier: 'Medium', text: 'Chitter back at the owl', hint: 'after dusk' },
+    { id: 'fireflies', tier: 'Medium', text: 'Catch 3 fireflies', goal: 3, hint: 'after dusk' },
+    { id: 'gold', tier: 'Medium', text: 'Find the pot of gold at the end of the rainbow', hint: 'after the rain clears', req: ['rainbow'] },
+    { id: 'dozing', tier: 'Medium', text: "Steal from someone who's dozing in the heat", req: ['heatwave'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3431,6 +3458,7 @@
     { id: 'snatchback', tier: 'Hard', text: 'Steal something back from a villager' },
     { id: 'gnomes', tier: 'Hard', text: 'Stash both garden gnomes' },
     { id: 'bone', tier: 'Hard', text: "Stash Biscuit's bone in your hideout" },
+    { id: 'herd', tier: 'Hard', text: 'Herd a sheep out of its field', hint: 'chase it out the gate', req: ['farm'] },
     { id: 'hens', tier: 'Hard', text: 'Get every hen squawking at once' },
     { id: 'eggs3', tier: 'Hard', text: 'Find 3 painted eggs', goal: 3, req: ['spring'] },
     { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
@@ -3499,7 +3527,10 @@
       if (r === 'ducks' && L.kind === 'seaside') return false;
       if (r === 'sparrows' && ['rain', 'storm', 'snowstorm'].includes(L.weather)) return false;
       if (r === 'frogs' && !(L.kind !== 'seaside' && hasOpenWater() && (wet() || L.season === 'spring'))) return false;
-      if (r === 'puddles' && !(wet() && !isWinter())) return false;
+      if (r === 'puddles' && !(planHas(['rain', 'storm']) && !isWinter())) return false;
+      if (r === 'farm' && !L.paddock) return false;
+      if (r === 'rainbow' && !rainbowPossible()) return false;
+      if (r === 'heatwave' && !planHas(['heatwave'])) return false;
     }
     return true;
   }
@@ -3548,7 +3579,7 @@
       setTimeout(() => endRun('win'), 1600);
     } else if (!task.final && regularTasksDone()) {
       const fin = run.tasks.find((t) => t.final);
-      setTimeout(() => { sfx('fanfare'); toast(fin.text, 'Finale unlocked!'); renderTodo(); }, 1600);
+      setTimeout(() => { sfx('fanfare'); toast(fin.text, 'Finale unlocked!', true); renderTodo(); }, 1600);
     }
   }
   function setProgress(id, n) {
@@ -3586,10 +3617,10 @@
     const left = run.maxStrikes - run.strikes;
     if (left <= 0) {
       run.over = true;
-      toast('No strikes left', 'Caught!');
+      toast('No strikes left', 'Caught!', true);
       setTimeout(() => endRun('caught'), 1200);
     } else {
-      toast(`${left} strike${left === 1 ? '' : 's'} left`, 'Caught!');
+      toast(`${left} strike${left === 1 ? '' : 's'} left`, 'Caught!', true);
     }
   }
 
@@ -3662,7 +3693,9 @@
     document.getElementById('rc-day').textContent = `Day ${run.day}`;
     document.getElementById('rc-town').textContent = L.name;
     document.getElementById('rc-season').textContent = `${cap(L.season)}${L.weather !== 'clear' ? ', ' + WEATHER_LABEL[L.weather].toLowerCase() : ''} \u00b7 ${L.kind === 'seaside' ? 'Seaside' : L.kind === 'river' ? 'Riverside' : 'Pond'} village`;
-    document.getElementById('rc-tip').textContent = [WEATHER_TIP[L.weather], SEASON_TIP[L.season], KIND_TIP[L.kind]].filter(Boolean).join(' ');
+    const later = (L.weatherPlan || []).slice(1).find((s) => s.w !== L.weather);
+    const forecast = later ? `Forecast: ${later.w === 'clear' ? 'clearing up' : WEATHER_LABEL[later.w].toLowerCase()} later.` : '';
+    document.getElementById('rc-tip').textContent = [WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season], KIND_TIP[L.kind]].filter(Boolean).join(' ');
     const m = Math.floor(run.timeTotal / 60), s = run.timeTotal % 60;
     document.getElementById('rc-tasks').textContent = `${run.tasks.length} tasks`;
     document.getElementById('rc-time').textContent = `${m}:${String(s).padStart(2, '0')} until sunset`;
@@ -3800,7 +3833,9 @@
     }
     todoCount.textContent = `${run.done.size}/${run.tasks.length}`;
   }
-  function toast(text, label) {
+  // A pop-up at the top. Finished tasks are struck through; news (`plain`) isn't.
+  function toast(text, label, plain = false) {
+    toastEl.classList.toggle('plain', plain);
     toastEl.innerHTML = '';
     const l = document.createElement('span'); l.className = 'label'; l.textContent = label;
     const tx = document.createElement('span'); tx.className = 'what'; tx.textContent = text;
@@ -4555,7 +4590,7 @@
     setProgress('eat5', run.eaten);
     if (it.kind === 'pie') completeTask('eatpie');
     if (it.kind === 'lemonade') completeTask('lemonade');
-    if (f.sweet) { player.sugar = 12; completeTask('sugar'); toast('Sugar rush!', 'Zoom zoom'); }
+    if (f.sweet) { player.sugar = 12; completeTask('sugar'); toast('Sugar rush!', 'Zoom zoom', true); }
     // Did the owner watch you finish it?
     const owner = it.owner && VILLAGER[it.owner];
     if (owner && canSee(owner, player.x, player.y - 6) && Math.hypot(owner.x - player.x, owner.y - player.y) < run.vision) {
@@ -5183,18 +5218,20 @@
   // Each village rolls a weather that suits its season. It changes what villagers can
   // see and hear, brings puddles, lightning, fog, wind, and decides which animals are out.
   const WEATHER_TABLE = {
-    spring: [['clear', 40], ['rain', 35], ['storm', 10], ['windy', 15]],
-    summer: [['clear', 55], ['rain', 15], ['storm', 20], ['windy', 10]],
-    autumn: [['clear', 25], ['rain', 25], ['fog', 25], ['windy', 20], ['storm', 5]],
+    spring: [['clear', 40], ['rain', 35], ['storm', 10], ['windy', 15], ['hail', 6]],
+    summer: [['clear', 50], ['rain', 15], ['storm', 18], ['windy', 8], ['heatwave', 20]],
+    autumn: [['clear', 25], ['rain', 25], ['fog', 25], ['windy', 20], ['storm', 5], ['hail', 6]],
     winter: [['clear', 40], ['snowstorm', 30], ['fog', 30]],
   };
-  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', windy: 'Windy', snowstorm: 'Snowstorm' };
+  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', windy: 'Windy', snowstorm: 'Snowstorm', hail: 'Hail', heatwave: 'Heatwave' };
   const WEATHER_TIP = {
     rain: 'It’s raining: villagers huddle under umbrellas and can’t see or hear as well. Splash in the puddles.',
     storm: 'Thunderstorm! Every thunderclap makes the villagers jump.',
     fog: 'Thick fog: villagers can barely see past their noses. Perfect sneaking weather.',
     windy: 'Windy: thrown things get blown off course.',
     snowstorm: 'Snowstorm: you can hardly see a thing, and neither can they.',
+    hail: 'Hail! The villagers are running for cover.',
+    heatwave: 'Heatwave: the villagers are slow and sleepy, and some will doze off.',
     clear: '',
   };
   function pickWeather(season) {
@@ -5206,8 +5243,8 @@
   const wet = () => !!L && (L.weather === 'rain' || L.weather === 'storm');
   const WIND = () => (L && L.weather === 'windy' ? 70 : L && L.weather === 'snowstorm' ? 40 : 0);
   // How far villagers can see / hear in this weather
-  const visionMul = () => ({ rain: 0.82, storm: 0.75, fog: 0.55, snowstorm: 0.62 }[L && L.weather] || 1);
-  const hearingMul = () => ({ rain: 0.75, storm: 0.7, snowstorm: 0.75 }[L && L.weather] || 1);
+  const visionMul = () => ({ rain: 0.82, storm: 0.75, fog: 0.55, snowstorm: 0.62, hail: 0.85 }[L && L.weather] || 1);
+  const hearingMul = () => ({ rain: 0.75, storm: 0.7, snowstorm: 0.75, hail: 0.65 }[L && L.weather] || 1);
 
   const weather = [];
   const fx = { flash: 0, nextBolt: 8, thunderAt: -1, ambience: null };
@@ -5216,6 +5253,7 @@
     const W = L.weather, S = L.season;
     let n = { winter: 150, autumn: 34, spring: 44 }[S] || 0;
     if (W === 'rain') n = 230; else if (W === 'storm') n = 300; else if (W === 'snowstorm') n = 380; else if (W === 'windy') n = Math.max(n, 70);
+    else if (W === 'hail') n = 200; else if (W === 'heatwave') n = 0;
     for (let i = 0; i < n; i++) weather.push({ x: Math.random(), y: Math.random(), s: Math.random(), ph: Math.random() * 6, col: pick(['#c0392b', '#e07b2a', '#f0a040', '#d9a43a']) });
     fx.flash = 0; fx.nextBolt = rr(6, 12); fx.thunderAt = -1;
     startAmbience();
@@ -5226,6 +5264,13 @@
     const wind = W === 'windy' ? 0.25 : W === 'snowstorm' ? 0.12 : W === 'storm' ? 0.06 : 0;
     ctx.lineCap = 'round';
     for (const w of weather) {
+      if (W === 'hail') { // hailstones pelting down, bouncing
+        w.y += (1.4 + w.s * 0.5) * dt; w.x += 0.03 * dt;
+        if (w.y > 1.05) { w.y = -0.05; w.x = Math.random(); }
+        const hx = left + w.x * viewW, hy = top + w.y * viewH;
+        ctx.fillStyle = 'rgba(245,250,255,0.9)'; circle(ctx, hx, hy, 1.1 + w.s * 0.9);
+        continue;
+      }
       if (rainy) { w.y += (0.9 + w.s * 0.5) * dt; w.x += (0.08 + wind) * dt; }
       else if (S === 'winter') { w.y += (0.05 + w.s * 0.05) * (W === 'snowstorm' ? 2.6 : 1) * dt; w.x += (Math.sin(t * 0.8 + w.ph) * 0.004 + wind) * dt; }
       else { w.y += (0.03 + w.s * 0.03) * dt; w.x += (Math.sin(t * 0.6 + w.ph) * 0.02 + 0.01 + wind) * dt; }
@@ -5245,6 +5290,7 @@
   function drawSeasonTint(ctx, left, top, viewW, viewH) {
     const W = L && L.weather;
     const tint = W === 'storm' ? 'rgb(168,176,198)' : W === 'rain' ? 'rgb(200,208,222)' : W === 'snowstorm' ? 'rgb(222,230,246)'
+      : W === 'hail' ? 'rgb(208,214,228)' : W === 'heatwave' ? 'rgb(255,232,200)'
       : { winter: 'rgb(226,234,252)', autumn: 'rgb(255,238,214)', spring: 'rgb(255,250,248)' }[L && L.season];
     if (tint) {
       ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = tint;
@@ -5289,6 +5335,7 @@
   }
   function updateWeatherFx(dt) {
     if (!L) return;
+    updateWeatherPlan();
     fx.flash = Math.max(0, fx.flash - dt * 2.2);
     // Puddle splashes
     if (L.puddles && areaOf(player.x, player.y) === 0) for (const p of L.puddles) {
@@ -5325,17 +5372,17 @@
   function startAmbience() {
     try { if (fx.ambience) { fx.ambience.src.stop(); fx.ambience = null; } } catch (_) { fx.ambience = null; }
     const W = L && L.weather;
-    if (!actx || !(W === 'rain' || W === 'storm' || W === 'windy' || W === 'snowstorm')) return;
+    if (!actx || !(W === 'rain' || W === 'storm' || W === 'windy' || W === 'snowstorm' || W === 'hail')) return;
     const n = actx.sampleRate * 2, buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     const src = actx.createBufferSource(); src.buffer = buf; src.loop = true;
-    const f = actx.createBiquadFilter(); f.type = W === 'windy' || W === 'snowstorm' ? 'bandpass' : 'lowpass'; f.frequency.value = W === 'windy' || W === 'snowstorm' ? 500 : 2500;
+    const f = actx.createBiquadFilter(); f.type = W === 'windy' || W === 'snowstorm' || W === 'hail' ? 'bandpass' : 'lowpass'; f.frequency.value = W === 'hail' ? 2200 : W === 'windy' || W === 'snowstorm' ? 500 : 2500;
     const g = actx.createGain(); g.gain.value = 0;
     src.connect(f).connect(g).connect(master); src.start();
     fx.ambience = { src, g, level: W === 'storm' ? 0.07 : W === 'rain' ? 0.05 : 0.04 };
   }
   function updateAmbienceLevel() {
-    if (!fx.ambience) { if (actx && actx.state === 'running' && L && ['rain', 'storm', 'windy', 'snowstorm'].includes(L.weather)) startAmbience(); return; }
+    if (!fx.ambience) { if (actx && actx.state === 'running' && L && ['rain', 'storm', 'windy', 'snowstorm', 'hail'].includes(L.weather)) startAmbience(); return; }
     const indoors = areaOf(player.x, player.y) > 0;
     const want = muted || paused ? 0 : fx.ambience.level * (indoors ? 0.35 : 1);
     fx.ambience.g.gain.value += (want - fx.ambience.g.gain.value) * 0.05;
@@ -5400,12 +5447,14 @@
         critters.push({ type: 'gull', x, y, z: 0, hx: x, hy: y, dir: 'left', walk: 0, ph: rand() * 6, flying: false, state: 'idle', cd: rr(2, 6), carry: null, tx: null, wait: rr(0, 3) });
       }
     }
+    spawnFarmNight();
   }
 
-  // Something scary happened near (x, y): birds and frogs bolt
+  // Something scary happened near (x, y): birds and frogs bolt (see also farmNightScare)
   function critterScare(x, y, r) {
     for (const c of critters) {
       if (Math.hypot(c.x - x, c.y - y) > r) continue;
+      if (FN_TYPES.has(c.type)) { farmNightScare(c, x, y, r); continue; }
       if (c.type === 'sparrow' && !c.flying) startFlock(c, x, y);
       if (c.type === 'gull' && c.state !== 'flee') { gullDrop(c); c.state = 'flee'; c.flying = true; c.fleeT = 3; c.fa = Math.atan2(c.y - y, c.x - x); c.cd = 8; if (r < 9999) completeTask('gullscare'); }
       if (c.type === 'duck') {
@@ -5436,6 +5485,7 @@
   }
 
   function updateCritters(dt) {
+    if (critters.some((c) => c.caught || (c.gone === true && c.z > 220))) critters = critters.filter((c) => !c.caught && !(c.gone === true && c.z > 220));
     const outside = areaOf(player.x, player.y) === 0;
     const pdist = (c) => Math.hypot(player.x - c.x, player.y - c.y);
     for (const c of critters) {
@@ -5443,6 +5493,7 @@
       c.ph += dt;
       if (c.bubble) { c.bubble.t -= dt; if (c.bubble.t <= 0) c.bubble = null; }
       const near = outside && started && pdist(c) < 70 && player.speed > 25 && !player.hidden;
+      if (FN_TYPES.has(c.type)) { updateFarmNight(c, dt, near); continue; }
 
       if (c.type === 'duck') {
         c.panic = Math.max(0, c.panic - dt);
@@ -5586,6 +5637,7 @@
   function heldPosGull(c) { return { x: c.x + (c.dir === 'right' ? 7 : -7), y: c.y + 0.5, z: c.z + 2 }; }
 
   function drawCritter(ctx, c, t) {
+    if (FN_TYPES.has(c.type)) { drawFarmNight(ctx, c, t); return; }
     if (c.type === 'frog' && c.gone > 0) return;
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -5713,6 +5765,363 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Dusk, changing weather, rainbows, hail, heatwaves; the farm; night animals
+  // ---------------------------------------------------------------------------
+  let duskK = 0; // 0 in daylight, 1 at sunset
+  function updateDusk() {
+    const p = run.timeTotal > 0 ? 1 - run.timeLeft / run.timeTotal : 0;
+    duskK = started ? clamp((p - 0.55) / 0.45, 0, 1) : 0;
+  }
+
+  // Weather can change partway through a day
+  function planWeather(season, first) {
+    const plan = [{ at: 0, w: first }];
+    if (first === 'hail') { plan.push({ at: 0.1, w: 'clear' }); return plan; }
+    if (rand() < 0.45) {
+      const at = 0.3 + rand() * 0.3;
+      let next;
+      if (first === 'rain' || first === 'storm' || first === 'fog') next = 'clear'; // clears up / the fog lifts
+      else if (season === 'winter') next = pick(['snowstorm', 'fog']);
+      else if (season === 'summer') next = pick(['storm', 'rain', first === 'heatwave' ? 'storm' : 'heatwave']);
+      else next = pick(['rain', 'hail', 'storm']);
+      if (next !== first) {
+        plan.push({ at, w: next });
+        if (next === 'hail') plan.push({ at: at + 0.07, w: first });
+        else if (next === 'rain' || next === 'storm') plan.push({ at: Math.min(0.92, at + 0.2 + rand() * 0.15), w: 'clear' });
+      }
+    }
+    return plan;
+  }
+  const planHas = (names) => !!L && (L.weatherPlan || []).some((s) => names.includes(s.w));
+  const rainbowPossible = () => !!L && (L.weatherPlan || []).some((s, i, a) => i > 0 && s.w === 'clear' && ['rain', 'storm'].includes(a[i - 1].w));
+
+  const WEATHER_NEWS = {
+    rain: 'It’s starting to rain', storm: 'A storm is rolling in', hail: 'Hail! Everyone’s running for cover',
+    heatwave: 'Phew, a heatwave', snowstorm: 'A snowstorm is blowing in', fog: 'Fog is rolling in', windy: 'The wind is picking up',
+  };
+  function setWeather(w) {
+    const was = L.weather;
+    if (was === w) return;
+    L.weather = w;
+    spawnWeather();
+    if (wet() && !isWinter() && !(L.puddles && L.puddles.length)) placePuddles();
+    if ((was === 'rain' || was === 'storm') && !wet()) startRainbow();
+    for (const v of villagers) v.shelter = w === 'hail';
+    toast(w === 'clear' ? (was === 'fog' ? 'The fog has lifted' : 'The sky is clearing') : WEATHER_NEWS[w] || WEATHER_LABEL[w], 'Weather', true);
+    updateRunBar();
+  }
+  function updateWeatherPlan() {
+    if (!started || paused || run.over || !L.weatherPlan) return;
+    const prog = 1 - run.timeLeft / run.timeTotal;
+    while (L.planIdx < L.weatherPlan.length && prog >= L.weatherPlan[L.planIdx].at) setWeather(L.weatherPlan[L.planIdx++].w);
+  }
+
+  // Rainbow, with a pot of gold where it ends
+  function startRainbow() {
+    const base = areaOf(player.x, player.y) === 0 ? player : { x: (L.plaza.x + 6) * TILE, y: (L.plaza.y + 6) * TILE };
+    for (let n = 0; n < 80; n++) {
+      const a = Math.random() * Math.PI * 2, d = (6 + Math.random() * 8) * TILE;
+      const x = base.x + Math.cos(a) * d, y = base.y + Math.sin(a) * d * 0.7;
+      if (x < 5 * TILE || x > WORLD_W - 5 * TILE || y < 5 * TILE || y > WORLD_H - 5 * TILE) continue;
+      if (tileAt(x, y) !== GRASS || navBlockedPt(x, y)) continue;
+      L.rainbow = { x, y, t: 45 };
+      addItem('goldpot', x, y);
+      setTimeout(() => toast('Find the pot of gold at its end!', 'A rainbow!', true), 2700);
+      return;
+    }
+  }
+  function drawRainbow(ctx, dt) {
+    const rb = L.rainbow;
+    if (!rb || rb.t <= 0) return;
+    if (!paused) rb.t -= dt;
+    const a = Math.min(1, rb.t / 6, (45 - rb.t) / 2) * 0.4;
+    const R = 520, cx = rb.x - R, cy = rb.y;
+    ['#e8453c', '#f2913a', '#f2c14e', '#8fd16a', '#4f93c7', '#5a5ad0', '#9a5ad0'].forEach((col, i) => {
+      ctx.strokeStyle = col; ctx.globalAlpha = a; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.arc(cx, cy, R - i * 7, Math.PI, Math.PI * 2); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+    if (!paused && Math.random() < dt * 6 && items.some((it) => it.kind === 'goldpot' && !it.held)) particles.push({ kind: 'spark', x: rb.x + rr(-10, 10), y: rb.y, z: rr(4, 20), vx: 0, vy: 0, vz: 30, life: 0.6, max: 0.6 });
+  }
+  ITEM.goldpot = { name: 'pot of gold', h: 13, r: 7, draw(c) {
+    c.fillStyle = '#2b2d33'; ellipse(c, 0, -5, 7, 5); c.fillRect(-7, -6, 14, 3);
+    c.fillStyle = '#f2c14e'; for (const [x, y] of [[-3, -10], [0, -11], [3, -10], [-1.5, -12.5], [1.5, -12.5]]) circle(c, x, y, 2.2);
+    c.fillStyle = '#fff3a8'; circle(c, -0.5, -12, 0.8);
+  } };
+
+  // --- The farm: a fenced sheep field with a cow, and a goat on the loose ---------------
+  function buildPaddock() {
+    const qs = shuffled([L.gardenQ, ...L.homeQs, L.pondQ]);
+    for (const [w, h] of [[12, 9], [10, 8], [9, 7]]) for (const q of qs) {
+      const r = fitRect(q, w + 2, h + 2, 50);
+      if (!r) continue;
+      const px = r.x + 1, py = r.y + 1;
+      const gateBottom = py + h / 2 < L.plaza.y + 6;
+      const gy = gateBottom ? py + h - 1 : py, gx = px + Math.floor(w / 2) - 1;
+      for (let x = px; x < px + w; x++) {
+        if (!(gy === py && (x === gx || x === gx + 1))) objects.push(makeFence(x, py, 'h'));
+        if (!(gy === py + h - 1 && (x === gx || x === gx + 1))) objects.push(makeFence(x, py + h - 1, 'h'));
+      }
+      for (let y = py + 1; y < py + h - 1; y++) { objects.push(makeFence(px, y, 'v')); objects.push(makeFence(px + w - 1, y, 'v')); }
+      objects.push(makeTrough((px + w - 2.5) * TILE, (py + 2.6) * TILE));
+      reserve(r.x, r.y, w + 2, h + 2);
+      L.paddock = { x: px, y: py, w, h, gx, gy, gateBottom };
+      return;
+    }
+  }
+  function makeTrough(x, y) {
+    return {
+      kind: 'trough', x, y, hitbox: box(x - 16, y - 8, 32, 9), bounds: { l: x - 22, r: x + 22, t: y - 22, b: y + 6 },
+      draw(ctx) {
+        ctx.fillStyle = '#7a5230'; roundRect(ctx, x - 17, y - 14, 34, 14, 3, true);
+        ctx.fillStyle = '#4f93c7'; ctx.fillRect(x - 14, y - 13, 28, 4);
+        ctx.fillStyle = '#e6c56a'; ellipse(ctx, x - 26, y - 4, 9, 6); // a hay bale
+        ctx.strokeStyle = '#c9a33a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 32, y - 6); ctx.lineTo(x - 20, y - 6); ctx.stroke();
+      },
+    };
+  }
+  const inPaddock = (c) => { const P = L.paddock; return P && c.x > P.x * TILE && c.x < (P.x + P.w) * TILE && c.y > P.y * TILE && c.y < (P.y + P.h) * TILE; };
+  const FN_TYPES = new Set(['sheep', 'cow', 'goat', 'hedgehog', 'owl', 'firefly']);
+
+  function spawnFarmNight() {
+    const T = TILE, P = L.paddock;
+    if (P) {
+      const ix = () => (P.x + 1.5 + rand() * (P.w - 3)) * T, iy = () => (P.y + 1.8 + rand() * (P.h - 3.2)) * T;
+      for (let k = 0; k < 5; k++) critters.push({ type: 'sheep', x: ix(), y: iy(), z: 0, dir: 'left', walk: 0, ph: rand() * 6, panic: 0, tx: null, wait: rr(0, 3) });
+      critters.push({ type: 'cow', x: ix(), y: iy(), z: 0, dir: 'right', walk: 0, ph: rand() * 6, tx: null, wait: rr(1, 4), mooT: rr(6, 12) });
+      const gx = (P.gx + 1) * T, gyy = (P.gateBottom ? P.y + P.h + 1.5 : P.y - 1.5) * T;
+      critters.push({ type: 'goat', x: gx + rr(-30, 30), y: gyy, z: 0, hx: gx, hy: gyy, dir: 'left', walk: 0, ph: rand() * 6, tx: null, wait: rr(1, 3), charge: 0, cd: 0, food: null });
+    }
+    // Night creatures (they come out as dusk falls)
+    const bushes = objects.filter((o) => (o.kind === 'bush' || o.kind === 'hidebush') && o.x > 5 * T && o.x < WORLD_W - 5 * T && o.y > 5 * T && o.y < WORLD_H - 5 * T);
+    for (let k = 0; k < 2 && bushes.length; k++) { const b = bushes[Math.floor(rand() * bushes.length)]; critters.push({ type: 'hedgehog', x: b.x + rr(-20, 20), y: b.y + 14, z: 0, hx: b.x, hy: b.y + 14, dir: 'left', walk: 0, ph: rand() * 6, curl: 0, tx: null, wait: rr(0, 3) }); }
+    const tall = (L.squirrelTrees || []).filter((tr) => tr.canopy);
+    if (tall.length) { const tr = tall[Math.floor(rand() * tall.length)]; critters.push({ type: 'owl', x: tr.x, y: tr.y + 1, z: tr.y - tr.canopy.cy + tr.canopy.r * 0.6, flying: true, dir: 'left', walk: 0, ph: rand() * 6, cd: 0, hootT: rr(4, 9), gone: false }); }
+    if (!isWinter()) for (let k = 0; k < 16; k++) {
+      const a = rand() * Math.PI * 2, d = rr(2, 10) * T;
+      const x = clamp((L.pond.cx * T) + Math.cos(a) * d * 1.6, 5 * T, WORLD_W - 5 * T), y = clamp((L.pond.cy * T) + Math.sin(a) * d - (L.kind === 'seaside' ? 8 * T : 0), 5 * T, WORLD_H - 5 * T);
+      critters.push({ type: 'firefly', x, y, z: rr(8, 24), hx: x, hy: y, flying: true, dir: 'left', walk: 0, ph: rand() * 6 });
+    }
+  }
+
+  function updateFarmNight(c, dt, near) {
+    const pd = Math.hypot(player.x - c.x, player.y - c.y);
+    const outside = areaOf(player.x, player.y) === 0;
+    switch (c.type) {
+      case 'sheep': {
+        c.panic = Math.max(0, c.panic - dt);
+        if (near && c.panic < 0.6) {
+          c.panic = 1.4; c.fa = Math.atan2(c.y - player.y, c.x - player.x) + rr(-0.4, 0.4);
+          c.bubble = { text: rpick(['Baa!', 'Baaa!', 'BAA!']), t: 1 }; if (pd < 300) sfx('baa');
+          completeTask('baa');
+        }
+        if (c.panic > 0) critterMove(c, c.x + Math.cos(c.fa) * 30, c.y + Math.sin(c.fa) * 30, 115, dt);
+        else {
+          c.wait -= dt;
+          if (c.wait <= 0) { c.tx = c.x + rr(-50, 50); c.ty = c.y + rr(-35, 35); c.wait = rr(1.5, 4); }
+          if (c.tx && critterMove(c, c.tx, c.ty, 16, dt)) c.tx = null;
+        }
+        if (L.paddock && !inPaddock(c)) {
+          const P = L.paddock, mx = Math.max(P.x * TILE - c.x, c.x - (P.x + P.w) * TILE, P.y * TILE - c.y, c.y - (P.y + P.h) * TILE);
+          if (mx > TILE * 0.8) completeTask('herd');
+        }
+        break;
+      }
+      case 'cow': {
+        c.mooT -= dt;
+        if (c.mooT <= 0) { c.mooT = rr(8, 15); c.bubble = { text: 'Mooo', t: 1.2 }; if (pd < 320) sfx('moo'); }
+        if (pd < 22 && outside) { // a big warm wall of cow
+          const dx = player.x - c.x, dy = player.y - c.y, d = Math.hypot(dx, dy) || 1, push = 22 - d;
+          const nx = player.x + dx / d * push, ny = player.y + dy / d * push;
+          if (!collides(nx, player.y)) player.x = nx;
+          if (!collides(player.x, ny)) player.y = ny;
+          if (!c.bumped || c.bumped < time - 3) { c.bumped = time; c.bubble = { text: 'MOOO!', t: 1.2 }; sfx('moo'); completeTask('moo'); }
+        }
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.x + rr(-40, 40); c.ty = c.y + rr(-25, 25); c.wait = rr(3, 7); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 10, dt)) c.tx = null;
+        break;
+      }
+      case 'goat': {
+        c.cd = Math.max(0, c.cd - dt);
+        if (c.charge > 0) { // head down, charging straight at you
+          c.charge -= dt;
+          if (!outside || player.inWardrobe) { c.charge = 0; break; }
+          critterMove(c, player.x, player.y, 175, dt);
+          if (pd < 15) {
+            const dx = player.x - c.x, dy = player.y - c.y, d = Math.hypot(dx, dy) || 1;
+            player.vx = dx / d * 260; player.vy = dy / d * 260; player.stun = 0.35; player.hopV = 120; player.hop = 0.01;
+            c.bubble = { text: 'BLEHH!', t: 1.2 }; sfx('meh'); sfx('bonk');
+            c.charge = 0; c.cd = 6;
+            completeTask('headbutt');
+          }
+          break;
+        }
+        // The goat eats anything lying about
+        if (!c.food || !items.includes(c.food) || c.food.held || c.food.air) {
+          c.food = null;
+          for (const it of items) {
+            if (it.held || it.air || it.z > 2 || it.type.heavy || it.floating || it.planted || areaOf(it.x, it.y) !== 0 || it.kind === 'goldpot') continue;
+            if (c.ignored && c.ignored.has(it)) continue;
+            const d = Math.hypot(it.x - c.x, it.y - c.y);
+            if (d < 150 && (!c.food || d < Math.hypot(c.food.x - c.x, c.food.y - c.y))) c.food = it; // the nearest thing
+          }
+          if (c.food) { c.chew = 2; c.foodT = 6; }
+        }
+        if (c.food) {
+          if (Math.hypot(c.food.x - c.x, c.food.y - c.y) > 10) {
+            c.foodT -= dt; // only the walk over counts: can't reach it in time? forget it
+            if (c.foodT <= 0) { (c.ignored = c.ignored || new Set()).add(c.food); c.food = null; break; }
+            critterMove(c, c.food.x, c.food.y, 40, dt);
+          }
+          else {
+            c.chew -= dt; c.walk += dt * 14;
+            if (c.chew <= 0) {
+              const it = c.food, i2 = items.indexOf(it);
+              if (i2 >= 0) items.splice(i2, 1);
+              crumbs(it.x, it.y, 3, 6, '#c9b57e');
+              c.bubble = { text: rpick(['Mehh!', 'Nom nom. Meh.']), t: 1.2 }; if (pd < 300) sfx('meh');
+              if (it.touched && !isFood(it)) completeTask('goat');
+              const owner = it.owner && VILLAGER[it.owner];
+              if (owner && canSee(owner, c.x, c.y)) say(owner, `That goat ate my ${it.type.name}!`, 2);
+              c.food = null;
+            }
+          }
+          break;
+        }
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.hx + rr(-90, 90); c.ty = c.hy + rr(-60, 60); c.wait = rr(1, 4); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 24, dt)) c.tx = null;
+        break;
+      }
+      case 'hedgehog': {
+        if (duskK < 0.25) break;
+        if (c.curl > 0) { c.curl -= dt; break; }
+        if (outside && pd < 55 && player.speed > 20) { c.curl = 4; c.bubble = { text: '*huff*', t: 0.9 }; completeTask('hedgehog'); break; }
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.hx + rr(-50, 50); c.ty = c.hy + rr(-30, 30); c.wait = rr(1, 3); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 14, dt)) c.tx = null;
+        break;
+      }
+      case 'owl': {
+        if (duskK < 0.25) break;
+        if (c.gone) { c.z += 40 * dt; c.x += 90 * dt; c.walk += dt * 25; break; }
+        c.cd = Math.max(0, c.cd - dt);
+        c.hootT -= dt;
+        if (c.hootT <= 0) { c.hootT = rr(7, 12); c.bubble = { text: 'hoo... hoo...', t: 1.4 }; if (pd < 400) sfx('hoot'); }
+        // The owl sees everything, and tells everyone
+        if (outside && started && pd < 160 && player.speed > 25 && !player.hidden && c.cd <= 0) {
+          c.cd = 8; c.bubble = { text: 'HOO! HOO!', t: 1.4 }; sfx('hoot'); sfx('hoot');
+          c.dir = player.x > c.x ? 'right' : 'left';
+          lookTowards(player.x, player.y, 280, () => rpick(['What’s the owl on about?', 'Who’s out there?', 'Hm? An owl?']));
+        }
+        break;
+      }
+      case 'firefly': {
+        if (duskK < 0.2) break;
+        c.x = c.hx + Math.sin(c.ph * 0.7) * 26 + Math.sin(c.ph * 1.9) * 8;
+        c.y = c.hy + Math.cos(c.ph * 0.5) * 18;
+        c.z = 14 + Math.sin(c.ph * 1.3) * 8;
+        if (outside && pd < 11) { // caught!
+          c.caught = true; sparkle(c.x, c.y, c.z); sfx('pick');
+          run.fireflies = (run.fireflies || 0) + 1; setProgress('fireflies', run.fireflies);
+        }
+        break;
+      }
+    }
+  }
+  // Chitter reactions for the farm and night animals
+  function farmNightScare(c, x, y, r) {
+    if (c.type === 'sheep') { c.panic = 1.4; c.fa = Math.atan2(c.y - y, c.x - x); c.bubble = { text: 'Baa!', t: 1 }; if (r < 9999) { sfx('baa'); completeTask('baa'); } }
+    if (c.type === 'cow' && r < 9999) { c.bubble = { text: 'MOOO!', t: 1.2 }; sfx('moo'); completeTask('moo'); }
+    if (c.type === 'goat' && r < 9999 && c.cd <= 0 && Math.hypot(c.x - x, c.y - y) < 110) { c.charge = 2.5; c.bubble = { text: 'Meh?!', t: 0.8 }; sfx('meh'); }
+    if (c.type === 'hedgehog') c.curl = 4;
+    if (c.type === 'owl' && duskK >= 0.25 && !c.gone && r < 9999 && Math.hypot(c.x - x, c.y - y) < 150) { c.gone = true; c.bubble = { text: 'HOO?!', t: 1 }; sfx('flutter'); completeTask('owl'); }
+  }
+
+  function drawFarmNight(ctx, c, t) {
+    const night = c.type === 'hedgehog' || c.type === 'owl' || c.type === 'firefly';
+    if (night && duskK < (c.type === 'firefly' ? 0.2 : 0.25)) return;
+    if (c.caught) return;
+    ctx.save();
+    if (night) ctx.globalAlpha = Math.min(1, (duskK - 0.2) * 4);
+    ctx.translate(c.x, c.y);
+    if (c.type === 'firefly') {
+      const glow = 0.5 + Math.sin(c.ph * 6) * 0.5;
+      ctx.translate(0, -c.z);
+      ctx.fillStyle = `rgba(255,240,120,${0.18 * glow})`; circle(ctx, 0, 0, 7);
+      ctx.fillStyle = `rgba(255,250,170,${0.6 + glow * 0.4})`; circle(ctx, 0, 0, 1.6);
+      ctx.restore(); return;
+    }
+    if (c.type !== 'owl') { ctx.fillStyle = 'rgba(20,30,10,0.22)'; ellipse(ctx, 0, 0, c.type === 'cow' ? 14 : c.type === 'hedgehog' ? 5 : 9, c.type === 'cow' ? 4 : 2.5); }
+    ctx.translate(0, -(c.z || 0));
+    if (c.dir === 'left') ctx.scale(-1, 1);
+    const step = c.moving ? Math.sin(c.walk * 2) * 2 : 0;
+    const graze = !c.moving && Math.sin(c.ph * 0.8) > 0.3 ? 3 : 0;
+    switch (c.type) {
+      case 'sheep': {
+        ctx.fillStyle = '#2b2d33';
+        ctx.fillRect(-5 + step * 0.5, -4, 1.6, 4); ctx.fillRect(4 - step * 0.5, -4, 1.6, 4);
+        ctx.fillStyle = '#f4f2ee';
+        for (const [bx, by, br] of [[-4, -8, 4.5], [0, -10, 5], [4, -8, 4.5], [-1, -6, 4.5], [3, -6, 4]]) circle(ctx, bx, by, br);
+        ctx.fillStyle = '#2b2d33'; ellipse(ctx, 8, -8 + graze, 2.8, 3.4);
+        ctx.fillStyle = '#ffffff'; circle(ctx, 9, -9 + graze, 0.6);
+        break;
+      }
+      case 'cow': {
+        ctx.fillStyle = '#2b2d33';
+        for (const lx of [-9, -5, 6, 10]) ctx.fillRect(lx + (lx < 0 ? step : -step) * 0.4, -7, 2.6, 7);
+        ctx.fillStyle = '#f4f2ee'; roundRect(ctx, -13, -19, 25, 13, 6, true);
+        ctx.fillStyle = '#2b2d33'; ellipse(ctx, -6, -15, 4, 3); ellipse(ctx, 4, -11, 3.5, 2.5); ellipse(ctx, 8, -17, 2.5, 2);
+        ctx.strokeStyle = '#2b2d33'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-13, -16); ctx.quadraticCurveTo(-17, -10, -15, -6 + Math.sin(c.ph * 2)); ctx.stroke();
+        ctx.fillStyle = '#f4f2ee'; roundRect(ctx, 10, -21 + graze, 9, 9, 3, true);
+        ctx.fillStyle = '#f2b8c6'; roundRect(ctx, 14, -16 + graze, 6, 4.5, 2, true);
+        ctx.fillStyle = '#2b2d33'; circle(ctx, 13.5, -18 + graze, 0.8);
+        ctx.fillStyle = '#d9c9a8'; poly(ctx, [[11, -21 + graze], [9, -25 + graze], [13, -21.5 + graze]]); ctx.fill();
+        break;
+      }
+      case 'goat': {
+        const head = c.charge > 0 ? 3 : graze;
+        ctx.fillStyle = '#6b4a2e';
+        ctx.fillRect(-5 + step * 0.5, -6, 1.8, 6); ctx.fillRect(4 - step * 0.5, -6, 1.8, 6);
+        ctx.fillStyle = '#d9c4a0'; roundRect(ctx, -7, -13, 14, 8, 4, true);
+        ctx.fillStyle = '#d9c4a0'; roundRect(ctx, 5, -17 + head, 6, 7, 3, true);
+        ctx.fillStyle = '#f4f2ee'; poly(ctx, [[8, -10 + head], [10, -10 + head], [9, -6 + head]]); ctx.fill(); // beard
+        ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(6.5, -17 + head); ctx.quadraticCurveTo(4, -21 + head, 2.5, -18 + head); ctx.stroke(); // horn
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 9, -15 + head, 0.7);
+        ctx.fillStyle = '#d9c4a0'; poly(ctx, [[-7, -12], [-10, -14], [-7, -10]]); ctx.fill();
+        break;
+      }
+      case 'hedgehog': {
+        if (c.curl > 0) { // a spiky ball
+          ctx.fillStyle = '#6b4a2e'; circle(ctx, 0, -4, 5);
+          ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 0.9;
+          for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 4, -4 + Math.sin(a) * 4); ctx.lineTo(Math.cos(a) * 7, -4 + Math.sin(a) * 7); ctx.stroke(); }
+        } else {
+          ctx.fillStyle = '#6b4a2e'; ellipse(ctx, -1, -3.5, 5.5, 3.5);
+          ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 0.8;
+          for (let k = 0; k < 7; k++) { ctx.beginPath(); ctx.moveTo(-5 + k * 1.5, -5); ctx.lineTo(-6 + k * 1.5, -8); ctx.stroke(); }
+          ctx.fillStyle = '#d9b38a'; ellipse(ctx, 4.2, -2.6, 2.6, 1.8);
+          ctx.fillStyle = '#1d1d22'; circle(ctx, 6.6, -2.6, 0.7); circle(ctx, 4.4, -3.4, 0.5);
+        }
+        break;
+      }
+      case 'owl': {
+        const flap = c.gone ? Math.sin(c.walk * 2) * 4 : 0;
+        ctx.fillStyle = '#8a6a4a'; ellipse(ctx, 0, -7, 5, 6.5);
+        if (c.gone) { poly(ctx, [[-3, -8], [-12, -12 - flap], [-3, -4]]); ctx.fill(); poly(ctx, [[3, -8], [12, -12 - flap], [3, -4]]); ctx.fill(); }
+        ctx.fillStyle = '#d9c4a0'; ellipse(ctx, 0, -5, 3.2, 4);
+        ctx.fillStyle = '#8a6a4a'; poly(ctx, [[-4.5, -12], [-3.5, -16], [-1.5, -12.5]]); ctx.fill(); poly(ctx, [[4.5, -12], [3.5, -16], [1.5, -12.5]]); ctx.fill();
+        ctx.fillStyle = '#f2c14e'; circle(ctx, -2, -11, 1.8); circle(ctx, 2, -11, 1.8);
+        ctx.fillStyle = '#1d1d22'; circle(ctx, -2, -11, 0.9); circle(ctx, 2, -11, 0.9);
+        ctx.fillStyle = '#e8a33a'; poly(ctx, [[-0.8, -9.6], [0.8, -9.6], [0, -8]]); ctx.fill();
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -5765,6 +6174,10 @@
       case 'hmph': tone(220, 150, 0.22, 'triangle', 0.08); break;
       case 'bark': tone(420, 250, 0.09, 'square', 0.08); tone(400, 230, 0.1, 'square', 0.07, 0.13); break;
       case 'rustle': noise(0.18, 0.09, 3000); break;
+      case 'baa': tone(420, 360, 0.25, 'sawtooth', 0.035); break;
+      case 'moo': tone(160, 120, 0.6, 'sawtooth', 0.05); break;
+      case 'meh': tone(520, 440, 0.2, 'square', 0.03); tone(480, 400, 0.12, 'square', 0.025, 0.2); break;
+      case 'hoot': tone(420, 380, 0.18, 'sine', 0.06); tone(400, 360, 0.25, 'sine', 0.06, 0.25); break;
       case 'quack': tone(560, 380, 0.09, 'sawtooth', 0.04); tone(540, 360, 0.09, 'sawtooth', 0.035, 0.12); break;
       case 'flutter': for (let k = 0; k < 5; k++) noise(0.04, 0.05, 3500); break;
       case 'ribbit': tone(260, 200, 0.07, 'square', 0.03); tone(300, 220, 0.07, 'square', 0.03, 0.09); break;
@@ -6064,6 +6477,7 @@
     }
 
     if (!indoors) { drawWeather(ctx, left, top, viewW, viewH, t, Math.min(0.05, t - (render.lastT || t))); drawSeasonTint(ctx, left, top, viewW, viewH); }
+    if (!indoors) drawRainbow(ctx, Math.min(0.05, t - (render.lastT || t)));
     render.lastT = t;
     drawDusk(ctx, left, top, viewW, viewH);
 
@@ -6142,6 +6556,7 @@
       updateDog(dt);
       updateCat(dt);
       updateHens(dt);
+      updateDusk();
       updateCritters(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
@@ -6229,7 +6644,7 @@
   }
 
   // Handy for poking at the game from the browser console
-  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get critters() { return critters; }, fx, online, dailySeed, get cat() { return cat; }, get hideBushes() { return hideBushes; } };
+  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get critters() { return critters; }, fx, setWeather, get duskK() { return duskK; }, online, dailySeed, get cat() { return cat; }, get hideBushes() { return hideBushes; } };
 
   const hot = window.claude?.hot;
   if (hot?.ready) hot.ready(() => boot()); else boot();
