@@ -90,14 +90,14 @@ const ITEMS=[
   {id:'gift',name:'Gift Box',r:0,price:18,sym:'✚',col:'#ff5a5a',mods:{freeReroll:1},extra:'One free reroll every shop',max:3},
   {id:'piggy',name:'Piggy Bank',r:1,price:28,sym:'●',col:'#ff9ad0',mods:{interest:10},extra:'Earn 10% interest on unspent materials after each wave (up to 30)',max:2},
   {id:'frost',name:'Frost Flake',r:1,price:32,sym:'✻',col:'#9fe8ff',mods:{freeze:10},extra:'Hits have a 10% chance to freeze aliens for 1s',max:3},
-  {id:'poison',name:'Poison Vial',r:1,price:32,sym:'▲',col:'#7dff4a',mods:{poison:4},extra:'Hits poison aliens for 4 damage per second',max:3},
+  {id:'poison',name:'Poison Vial',r:1,price:32,sym:'▲',col:'#7dff4a',mods:{poison:4},extra:'Hits poison aliens for 4 damage per second, stacking up to 3 times',max:3},
   {id:'cat',name:'Lucky Cat',r:1,price:26,sym:'✤',col:'#ffcc4d',mods:{luck:15,lootMul:100},extra:'Healing fruit drops twice as often',max:2},
   {id:'rage',name:'Rage Soda',r:1,price:30,sym:'ϟ',col:'#ff5d3d',mods:{rage:30},extra:'+30% attack speed for 4s after you get hit'},
   {id:'panic',name:'Panic Button',r:1,price:28,sym:'✹',col:'#ff8a3d',mods:{panic:30,armor:1},extra:'Explode for 30 damage when you get hit'},
   {id:'rod',name:'Storm Lantern',r:2,price:58,sym:'ϟ',col:'#6fe3ff',mods:{strike:1},extra:'Lightning strikes a random alien every 2.5s'},
   {id:'fshield',name:'Force Shield',r:2,price:60,sym:'◈',col:'#6fe3ff',mods:{shield:1},extra:'Blocks one hit, then recharges for 8s',max:2},
-  {id:'urn',name:'Treasure Urn',r:2,price:52,sym:'♦',col:'#ffcc4d',mods:{matChance:15,harvest:4},extra:'15% chance kills drop an extra material'},
-  {id:'missile',name:'Missile Pod',r:3,price:95,sym:'➶',col:'#7bd35a',mods:{missile:1},extra:'Every 6 kills, fire a homing missile (fewer with more pods)',max:3},
+  {id:'urn',name:'Treasure Urn',r:2,price:52,sym:'♦',col:'#ffcc4d',mods:{matChance:25,harvest:6},extra:'25% chance kills drop an extra material'},
+  {id:'missile',name:'Missile Pod',r:3,price:95,sym:'➶',col:'#7bd35a',mods:{missile:1},extra:'Every 7 kills, fire a homing missile (sooner with more pods)',max:3},
   {id:'chrono',name:'Chrono Crystal',r:3,price:90,sym:'✦',col:'#6fa8ff',mods:{slow:15,atkSpd:5},extra:'All aliens move 15% slower',max:2},
 ];
 const ITEM_BY=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
@@ -451,8 +451,8 @@ function hurtEnemy(e,d,crit,ang,knock,bonk,noProc){
   sfx(bonk?'bonk':crit?'crit':'hit');
   if(S.lifesteal>0&&run.lsCd<=0&&Math.random()*100<S.lifesteal){heal(1);run.lsCd=.12}
   if(!noProc&&e.hp>0){
-    if(S.freeze&&Math.random()*100<S.freeze){if(!(e.frz>0))parts.push({x:e.x,y:e.y,vx:0,vy:0,t:0,life:.3,img:'fx_glint',col:'#bff4ff',s0:20,s1:50,add:1});e.frz=e.def.isBoss?.3:1}
-    if(S.poison){e.psn=3;e.psnD=S.poison*(1+S.dmg/100)}
+    if(S.freeze&&Math.random()*100<S.freeze){if(!(e.frz>0))parts.push({x:e.x,y:e.y,vx:0,vy:0,t:0,life:.3,img:'fx_glint',col:'#bff4ff',s0:20,s1:50,add:1});e.frz=e.def.isBoss?.5:1}
+    if(S.poison){e.psnS=e.psn>0?Math.min(3,(e.psnS||1)+1):1;e.psn=3;e.psnD=S.poison*(1+S.dmg/100)*e.psnS}
   }
   if(e.hp<=0)killEnemy(e,true);
 }
@@ -476,7 +476,7 @@ function killEnemy(e,drops){
     fx.push({k:'ring',x:P.x,y:P.y,r0:10,r1:140,t:0,life:.4,c:'#5ef2b0',w:5}); sfx('combo');
   }
   let m=e.mats; if(e.def.mc&&Math.random()<e.def.mc)m++; if(S.matChance&&Math.random()*100<S.matChance)m++;
-  if(S.missile){run.mk=(run.mk||0)+1;if(run.mk>=Math.max(2,7-S.missile)){run.mk=0;fireMissile()}} if(m&&Math.random()<S.luck/200)m++;
+  if(S.missile){run.mk=(run.mk||0)+1;if(run.mk>=Math.max(3,8-S.missile)){run.mk=0;fireMissile()}} if(m&&Math.random()<S.luck/200)m++;
   if(m>=8){const b5=Math.floor(m/5);for(let i=0;i<b5;i++)dropGem(e.x,e.y,5);m-=b5*5}
   for(let i=0;i<m;i++)dropGem(e.x,e.y,1);
   if(Math.random()<.025*(1+S.luck/100)*(1+S.lootMul/100))pickups.push({k:'fruit',x:e.x,y:e.y,t:0,vx:rand(-60,60),vy:rand(-60,60)});
