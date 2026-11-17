@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 11, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 12, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -430,7 +430,34 @@ const SKY_D = makeDungeon('sky', 'The Cloudspire Isles', 10, null, { outdoor: tr
   D.roost = { x: (X + 20) * T, y: 9 * T }; D.ruins = { x: (X + 19) * T, y: 35 * T };
   D.start = { x: (X + 20) * T, y: 4 * T + 8 };
 }
-const nearSkySite = (tx, ty, d) => Math.hypot(tx - SKY_D.roost.x / T, ty - SKY_D.roost.y / T) < d || Math.hypot(tx - SKY_D.x0 - 20, ty - 4) < 3;
+const nearSkySite = (tx, ty, d) => Math.hypot(tx - SKY_D.roost.x / T, ty - SKY_D.roost.y / T) < d || Math.hypot(tx - SKY_D.x0 - 20, ty - 4) < 3 || Math.hypot(tx - SKY_D.x0 - 24, ty - 36) < 4;
+// ---------- the Storm Spire: a sky temple on the south isle of the Cloudspire Isles ----------
+const SPIRE = { x: (SKY_D.x0 + 24) * T, y: 36 * T + 4, tx: SKY_D.x0 + 24, ty: 36 };
+for (let y = 33; y <= 38; y++) for (let lx = 21; lx <= 27; lx++) if (tiles[y * W + SKY_D.x0 + lx] === DEEP) tiles[y * W + SKY_D.x0 + lx] = LAND;
+ENTRANCES.push(SPIRE); pathLine(SKY_D.x0 + 19, 35, SKY_D.x0 + 24, 37);
+const SPIRE_D = makeDungeon('spire', 'The Storm Spire', 11, SPIRE, { tint: 'rgb(205,218,245)',
+  gateMsg: 'The wind gate is sealed. Strike the three storm crystals in the Gust Gallery.', bossDoorMsg: 'A door crackling with lightning. The Colossus Sentinel keeps its key.',
+  objective: g => !g.open.sw ? 'Strike the three storm crystals in the Gust Gallery. The wind lanes push hard: dash (Shift) to cut across them.'
+    : !g.open.lock ? (g.keys ? 'Use the small key on the door in the west wall of the Hall of Winds.' : 'Find a small key. Look in the alcove east of the Hall of Winds.')
+    : !S.defeated.aegis ? 'Defeat the Colossus Sentinel. Its shield blocks hits from the front: get behind it, or strike after its laser overheats.'
+    : !g.open.boss ? 'Open the lightning door north of the Hall of Winds with the Boss Key.'
+    : !S.defeated.storm ? 'Defeat the Stormlord. Knock its storm orb back with your sword to bring it down.' : 'The storm has passed. Take the stairs back down.' });
+{
+  const D = SPIRE_D;
+  carve(D, 6, 1, 33, 10);                          // the Stormlord's open-air summit
+  carve(D, 19, 11, 20, 12);
+  carve(D, 12, 13, 27, 24);                        // Hall of Winds
+  carve(D, 28, 20, 30, 22);                        // key alcove
+  carve(D, 1, 13, 10, 24);                         // the Colossus Sentinel's vault
+  carve(D, 3, 26, 36, 33);                         // Gust Gallery
+  for (let x = 3; x <= 36; x++) { for (const y of [28, 29]) { dset(D, x, y, WIND); JET.set(y * W + D.x0 + x, [1, 0]); } for (const y of [30, 31]) { dset(D, x, y, WIND); JET.set(y * W + D.x0 + x, [-1, 0]); } }
+  carve(D, 19, 34, 20, 34); entryHall(D);
+  addDoor(D, 'sw', 'switch', [[19, 25], [20, 25]], GATE);
+  addDoor(D, 'lock', 'lock', [[11, 14], [11, 15]], LOCK, [10, 14]);
+  addDoor(D, 'boss', 'boss', [[19, 11], [20, 11]], BDOOR);
+  for (const [i, x, y] of [[1, 4, 27], [2, 35, 27], [3, 5, 33]]) D.switches.push({ id: 'w' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
+  for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
+}
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -556,7 +583,7 @@ function edgeKey(prefix, other, x, y) {
 }
 const landForShore = (x, y) => isLand(tileAt(x, y)) && !isBridge(x, y);
 const notPath = (x, y) => tileAt(x, y) !== PATH;
-const floorLike = t => t === FLOOR || t === STAIRS || t === BOG || t === GATE || t === LOCK || t === BDOOR;
+const floorLike = t => t === FLOOR || t === STAIRS || t === BOG || t === WIND || t === GATE || t === LOCK || t === BDOOR;
 function drawOutdoorTile(c, x, y, px, py, t) {
   if (dungeonAt(px).theme === 'sky') { drawSkyTile(c, x, y, px, py, t); return; }
   if (t === BOG) {
@@ -625,6 +652,7 @@ function drawDungeonTile(c, x, y) {
     if (t === GATE) spr(c, 'd_gate', px, py);
     if (t === LOCK) spr(c, 'd_door', px, py);
     if (t === BDOOR) spr(c, 'd_bossdoor', px, py);
+    if (t === WIND) { c.fillStyle = 'rgba(190,235,255,.45)'; c.fillRect(px, py, T, T); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(px, py + 14, T, 3); }
     if (t === BOG) {
       const hb = hash(x, y); c.fillStyle = 'rgba(40,58,24,.82)'; c.fillRect(px, py, T, T);
       c.fillStyle = 'rgba(120,150,60,.35)'; ellipse(c, px + 8 + hb * 16, py + 10 + hb * 10, 4, 2); ellipse(c, px + 22 - hb * 10, py + 22, 3, 1.5);
@@ -701,6 +729,7 @@ const ITEMS = {
   fang:    { name: 'Wyrm Fang', price: 400 },
   heartwood: { name: 'Heartwood', price: 500 },
   dragonscale: { name: 'Dragon Scale', price: 600 },
+  stormcore: { name: 'Storm Core', price: 650 },
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   sunstone: { name: 'Sunstone', price: 450 },
@@ -715,6 +744,7 @@ const WEAPONS = {
   arcane:  { name: 'Arcane Edge', dmg: 3, col: '#d6b8ff', cost: { gem: 1, crystal: 5 }, beam: true, desc: 'Cut from the Hollow Gem. Triple damage, and fires a sword beam while your hearts are full.' },
   frost:   { name: 'Frostbite Blade', dmg: 3, col: '#9fe8ff', cost: { frostheart: 1, crystal: 6 }, freeze: true, desc: 'Forged from the Frost Heart. Triple damage, and freezes foes so they move at a crawl.' },
   sun:     { name: 'Sunblade', dmg: 4, col: '#ffd65a', cost: { sunstone: 1, crystal: 8 }, beam: true, beamAlways: true, desc: 'Forged from the Sunstone. Quadruple damage, and every swing fires a beam of sunlight.' },
+  storm:   { name: 'Stormbrand', dmg: 4, col: '#fff6a8', cost: { stormcore: 1, feather: 6 }, beam: true, reach: 8, desc: 'Forged around the Storm Core. Quadruple damage, long reach, and fires a lightning beam while your hearts are full.' },
   gale:    { name: 'Gale Blade', dmg: 3, col: '#bfefff', cost: { feather: 5, crystal: 4 }, reach: 12, desc: 'Light as the wind. Triple damage with the longest reach of any blade.' },
   obsidian: { name: 'Obsidian Edge', dmg: 3, col: '#6a5a8a', cost: { obsidian: 6, crystal: 3 }, desc: 'Volcanic glass, sharp as a razor. Triple damage, no trophy needed.' },
   great:   { name: 'Bone Greatsword', dmg: 4, col: '#e6ecff', cost: { relic: 1, stone: 10 }, heavy: true, desc: 'The Bone Knight\'s blade. Quadruple damage in a wide arc, but slower swings.' },
@@ -776,6 +806,9 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'spire', giver: 'aeris', name: 'The Storm Spire', req: 'skyfoes', goal: { boss: ['aegis', 'storm'] }, reward: { gold: 450, items: { crystal: 10 } },
+    offer: ['See the white tower on the south isle? The Storm Spire. The old sky folk built it to tame the weather.', 'Now the Stormlord rules it, guarded by a great stone colossus. Climb the spire and break the storm, friend.'],
+    done: ['Blue skies, for the first time in years! Take that Storm Core to a workbench. It will make a blade worthy of the wind.'] },
   { id: 'hawks', giver: 'aeris', name: 'Feathers on the Wind', goal: { kill: [['hawk', 5]] }, reward: { gold: 130, items: { feather: 4 } },
     offer: ['Welcome to the clouds, ground-walker! The gale hawks have grown bold, diving at anyone on the bridges.', 'Drive off five of them. When one hovers and screeches, it is about to swoop: step aside!'],
     done: ['The skies are calmer already. Keep those feathers: woven together, they make you fast as the wind.'] },
@@ -913,7 +946,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1063,6 +1096,11 @@ dSpawn(TOMB_D, [['scarab', 15, 37], ['scarab', 24, 37], ['scarab', 21, 40], ['mu
 dChest(TOMB_D, 'key', 'key', 37, 26); dChest(TOMB_D, 'hall', 'gold', 32, 13);
 dPillars(TOMB_D, [[15, 14], [29, 14], [15, 19], [29, 19]]);
 for (const [x, y] of [[14, 41], [25, 41], [5, 23], [34, 23]]) addRes('pot', TOMB_D.x0 + x, y);
+dSpawn(SPIRE_D, [['windling', 15, 38], ['puff', 24, 37], ['hawk', 20, 39], ['windling', 10, 33], ['windling', 28, 32], ['puff', 14, 27], ['puff', 30, 27], ['hawk', 22, 32],
+  ['sentinel', 16, 17], ['sentinel', 24, 21], ['hawk', 20, 15], ['puff', 14, 22], ['windling', 26, 15]]);
+dChest(SPIRE_D, 'key', 'key', 30, 21); dChest(SPIRE_D, 'hall', 'gold', 13, 14);
+dPillars(SPIRE_D, [[15, 19], [24, 17], [10, 3], [29, 3], [10, 8], [29, 8]]);
+for (const [x, y] of [[14, 41], [25, 41], [36, 33], [3, 26], [27, 23]]) addRes('pot', SPIRE_D.x0 + x, y);
 dSpawn(FORGE_D, [['magmite', 15, 38], ['salamander', 24, 38], ['imp', 20, 37], ['magmite', 8, 27], ['magmite', 30, 31], ['salamander', 14, 32], ['salamander', 26, 30], ['boulderback', 20, 28],
   ['mage', 5, 30], ['imp', 33, 27], ['magmite', 24, 33], ['imp', 22, 22], ['salamander', 26, 21], ['magmite', 14, 14], ['boulderback', 24, 15], ['imp', 18, 14]]);
 dChest(FORGE_D, 'key', 'key', 30, 22); dChest(FORGE_D, 'hall', 'gold', 26, 14);
@@ -1100,6 +1138,12 @@ const BOSS_INFO = {
   scarab: { name: 'The Golden Scarab', hp: 80, contact: 40, wake: 5 * T, col: '#ffd65a',
     seq: { 1: ['scuttle', 'roll', 'scuttle', 'beam'], 2: ['roll', 'dive', 'beam', 'scuttle', 'roll'], 3: ['beam', 'roll', 'dive', 'roll', 'beam', 'scuttle'] },
     lines: { 2: 'The Golden Scarab takes flight!', 3: 'The Golden Scarab blazes like the sun!' } },
+  aegis:  { name: 'The Colossus Sentinel', hp: 70, contact: 34, wake: 4 * T, col: '#7fe0f0',
+    seq: { 1: ['hover', 'orbs', 'laser', 'hover', 'slam'], 2: ['laser', 'slam', 'orbs', 'hover', 'laser'], 3: ['laser', 'summon', 'slam', 'laser', 'orbs', 'slam'] },
+    lines: { 2: 'The Colossus Sentinel\'s eye burns brighter!', 3: 'The Colossus Sentinel turns faster!' } },
+  storm:  { name: 'The Stormlord', hp: 84, contact: 30, wake: 5.5 * T, col: '#fff6a8',
+    seq: { 1: ['drift', 'bolts', 'orb', 'drift', 'bolts', 'orb'], 2: ['bolts', 'gust', 'orb', 'bolts', 'summon', 'orb'], 3: ['gust', 'bolts', 'orb', 'bolts', 'gust', 'orb', 'summon'] },
+    lines: { 2: 'The Stormlord summons a gale!', 3: 'The Stormlord becomes the storm!' } },
   forge:  { name: 'The Forgemaster', hp: 64, contact: 34, wake: 4 * T, col: '#ff9a3c',
     seq: { 1: ['stomp', 'slam', 'stomp', 'charge'], 2: ['slam', 'sparks', 'charge', 'stomp', 'slam'], 3: ['sparks', 'charge', 'slam', 'summon', 'charge', 'slam'] },
     lines: { 2: 'The Forgemaster stokes his furnace!', 3: 'The Forgemaster burns white-hot!' } },
@@ -1142,6 +1186,8 @@ const BOSSES = [
   makeBoss('jarl', FROST_D.camp.x, FROST_D.camp.y, { cx: FROST_D.camp.x, cy: FROST_D.camp.y, r: 5.6 * T }),
   makeBoss('mummy', (TOMB_D.x0 + 5) * T + 16, 16 * T, roomArena(TOMB_D, 1, 12, 10, 20)),
   makeBoss('scarab', (TOMB_D.x0 + 20) * T, 5 * T, roomArena(TOMB_D, 8, 1, 31, 10)),
+  makeBoss('aegis', (SPIRE_D.x0 + 5) * T + 16, 19 * T, roomArena(SPIRE_D, 1, 13, 10, 24)),
+  makeBoss('storm', (SPIRE_D.x0 + 20) * T, 6 * T, roomArena(SPIRE_D, 6, 1, 33, 10)),
   makeBoss('forge', (FORGE_D.x0 + 5) * T + 16, 19 * T, roomArena(FORGE_D, 1, 13, 10, 24)),
   makeBoss('drake', (FORGE_D.x0 + 20) * T, 6 * T, roomArena(FORGE_D, 8, 1, 31, 10)),
   makeBoss('hag', (HOLLOW_D.x0 + 5) * T + 16, 17 * T + 8, roomArena(HOLLOW_D, 1, 12, 10, 21)),
@@ -1326,6 +1372,7 @@ const ICON_DRAW = {
   feather: c => { c.save(); c.translate(16, 16); c.rotate(-0.6); c.fillStyle = '#c8b89a'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#efe6d8'; c.beginPath(); c.ellipse(-1, -3, 3, 10, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-0.5, -12, 1.5, 26); c.restore(); },
   chime: c => { c.fillStyle = '#8a6a44'; c.fillRect(6, 4, 20, 3); c.strokeStyle = '#c8c0b0'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(9 + i * 5, 7); c.lineTo(9 + i * 5, 12); c.stroke(); } for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#7fe0f0' : '#bfefff'; c.fillRect(8 + i * 5, 12, 3, 10 + (i % 2) * 6); } c.fillStyle = '#ffffff'; c.fillRect(8, 13, 1, 6); },
   bloom: c => { c.fillStyle = '#3d6a44'; c.fillRect(15, 18, 2, 12); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.fillStyle = i % 2 ? '#ff7a2a' : '#ffb347'; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 13 + Math.sin(a) * 6, 5, 3, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe08a'; circle(c, 16, 13, 3.5); },
+  stormcore: c => { c.fillStyle = 'rgba(127,224,240,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#3a4a6a'; circle(c, 16, 16, 9); c.fillStyle = '#7fe0f0'; circle(c, 16, 16, 6); c.strokeStyle = '#fff6a8'; c.lineWidth = 2; c.beginPath(); c.moveTo(18, 6); c.lineTo(13, 16); c.lineTo(19, 16); c.lineTo(14, 26); c.stroke(); },
   dragonscale: c => { c.fillStyle = '#5a1a14'; c.beginPath(); c.moveTo(16, 3); c.quadraticCurveTo(29, 12, 16, 29); c.quadraticCurveTo(3, 12, 16, 3); c.fill(); c.fillStyle = '#c8402a'; c.beginPath(); c.moveTo(16, 6); c.quadraticCurveTo(25, 13, 16, 25); c.quadraticCurveTo(7, 13, 16, 6); c.fill(); c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(16, 9); c.quadraticCurveTo(21, 14, 16, 20); c.quadraticCurveTo(11, 14, 16, 9); c.fill(); c.fillStyle = '#fff2c4'; c.fillRect(14, 11, 2, 4); },
   heartwood: c => { c.fillStyle = '#3d2a1a'; c.fillRect(8, 6, 16, 22); c.fillStyle = '#7a5232'; c.fillRect(10, 8, 12, 18); c.strokeStyle = '#5a3a22'; c.lineWidth = 1.5; for (const r of [3, 6]) { c.beginPath(); c.ellipse(16, 17, r, r * 1.4, 0, 0, Math.PI * 2); c.stroke(); } c.fillStyle = '#7fe07a'; circle(c, 16, 17, 2.5); c.fillStyle = '#4f8a3a'; c.beginPath(); c.ellipse(22, 6, 5, 3, -0.6, 0, Math.PI * 2); c.fill(); },
   fang: c => { c.fillStyle = '#7a5a2a'; c.beginPath(); c.moveTo(10, 4); c.quadraticCurveTo(26, 10, 18, 29); c.quadraticCurveTo(14, 18, 10, 4); c.fill(); c.fillStyle = '#f2ead6'; c.beginPath(); c.moveTo(11, 6); c.quadraticCurveTo(24, 11, 18, 26); c.quadraticCurveTo(15, 17, 11, 6); c.fill(); },
@@ -1350,8 +1397,8 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale'];
-const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore'];
+const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
   if (DH) return DH.objective(dgs(DH));
@@ -1471,6 +1518,12 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">The Storm Spire</div>
+      <dl class="controls">
+      <dt>Getting in</dt><dd>A white tower on the south isle of the Cloudspire Isles.</dd>
+      <dt>Gust Gallery</dt><dd>Two wind lanes blow hard across the gallery. Dash (Shift) to cut through them and strike the three storm crystals.</dd>
+      <dt>Colossus Sentinel</dt><dd>Its great shield blocks every hit from the front, and it turns to face you. Circle behind it, or strike when its laser overheats.</dd>
+      <dt>Stormlord</dt><dd>It floats out of reach. Step out of the yellow lightning rings, lean into its gales, and swing at its storm orb to knock it back: the orb brings the Stormlord crashing down.</dd></dl>
       <div class="label">The Cloudspire Isles</div>
       <dl class="controls">
       <dt>Getting there</dt><dd>Ride the Great Updraft on Cinder Peak's east slope. The down-gust at Zephyr Roost takes you back.</dd>
@@ -1837,7 +1890,7 @@ function deflect(hx, hy, rad) {
   for (const p of projectiles) if (p.kind === 'orb' && !p.returned && !p.dead && Math.hypot(p.x - hx, p.y - hy) < rad + 8) {
     p.returned = true; p.sp = 270; floatText(p.x, p.y - 20, 'Return!', '#ffe08a'); SFX.play('special'); impact(4); burst(p.x, p.y, '#ffe08a', 10);
   }
-  for (const p of projectiles) if (!p.dead && !p.friendly && p.kind !== 'orb' && p.kind !== 'axe' && p.kind !== 'spike' && p.kind !== 'sunball' && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
+  for (const p of projectiles) if (!p.dead && !p.friendly && p.kind !== 'orb' && p.kind !== 'axe' && p.kind !== 'spike' && p.kind !== 'bolt' && p.kind !== 'sunball' && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
   if (n) { floatText(hx, hy - 20, 'Deflect!', '#ffffff'); SFX.play('hit'); }
 }
 function hitEnemies(a) {
@@ -1852,7 +1905,7 @@ function hitEnemies(a) {
   const AB = activeBoss();
   if (AB && AB.decoys) for (const dc of AB.decoys) if (!dc.popped && Math.hypot(dc.x - hx, dc.y - 26 - AB.z - hy) < rad + 26) { dc.popped = true; burst(dc.x, dc.y - 40, '#dff6ff', 16); floatText(dc.x, dc.y - 80, 'Just a reflection!', '#c8e8ff'); SFX.play('mine'); hit = true; }
   hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad);
-  if (AB && bossHittable(AB) && Math.hypot(AB.x - hx, AB.y - (AB.type === 'treant' || AB.type === 'forge' ? 50 : 26) - AB.z - hy) < rad + (AB.type === 'treant' || AB.type === 'forge' ? 40 : 30)) { if (AB.decoys && AB.decoys.some(dc => !dc.popped)) { AB.decoys = []; wizardDazeQuiet(AB, 'Found her! Strike now!'); } damageBoss(AB, dmg); hit = true; }
+  if (AB && bossHittable(AB) && Math.hypot(AB.x - hx, AB.y - (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 50 : 26) - AB.z - hy) < rad + (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 40 : 30)) { if (AB.decoys && AB.decoys.some(dc => !dc.popped)) { AB.decoys = []; wizardDazeQuiet(AB, 'Found her! Strike now!'); } damageBoss(AB, dmg); hit = true; }
   deflect(hx, hy, rad + 6);
   hitSwitches(hx, hy, rad);
   if (sp) { impact(7); burst(hx, hy, '#ffe08a', 14); } else if (hit) impact(2);
@@ -2040,7 +2093,7 @@ function update(dt) {
   for (const e of enemies) updateEnemy(e, dt, fainted);
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].remove) enemies.splice(i, 1);
   updateProjectiles(dt, fainted);
-  updateHazards(dt, fainted); updateVents(fainted); if (dungeonAt(P.x) === SKY_D) updateJets(dt);
+  updateHazards(dt, fainted); updateVents(fainted); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D) updateJets(dt);
   updateBosses(dt, fainted);
   updateWorldLinks(dt);
   for (let i = pickups.length - 1; i >= 0; i--) {
@@ -2357,7 +2410,7 @@ function updateProjectiles(dt, fainted) {
       if (!p.returned && !fainted && Math.hypot(P.x - p.x, P.y - 14 - p.y) < 16) { damagePlayer(2, p); p.dead = true; burst(p.x, p.y, '#c9b8ff', 12); }
       if (p.returned && Math.hypot(tx - p.x, ty - p.y) < 30) {
         if (o.phase === 3 && !p.batted && rng() < 0.4) { p.returned = false; p.batted = true; p.sp = 150; p.ang += Math.PI; floatText(o.x, o.y - 90, 'He swats it back!', '#ff9a9a'); SFX.play('hit'); }
-        else { p.dead = true; burst(p.x, p.y, '#ffe08a', 20); wizardDaze(o); }
+        else { p.dead = true; burst(p.x, p.y, '#ffe08a', 20); if (o.type === 'storm') stormDaze(o); else wizardDaze(o); }
       }
       if (p.t > p.life) p.dead = true;
       continue;
@@ -2384,6 +2437,7 @@ function updateProjectiles(dt, fainted) {
       else { p.x += p.vx * dt; p.y += p.vy * dt; }
       if (p.kind === 'fire' && Math.random() < dt * 40) particles.push({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 20, vy: -20, life: 0.3, color: Math.random() < 0.5 ? '#ffb347' : '#ec5257', size: 3 });
       if (p.kind === 'fire' && inDungeon(p.x) && !dungeonAt(p.x).outdoor && !walkable(p.x, p.y + 14)) { p.dead = true; burst(p.x, p.y, '#ffb347', 8); }
+      if (p.kind === 'bolt') { if (p.t >= 0.7 && !p.hit) { p.hit = true; impact(3); SFX.play('slam'); burst(p.x, p.y, '#fff6a8', 10); if (!fainted && !P.dash && Math.hypot(P.x - p.x, (P.y - p.y) / 0.7) < 24) damagePlayer(2, { x: p.x, y: p.y + 30 }); } if (p.t > p.life) p.dead = true; continue; }
       if (p.kind === 'spike') { if (p.t >= 0.5 && p.t < 0.85 && !p.hit && !fainted && Math.hypot(P.x - p.x, P.y - p.y) < 20) { p.hit = true; damagePlayer(2, p); } if (p.t > p.life) p.dead = true; continue; }
       if (p.kind === 'axe') {
         const o = p.owner, tx = p.back ? o.x : p.tx, ty = p.back ? o.y - 40 : p.ty, dx = tx - p.x, dy = ty - p.y, dd = Math.hypot(dx, dy) || 1;
@@ -2437,6 +2491,10 @@ function damageBoss(B, n) {
   }
   const dazed = B.state === 'dazed';
   let dmg = n * (dazed ? 2 : 1);
+  if (B.type === 'aegis' && B.state !== 'dazed') {
+    let da = Math.atan2(P.y - B.y, P.x - B.x) - (B.dir || 0); while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+    if (Math.abs(da) < 1.1) { B.shield = 0.35; floatText(B.x, B.y - 120, 'Blocked!', '#c8d0ff'); SFX.play('mine'); if (!aegisHint) { aegisHint = true; toast('Its shield blocks you from the front. Get behind it, or strike when its laser overheats!', 4500); } return; }
+  }
   if (B.type === 'forge' && !(B.cool > 0)) {
     B.shield = 0.35; floatText(B.x, B.y - 120, 'Too hot!', '#ffb347'); SFX.play('mine');
     if (!quenchHint) { quenchHint = true; toast('He is red-hot! Smash a water barrel right next to him to quench him.', 4500); }
@@ -2515,6 +2573,18 @@ function bossStart(B, action) {
     else if (action === 'lash') { B.state = 'lashWind'; B.st = B.phase === 3 ? 0.45 : 0.6; }
     else if (action === 'curse') { B.state = 'curse'; B.st = 0.8; }
     else if (action === 'sarcophagus') { B.state = 'sink'; B.st = 0.5; SFX.play('wisp'); }
+  } else if (B.type === 'aegis') {
+    if (action === 'hover') B.state = 'hover';
+    else if (action === 'laser') { B.state = 'laserWind'; B.st = 0.8; }
+    else if (action === 'slam') { B.state = 'slamWind'; B.st = 0.7; }
+    else if (action === 'orbs') { B.state = 'orbs'; B.st = 0.6; }
+    else if (action === 'summon') { B.state = 'summon'; B.st = 0.8; }
+  } else if (B.type === 'storm') {
+    if (action === 'drift') B.state = 'drift';
+    else if (action === 'bolts') { B.state = 'bolts'; B.st = 0.5; }
+    else if (action === 'orb') { B.state = 'orb'; B.st = 0.6; }
+    else if (action === 'gust') { B.state = 'gust'; B.st = 0.5; }
+    else if (action === 'summon') { B.state = 'summon'; B.st = 0.8; }
   } else if (B.type === 'forge') {
     if (action === 'stomp') B.state = 'stomp';
     else if (action === 'slam') { B.state = 'slamWind'; B.st = B.phase === 3 ? 0.6 : 0.8; }
@@ -2575,6 +2645,8 @@ function finishBoss(B) {
   if (B.type === 'jarl') { drop(B.x, B.y - 10, 'gold', 20, 10); drop(B.x, B.y - 10, 'horn', 1); banner('Jarl Frostbeard defeated!', '#ffe08a'); }
   if (B.type === 'mummy') { drop(B.x, B.y - 10, 'gold', 16, 5); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mummy King crumbles!', '#ffe08a'); }
   if (B.type === 'scarab') { drop(B.x, B.y - 10, 'gold', 30, 10); drop(B.x, B.y - 10, 'sunstone', 1); banner('The Golden Scarab falls!', '#ffe08a'); }
+  if (B.type === 'aegis') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'crystal', 4); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Colossus Sentinel crumbles!', '#ffe08a'); }
+  if (B.type === 'storm') { B.gust = null; drop(B.x, B.y - 10, 'gold', 40, 10); drop(B.x, B.y - 10, 'stormcore', 1); banner('The Stormlord is defeated! The skies clear.', '#ffe08a'); }
   if (B.type === 'forge') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'obsidian', 4); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Forgemaster cools for good!', '#ffe08a'); }
   if (B.type === 'drake') { B.rocks = []; drop(B.x, B.y - 10, 'gold', 40, 10); drop(B.x, B.y - 10, 'dragonscale', 1); banner('The Magma Drake is slain!', '#ffe08a'); }
   if (B.type === 'hag') { drop(B.x, B.y - 10, 'gold', 16, 5); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Bog Hag is vanquished!', '#ffe08a'); }
@@ -2602,7 +2674,7 @@ function updateBosses(dt, fainted) {
       Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: B.hx, y: B.hy, z: 0, ring: null, alpha: 1 });
       for (const e of enemies) if (e.minion) e.remove = true;
       projectiles.length = 0; bossBar();
-      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; if (B.type === 'wraith') blizzard = 0;
+      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; if (B.type === 'wraith') blizzard = 0;
     if (!fainted) toast(`${B.name} waits for your return.`);
       continue;
     }
@@ -2619,7 +2691,7 @@ function updateBosses(dt, fainted) {
       continue;
     }
     if (B.state === 'wake' || B.state === 'rest') { B.st -= dt; if (B.type === 'wraith') B.z += (20 + Math.sin(B.anim * 2) * 6 - B.z) * Math.min(1, dt * 4); if (B.type === 'wizard') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * 0.1; if (B.type === 'bat') B.z += (46 - B.z) * Math.min(1, dt * 4); if (B.st <= 0) bossNext(B); }
-    else ({ forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
+    else ({ aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
     const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving'].includes(B.state);
     if (B.active && !harmless && B.z < 14 && d < I.contact && !fainted) damagePlayer(2, B);
   }
@@ -3920,14 +3992,14 @@ function drawSkyTile(c, x, y, px, py, t) {
   }
   if (t === WIND) { c.fillStyle = 'rgba(210,240,255,.65)'; c.fillRect(px + 2, py + 2, T - 4, T - 4); }
 }
-function drawSkyOverlay(c, camX, camY, vw, vh) {
+function drawSkyOverlay(c, camX, camY, vw, vh, clouds) {
   for (let ty = Math.floor(camY / T); ty < (camY + vh) / T; ty++) for (let tx = Math.floor(camX / T); tx < (camX + vw) / T; tx++) {
     const k = ty * W + tx, dir = JET.get(k); if (!dir) continue;
     const ph = (time * 2 + hash(tx, ty)) % 1, ox = dir[0] * (ph - 0.5) * T, oy = dir[1] * (ph - 0.5) * T, cxp = tx * T + 16 + ox, cyp = ty * T + 16 + oy;
     c.strokeStyle = `rgba(255,255,255,${0.8 * Math.sin(ph * Math.PI)})`; c.lineWidth = 2; c.beginPath();
     c.moveTo(cxp - dir[0] * 8 - dir[1] * 6, cyp - dir[1] * 8 - dir[0] * 6); c.lineTo(cxp, cyp); c.lineTo(cxp - dir[0] * 8 + dir[1] * 6, cyp - dir[1] * 8 + dir[0] * 6); c.stroke();
   }
-  for (let i = 0; i < 7; i++) {
+  if (clouds) for (let i = 0; i < 7; i++) {
     const span = DW * T + 400, cxp = SKY_D.x0 * T - 200 + ((hash(i, 9) * span + time * (12 + i * 3)) % span), cyp = (3 + hash(9, i) * 40) * T;
     if (cxp < camX - 200 || cxp > camX + vw + 200 || cyp < camY - 100 || cyp > camY + vh + 100) continue;
     c.fillStyle = 'rgba(255,255,255,.22)'; for (const [ox, oy, r] of [[-40, 0, 30], [0, -12, 40], [40, 0, 30], [10, 10, 34]]) circle(c, cxp + ox, cyp + oy, r);
@@ -3953,6 +4025,100 @@ function drawWindmill(c, o) {
   c.save(); c.translate(x, y - 74); c.rotate(time * 1.2);
   for (let i = 0; i < 4; i++) { c.rotate(Math.PI / 2); c.fillStyle = '#6a4a2a'; c.fillRect(-2, 0, 4, 40); c.fillStyle = '#f2ead6'; c.fillRect(2, 10, 10, 28); }
   c.restore(); c.fillStyle = '#3b2414'; circle(c, x, y - 74, 4);
+}
+// ---------- Aegis, the Colossus Sentinel: shielded in front, overheats after its laser ----------
+let aegisHint = false;
+function updateAegis(B, dt, fainted, d) {
+  if (B.dir === undefined) B.dir = Math.PI / 2;
+  const turn = B.state === 'laser' ? 0.75 : B.phase === 3 ? 1.3 : 0.95;
+  if (B.state !== 'dazed' && B.state !== 'dying') { const want = Math.atan2(P.y - B.y, P.x - B.x); let da = want - B.dir; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2; B.dir += Math.max(-turn * dt, Math.min(turn * dt, da)); }
+  switch (B.state) {
+    case 'hover': { B.st += dt; const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; if (dd > 110) { B.x += dx / dd * 40 * dt; B.y += dy / dd * 40 * dt; clampBoss(B); } if (B.st > 1.2) bossRest(B, 0.2); break; }
+    case 'laserWind': B.st -= dt; if (B.st <= 0) { B.state = 'laser'; B.st = 1.7; SFX.play('boss'); } break;
+    case 'laser': {
+      B.st -= dt; const ex = B.x + Math.cos(B.dir) * 16, ey = B.y - 50, bx = ex + Math.cos(B.dir) * 380, by = ey + Math.sin(B.dir) * 380;
+      if (!fainted && !P.dash && segDist(P.x, P.y - 14, ex, ey, bx, by) < 16) damagePlayer(2, { x: P.x - Math.cos(B.dir) * 20, y: P.y - Math.sin(B.dir) * 20 });
+      if (Math.random() < dt * 30) particles.push({ x: ex + Math.cos(B.dir) * rng() * 300, y: ey + Math.sin(B.dir) * rng() * 300, vx: 0, vy: -20, life: 0.3, color: '#bfefff', size: 3 });
+      if (B.st <= 0) { B.state = 'dazed'; B.st = 1.8; floatText(B.x, B.y - 120, 'Overheated! Strike now!', '#ffe08a'); SFX.play('crumble'); }
+      break;
+    }
+    case 'slamWind': B.st -= dt; B.z = (1 - B.st / 0.7) * 30; if (B.st <= 0) { B.z = 0; impact(10); hitStop = 0.07; SFX.play('slam'); B.ring = { x: B.x, y: B.y, r: 30, max: 190, hit: false }; if (d < 70 && !fainted) damagePlayer(2, B); bossRest(B, 0.8); } break;
+    case 'orbs': B.st -= dt; if (B.st <= 0) { for (const off of B.phase === 1 ? [0] : [-0.5, 0, 0.5]) projectiles.push({ kind: 'wisp', x: B.x + Math.cos(B.dir) * 20, y: B.y - 50, ang: B.dir + off, t: 0, life: 3.4 }); SFX.play('wisp'); bossRest(B, 0.6); } break;
+    case 'summon': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['windling', 'windling'], 4); bossRest(B, 0.5); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.4); break;
+  }
+}
+function drawAegis(c, B) {
+  const dir = B.dir === undefined ? Math.PI / 2 : B.dir, x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y - 50 - (B.z || 0) + Math.sin(B.anim * 2) * 4, fx = Math.cos(dir), fy = Math.sin(dir);
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, B.x, B.y + 4, 40, 12);
+  if (B.state === 'laserWind') { c.strokeStyle = `rgba(127,224,240,${0.3 + (1 - B.st / 0.8) * 0.5})`; c.lineWidth = 2; c.setLineDash([6, 6]); c.beginPath(); c.moveTo(x + fx * 16, y); c.lineTo(x + fx * 380, y + fy * 380); c.stroke(); c.setLineDash([]); }
+  if (B.state === 'laser') { c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = 'rgba(127,224,240,.6)'; c.lineWidth = 16; c.beginPath(); c.moveTo(x + fx * 16, y); c.lineTo(x + fx * 380, y + fy * 380); c.stroke(); c.strokeStyle = '#ffffff'; c.lineWidth = 5; c.stroke(); c.restore(); }
+  c.globalAlpha = 1; bossFlash(c, B);
+  const hot = B.state === 'dazed';
+  c.fillStyle = '#6a6458'; c.beginPath(); c.moveTo(x, y - 46); c.lineTo(x + 34, y); c.lineTo(x, y + 44); c.lineTo(x - 34, y); c.closePath(); c.fill();
+  c.fillStyle = hot ? '#c88a5a' : '#a49e8f'; c.beginPath(); c.moveTo(x, y - 46); c.lineTo(x - 34, y); c.lineTo(x, y); c.closePath(); c.fill();
+  c.strokeStyle = hot ? '#ff9a3c' : '#7fe0f0'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 20, y - 6); c.lineTo(x, y + 20); c.lineTo(x + 20, y - 6); c.stroke();
+  c.fillStyle = B.state === 'laserWind' || B.state === 'laser' ? '#ffffff' : hot ? '#ff9a3c' : '#7fe0f0'; circle(c, x + fx * 14, y + fy * 8, 7);
+  // the great shield on its facing side
+  c.save(); c.translate(x + fx * 42, y + fy * 22); c.rotate(dir + Math.PI / 2);
+  c.fillStyle = '#3a4a5a'; c.fillRect(-36, -6, 72, 13); c.fillStyle = '#5a6e82'; c.fillRect(-32, -4, 64, 5); c.fillStyle = '#7fe0f0'; c.fillRect(-24, 2, 48, 2); c.restore();
+  c.globalAlpha = 1;
+  if (B.state === 'laserWind' || B.state === 'slamWind' || B.state === 'orbs') bossWarn(c, { x }, y - 70);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 20, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 60, 24);
+}
+// ---------- the Stormlord: out of reach until its own storm orb knocks it down ----------
+function stormDaze(B) { B.state = 'dazed'; B.st = 3.2; B.z = 0; impact(12); SFX.play('slam'); floatText(B.x, B.y - 110, 'Knocked out of the sky! Strike now!', '#ffe08a'); }
+function updateStorm(B, dt, fainted, d) {
+  const A = B.arena, fly = 60;
+  if (B.gust) { B.gust.t -= dt; if (!fainted && !P.dash) moveBody(P, B.gust.dx * 150 * dt, B.gust.dy * 150 * dt, 9); if (Math.random() < dt * 40) particles.push({ x: P.x + (rng() - 0.5) * 700, y: P.y + (rng() - 0.5) * 300, vx: B.gust.dx * 400, vy: B.gust.dy * 400, life: 0.4, color: '#ffffff', size: 2 }); if (B.gust.t <= 0) B.gust = null; }
+  if (B.state !== 'dazed' && B.state !== 'dying') B.z += (fly - B.z) * Math.min(1, dt * 3);
+  switch (B.state) {
+    case 'drift': { B.st += dt; const a = B.anim * 0.9, tx = A.cx + Math.cos(a) * 200, ty = A.cy + Math.sin(a * 1.6) * 50, dx = tx - B.x, dy = ty - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * Math.min(dd, 150 * dt); B.y += dy / dd * Math.min(dd, 150 * dt); if (B.st > 1.5) bossRest(B, 0.1); break; }
+    case 'bolts':
+      B.st -= dt;
+      if (B.st <= 0) {
+        const n = B.phase === 1 ? 4 : B.phase === 2 ? 6 : 8;
+        for (let i = 0; i < n; i++) { const tx = i === 0 ? P.x : P.x + (rng() - 0.5) * 300, ty = i === 0 ? P.y : P.y + (rng() - 0.5) * 160; projectiles.push({ kind: 'bolt', vx: 0, vy: 0, x: Math.max(A.x0 + 30, Math.min(A.x1 - 30, tx)), y: Math.max(A.y0 + 40, Math.min(A.y1 - 10, ty)), t: -i * 0.18, life: 0.95 }); }
+        bossRest(B, 0.9);
+      }
+      break;
+    case 'orb': B.st -= dt; if (B.st <= 0) { projectiles.push({ kind: 'orb', owner: B, x: B.x, y: B.y - 44 - B.z, ang: Math.atan2(P.y - B.y, P.x - B.x), sp: 110, t: 0, life: 9 }); SFX.play('wisp'); bossRest(B, 1.6); } break;
+    case 'gust':
+      B.st -= dt;
+      if (B.st <= 0) { const a = rng() < 0.5 ? 0 : Math.PI; B.gust = { dx: Math.cos(a), dy: 0, t: 2.2 }; SFX.play('dash'); floatText(P.x, P.y - 70, 'A gale!', '#dff6ff'); if (B.phase >= 2) for (let i = 0; i < 4; i++) projectiles.push({ kind: 'bolt', vx: 0, vy: 0, x: A.x0 + 60 + rng() * (A.x1 - A.x0 - 120), y: A.y0 + 60 + rng() * (A.y1 - A.y0 - 80), t: -0.4 - i * 0.3, life: 0.95 }); bossRest(B, 1); }
+      break;
+    case 'summon': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['windling', 'puff'], 4); SFX.play('boss'); bossRest(B, 0.5); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) { bossRest(B, 0.4); } break;
+  }
+}
+function drawStormlord(c, B) {
+  const z = B.z || 0, x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y - z - 40 + Math.sin(B.anim * 2) * 4, down = B.state === 'dazed';
+  c.fillStyle = 'rgba(0,0,0,.28)'; ellipse(c, B.x, B.y + 4, 40 * Math.max(0.5, 1 - z / 150), 12);
+  c.globalAlpha = 1; bossFlash(c, B);
+  // swirling storm-cloud robe
+  for (let i = 0; i < 7; i++) { const a = time * 1.5 + i * 0.9, r = 26 + (i % 3) * 6; c.fillStyle = i % 2 ? '#4a5268' : '#5f6a84'; circle(c, x + Math.cos(a) * r * 0.8, y + 18 + Math.sin(a) * 8, 16 + (i % 2) * 4); }
+  c.fillStyle = '#3a4258'; ellipse(c, x, y, 26, 34); c.fillStyle = '#6a7898'; ellipse(c, x - 6, y - 8, 14, 22);
+  // crown of lightning
+  c.fillStyle = down ? '#9a9a9a' : '#fff6a8'; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(x + i * 9 - 4, y - 30); c.lineTo(x + i * 9, y - 48 - (i === 0 ? 8 : 0)); c.lineTo(x + i * 9 + 4, y - 30); c.closePath(); c.fill(); }
+  c.fillStyle = down ? '#ffe08a' : '#bfefff'; c.fillRect(x - 11, y - 16, 7, 4); c.fillRect(x + 4, y - 16, 7, 4);
+  // arms crackling
+  if (!down) { c.strokeStyle = 'rgba(255,246,168,.8)'; c.lineWidth = 2; for (const s of [-1, 1]) { c.beginPath(); let bx = x + s * 24, by = y; c.moveTo(bx, by); for (let i = 0; i < 4; i++) { bx += s * (6 + Math.random() * 6); by += (Math.random() - 0.5) * 14; c.lineTo(bx, by); } c.stroke(); } }
+  c.globalAlpha = 1;
+  if (B.state === 'bolts' || B.state === 'orb' || B.state === 'gust') bossWarn(c, { x }, y - 70);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 10, z: 0, anim: B.anim });
+  if (down) drawStars(c, x, y - 60, 26);
+}
+function drawSpireGate(c) {
+  const x = SPIRE.x, y = SPIRE.y;
+  c.fillStyle = 'rgba(0,0,0,.25)'; ellipse(c, x, y - 2, 60, 12);
+  c.fillStyle = '#c8c4b8'; c.fillRect(x - 40, y - 110, 80, 110); c.fillStyle = '#e6e2d6'; c.fillRect(x - 36, y - 110, 30, 110);
+  c.fillStyle = '#8a8478'; for (let i = 0; i < 5; i++) c.fillRect(x - 40, y - 100 + i * 22, 80, 2);
+  c.fillStyle = '#5a6e82'; c.beginPath(); c.moveTo(x - 46, y - 110); c.lineTo(x, y - 170); c.lineTo(x + 46, y - 110); c.closePath(); c.fill(); c.fillStyle = '#7f98b0'; c.beginPath(); c.moveTo(x - 46, y - 110); c.lineTo(x, y - 170); c.lineTo(x - 6, y - 110); c.closePath(); c.fill();
+  c.strokeStyle = '#fff6a8'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y - 170); c.lineTo(x, y - 190); c.stroke();
+  if (Math.sin(time * 1.7) > 0.93) { c.strokeStyle = '#fff6a8'; c.lineWidth = 3; c.beginPath(); c.moveTo(x, y - 190); c.lineTo(x - 8, y - 220); c.lineTo(x + 4, y - 240); c.lineTo(x - 4, y - 270); c.stroke(); }
+  c.fillStyle = '#1a2230'; c.beginPath(); c.moveTo(x - 16, y); c.lineTo(x - 16, y - 34); c.quadraticCurveTo(x, y - 52, x + 16, y - 34); c.lineTo(x + 16, y); c.closePath(); c.fill();
+  const g = 0.35 + Math.sin(time * 3) * 0.15; c.fillStyle = `rgba(127,224,240,${g})`; c.beginPath(); c.moveTo(x - 12, y); c.lineTo(x - 12, y - 30); c.quadraticCurveTo(x, y - 46, x + 12, y - 30); c.lineTo(x + 12, y); c.closePath(); c.fill();
 }
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
@@ -4139,6 +4305,11 @@ function drawProjectiles(c) {
       c.fillStyle = 'rgba(232,200,138,.45)'; circle(c, p.x, p.y, 10); c.fillStyle = '#c99a5a'; circle(c, p.x, p.y, 6); c.fillStyle = '#f2dcae'; circle(c, p.x - 2, p.y - 2, 2);
     } else if (p.kind === 'ice') {
       c.save(); c.translate(p.x, p.y); c.rotate((p.ang || 0) + Math.PI / 2); c.fillStyle = 'rgba(190,240,255,.4)'; circle(c, 0, 0, 9); c.fillStyle = '#9fe8ff'; diamond(c, 0, 0, 4, 9); c.fillStyle = '#ffffff'; diamond(c, -1, -1, 1.5, 5); c.restore();
+    } else if (p.kind === 'bolt') {
+      if (p.t < 0) continue;
+      if (p.t < 0.7) { const k = p.t / 0.7; c.strokeStyle = `rgba(255,240,120,${0.3 + k * 0.6})`; c.lineWidth = 2; c.beginPath(); c.ellipse(p.x, p.y, 26 - k * 10, 11 - k * 4, 0, 0, Math.PI * 2); c.stroke(); c.fillStyle = `rgba(255,240,120,${k * 0.25})`; c.beginPath(); c.ellipse(p.x, p.y, 26 - k * 10, 11 - k * 4, 0, 0, Math.PI * 2); c.fill(); }
+      else if (p.t < 0.84) { c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = '#fff6a8'; c.lineWidth = 4; c.beginPath(); let bx = p.x, by = p.y - 320; c.moveTo(bx, by); for (let i = 1; i <= 8; i++) { bx = p.x + (i < 8 ? (Math.random() - 0.5) * 24 : 0); by = p.y - 320 + i * 40; c.lineTo(bx, by); } c.stroke(); c.fillStyle = 'rgba(255,250,200,.6)'; circle(c, p.x, p.y, 22); c.restore(); }
+      else { c.fillStyle = 'rgba(40,40,50,.4)'; ellipse(c, p.x, p.y, 14, 6); }
     } else if (p.kind === 'spike') {
       if (p.t < 0) continue;
       if (p.flame) {
@@ -4188,7 +4359,7 @@ function drawTent(c, o) {
   c.fillStyle = 'rgba(242,248,255,.85)'; c.beginPath(); c.moveTo(o.x - 10, o.y - 40); c.lineTo(o.x, o.y - 52); c.lineTo(o.x + 10, o.y - 40); c.closePath(); c.fill();
   c.fillStyle = '#c0392b'; c.fillRect(o.x - 1, o.y - 66, 2, 16); c.fillRect(o.x + 1, o.y - 66, 10, 6);
 }
-function drawBossAny(c, B) { ({ forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
+function drawBossAny(c, B) { ({ aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
 function drawJarl(c, B) {
   let sx = 1, sy = 1, ox = 0;
   if (B.state === 'stride') { const k = Math.abs(Math.sin(B.anim * 7)); sy = 1 - k * 0.05; sx = 1 + k * 0.03; }
@@ -4669,7 +4840,7 @@ function render() {
   const inViewT = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   if (CD === TOMB_D) drawTraps(ctx, inViewT);
   if (CD === CINDER_D || CD === FORGE_D) drawCinderGround(ctx, camX, camY, viewW, viewH, inViewT);
-  if (CD === SKY_D) drawSkyOverlay(ctx, camX, camY, viewW, viewH);
+  if (CD === SKY_D || CD === SPIRE_D) drawSkyOverlay(ctx, camX, camY, viewW, viewH, CD === SKY_D);
   const inView = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   for (const p of pickups) {
     if (!inView(p.x, p.y)) continue;
@@ -4697,7 +4868,7 @@ function render() {
     else if (kind === 1) drawEnemy(ctx, o);
     else if (kind === 7) drawBossAny(ctx, o);
     else if (kind === 8) drawChest(ctx, o);
-    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : drawCryptDoor)(ctx);
+    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : drawCryptDoor)(ctx);
     else if (kind === 10) drawSwitch(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) drawPlayer(ctx);
