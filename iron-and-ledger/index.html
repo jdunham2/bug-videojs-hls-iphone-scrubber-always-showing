@@ -888,11 +888,14 @@ const VIEWS={
     return h+'</div>'},
   bench(){const ws=S.stash.filter(w=>w.base!=='golden'&&w.appraised);const opt=(sel)=>ws.map(w=>`<option value="${w.id}">${esc(wLabel(w))} · ${Math.round(w.cond)}%</option>`).join('');
     let html=`<div class="panel"><h3>Workbench <span>Combine two weapons into one stronger one</span></h3><p class="help" style="margin:0 0 8px">Pick a weapon to upgrade and a second weapon to melt down into it. Two of the <b>same</b> kind give +1 rarity and a bigger damage boost. Two <b>different</b> kinds keep the first weapon's look and stats and add the second one's special powers (silent, freeze, chain lightning, pierce). Every combine adds damage, up to +60%, and keeps the best condition and attachments. The second weapon is used up. Only appraised weapons can be combined.</p>`;
+    const rdy=readyRecipes();if(rdy.length){html+=`<div style="border:1px solid #ff8ad8;padding:10px;margin:0 0 12px;background:rgba(255,138,216,.06)"><div class="wname" style="color:#ff8ad8">✨ Ready to forge: ${rdy.length} secret recipe${rdy.length>1?'s':''}! <span class="wstats">The boxes below have been set to the first one.</span></div>`;
+      for(const x of rdy)html+=`<div class="row" style="grid-template-columns:minmax(0,1fr) auto"><div style="min-width:0"><div class="wname" style="color:#f2d24b">${esc(BASES[x.r.k].name)}</div><div class="wstats">${esc(wLabel(x.A))} + ${esc(wLabel(x.B))} · ${esc(BASES[x.r.k].desc)}</div></div><div class="acts">${btn('fuse-recipe',RECIPES.indexOf(x.r),'Forge · '+money(fuseFee(x.A,x.B)),'primary',S.cash<fuseFee(x.A,x.B))}</div></div>`;
+      if(rdy.length>1)html+=`<div style="margin-top:6px">${btn('fuse-all',0,`Forge all ${rdy.length} · ${money(rdy.reduce((m,x)=>m+fuseFee(x.A,x.B),0))}`,'primary',S.cash<fuseFee(rdy[0].A,rdy[0].B))}</div>`;html+='</div>'}
     if(ws.length<2)return html+`<p>You need at least two appraised weapons in your stash. Appraise loot at the Terminal first.</p></div>`;
     html+=`<div class="row" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><label>Upgrade this<br><select id="fuseA">${opt()}</select></label><label>Melt this into it<br><select id="fuseB">${opt()}</select></label></div><div id="fusePrev" class="wstats" style="margin:10px 0"></div>${btn('fuse',0,'Combine!','primary')}</div>`;
     return html+VIEWS.recipes()},
   recipes(){const got=S.recipes||[];let h=`<div class="panel" style="margin-top:12px"><h3>✨ Secret recipes <span>${got.length} of ${RECIPES.length} forged</span></h3><p class="help" style="margin:0 0 8px">Combine these exact pairs (any colour or theme of them works) to forge a Mythic weapon you can't find anywhere else. Recipes cost ${money(1500)}.</p>`;
-    for(const r of RECIPES){const d=BASES[r.k];h+=`<div class="row" style="grid-template-columns:minmax(0,1fr) auto"><div style="min-width:0"><div class="wname" style="color:${got.includes(r.k)?'#f2d24b':'inherit'}">${got.includes(r.k)?'✅':'✨'} ${esc(d.name)}</div><div class="wstats">${esc(BASES[r.a].name)} + ${esc(BASES[r.b].name)} · ${esc(d.desc)}</div></div><div class="wstats">dmg ${d.dmg||'sleep gas'}</div></div>`}
+    const rdyK=readyRecipes().map(x=>x.r.k);for(const r of RECIPES){const d=BASES[r.k];h+=`<div class="row" style="grid-template-columns:minmax(0,1fr) auto"><div style="min-width:0"><div class="wname" style="color:${got.includes(r.k)?'#f2d24b':'inherit'}">${got.includes(r.k)?'✅':'✨'} ${esc(d.name)}${rdyK.includes(r.k)?' <span class="tag eq">ready now!</span>':''}</div><div class="wstats">${esc(BASES[r.a].name)} + ${esc(BASES[r.b].name)} · ${esc(d.desc)}</div></div><div class="wstats">dmg ${d.dmg||'sleep gas'}</div></div>`}
     return h+'</div>'},
   story(){const c=storyCh(),n=S.story|0;
     let html=`<div class="panel"><h3>The Ursine Syndicate <span>Chapter ${Math.min(n+1,STORY.length)} of ${STORY.length}</span></h3>`;
@@ -1008,7 +1011,19 @@ const VIEWS={
     return html+`<p class="help" style="margin:8px 0 0">Rifles, carbines, DMRs, LMGs, sniper rifles and miniguns don't come off the shelf. Tranq them off bears or buy from rivals.</p></div></div>`;
   },
 };
-function benchPreview(){const a=$('#fuseA'),b=$('#fuseB'),pv=$('#fusePrev');if(!a||!b||!pv)return;if(a.value===b.value&&b.options.length>1){b.selectedIndex=(a.selectedIndex+1)%b.options.length}
+const BENCH={auto:true};
+function readyRecipes(){ // every secret recipe you can forge right now, without using a weapon twice
+  const pool=S.stash.filter(w=>w.appraised&&w.base!=='golden'&&!(BASES[w.base]&&BASES[w.base].mythic)),used=new Set(),out=[];
+  const eq=w=>w.id===S.primary||w.id===S.secondary||(S.extra||[]).includes(w.id);const cost=w=>wValue(w)+(eq(w)?1e9:0);
+  for(const r of RECIPES){const as=pool.filter(w=>!used.has(w.id)&&baseOf(w)===r.a).sort((x,y)=>cost(x)-cost(y)),bs=pool.filter(w=>!used.has(w.id)&&baseOf(w)===r.b).sort((x,y)=>cost(x)-cost(y));
+    let A=null,B=null;for(const a of as){const b=bs.find(b=>b.id!==a.id);if(b){A=a;B=b;break}}if(A&&B){used.add(A.id);used.add(B.id);out.push({r,A,B})}}
+  return out}
+function doFuse(A,B){if(!A||!B||A===B)return false;const fee=fuseFee(A,B);if(S.cash<fee){logMsg('Not enough cash to combine.','bad');return false}S.cash-=fee;
+  const r=fuseResult(A,B);r.id=uid++;const wasP=S.primary===A.id,wasS=S.secondary===A.id,ex=(S.extra||[]).indexOf(A.id);removeFromStash(A);removeFromStash(B);S.stash.push(r);
+  if(S.primary===B.id)S.primary=null;if(S.secondary===B.id)S.secondary=null;S.extra=(S.extra||[]).filter(x=>x!==B.id);
+  if(wasP)S.primary=r.id;if(wasS)S.secondary=r.id;if(ex>=0)S.extra.push(r.id);if(r.mythic){S.recipes=S.recipes||[];if(!S.recipes.includes(r.base))S.recipes.push(r.base);logMsg(`✨ MYTHIC! You forged the ${BASES[r.base].name}!`,'good')}
+  SFX.chime&&SFX.chime();logMsg(`🔧 Combined into ${wLabel(r)}!${r.fx.length?' Powers: '+r.fx.map(f=>POWER_N[f]).join(', '):''}`,'good');questEv('fuse');save();return true}
+function benchPreview(){if(BENCH.auto&&$('#fuseA')){BENCH.auto=false;const rd=readyRecipes()[0];if(rd){$('#fuseA').value=String(rd.A.id);$('#fuseB').value=String(rd.B.id)}}const a=$('#fuseA'),b=$('#fuseB'),pv=$('#fusePrev');if(!a||!b||!pv)return;if(a.value===b.value&&b.options.length>1){b.selectedIndex=(a.selectedIndex+1)%b.options.length}
   const A=byId(+a.value),B=byId(+b.value);if(!A||!B||A===B){pv.textContent='Pick two different weapons.';return}const r=fuseResult(A,B),fee=fuseFee(A,B),st=wStats(r),s0=wStats(A);
   if(findRecipe(A,B)){pv.innerHTML=`<b style="color:#ff8ad8;font-size:15px">✨ SECRET RECIPE! ✨</b> These two make <b style="color:#f2d24b">${esc(BASES[r.base].name)}</b>, a Mythic weapon · damage <b>${Math.round(st.dmg)}</b> · ${esc(BASES[r.base].desc)} · cost ${money(fee)}${S.cash<fee?' (not enough cash)':''}`;return}
   pv.innerHTML=`Result: <b style="color:#d6a64b">${esc(wLabel(r))}</b> · ${RAR[r.rar].n}${r.rar>A.rar?' ⬆':''} · damage ${Math.round(s0.dmg)} → <b>${Math.round(st.dmg)}</b> · powers: ${[...POWERS.filter(f=>BASES[r.base][f]),...r.fx].map(f=>POWER_N[f]).join(', ')||'none'} · cost ${money(fee)}${S.cash<fee?' (not enough cash)':''}`}
@@ -1025,7 +1040,7 @@ function renderHub(){
   $('#ledger').innerHTML=S.log.map(l=>`<div class="${l.cls}">${l.txt}</div>`).join('')||'<div>No entries yet.</div>';
   const wb=$('#wipe');wb.textContent=armed==='wipe'?'Click again to wipe everything':'Wipe save';wb.classList.toggle('armed',armed==='wipe');
 }
-document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;tab=b.dataset.tab;armed=null;renderHub()});
+document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;tab=b.dataset.tab;if(tab==='bench')BENCH.auto=true;armed=null;renderHub()});
 $('#hub').addEventListener('change',e=>{if(e.target.id==='fuseA'||e.target.id==='fuseB')benchPreview();if(e.target.id==='nick'){NET.nick=(e.target.value||'').replace(/[^\w .'-]/g,'').trim().slice(0,16)||NET.nick;try{localStorage.setItem('il-nick',NET.nick)}catch(_){}netSend()}});
 $('#hub').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
@@ -1088,9 +1103,9 @@ $('#hub').addEventListener('click',e=>{
     case 'pet-off':S.pet=null;break;
     case 'story-replay':S.storySeen=-1;setTimeout(storyModal,0);break;
     case 'story-restart':S.story=0;S.storyHave=0;S.storySeen=-1;setTimeout(storyModal,0);break;
-    case 'fuse':{const A=byId(+($('#fuseA')||{}).value),B=byId(+($('#fuseB')||{}).value);if(!A||!B||A===B)break;const fee=fuseFee(A,B);if(!pay(fee)){logMsg('Not enough cash to combine.','bad');break}
-      const r=fuseResult(A,B);r.id=uid++;const wasP=S.primary===A.id,wasS=S.secondary===A.id,ex=(S.extra||[]).indexOf(A.id);removeFromStash(A);removeFromStash(B);S.stash.push(r);
-      if(wasP)S.primary=r.id;if(wasS)S.secondary=r.id;if(ex>=0)S.extra.push(r.id);if(r.mythic){S.recipes=S.recipes||[];if(!S.recipes.includes(r.base))S.recipes.push(r.base);logMsg(`✨ MYTHIC! You forged the ${BASES[r.base].name}!`,'good')}SFX.chime&&SFX.chime();logMsg(`🔧 Combined into ${wLabel(r)}!${r.fx.length?' Powers: '+r.fx.map(f=>POWER_N[f]).join(', '):''}`,'good');questEv('fuse');break}
+    case 'fuse':{const A=byId(+($('#fuseA')||{}).value),B=byId(+($('#fuseB')||{}).value);if(doFuse(A,B))BENCH.auto=true;break}
+    case 'fuse-recipe':{const rd=readyRecipes().find(x=>x.r.k===RECIPES[id].k);if(rd&&doFuse(rd.A,rd.B))BENCH.auto=true;break}
+    case 'fuse-all':{let n=0;for(let g=0;g<200;g++){const rd=readyRecipes()[0];if(!rd||S.cash<fuseFee(rd.A,rd.B))break;if(!doFuse(rd.A,rd.B))break;n++}if(n)logMsg(`✨ Forged ${n} Mythic weapon${n>1?'s':''} in one go!`,'good');else logMsg('Not enough cash to forge.','bad');BENCH.auto=true;break}
     case 'board-sort':BOARD.sort=['cash','tv','wc','my','tk','raids'][id]||'cash';break;
     case 'q-reroll':if(S.quests&&S.quests[id]&&pay(50)){S.quests[id]=null;S.quests=S.quests.filter(Boolean);const nq=newQuest();S.quests.splice(id,0,nq);logMsg('Swapped a quest.')}break;
     case 'set-assist':S.settings.assist=id;break;
