@@ -253,6 +253,20 @@ compose('e_slord', 'body_blueF.png', [
     ('eye_angry_blue.png', -34, -60, .95, 0, False), ('eye_angry_blue.png', 34, -60, .95, 0, True), ('eye_angry_blue.png', 0, -22, .8, 0, False),
     ('mouthB.png', 0, 30, 1.3, 0, False)], maxpx=300)
 
+compose('e_warden', 'body_darkA.png', [
+    ('arm_darkD.png', -112, 30, .75, -30, False, L), ('arm_darkD.png', 112, 30, .75, 30, True, L),
+    ('leg_darkC.png', -45, 100, .6, 0, False, L), ('leg_darkC.png', 45, 100, .6, 0, True, L),
+    ('detail_white_horn_large.png', -58, -96, 1.6, 22, False, L), ('detail_white_horn_large.png', 58, -96, 1.6, -22, True, L),
+    ('eye_angry_red.png', -38, -30, 1.0, 0, False), ('eye_angry_red.png', 38, -30, 1.0, 0, True),
+    ('eyebrowC.png', -38, -64, .9, -12, False), ('eyebrowC.png', 38, -64, .9, 12, True), ('mouthI.png', 0, 42, 1.3, 0, False)], maxpx=300)
+compose('e_wraith', 'body_whiteF.png', [
+    ('arm_whiteE.png', -100, -10, .7, -60, False, L), ('arm_whiteE.png', 100, -10, .7, 60, True, L),
+    ('eye_psycho_dark.png', -36, -62, .95, 0, False), ('eye_psycho_dark.png', 36, -62, .95, 0, False),
+    ('eyebrowA.png', -36, -96, .9, 15, False), ('eyebrowA.png', 36, -96, .9, -15, True), ('mouthJ.png', 0, 12, 1.2, 0, False)], maxpx=300)
+compose('e_watcher', 'body_blueB.png', [
+    ('detail_blue_antenna_large.png', -50, -112, 1.4, 25, False, L), ('detail_blue_antenna_large.png', 0, -128, 1.5, 0, False, L), ('detail_blue_antenna_large.png', 50, -112, 1.4, -25, True, L),
+    ('eye_human_red.png', 0, -10, 2.3, 0, False), ('mouth_closed_fangs.png', 0, 70, 1.3, 0, False)], maxpx=300)
+
 # ---------- particles ----------
 PART = {'smoke': ('smoke_07.png', 128), 'puff': ('smoke_04.png', 96), 'fire': ('fire_01.png', 96), 'flame': ('flame_05.png', 64),
         'muzzle': ('muzzle_02.png', 64), 'slash': ('slash_03.png', 128), 'scorch': ('scorch_02.png', 128), 'splat': ('dirt_02.png', 128),
