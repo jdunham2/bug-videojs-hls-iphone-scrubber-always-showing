@@ -74,6 +74,7 @@
 
   const VILLAGE_B_RIVER = ['ford', 'bridge', 'brook', 'wade', 'water', 'burn'];
   const VILLAGE_B_SEA = ['haven', 'port', 'sands', 'cove', 'bay', 'quay'];
+  const VILLAGE_B_KIND = { market: ['market', 'cross', 'chester', 'borough'], windmill: ['mill', 'hill', 'down', 'barrow'], lake: ['mere', 'lake', 'water', 'pool'] };
   function genLayout(opts = {}) {
     const kind = opts.kind || pick(KIND_NAMES);
     const season = opts.season || pick(SEASON_NAMES);
@@ -88,7 +89,8 @@
     };
     const order = shuffled(['NW', 'NE', 'SW', 'SE']);
     return {
-      name: pick(VILLAGE_A) + pick(kind === 'seaside' ? VILLAGE_B_SEA : kind === 'river' ? VILLAGE_B_RIVER : VILLAGE_B),
+      name: pick(VILLAGE_A) + pick(kind === 'seaside' ? VILLAGE_B_SEA : kind === 'river' ? VILLAGE_B_RIVER : VILLAGE_B_KIND[kind] || VILLAGE_B),
+      event: opts.event !== undefined ? opts.event : pickEvent(season),
       kind, season, weather: weatherName, weatherPlan: opts.plan || planWeather(season, weatherName), planIdx: 1, roadY, roadX,
       plaza: { x: roadX - 5, y: roadY - 5, w: 12, h: 12 },
       quads,
@@ -179,7 +181,7 @@
     else {
       const q = L.pondQ;
       // Start big and shrink until it fits in its corner
-      let rx = 7 + Math.floor(rand() * 3), ry = 5 + Math.floor(rand() * 2), r = null, w = 0, h = 0;
+      let rx = L.kind === 'lake' ? 11 : 7 + Math.floor(rand() * 3), ry = L.kind === 'lake' ? 7 : 5 + Math.floor(rand() * 2), r = null, w = 0, h = 0;
       for (;;) {
         w = Math.ceil(rx * 2.5) + 2; h = Math.ceil(ry * 2.5) + 2;
         r = fitRect(q, w, h, 120);
@@ -198,6 +200,7 @@
         else if (d < 1.5) setT(x, y, SAND);
       }
       reserve(r.x, r.y, w, h);
+      if (L.kind === 'lake') { buildLakeIsland(cx, cy, rx, ry); buildJetty(); }
       let sx0 = Math.round(cx + rx * 0.45);
       let dirs = [q.north ? -1 : 1];
       if (L.kind === 'river') {
@@ -231,6 +234,7 @@
       reserve(gx - 1, gy - 1, 13, 12);
       markSolid(gx - 1, gy - 1, 13, 12);
     }
+    buildKindEarly(markSolid);
 
     // Houses: up to three per home quadrant, rows nearest the road first
     const roofs = shuffled(['#b5523b', '#4f6fa8', '#7a4f8f', '#3f7f6a', '#c08a2e', '#b5523b', '#4f6fa8']);
@@ -274,6 +278,7 @@
       setT(g.gateX, g.gateY, PATH);
       carvePath(g.gateX, outY, solid);
     }
+    if (L.jetty) carvePath(L.jetty.baseX - L.jetty.sx, L.jetty.baseY - L.jetty.sy, solid);
 
     // Who lives where: Bertram nearest his garden, everyone else at random
     {
@@ -320,10 +325,12 @@
     // Plaza props
     const px = plaza.x, py = plaza.y;
     objects.push(makeWell((px + 6) * TILE, (py + 4.2) * TILE));
-    objects.push(makeBench((px + 2) * TILE, (py + 1.4) * TILE));
-    objects.push(makeBench((px + 10) * TILE, (py + 1.4) * TILE));
-    objects.push(makeBench((px + 2) * TILE, (py + 10.6) * TILE));
-    objects.push(makeBench((px + 10) * TILE, (py + 10.6) * TILE));
+    if (L.kind !== 'market') { // on market day the stalls take the benches' places
+      objects.push(makeBench((px + 2) * TILE, (py + 1.4) * TILE));
+      objects.push(makeBench((px + 10) * TILE, (py + 1.4) * TILE));
+      objects.push(makeBench((px + 2) * TILE, (py + 10.6) * TILE));
+      objects.push(makeBench((px + 10) * TILE, (py + 10.6) * TILE));
+    }
     for (const [lx, ly] of [[0.5, 0.6], [11.5, 0.6], [0.5, 11.6], [11.5, 11.6]]) objects.push(makeLamp((px + lx) * TILE, (py + ly) * TILE));
     {
       const pcx = px + 6;
@@ -332,6 +339,7 @@
       const left = L.pond.cx <= pcx ? 'POND' : gcx <= pcx ? 'GARDEN' : 'HOMES';
       objects.push(makeSign((px + 8.2) * TILE, (py + 7.4) * TILE, right, left === right ? 'HOMES' : left));
     }
+    buildKindLate();
 
     // Garden fence + scarecrow
     {
@@ -1406,6 +1414,7 @@
     return t === WATER || t === WALL;
   }
   function collides(x, y) {
+    if (player.boat) return boatBlocked(x, y);
     const l = x - PLAYER_HB.w / 2, r = x + PLAYER_HB.w / 2, t = y - PLAYER_HB.h, b = y;
     if (l < 0 || t < 0 || r > WORLD_W || b > MH_ALL * TILE) return true;
     if (solidAt(l, t) || solidAt(r, t) || solidAt(l, b) || solidAt(r, b) || solidAt(x, t) || solidAt(x, b)) return true;
@@ -1435,7 +1444,8 @@
     const heavy = player.held && player.held.type.heavy;
     const running = input.run && !heavy;
     let maxSpd = heavy ? WALK_SPEED * heavyMult() : running ? runSpeed() : WALK_SPEED;
-    if (player.stuffed) maxSpd = Math.min(maxSpd, WALK_SPEED * 0.75); // waddle
+    if (player.boat) maxSpd = 80; // rowing
+    else if (player.stuffed) maxSpd = Math.min(maxSpd, WALK_SPEED * 0.75); // waddle
     else if (player.sugar > 0) maxSpd *= 1.25;                         // zoom
     const tx = ix * maxSpd, ty = iy * maxSpd;
 
@@ -1527,6 +1537,11 @@
       drawRaccoonFront(ctx, p, t, moving, bob);
     } else {
       drawRaccoonBack(ctx, p, t, moving, bob);
+    }
+    if (p.flour > 0) { // dusted white from ears to tail
+      ctx.globalAlpha = Math.min(1, p.flour / 5) * 0.72; ctx.fillStyle = '#fbfaf6';
+      ellipse(ctx, 0, -9, 11, 8); ellipse(ctx, 0, -17, 8, 6); ellipse(ctx, -9, -8, 5, 3);
+      ctx.globalAlpha = 1;
     }
     if (p.mud > 0) { // caked in mud
       ctx.globalAlpha = Math.min(1, p.mud / 6) * 0.8; ctx.fillStyle = '#6b4a2e';
@@ -2241,6 +2256,7 @@
       placeFree('pinecone', tr.x + rr(-16, 16), tr.y + rr(6, 12));
     }
     placeSeasonalItems();
+    placeKindItems();
     const trees = objects.filter((o) => o.kind === 'tree' && o.x > 5 * T && o.x < WORLD_W - 5 * T && o.y > 5 * T && o.y < WORLD_H - 5 * T);
     for (let n = 0; n < 10 && trees.length; n++) {
       const tr = trees.splice(Math.floor(rand() * trees.length), 1)[0];
@@ -2325,6 +2341,7 @@
   function grabOrDrop() {
     if (!started) return;
     if (player.inWardrobe) { exitWardrobe(); return; }
+    if (boatAction()) return;
     if (player.held && !(petChoice() === 'wardrobe')) { dropHeld(false); return; }
     const pc = petChoice();
     if (pc === 'dog') { petDog(); return; }
@@ -2351,6 +2368,11 @@
     if (it.kind === 'goldpot') { completeTask('gold'); run.earned += 3; updateRunBar(); setTimeout(() => toast('+3 \u2726 bonus', 'Pot of gold!', true), 1200); if (L.rainbow) L.rainbow.t = Math.min(L.rainbow.t, 4); }
     if (it.owner && VILLAGER[it.owner] && VILLAGER[it.owner].dozing > 0 && Math.hypot(VILLAGER[it.owner].x - it.x, VILLAGER[it.owner].y - it.y) < 160) completeTask('dozing');
     if (it.kind === 'egg') completeTask('egg');
+    if (it.stall) { completeTask('stall'); if (['teddy', 'toyboat', 'kite'].includes(it.kind)) completeTask('toystall'); }
+    if (it.kind === 'bigfish') completeTask('bigfish');
+    if (it.kind === 'rosette') completeTask('rosette');
+    if (it.kind === 'weddingcake') completeTask('weddingcake');
+    if (it.kind === 'bouquet') completeTask('bouquet');
     if (it.kind === 'paintegg') { run.eggs = (run.eggs || 0) + 1; setProgress('eggs3', run.eggs); }
     if (it.kind === 'sock' || it.kind === 'shirt') completeTask('washing');
     if (it.kind === 'fish' && it.owner === 'ollie') completeTask('fish');
@@ -2484,7 +2506,7 @@
           continue;
         }
         if (!it.noticed) { it.noticed = true; dogNotice(it); }
-        if (it.type.fragile && it.vz < (it.kind === 'snowball' ? -40 : -165)) { shatter(it); items.splice(i, 1); continue; } // crash!
+        if (it.type.fragile && it.vz < (it.kind === 'snowball' || it.kind === 'flour' ? -40 : -165)) { shatter(it); items.splice(i, 1); continue; } // crash!
         if (it.vz < -110) {
           it.vz = -it.vz * (it.kind === 'ball' ? 0.6 : 0.3);
           it.vx *= 0.75; it.vy *= 0.75;
@@ -2822,7 +2844,7 @@
   function spawnVillagers() {
     const mult = run.villagerSpeed;
     for (const d of VILLAGER_DEFS) {
-      const stops = stopsFor(d.id).map((s) => {
+      const stops = withStall(d.id, stopsFor(d.id)).map((s) => {
         if (navBlockedPt(s.wx, s.wy)) {
           const o = nearestOpen(Math.floor(s.wx / TILE), Math.floor(s.wy / TILE));
           if (o) { s.wx = (o[0] + 0.5) * TILE; s.wy = (o[1] + 0.6) * TILE; }
@@ -3066,7 +3088,7 @@
       v.lineT -= dt;
       if (v.lineT <= 0) {
         v.lineT = 5 + Math.random() * 6;
-        const ls = v.lines[stop.act] || (stop.act === 'home' ? HOME_LINES : null);
+        const ls = stop.lines || v.lines[stop.act] || (stop.act === 'home' ? HOME_LINES : null);
         if (ls && Math.random() < 0.6) say(v, rpick(ls));
       }
     }
@@ -3415,6 +3437,13 @@
     { id: 'whirlwind', tier: 'Easy', text: 'Get swept up in the whirlwind', req: ['whirlwind'] },
     { id: 'mud', tier: 'Easy', text: 'Roll in the mud with the pig', req: ['pig'] },
     { id: 'pepper', tier: 'Easy', text: 'Win Pepper the pup over with a snack', hint: 'drop some food near her' },
+    { id: 'stall', tier: 'Easy', text: 'Swipe something from a market stall', req: ['stalls'] },
+    { id: 'flour', tier: 'Easy', text: 'Get covered in flour', hint: 'throw a flour sack', req: ['mill'] },
+    { id: 'wheat', tier: 'Easy', text: 'Hide in the wheat field', req: ['wheatfield'] },
+    { id: 'hay', tier: 'Easy', text: 'Hide in the haystack by the barn', req: ['barn'] },
+    { id: 'row', tier: 'Easy', text: 'Row the boat out onto the lake', hint: 'press E by the boat at the jetty', req: ['boat'] },
+    { id: 'rosette', tier: 'Easy', text: 'Swipe the first-prize rosette', req: ['fete'] },
+    { id: 'toffee', tier: 'Easy', text: 'Eat a toffee apple', req: ['bonfire'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3454,6 +3483,15 @@
     { id: 'parrot', tier: 'Medium', text: 'Get the parrot shouting “THIEF!”', hint: 'carry someone’s things past it', req: ['parrot'] },
     { id: 'muddy', tier: 'Medium', text: 'Track mud into someone’s house', req: ['pig'] },
     { id: 'mouse', tier: 'Medium', text: 'Scare someone with a mouse', hint: 'chase one towards them, indoors' },
+    { id: 'cart', tier: 'Medium', text: 'Knock over the fruit cart', hint: 'run into it', req: ['cart'] },
+    { id: 'toystall', tier: 'Medium', text: "Steal a toy from Percy's toy stall", req: ['stalls'] },
+    { id: 'ghost', tier: 'Medium', text: 'Scare someone while covered in flour', hint: 'they’ll think you’re a ghost', req: ['mill'] },
+    { id: 'island', tier: 'Medium', text: 'Stash something on the island', req: ['island'] },
+    { id: 'bigfish', tier: 'Medium', text: 'Steal the prize fish from the fishing contest', req: ['contest'] },
+    { id: 'cakecontest', tier: 'Medium', text: 'Eat a cake from the cake contest', req: ['fete'] },
+    { id: 'bouquet', tier: 'Medium', text: 'Steal the wedding bouquet', req: ['wedding'] },
+    { id: 'firework', tier: 'Medium', text: 'Set off a firework', hint: 'throw a rocket into the bonfire', req: ['bonfire'] },
+    { id: 'scarecrows', tier: 'Medium', text: 'Knock down 3 festival scarecrows', goal: 3, hint: 'throw things at them', req: ['scarecrows'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3487,6 +3525,7 @@
     { id: 'herd', tier: 'Hard', text: 'Herd a sheep out of its field', hint: 'chase it out the gate', req: ['farm'] },
     { id: 'deer', tier: 'Hard', text: 'Sneak right up to a deer', hint: 'freeze when it looks up' },
     { id: 'bees', tier: 'Hard', text: 'Lead a swarm of bees to a villager', hint: 'bump the beehive, then run', req: ['bees'] },
+    { id: 'weddingcake', tier: 'Hard', text: 'Run off with the wedding cake', req: ['wedding'] },
     { id: 'hens', tier: 'Hard', text: 'Get every hen squawking at once' },
     { id: 'eggs3', tier: 'Hard', text: 'Find 3 painted eggs', goal: 3, req: ['spring'] },
     { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
@@ -3565,6 +3604,15 @@
       if (r === 'fishpond' && !(L.kind !== 'seaside' && hasOpenWater())) return false;
       if (r === 'swan' && L.kind === 'seaside') return false;
       if (r === 'notwinter' && isWinter()) return false;
+      if (EVENT_NAMES.includes(r) && L.event !== r) return false;
+      if (r === 'boat' && !(L.boat && hasOpenWater())) return false;
+      if (r === 'island' && !L.island) return false;
+      if (r === 'contest' && !L.contest) return false;
+      if (r === 'cart' && !L.cart) return false;
+      if (r === 'stalls' && !L.stalls) return false;
+      if (r === 'mill' && !L.mill) return false;
+      if (r === 'wheatfield' && !L.wheat) return false;
+      if (r === 'barn' && !L.barn) return false;
       if (r === 'farm' && !L.paddock) return false;
       if (r === 'rainbow' && !rainbowPossible()) return false;
       if (r === 'heatwave' && !planHas(['heatwave'])) return false;
@@ -3729,10 +3777,10 @@
     updateRunBar();
     document.getElementById('rc-day').textContent = `Day ${run.day}`;
     document.getElementById('rc-town').textContent = L.name;
-    document.getElementById('rc-season').textContent = `${cap(L.season)}${L.weather !== 'clear' ? ', ' + WEATHER_LABEL[L.weather].toLowerCase() : ''} \u00b7 ${L.kind === 'seaside' ? 'Seaside' : L.kind === 'river' ? 'Riverside' : 'Pond'} village`;
+    document.getElementById('rc-season').textContent = `${cap(L.season)}${L.weather !== 'clear' ? ', ' + WEATHER_LABEL[L.weather].toLowerCase() : ''} \u00b7 ${KIND_LABEL[L.kind]} village${L.event ? ' \u00b7 ' + EVENT_LABEL[L.event] + '!' : ''}`;
     const later = (L.weatherPlan || []).slice(1).find((s) => s.w !== L.weather);
     const forecast = later ? `Forecast: ${later.w === 'clear' ? 'clearing up' : WEATHER_LABEL[later.w].toLowerCase()} later.` : '';
-    document.getElementById('rc-tip').textContent = [WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season], KIND_TIP[L.kind]].filter(Boolean).join(' ');
+    document.getElementById('rc-tip').textContent = [EVENT_TIP[L.event], KIND_TIP[L.kind], WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season]].filter(Boolean).join(' ');
     const m = Math.floor(run.timeTotal / 60), s = run.timeTotal % 60;
     document.getElementById('rc-tasks').textContent = `${run.tasks.length} tasks`;
     document.getElementById('rc-time').textContent = `${m}:${String(s).padStart(2, '0')} until sunset`;
@@ -3996,6 +4044,8 @@
     if (player.hidden && bush.kind === 'bed' && villagers.some((v) => areaOf(v.x, v.y) === areaOf(player.x, player.y))) completeTask('bedhome');
     if (player.hidden && !wasHidden) {
       completeTask(bush.kind === 'bed' ? 'bed' : bush.kind === 'leafpile' ? 'leafhide' : 'hide');
+      if (bush.kind === 'wheat') completeTask('wheat');
+      if (bush.kind === 'haystack') completeTask('hay');
       // Chasers who weren't right on top of you lose track in the leaves
       for (const v of villagers) {
         if (v.state === 'chase' && Math.hypot(v.x - player.x, v.y - player.y) > 60) {
@@ -4340,6 +4390,7 @@
 
   // Fragile things smash when they hit the floor hard
   function shatter(it) {
+    if (it.kind === 'flour') { burstFlour(it); return; }
     if (it.kind === 'snowball') { // a soft white splat, not a crash
       for (let k = 0; k < 8; k++) particles.push({ kind: 'shard', col: '#f4f8fb', x: it.x, y: it.y, z: Math.max(2, it.z), vx: rr(-40, 40), vy: rr(-20, 20), vz: rr(30, 80), life: 0.5, max: 0.5 });
       sfx('splat');
@@ -4627,6 +4678,8 @@
     setProgress('eat5', run.eaten);
     if (it.kind === 'pie') completeTask('eatpie');
     if (it.kind === 'lemonade') completeTask('lemonade');
+    if (it.contest && it.kind === 'cake') completeTask('cakecontest');
+    if (it.kind === 'toffee') completeTask('toffee');
     if (f.sweet) { player.sugar = 12; completeTask('sugar'); toast('Sugar rush!', 'Zoom zoom', true); }
     // Did the owner watch you finish it?
     const owner = it.owner && VILLAGER[it.owner];
@@ -4899,7 +4952,7 @@
   // it looks and what there is to do.
   // ---------------------------------------------------------------------------
   const SEASON_NAMES = ['spring', 'summer', 'autumn', 'winter'];
-  const KIND_NAMES = ['pond', 'river', 'seaside'];
+  const KIND_NAMES = ['pond', 'river', 'seaside', 'market', 'windmill', 'lake'];
   const SEASON_LOOK = {
     spring: { grass: '#7cba55', patch: ['rgba(110,170,70,0.35)', 'rgba(175,220,120,0.3)'], blade: ['rgba(70,135,50,0.55)', 'rgba(175,225,120,0.5)'], blades: 9000,
       flowers: 1200, petals: ['#ffffff', '#ffd1e3', '#ff9ec4', '#c9b3ff', '#fff3a8'], path: ['#b08b55', '#cfac72'], sand: ['#c9b57e', '#e3cf96'],
@@ -4924,7 +4977,8 @@
     autumn: 'Autumn: leaf piles are perfect for jumping in, and for hiding in.',
     winter: 'Winter: press E on the snow to scoop a snowball. Watch out, the ice is slippery.',
   };
-  const KIND_TIP = { pond: '', river: 'A river runs right through the village.', seaside: 'The village sits by the sea, with a pier.' };
+  const KIND_TIP = { pond: '', river: 'A river runs right through the village.', seaside: 'The village sits by the sea, with a pier.',
+    market: 'It’s market day! The stalls are full of goodies, and the stallholders are watching.', windmill: 'A windmill turns on the hill: flour sacks, a wheat field and a hay barn.', lake: 'A big lake with an island in the middle. Take the rowing boat from the jetty.' };
   const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
   // --- Seasonal objects ---------------------------------------------------------
@@ -6847,6 +6901,568 @@
   }
 
   // ---------------------------------------------------------------------------
+  // More villages: market day, a windmill on the hill, a lake with an island.
+  // Village events: a fete, a wedding, bonfire night, a scarecrow festival.
+  // ---------------------------------------------------------------------------
+  const EVENT_NAMES = ['fete', 'wedding', 'bonfire', 'scarecrows'];
+  const EVENTS_BY_SEASON = { spring: ['fete', 'wedding'], summer: ['fete', 'wedding', 'scarecrows'], autumn: ['bonfire', 'scarecrows', 'wedding'], winter: ['bonfire'] };
+  const EVENT_LABEL = { fete: 'Village fete', wedding: 'Wedding day', bonfire: 'Bonfire night', scarecrows: 'Scarecrow festival' };
+  const EVENT_TIP = {
+    fete: 'It’s the village fete! Bunting, and a cake contest on the plaza.',
+    wedding: 'There’s a wedding on the plaza today: flowers, chairs, and a very big cake.',
+    bonfire: 'Bonfire night! Fireworks after dusk, toffee apples, and a box of rockets by the fire.',
+    scarecrows: 'Scarecrow festival: everyone’s made a scarecrow. It would be a shame if they fell over...',
+  };
+  const KIND_LABEL = { pond: 'Pond', river: 'Riverside', seaside: 'Seaside', market: 'Market', windmill: 'Windmill', lake: 'Lakeside' };
+  function pickEvent(season) { return rand() < 0.4 ? pick(EVENTS_BY_SEASON[season]) : null; }
+
+  // --- New items -----------------------------------------------------------------------------
+  Object.assign(ITEM, {
+    flour: { name: 'flour sack', h: 13, r: 6, fragile: true, draw(c) {
+      c.fillStyle = '#efe6d2'; roundRect(c, -6, -13, 12, 13, 4, true);
+      c.fillStyle = '#d9cdb0'; c.fillRect(-6, -11, 12, 1.5);
+      c.fillStyle = '#c0a060'; c.font = 'bold 5px sans-serif'; c.textAlign = 'center'; c.fillText('FLOUR', 0, -4);
+    } },
+    bigfish: { name: 'prize fish', h: 8, r: 10, draw(c) {
+      c.fillStyle = '#7fa3b8'; ellipse(c, 0, -4, 11, 4.5);
+      c.fillStyle = '#5a8199'; poly(c, [[-9, -4], [-15, -9], [-15, 1]]); c.fill();
+      c.fillStyle = '#c9d8e2'; ellipse(c, 1, -2.6, 7, 1.6);
+      c.fillStyle = '#1d1d22'; circle(c, 7, -5, 0.9);
+      c.fillStyle = '#e8453c'; c.fillRect(-3, -10, 5, 3); // prize ribbon
+    } },
+    rosette: { name: 'first-prize rosette', h: 9, r: 5, draw(c) {
+      c.fillStyle = '#4f6fa8'; poly(c, [[-2, -3], [-4, 3], [-1, 1]]); c.fill(); poly(c, [[2, -3], [4, 3], [1, 1]]); c.fill();
+      c.fillStyle = '#4f6fa8'; circle(c, 0, -6, 4.5); c.fillStyle = '#f2c14e'; circle(c, 0, -6, 2.2);
+    } },
+    weddingcake: { name: 'wedding cake', h: 26, r: 9, heavy: true, draw(c) {
+      c.fillStyle = '#f8f4ec'; roundRect(c, -9, -10, 18, 10, 2, true); roundRect(c, -6.5, -18, 13, 8, 2, true); roundRect(c, -4, -24, 8, 6, 2, true);
+      c.fillStyle = '#f2b8c6'; for (const [y, w] of [[-10, 9], [-18, 6.5], [-24, 4]]) c.fillRect(-w, y, w * 2, 1.4);
+      c.fillStyle = '#e8453c'; circle(c, 0, -25.5, 1.6);
+    } },
+    bouquet: { name: 'wedding bouquet', h: 11, r: 5, draw(c) {
+      c.fillStyle = '#3f7f6a'; poly(c, [[-1.5, 0], [1.5, 0], [3, -6], [-3, -6]]); c.fill();
+      for (const [x, y, col] of [[-3, -8, '#ffffff'], [3, -8, '#f2b8c6'], [0, -10, '#ffd166'], [-1.5, -6.5, '#f2b8c6'], [1.5, -6.5, '#ffffff']]) { c.fillStyle = col; circle(c, x, y, 2.3); }
+    } },
+    rocket: { name: 'firework rocket', h: 14, r: 4, draw(c) {
+      c.fillStyle = '#c0392b'; c.fillRect(-2, -12, 4, 10);
+      c.fillStyle = '#f2c14e'; poly(c, [[-2.5, -12], [2.5, -12], [0, -16]]); c.fill();
+      c.fillStyle = '#7a5230'; c.fillRect(-0.5, -2, 1, 4);
+    } },
+    toffee: { name: 'toffee apple', h: 11, r: 4, draw(c) {
+      c.fillStyle = '#d9c4a0'; c.fillRect(-0.6, -11, 1.2, 5);
+      c.fillStyle = '#8a3a1a'; circle(c, 0, -4, 4); c.fillStyle = '#c0582a'; circle(c, -1.2, -5.2, 1.4);
+    } },
+  });
+  Object.assign(FOOD, { weddingcake: { bites: 5, fill: 60, sweet: true }, toffee: { bites: 2, fill: 18, sweet: true } });
+
+  // --- Lake: an island, a jetty and a rowing boat --------------------------------------------
+  function buildLakeIsland(cx, cy, rx, ry) {
+    if (rx < 7 || ry < 4) return;
+    let n = 0;
+    for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+      const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, d = dx * dx + dy * dy;
+      if (d < 0.07) { setT(x, y, GRASS); n++; } else if (d < 0.13) { setT(x, y, SAND); n++; }
+    }
+    if (n) L.island = { cx, cy, rx: rx * Math.sqrt(0.13), ry: ry * Math.sqrt(0.13) };
+  }
+  const onIsland = (x, y) => { const I = L && L.island; if (!I) return false; const dx = (x / TILE - I.cx) / I.rx, dy = (y / TILE - I.cy) / I.ry; return dx * dx + dy * dy < 1.1 && tileAt(x, y) !== WATER; };
+  // A jetty sticking out into the lake on the side facing the plaza (planks over the water)
+  function buildJetty() {
+    const p = L.pond, a = Math.atan2(L.plaza.y + 6 - p.cy, L.plaza.x + 6 - p.cx);
+    const horiz = Math.abs(Math.cos(a)) > Math.abs(Math.sin(a));
+    const ox = horiz ? Math.sign(Math.cos(a)) : 0, oy = horiz ? 0 : Math.sign(Math.sin(a)); // towards the plaza
+    let x = Math.floor(p.cx), y = Math.floor(p.cy), seenWater = false, shore = null;
+    for (let n = 0; n < 40; n++, x += ox, y += oy) {
+      const w = getT(x, y) === WATER;
+      if (w) seenWater = true; else if (seenWater) { shore = [x, y]; break; }
+    }
+    if (!shore) return;
+    const sx = -ox, sy = -oy; // the jetty points back out over the water
+    x = shore[0]; y = shore[1];
+    let len = 0;
+    for (; len < 4; len++) { x += sx; y += sy; if (getT(x, y) !== WATER) break; setT(x, y, BRIDGE); }
+    if (len < 2) return;
+    const endX = x - sx, endY = y - sy;
+    L.jetty = { baseX: shore[0], baseY: shore[1], x: (endX + 0.5) * TILE, y: (endY + 0.6) * TILE, sx, sy };
+    // the boat moored alongside the end
+    const bx = endX + (sy !== 0 ? 1 : 0), by = endY + (sx !== 0 ? 1 : 0);
+    if (getT(bx, by) === WATER) L.boat = { x: (bx + 0.5) * TILE, y: (by + 0.7) * TILE };
+    else if (getT(endX + sx, endY + sy) === WATER) L.boat = { x: (endX + sx + 0.5) * TILE, y: (endY + sy + 0.7) * TILE };
+    L.boatHome = L.boat && { ...L.boat };
+  }
+  function drawRowboat(ctx, x, y, t, rowing) {
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = 'rgba(200,230,255,0.45)'; ellipse(ctx, 0, 2, 20, 6);
+    ctx.fillStyle = '#7a5230'; ellipse(ctx, 0, -1, 18, 7.5);
+    ctx.fillStyle = '#a0703f'; ellipse(ctx, 0, -2.5, 15, 5.5);
+    ctx.fillStyle = '#7a5230'; ctx.fillRect(-2, -8, 4, 11);
+    const a = rowing ? Math.sin(t * 6) * 0.5 : 0.2;
+    ctx.strokeStyle = '#c9a26a'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 6, -3); ctx.lineTo(s * (19 + Math.cos(a) * 2), 3 + Math.sin(a) * 4); ctx.stroke(); }
+    ctx.restore();
+  }
+  const boatWater = (x, y) => tileAt(x, y) === WATER;
+  function boatBlocked(x, y) {
+    for (const [ox, oy] of [[-10, -4], [10, -4], [-10, 3], [10, 3], [0, 0]]) if (!boatWater(x + ox, y + oy) || x + ox < 0 || y + oy < 0) return true;
+    return false;
+  }
+  // E by the boat climbs in; E in the boat climbs out onto the nearest bit of land
+  function boatAction() {
+    if (!L || L.kind !== 'lake') return false;
+    if (player.boat) {
+      const d = DIRV[player.dir];
+      let best = null, bd = 1e9;
+      player.boat = false;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) for (const r of [20, 26, 32]) {
+        const x = player.x + Math.cos(a) * r, y = player.y + Math.sin(a) * r * 0.8;
+        if (collides(x, y) || tileAt(x, y) === WATER) continue;
+        const score = r - (Math.cos(a) * d[0] + Math.sin(a) * d[1]) * 12;
+        if (score < bd) { bd = score; best = { x, y }; }
+      }
+      if (!best) { player.boat = true; player.bubble = { text: 'no land here', t: 1 }; return true; }
+      L.boat = { x: player.x, y: player.y };
+      Object.assign(player, { x: best.x, y: best.y, vx: 0, vy: 0 });
+      sfx('tap');
+      return true;
+    }
+    if (!L.boat || !hasOpenWater() || (player.held && player.held.type.heavy)) return false;
+    if (Math.hypot(L.boat.x - player.x, L.boat.y - player.y) > 46) return false;
+    Object.assign(player, { boat: true, x: L.boat.x, y: L.boat.y, vx: 0, vy: 0, boatFrom: { x: L.boat.x, y: L.boat.y } });
+    L.boat = null; sfx('splash');
+    return true;
+  }
+  const boatNear = () => L && L.kind === 'lake' && !player.boat && L.boat && hasOpenWater() && Math.hypot(L.boat.x - player.x, L.boat.y - player.y) < 46;
+  function makeBoatObj() {
+    const o = {
+      kind: 'rowboat', isBoatObj: true,
+      get x() { return L.boat ? L.boat.x : -999; }, get y() { return L.boat ? L.boat.y : -999; },
+      get bounds() { const b = L.boat || { x: -999, y: -999 }; return { l: b.x - 24, r: b.x + 24, t: b.y - 14, b: b.y + 10 }; },
+      draw(ctx, t) { if (L.boat) drawRowboat(ctx, L.boat.x, L.boat.y + Math.sin(t * 1.5) * 0.6, t, false); },
+    };
+    return o;
+  }
+  function makeContestTable(x, y, label, cloth = '#f4f2ee') {
+    return {
+      kind: 'table', x, y, hitbox: box(x - 22, y - 8, 44, 9), bounds: { l: x - 30, r: x + 30, t: y - 40, b: y + 4 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 4, y, 26, 5); },
+      draw(ctx) {
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 20, y - 12, 3, 12); ctx.fillRect(x + 17, y - 12, 3, 12);
+        ctx.fillStyle = cloth; roundRect(ctx, x - 23, y - 16, 46, 6, 2, true);
+        ctx.fillStyle = shade(cloth, -0.12); ctx.fillRect(x - 23, y - 11, 46, 4);
+        if (label) {
+          ctx.fillStyle = '#7a5230'; ctx.fillRect(x + 24, y - 30, 2, 30);
+          ctx.fillStyle = '#f4e3b8'; roundRect(ctx, x + 14, y - 40, 34, 12, 2, true);
+          ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(label, x + 31, y - 32);
+        }
+      },
+    };
+  }
+
+  // --- Market: four stalls on the plaza and a fruit cart -------------------------------------
+  const STALLS = [
+    { owner: 'rosa', label: 'BAKERY', col: '#c0392b', goods: ['bread', 'cookies', 'bread'], lines: ['Fresh bread!', 'Cookies! Lovely cookies!', 'Get your loaves here!'] },
+    { owner: 'bertram', label: 'FRUIT & VEG', col: '#3f7f6a', goods: ['apple', 'cabbage', 'apple', 'carrot'], lines: ['Apples! Crunchy apples!', 'Veg, fresh from the garden!', 'Carrots, two a penny!'] },
+    { owner: 'ollie', label: 'FISH', col: '#4f6fa8', goods: ['fish', 'fish', 'fish'], lines: ['Fresh fish!', 'Caught this morning!', 'Fiiish! Lovely fish!'] },
+    { owner: 'percy', label: 'TOYS', col: '#d9a43a', goods: ['teddy', 'toyboat', 'kite'], lines: ['Toys for the little ones!', 'Teddies! Kites!', 'Roll up, roll up!'] },
+  ];
+  function makeStall(x, y, s) {
+    return {
+      kind: 'stall', x, y, hitbox: box(x - 44, y - 11, 88, 12), bounds: { l: x - 52, r: x + 52, t: y - 70, b: y + 4 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 4, y, 50, 6); },
+      draw(ctx, t) {
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 46, y - 56, 3, 56); ctx.fillRect(x + 43, y - 56, 3, 56);
+        ctx.fillStyle = '#a0703f'; ctx.fillRect(x - 46, y - 16, 92, 16);
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 46, y - 16, 92, 3);
+        // striped canopy
+        for (let k = 0; k < 8; k++) { ctx.fillStyle = k % 2 ? '#f4f2ee' : s.col; ctx.fillRect(x - 50 + k * 12.5, y - 64, 12.5, 10); }
+        for (let k = 0; k < 8; k++) { ctx.fillStyle = k % 2 ? '#f4f2ee' : s.col; ctx.beginPath(); ctx.arc(x - 43.75 + k * 12.5, y - 54, 6.25, 0, Math.PI); ctx.fill(); }
+        ctx.fillStyle = '#f4e3b8'; roundRect(ctx, x - 26, y - 13, 52, 9, 2, true);
+        ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 6.5px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(s.label, x, y - 6.5);
+      },
+    };
+  }
+  function makeCart(x, y) {
+    const C = { x, y, tipped: false };
+    L.cart = C;
+    return {
+      kind: 'cart', x, y, hitbox: box(x - 20, y - 8, 40, 9), bounds: { l: x - 34, r: x + 34, t: y - 34, b: y + 6 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 4, y, 26, 5); },
+      draw(ctx) {
+        ctx.save(); ctx.translate(x, y);
+        if (C.tipped) ctx.rotate(-0.5);
+        ctx.fillStyle = '#7a5230'; circle(ctx, -12, -4, 6); circle(ctx, 12, -4, 6);
+        ctx.fillStyle = '#c9a26a'; circle(ctx, -12, -4, 2); circle(ctx, 12, -4, 2);
+        ctx.fillStyle = '#a0703f'; ctx.fillRect(-20, -18, 40, 11);
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(18, -14, 14, 2.5);
+        if (!C.tipped) { ctx.fillStyle = '#e8453c'; for (let k = 0; k < 7; k++) circle(ctx, -15 + k * 5, -19 - (k % 2) * 2, 3); }
+        ctx.restore();
+      },
+    };
+  }
+  function tipCart() {
+    const C = L.cart;
+    if (!C || C.tipped) return;
+    C.tipped = true; sfx('crash'); sfx('thud'); run.shake = Math.max(run.shake, 0.2);
+    for (let k = 0; k < 6; k++) {
+      const it = addItem('apple', C.x + rr(-10, 10), C.y - 4, { owner: 'bertram' });
+      Object.assign(it, { air: true, z: 14, vz: rr(80, 160), vx: rr(-120, 120), vy: rr(-30, 90), spin: rr(-10, 10), kicker: 'cart' });
+    }
+    lookTowards(C.x, C.y, 320, () => rpick(['My apples!', 'The cart!', 'Who did that?!']));
+    completeTask('cart');
+  }
+
+  // --- Windmill village: the mill, flour, a wheat field and a hay barn ----------------------
+  function makeWindmill(x, y) {
+    return {
+      kind: 'windmill', x, y, hitbox: box(x - 26, y - 16, 52, 17), bounds: { l: x - 80, r: x + 80, t: y - 190, b: y + 6 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.25)'; ellipse(ctx, x + 12, y, 44, 9); },
+      draw(ctx, t) {
+        ctx.fillStyle = '#e8dcc4'; poly(ctx, [[x - 28, y], [x + 28, y], [x + 18, y - 104], [x - 18, y - 104]]); ctx.fill();
+        ctx.fillStyle = '#d4c6a8'; poly(ctx, [[x + 8, y], [x + 28, y], [x + 18, y - 104], [x + 4, y - 104]]); ctx.fill();
+        ctx.fillStyle = '#7a4f3a'; poly(ctx, [[x - 22, y - 102], [x + 22, y - 102], [x, y - 128]]); ctx.fill();
+        ctx.fillStyle = '#5a3a20'; roundRect(ctx, x - 8, y - 22, 16, 22, 7, true);
+        ctx.fillStyle = '#7fa3b8'; ctx.fillRect(x - 5, y - 64, 10, 10); ctx.fillRect(x - 4, y - 90, 8, 8);
+        const spd = L.weather === 'windy' || L.weather === 'storm' ? 2.4 : L.weather === 'heatwave' ? 0.25 : 0.8;
+        const hx = x, hy = y - 100, a0 = t * spd;
+        for (let k = 0; k < 4; k++) {
+          const a = a0 + k * Math.PI / 2;
+          ctx.save(); ctx.translate(hx, hy); ctx.rotate(a);
+          ctx.fillStyle = '#7a5230'; ctx.fillRect(-1.5, 0, 3, 70);
+          ctx.fillStyle = 'rgba(244,242,238,0.92)'; ctx.fillRect(2, 14, 12, 54);
+          ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 0.8;
+          for (let j = 0; j < 5; j++) { ctx.beginPath(); ctx.moveTo(2, 18 + j * 11); ctx.lineTo(14, 18 + j * 11); ctx.stroke(); }
+          ctx.restore();
+        }
+        ctx.fillStyle = '#5a3a20'; circle(ctx, hx, hy, 4);
+      },
+    };
+  }
+  function makeWheatRow(x0, x1, y) {
+    const stalks = [];
+    for (let x = x0 + 2; x < x1 - 2; x += 4.5) stalks.push([x + rr(-1, 1), rr(16, 22), rr(0, 6)]);
+    const o = {
+      kind: 'wheat', x: (x0 + x1) / 2, y, rustle: 0, hitbox: null,
+      bounds: { l: x0 - 4, r: x1 + 4, t: y - 30, b: y + 4 },
+      contains(px, py) { return px > x0 + 4 && px < x1 - 4 && py > y - TILE + 4 && py <= y + 4; },
+      draw(ctx, t) {
+        const col = L.season === 'spring' ? ['#7fb350', '#5f9a3a'] : ['#e6c25a', '#c9a33a'];
+        ctx.lineCap = 'round';
+        for (const [sx, h, ph] of stalks) {
+          const near = Math.abs(sx - player.x) < 14 && Math.abs(y - player.y) < TILE && player.speed > 10 ? Math.sin(t * 30 + ph) * 2.5 : 0;
+          const sw = Math.sin(t * 1.4 + ph + sx * 0.05) * 2 + near;
+          ctx.strokeStyle = col[1]; ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.moveTo(sx, y); ctx.quadraticCurveTo(sx, y - h * 0.6, sx + sw, y - h); ctx.stroke();
+          ctx.fillStyle = col[0]; ellipse(ctx, sx + sw, y - h - 2, 1.8, 4);
+        }
+      },
+    };
+    return o;
+  }
+  function makeBarn(x, y) {
+    return {
+      kind: 'barn', x, y, hitbox: box(x - 56, y - 50, 112, 51), bounds: { l: x - 64, r: x + 64, t: y - 120, b: y + 6 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.25)'; ctx.fillRect(x - 50, y - 6, 120, 12); },
+      draw(ctx) {
+        ctx.fillStyle = '#a8392b'; ctx.fillRect(x - 56, y - 70, 112, 70);
+        ctx.fillStyle = '#8a2e22'; poly(ctx, [[x - 62, y - 68], [x + 62, y - 68], [x + 40, y - 110], [x - 40, y - 110]]); ctx.fill();
+        ctx.fillStyle = '#3a2418'; ctx.fillRect(x - 20, y - 48, 40, 48);
+        ctx.fillStyle = '#e6c56a'; poly(ctx, [[x - 18, y], [x + 18, y], [x + 12, y - 22], [x - 10, y - 26]]); ctx.fill(); // hay inside
+        ctx.strokeStyle = '#f4f2ee'; ctx.lineWidth = 2.5;
+        ctx.strokeRect(x - 20, y - 48, 40, 48);
+        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + s * 22, y - 48); ctx.lineTo(x + s * 42, y); ctx.moveTo(x + s * 42, y - 48); ctx.lineTo(x + s * 22, y); ctx.stroke(); }
+        ctx.fillStyle = '#3a2418'; ctx.fillRect(x - 10, y - 92, 20, 16); // the loft door
+        ctx.fillStyle = '#e6c56a'; ctx.fillRect(x - 8, y - 82, 16, 6);
+      },
+    };
+  }
+  function makeHaystack(x, y) {
+    const o = {
+      kind: 'haystack', x, y, r: 22, hitbox: null, rustle: 0,
+      bounds: { l: x - 30, r: x + 30, t: y - 40, b: y + 6 },
+      contains(px, py) { const dx = (px - x) / 20, dy = (py - (y - 6)) / 11; return dx * dx + dy * dy < 1; },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.25)'; ellipse(ctx, x + 5, y, 26, 6); },
+      draw(ctx, t) {
+        const shake = o.rustle > 0 ? Math.sin(t * 40) * 1.5 : 0;
+        ctx.fillStyle = '#c9a33a'; ellipse(ctx, x + shake, y - 12, 24, 15);
+        ctx.fillStyle = '#e6c56a'; ellipse(ctx, x + shake - 2, y - 15, 20, 12);
+        ctx.strokeStyle = '#b08a2a'; ctx.lineWidth = 0.8;
+        for (let k = 0; k < 9; k++) { const a = k * 0.7; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 14 + shake, y - 14 + Math.sin(a) * 7); ctx.lineTo(x + Math.cos(a) * 19 + shake, y - 18 + Math.sin(a) * 8); ctx.stroke(); }
+        if (player.hidden && player.hidingIn === o) {
+          const ex = player.x, ey = player.y - 16;
+          ctx.fillStyle = MASK; ellipse(ctx, ex, ey, 7, 2.8);
+          ctx.fillStyle = '#ffffff'; circle(ctx, ex - 3, ey, 1.6); circle(ctx, ex + 3, ey, 1.6);
+          ctx.fillStyle = NOSE; circle(ctx, ex - 3, ey, 0.8); circle(ctx, ex + 3, ey, 0.8);
+        }
+      },
+    };
+    return o;
+  }
+
+  // Called from buildMap after the garden, before the houses (needs room)
+  function buildKindEarly(markSolid) {
+    const T = TILE;
+    const quads = shuffled([...L.homeQs, L.pondQ, L.gardenQ]);
+    const place = (w, h) => { for (const q of quads) { const r = fitRect(q, w, h, 60); if (r) { reserve(r.x, r.y, w, h); return r; } } return null; };
+    L.mill = null; L.wheat = null; L.barn = null;
+    if (L.kind === 'windmill') {
+      const r = place(7, 6);
+      if (r) { L.mill = { x: (r.x + 3.5) * T, y: (r.y + 4.6) * T, door: { x: (r.x + 3.5) * T, y: (r.y + 5.4) * T } }; markSolid(r.x + 2, r.y + 3, 3, 2); }
+      if (!isWinter()) { const w = place(10, 5); if (w) L.wheat = { x: w.x + 1, y: w.y + 1, w: 8, h: 3 }; }
+      const b = place(6, 6);
+      if (b) { L.barn = { x: (b.x + 3) * T, y: (b.y + 3.6) * T }; markSolid(b.x, b.y + 1, 6, 3); }
+    }
+  }
+  // Called from buildMap after the plaza props
+  function buildKindLate() {
+    const T = TILE, P = L.plaza, px = P.x, py = P.y;
+    L.stalls = null; L.cart = null; L.festCrows = []; L.bonfire = null; L.fireworks = [];
+    if (L.kind === 'market') {
+      L.stalls = [];
+      const spots = [[px + 2.6, py + 2.2], [px + 9.4, py + 2.2], [px + 2.6, py + 10.6], [px + 9.4, py + 10.6]];
+      STALLS.forEach((s, i) => {
+        const [sx, sy] = spots[i];
+        objects.push(makeStall(sx * T, sy * T, s));
+        L.stalls.push({ ...s, x: sx * T, y: sy * T, vx: sx * T, vy: (sy - 0.9) * T });
+      });
+      const c = freeSpotNear(px + 13, py + 6, 2, 1, 3) || freeSpotNear(px - 3, py + 6, 2, 1, 3);
+      if (c) objects.push(makeCart((c[0] + 1) * T, (c[1] + 0.7) * T));
+    }
+    if (L.mill) objects.push(makeWindmill(L.mill.x, L.mill.y));
+    if (L.wheat) { const W = L.wheat; for (let r = 0; r < W.h; r++) objects.push(makeWheatRow(W.x * T, (W.x + W.w) * T, (W.y + r + 0.95) * T)); }
+    if (L.barn) { objects.push(makeBarn(L.barn.x, L.barn.y)); objects.push(makeHaystack(L.barn.x + 70, L.barn.y + 14)); }
+    if (L.jetty) {
+      objects.push(makeBoatObj());
+      const J = L.jetty, s = freeSpotNear(J.baseX + 2, J.baseY + 1, 2, 1, 4) || freeSpotNear(J.baseX - 3, J.baseY - 1, 2, 1, 4);
+      if (s) { L.contest = { x: (s[0] + 1) * T, y: (s[1] + 0.8) * T }; objects.push(makeContestTable(L.contest.x, L.contest.y, 'BIGGEST CATCH', '#dbe6ee')); }
+    }
+    if (L.island) { const I = L.island; objects.push(makeTree((I.cx + 0.6) * T, (I.cy - 0.1) * T)); }
+    // Events
+    const E = L.event;
+    if (E === 'fete' || E === 'wedding') objects.push(makeBunting(E));
+    if (E === 'fete') objects.push(makeContestTable((px + 9) * T, (py + 7.6) * T, 'CAKE CONTEST', '#f2d6dc'));
+    if (E === 'wedding') {
+      objects.push(makeArch((px + 6) * T, (py + 9.6) * T));
+      for (const cx of [3.4, 4.6, 7.4, 8.6]) for (const cy of [7, 8]) objects.push(makeChair((px + cx) * T, (py + cy) * T));
+      objects.push(makeContestTable((px + 2.6) * T, (py + 5.6) * T, null, '#f8f4ec'));
+    }
+    if (E === 'bonfire') {
+      L.bonfire = { x: (px + 6) * T, y: (py + 8.6) * T };
+      objects.push(makeBonfire(L.bonfire.x, L.bonfire.y));
+      objects.push(makeContestTable((px + 2.6) * T, (py + 5.6) * T, 'TOFFEE APPLES', '#f2e2c4'));
+    }
+    if (E === 'scarecrows') {
+      const cols = [['#c0392b', '#3a2418'], ['#7a4f8f', '#d9a43a'], ['#3f7f6a', '#2b2d33'], ['#d9a43a', '#4f6fa8'], ['#f2b8c6', '#7a5230']];
+      for (let k = 0; k < 5; k++) {
+        const s = k < 2 ? freeSpotNear(px + (k ? 13 : -2), py + 3 + k * 5, 1, 1, 4) : randomFreeSpot(1, 1);
+        if (s) { const o = makeFestScarecrow((s[0] + 0.5) * T, (s[1] + 0.85) * T, cols[k][0], cols[k][1]); objects.push(o); L.festCrows.push(o); }
+      }
+    }
+  }
+  // Items for the new villages and events (called at the end of placeItems)
+  function placeKindItems() {
+    const T = TILE, P = L.plaza, px = P.x, py = P.y;
+    if (L.stalls) for (const s of L.stalls) s.goods.forEach((g, i) => { addItem(g, s.x - 30 + i * (60 / Math.max(1, s.goods.length - 1)), s.y - 3, { z: 16, owner: s.owner }).stall = true; });
+    if (L.mill) {
+      for (let k = 0; k < 3; k++) placeFree('flour', L.mill.x - 34 + k * 12, L.mill.y + 12);
+      placeFree('bread', L.mill.x + 28, L.mill.y + 10, { owner: 'rosa' });
+      placeFree('flour', L.mill.x + 40, L.mill.y + 4);
+    }
+    if (L.contest) { const it = addItem('bigfish', L.contest.x - 6, L.contest.y - 3, { z: 16, owner: 'ollie' }); it.contest = true; }
+    const E = L.event;
+    if (E === 'fete') {
+      [['cake', 'rosa'], ['cake', 'mabel'], ['cake', 'fennick']].forEach(([k, o], i) => { const it = addItem(k, (px + 9) * T - 15 + i * 15, (py + 7.6) * T - 3, { z: 16, owner: o }); it.contest = true; });
+      addItem('rosette', (px + 9) * T + 18, (py + 7.6) * T - 2, { z: 16, owner: 'fennick' });
+    }
+    if (E === 'wedding') {
+      addItem('weddingcake', (px + 2.6) * T, (py + 5.6) * T - 3, { z: 16, owner: 'rosa' });
+      addItem('bouquet', (px + 7.4) * T, (py + 7) * T + 2, { z: 8, owner: 'fennick' });
+    }
+    if (E === 'bonfire') {
+      for (let k = 0; k < 3; k++) addItem('toffee', (px + 2.6) * T - 14 + k * 14, (py + 5.6) * T - 3, { z: 16, owner: 'mabel' });
+      for (let k = 0; k < 3; k++) placeFree('rocket', L.bonfire.x + 60 + k * 9, L.bonfire.y + 4);
+    }
+  }
+  // Market day: stallholders spend the morning at their stalls
+  function withStall(id, stops) {
+    const s = L.stalls && L.stalls.find((x) => x.owner === id);
+    if (!s) return stops;
+    return [{ wx: s.vx, wy: s.vy, act: 'sell', dur: 22, face: 'down', lines: s.lines }, ...stops];
+  }
+
+  // --- Event decorations --------------------------------------------------------------------
+  function makeBunting(kind) {
+    const P = L.plaza, T = TILE, x0 = P.x * T + 16, x1 = (P.x + P.w) * T - 16, ys = [P.y * T + 12, (P.y + P.h) * T - 10];
+    const cols = kind === 'wedding' ? ['#ffffff', '#f2b8c6', '#ffe9f0'] : ['#e8453c', '#f2c14e', '#4f93c7', '#8fd16a'];
+    return {
+      kind: 'bunting', x: (x0 + x1) / 2, y: ys[0] - 1, bounds: { l: x0 - 10, r: x1 + 10, t: ys[0] - 60, b: ys[1] + 4 },
+      draw(ctx, t) {
+        for (const y of ys) {
+          const top = y - 44;
+          ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.moveTo(x0, top); ctx.quadraticCurveTo((x0 + x1) / 2, top + 14, x1, top); ctx.stroke();
+          const n = 18;
+          for (let k = 1; k < n; k++) {
+            const u = k / n, fx = x0 + (x1 - x0) * u, fy = top + 14 * 2 * u * (1 - u) + Math.sin(t * 2 + k) * 0.6;
+            ctx.fillStyle = cols[k % cols.length]; poly(ctx, [[fx - 3.5, fy], [fx + 3.5, fy], [fx, fy + 7]]); ctx.fill();
+          }
+        }
+      },
+    };
+  }
+  function makeArch(x, y) {
+    return {
+      kind: 'arch', x, y, hitbox: null, bounds: { l: x - 40, r: x + 40, t: y - 80, b: y + 6 },
+      draw(ctx, t) {
+        ctx.strokeStyle = '#f4f2ee'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(x - 30, y); ctx.lineTo(x - 30, y - 44); ctx.arc(x, y - 44, 30, Math.PI, 0); ctx.lineTo(x + 30, y); ctx.stroke();
+        for (let k = 0; k < 14; k++) {
+          const a = Math.PI + (k / 13) * Math.PI, fx = x + Math.cos(a) * 30, fy = y - 44 + Math.sin(a) * 30;
+          ctx.fillStyle = k % 2 ? '#f2b8c6' : '#ffffff'; circle(ctx, fx, fy, 3.4);
+          ctx.fillStyle = '#7fb350'; circle(ctx, fx + 2, fy + 2, 1.5);
+        }
+        if (Math.random() < 0.05 && !paused) particles.push({ kind: 'shard', col: pick(['#f2b8c6', '#ffd166', '#ffffff', '#9ad1ff']), x: x + rr(-30, 30), y, z: 70, vx: rr(-15, 15), vy: rr(-5, 5), vz: rr(0, 20), life: 1.6, max: 1.6 });
+      },
+    };
+  }
+  function makeChair(x, y) {
+    return {
+      kind: 'chair', x, y, hitbox: null, bounds: { l: x - 8, r: x + 8, t: y - 22, b: y + 3 },
+      draw(ctx) {
+        ctx.fillStyle = '#f4f2ee'; ctx.fillRect(x - 5, y - 8, 10, 2.5); ctx.fillRect(x - 5, y - 18, 10, 9);
+        ctx.fillStyle = '#d9d2c4'; ctx.fillRect(x - 5, y - 6, 1.5, 6); ctx.fillRect(x + 3.5, y - 6, 1.5, 6);
+        ctx.fillStyle = '#f2b8c6'; circle(ctx, x, y - 16, 1.8);
+      },
+    };
+  }
+  function makeBonfire(x, y) {
+    return {
+      kind: 'bonfire', x, y, hitbox: box(x - 16, y - 8, 32, 9), bounds: { l: x - 60, r: x + 60, t: y - 70, b: y + 30 },
+      shadow(ctx) { const g = ctx.createRadialGradient(x, y - 6, 4, x, y - 6, 70); g.addColorStop(0, `rgba(255,170,60,${0.25 + duskK * 0.35})`); g.addColorStop(1, 'rgba(255,170,60,0)'); ctx.fillStyle = g; ctx.fillRect(x - 70, y - 76, 140, 140); },
+      draw(ctx, t) {
+        ctx.fillStyle = '#5a3a20';
+        for (const [a, l] of [[-0.6, 22], [0.6, 22], [-0.2, 18], [0.25, 20]]) { ctx.save(); ctx.translate(x, y - 3); ctx.rotate(a); ctx.fillRect(-2, -l, 4, l); ctx.restore(); }
+        for (let k = 0; k < 6; k++) {
+          const fx = x + Math.sin(t * 5 + k * 2) * 5 + (k - 2.5) * 3, h = 16 + Math.sin(t * 9 + k) * 6 + (k % 3) * 4;
+          ctx.fillStyle = k % 2 ? '#f2913a' : '#ffd166';
+          poly(ctx, [[fx - 5, y - 4], [fx + 5, y - 4], [fx + Math.sin(t * 7 + k) * 2, y - 4 - h]]); ctx.fill();
+        }
+        if (Math.random() < 0.3 && !paused) particles.push({ kind: 'spark', x: x + rr(-6, 6), y, z: 20, vx: rr(-10, 10), vy: 0, vz: rr(40, 90), life: 0.8, max: 0.8 });
+      },
+    };
+  }
+  function makeFestScarecrow(x, y, shirt, hat) {
+    const o = {
+      kind: 'festcrow', x, y, down: false,
+      hitbox: box(x - 4, y - 5, 8, 6), bounds: { l: x - 30, r: x + 30, t: y - 64, b: y + 10 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 6, y, 14, 4); },
+      draw(ctx, t) {
+        ctx.save(); ctx.translate(x, y);
+        if (o.down) { ctx.translate(0, 2); ctx.rotate(Math.PI / 2 * 0.95); } else ctx.rotate(Math.sin(t * 1.1 + x) * 0.04);
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(-2, -48, 4, 48); ctx.fillRect(-20, -36, 40, 3);
+        ctx.fillStyle = shirt; roundRect(ctx, -10, -40, 20, 22, 4, true);
+        ctx.fillStyle = '#e6c56a'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 20, -36); ctx.lineTo(s * 25, -30); ctx.lineTo(s * 18, -31); ctx.fill(); }
+        ctx.fillStyle = L.season === 'autumn' ? '#f2913a' : '#efe3cf'; circle(ctx, 0, -46, 7.5); // pumpkin heads in autumn
+        ctx.fillStyle = '#2b2d33'; circle(ctx, -2.5, -47, 1.3); circle(ctx, 2.5, -47, 1.3); ctx.fillRect(-3, -43.5, 6, 1.2);
+        ctx.fillStyle = hat; ctx.fillRect(-11, -54, 22, 3); roundRect(ctx, -6, -62, 12, 9, 2, true);
+        ctx.fillStyle = '#f2c14e'; circle(ctx, 6, -26, 2.2); // a prize ribbon
+        ctx.restore();
+      },
+    };
+    return o;
+  }
+
+  // --- Per frame ---------------------------------------------------------------------------------
+  function updateKinds(dt) {
+    if (!L || !started || paused) return;
+    const outside = areaOf(player.x, player.y) === 0;
+    // Rowing
+    if (player.boat) {
+      if (player.boatFrom && Math.hypot(player.x - player.boatFrom.x, player.y - player.boatFrom.y) > 70) completeTask('row');
+      if (player.speed > 10 && Math.random() < dt * 4) particles.push({ kind: 'ring', x: player.x + rr(-12, 12), y: player.y + 2, r: 2, life: 0.8, max: 0.8 });
+    }
+    if (L.island) for (const it of items) if (!it.held && !it.air && onIsland(it.x, it.y) && it.touched) { completeTask('island'); break; }
+    // The fruit cart
+    const C = L.cart;
+    if (C && !C.tipped && outside) {
+      if (Math.hypot(player.x - C.x, player.y - (C.y - 4)) < 30 && Math.max(player.speed, C.lastSpd || 0) > 120) tipCart();
+      C.lastSpd = player.speed;
+      for (const it of items) if (it.air && it.kicker !== 'cart' && Math.hypot(it.vx, it.vy) > 100 && it.z < 30 && Math.hypot(it.x - C.x, it.y - C.y) < 22) { tipCart(); break; }
+    }
+    // Flour clouds: walk into one and you come out white
+    if (L.flourClouds) for (let i = L.flourClouds.length - 1; i >= 0; i--) {
+      const c = L.flourClouds[i];
+      c.t -= dt;
+      if (Math.random() < dt * 12) particles.push({ x: c.x + rr(-22, 22), y: c.y + rr(-10, 10), r: rr(5, 9), life: 0.9, max: 0.9, vy: -6 });
+      if (Math.hypot(player.x - c.x, player.y - c.y) < 40 && areaOf(player.x, player.y) === areaOf(c.x, c.y)) {
+        if (!(player.flour > 20)) player.bubble = { text: '*cough* pfft!', t: 1.3 };
+        player.flour = 35; completeTask('flour');
+      }
+      if (c.t <= 0) L.flourClouds.splice(i, 1);
+    }
+    // Flour: covered in it, you look like a ghost
+    if (player.flour > 0) {
+      player.flour -= dt * (wet() ? 3 : 1);
+      if (Math.random() < dt * 6) particles.push({ x: player.x + rr(-6, 6), y: player.y - rr(0, 4), r: rr(1.5, 3), life: 0.6, max: 0.6, vy: -6 });
+      if (!player.hidden) for (const v of villagers) {
+        if ((v.ghostCD || 0) > time || (v.state !== 'route' && v.state !== 'act') || !canSeePlayer(v) || Math.hypot(v.x - player.x, v.y - player.y) > 140) continue;
+        v.ghostCD = time + 20;
+        if (startleV(v, rpick(['A G-G-GHOST!', 'Eeek! A ghost!', 'Wh-what IS that?!']), { state: 'sulk' })) { v.stateT = 2.5; completeTask('ghost'); }
+      }
+    }
+    // Festival scarecrows get knocked over by thrown things
+    for (const o of L.festCrows) {
+      if (o.down) continue;
+      for (const it of items) {
+        if (!it.air || Math.hypot(it.vx, it.vy) < 80 || it.z > 55 || Math.hypot(it.x - o.x, it.y - o.y) > 16) continue;
+        o.down = true; o.hitbox.w = 1; o.hitbox.h = 1; sfx('thud'); puff(o.x, o.y, 4);
+        lookTowards(o.x, o.y, 220, () => rpick(['My scarecrow!', 'Not my prize scarecrow!', 'Who knocked that over?!']));
+        run.crows = (run.crows || 0) + 1; setProgress('scarecrows', run.crows);
+        it.vx *= -0.3; it.vy *= -0.3; break;
+      }
+    }
+    // Bonfire night: rockets in the fire go up, and the sky fills with fireworks after dusk
+    const B = L.bonfire;
+    if (B) {
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        if (it.kind !== 'rocket' || it.held || it.z > 30 || Math.hypot(it.x - B.x, it.y - B.y) > 34) continue;
+        items.splice(i, 1);
+        launchFirework(B.x, B.y - 10, true);
+      }
+      L.fwT = (L.fwT || 0) - dt;
+      if (duskK > 0.45 && L.fwT <= 0) { L.fwT = rr(2, 5); launchFirework(B.x + rr(-200, 200), B.y + rr(-150, 50), false); }
+    }
+    for (let i = L.fireworks.length - 1; i >= 0; i--) {
+      const f = L.fireworks[i];
+      f.z += f.vz * dt; f.vz -= 170 * dt; f.x += f.vx * dt;
+      if (Math.random() < 0.8) particles.push({ kind: 'spark', x: f.x, y: f.y, z: f.z, vx: 0, vy: 0, vz: -20, life: 0.3, max: 0.3 });
+      if (f.vz < 40) {
+        L.fireworks.splice(i, 1);
+        const col = pick(['#ff6f91', '#ffd166', '#9ad1ff', '#8fd16a', '#c79aff']);
+        for (let k = 0; k < 40; k++) { const a = (k / 40) * Math.PI * 2, s = rr(60, 110); particles.push({ kind: 'shard', col, x: f.x, y: f.y, z: f.z, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.3, vz: Math.sin(a) * s * 0.9 + 40, life: 1.3, max: 1.3 }); }
+        if (Math.hypot(f.x - player.x, f.y - player.y) < 600) { sfx('thud'); sfx('crash'); }
+        if (f.mine) {
+          completeTask('firework');
+          for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - f.x, v.y - f.y) < 420) startleV(v, rpick(['Ooh!', 'Aaah!', 'Who lit that?!', 'Goodness!']));
+        }
+      }
+    }
+  }
+  function launchFirework(x, y, mine) {
+    L.fireworks.push({ x, y, z: 10, vz: rr(230, 290), vx: rr(-15, 15), mine });
+    if (Math.hypot(x - player.x, y - player.y) < 500) sfx('whoosh');
+  }
+  // A flour sack bursts: a big white cloud
+  function burstFlour(it) {
+    sfx('splat'); sfx('whoosh');
+    for (let k = 0; k < 26; k++) { const a = Math.random() * Math.PI * 2, s = rr(10, 70); particles.push({ kind: 'shard', col: '#f8f6f0', x: it.x, y: it.y, z: rr(2, 12), vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.5, vz: rr(20, 90), life: 1, max: 1 }); }
+    for (let k = 0; k < 10; k++) particles.push({ x: it.x + rr(-20, 20), y: it.y + rr(-10, 10), r: rr(5, 9), life: 1.4, max: 1.4, vy: -8 });
+    (L.flourClouds = L.flourClouds || []).push({ x: it.x, y: it.y, t: 4 }); // hangs in the air for a bit: run through it
+    for (const v of villagers) if (Math.hypot(v.x - it.x, v.y - it.y) < 48) startleV(v, rpick(['Achoo!', 'Pfft! Flour!', '*cough cough*']));
+    lookTowards(it.x, it.y, 200, () => rpick(['Who wasted that flour?!', 'What a mess!']));
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -7141,7 +7757,7 @@
     vis.push(playerEntry);
     vis.sort((a, b) => a.y - b.y);
     for (const o of vis) {
-      if (o.isPlayer) { drawPlayerWithHeld(ctx, t); continue; }
+      if (o.isPlayer) { if (player.boat) drawRowboat(ctx, player.x, player.y + 2, t, player.speed > 10); drawPlayerWithHeld(ctx, t); continue; }
       if (o.isItem) { drawItem(ctx, o, t); continue; }
       if (o.isVillager) { drawVillagerWithHeld(ctx, o.v, t); continue; }
       if (o.isDog) { drawDogWithHeld(ctx, t); continue; }
@@ -7185,6 +7801,8 @@
     }
     const pc = petChoice();
     if (pc === 'wardrobe') drawPrompt(ctx, { x: nearWardrobe.x, y: nearWardrobe.y, z: 0, owner: null, type: { h: 74, name: 'hide in wardrobe' } }, t);
+    else if (player.boat && started) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'get out' } }, t);
+    else if (boatNear() && started && !(target && itemReach(target) < 14)) drawPrompt(ctx, { x: L.boat.x, y: L.boat.y, z: 0, owner: null, type: { h: 16, name: 'row the boat' } }, t);
     else if (pc === 'dog') drawPrompt(ctx, { x: dog.x, y: dog.y, z: 0, owner: null, type: { h: 24, name: 'pet Biscuit' } }, t);
     else if (pc === 'cat') drawPrompt(ctx, { x: cat.x, y: cat.y, z: cat.z, owner: null, type: { h: 18, name: 'pet Marmalade' } }, t);
     else if (target && started) drawPrompt(ctx, target, t);
@@ -7292,6 +7910,7 @@
       updateDusk();
       updateCritters(dt);
       updateWildsWorld(dt);
+      updateKinds(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
@@ -7337,9 +7956,9 @@
     placePuddles();
     spawnCritters();
     spawnWeather();
-    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile'); // places to hide
+    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack'); // places to hide
     spawnAmbient();
-    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0 });
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0 });
     target = null;
     cam.x = player.x; cam.y = player.y;
   }

@@ -19,7 +19,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Mute sound | N | — |
 
 ## What's in the game
-- **Seasons and village kinds**: every daily village rolls one of four seasons and one of three kinds.
+- **Seasons and village kinds**: every daily village rolls one of four seasons and one of six kinds.
   - *Spring*: blossom trees, drifting petals, Mrs. Fennick's tulip beds to trample, painted eggs hidden by bushes.
   - *Summer*: washing drying on lines (steal it), Rosa's lemonade on the picnic table.
   - *Autumn*: orange and red trees, falling leaves, chimney smoke, leaf piles to jump in (noisy) or hide in.
@@ -27,6 +27,21 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     you can slide across, snowmen to knock down, and E on the snow scoops a snowball to throw.
   - *Pond*, *riverside* (a river runs across the map; the road crosses on bridges; floating things drift
     downstream) or *seaside* (a beach and sea along the south edge, a pier, a rowing boat, seashells, Ollie's fish).
+  - *Market*: market day, with four stalls on the plaza (Rosa's bakery, Bertram's fruit and veg, Ollie's fish,
+    Percy's toys). The stallholders spend the morning behind their stalls shouting their wares, and there's a
+    fruit cart to run into (apples everywhere).
+  - *Windmill*: a windmill on the hill (its sails spin faster in the wind), flour sacks that burst into a cloud
+    when thrown (walk through it and you come out white, and villagers who see you think you're a ghost), a
+    wheat field to hide in, and a hay barn with a haystack to hide in.
+  - *Lakeside*: a big lake with an island in the middle and a jetty. Press E by the rowing boat to climb in,
+    row anywhere on the water, and E again to climb out onto the nearest land; villagers can't follow you to
+    the island. There's also a fishing contest with a prize fish on the table.
+- **Village events**: some days (about 2 in 5) there's something on, depending on the season:
+  - *Village fete* (spring, summer): bunting, and a cake contest with three cakes and a first-prize rosette.
+  - *Wedding* (spring to autumn): a flower arch, rows of chairs, confetti, a bouquet and a three-tier cake.
+  - *Bonfire night* (autumn, winter): a bonfire, toffee apples, a box of rockets (throw one in the fire to set
+    it off; every villager nearby jumps), and fireworks once dusk falls.
+  - *Scarecrow festival* (summer, autumn): prize scarecrows around the village, waiting to be knocked over.
   - Every village also has a hen house: hens panic and squawk when chased (loud enough to make villagers look)
     and their eggs can be stolen, eaten or smashed.
 - **Weather**: each village also rolls weather that suits its season.
@@ -67,7 +82,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 107 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 124 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -131,7 +146,10 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   `buildPaddock()`, `spawnFarmNight()` / `updateFarmNight()` / `drawFarmNight()` (sheep, cow, goat, hedgehogs,
   owl, fireflies), `updateDusk()`; wild animals and pets: `buildWilds()` (beehive, mud wallow, perch),
   `spawnWilds()` / `updateWilds()` / `wildScare()` / `drawWilds()`, `updatePup()`, `parrotHear()`,
-  `updateWildsWorld()` (hive, mud, whirlwind), `drawWhirl()`, `drawFrost()` / `frostSlip()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
+  `updateWildsWorld()` (hive, mud, whirlwind), `drawWhirl()`, `drawFrost()` / `frostSlip()`;
+  new villages and events: `buildKindEarly()` / `buildKindLate()` / `placeKindItems()` (stalls, cart, windmill,
+  wheat, barn, jetty, contest, event decorations), `buildLakeIsland()`, `buildJetty()`, `boatAction()`,
+  `withStall()` (stallholders' rounds), `updateKinds()` (rowing, cart, flour, scarecrows, fireworks), `pickEvent()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
   `subscribeScores()`/`postScore()`/`renderBoard()` (db `scores/<user id>`)
 - **Eating**: `FOOD` table, `startEating()`, `updateEating()` (bites, tummy, stuffed, sugar rush), `finishFood()`
