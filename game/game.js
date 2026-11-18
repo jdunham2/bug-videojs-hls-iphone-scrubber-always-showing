@@ -350,6 +350,7 @@
     placeHideBushes();
     placeSeasonal();
     buildPaddock();
+    buildWilds();
 
     // Forest border: dense trees around the edge
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
@@ -1442,7 +1443,7 @@
       if (v < target) return Math.min(target, v + rate * dt);
       return Math.max(target, v - rate * dt);
     };
-    const slip = onIce(player.x, player.y) ? 0.14 : 1; // ice: hard to start, harder to stop
+    const slip = onIce(player.x, player.y) ? 0.14 : frosty(player.x, player.y) ? 0.3 : 1; // ice: hard to start, harder to stop
     const rateX = (Math.abs(tx) > 0.01 ? ACCEL : FRICTION) * slip;
     const rateY = (Math.abs(ty) > 0.01 ? ACCEL : FRICTION) * slip;
     player.vx = approach(player.vx, tx, rateX);
@@ -1526,6 +1527,11 @@
       drawRaccoonFront(ctx, p, t, moving, bob);
     } else {
       drawRaccoonBack(ctx, p, t, moving, bob);
+    }
+    if (p.mud > 0) { // caked in mud
+      ctx.globalAlpha = Math.min(1, p.mud / 6) * 0.8; ctx.fillStyle = '#6b4a2e';
+      ellipse(ctx, -4, -5, 3.4, 2.4); ellipse(ctx, 4, -8, 2.6, 2); ellipse(ctx, 1, -2, 4, 1.8); ellipse(ctx, -1, -12, 2, 1.5);
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
   }
@@ -1714,7 +1720,11 @@
     for (const b of butterflies) {
       b.ph += dt * 18;
       const dp = Math.hypot(b.x - player.x, b.y - player.y);
-      if (dp < 48 && player.speed > 20) b.flee = Math.max(b.flee, 1);
+      if (dp < 48 && player.speed > WALK_SPEED * 1.15) b.flee = Math.max(b.flee, 1);
+      if (dp < 13 && b.flee <= 0 && started && areaOf(player.x, player.y) === 0) { // caught! (and let go)
+        b.flee = 2.5; sparkle(b.x, b.y, b.z); sfx('pick'); player.bubble = { text: 'caught one!', t: 1 };
+        completeTask('butterfly');
+      }
       if (b.flee > 0) {
         b.flee -= dt;
         const a = Math.atan2(b.y - player.y, b.x - player.x);
@@ -2835,6 +2845,7 @@
   function say(v, text, dur = 2.2, alert = false) {
     v.bubble = { text, t: dur, alert };
     if (!alert && Math.hypot(v.x - player.x, v.y - player.y) < 260) babble(v.pitch, text.length);
+    if (!alert && v.stops && L && areaOf(v.x, v.y) === 0) parrotHear(v, text);
   }
 
   function displaced(it) {
@@ -3166,6 +3177,7 @@
         case 'sulk': v.stateT -= dt; if (v.stateT <= 0) toRoute(v); break;
         case 'startled': v.stateT -= dt; if (v.stateT <= 0) afterStartle(v); break;
       }
+      if (L.weather === 'frost') frostSlip(v, dt);
 
       // Villagers are solid: nudge the raccoon out of the way
       const dx = player.x - v.x, dy = player.y - v.y, d = Math.hypot(dx, dy);
@@ -3397,6 +3409,12 @@
     { id: 'moo', tier: 'Easy', text: 'Get a moo out of the cow', req: ['farm'] },
     { id: 'headbutt', tier: 'Easy', text: 'Get headbutted by the goat', hint: 'chitter at it', req: ['farm'] },
     { id: 'hedgehog', tier: 'Easy', text: 'Make a hedgehog curl up', hint: 'after dusk' },
+    { id: 'rabbit', tier: 'Easy', text: 'Send a rabbit bolting', req: ['notwinter'] },
+    { id: 'swan', tier: 'Easy', text: 'Get chased by the swan', hint: 'go near it, then run!', req: ['swan'] },
+    { id: 'butterfly', tier: 'Easy', text: 'Catch a butterfly', hint: 'walk, don’t run', req: ['notwinter'] },
+    { id: 'whirlwind', tier: 'Easy', text: 'Get swept up in the whirlwind', req: ['whirlwind'] },
+    { id: 'mud', tier: 'Easy', text: 'Roll in the mud with the pig', req: ['pig'] },
+    { id: 'pepper', tier: 'Easy', text: 'Win Pepper the pup over with a snack', hint: 'drop some food near her' },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3428,6 +3446,14 @@
     { id: 'fireflies', tier: 'Medium', text: 'Catch 3 fireflies', goal: 3, hint: 'after dusk' },
     { id: 'gold', tier: 'Medium', text: 'Find the pot of gold at the end of the rainbow', hint: 'after the rain clears', req: ['rainbow'] },
     { id: 'dozing', tier: 'Medium', text: "Steal from someone who's dozing in the heat", req: ['heatwave'] },
+    { id: 'fox', tier: 'Medium', text: 'Chase the fox away from the hens', hint: 'it sneaks up on the hen house' },
+    { id: 'badger', tier: 'Medium', text: 'Get chased off by a badger', hint: 'after dusk', req: ['notwinter'] },
+    { id: 'catchfish', tier: 'Medium', text: 'Catch a fish with your paws', hint: 'wait quietly at the water’s edge', req: ['fishpond'] },
+    { id: 'soak', tier: 'Medium', text: 'Soak a villager with a puddle splash', hint: 'run through a puddle beside them', req: ['soak'] },
+    { id: 'slip', tier: 'Medium', text: 'Make a chaser slip on the frost', hint: 'lead them along the icy paths', req: ['frost'] },
+    { id: 'parrot', tier: 'Medium', text: 'Get the parrot shouting “THIEF!”', hint: 'carry someone’s things past it', req: ['parrot'] },
+    { id: 'muddy', tier: 'Medium', text: 'Track mud into someone’s house', req: ['pig'] },
+    { id: 'mouse', tier: 'Medium', text: 'Scare someone with a mouse', hint: 'chase one towards them, indoors' },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3459,6 +3485,8 @@
     { id: 'gnomes', tier: 'Hard', text: 'Stash both garden gnomes' },
     { id: 'bone', tier: 'Hard', text: "Stash Biscuit's bone in your hideout" },
     { id: 'herd', tier: 'Hard', text: 'Herd a sheep out of its field', hint: 'chase it out the gate', req: ['farm'] },
+    { id: 'deer', tier: 'Hard', text: 'Sneak right up to a deer', hint: 'freeze when it looks up' },
+    { id: 'bees', tier: 'Hard', text: 'Lead a swarm of bees to a villager', hint: 'bump the beehive, then run', req: ['bees'] },
     { id: 'hens', tier: 'Hard', text: 'Get every hen squawking at once' },
     { id: 'eggs3', tier: 'Hard', text: 'Find 3 painted eggs', goal: 3, req: ['spring'] },
     { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
@@ -3525,9 +3553,18 @@
       if (SEASON_NAMES.includes(r) && L.season !== r) return false;
       if (KIND_NAMES.includes(r) && L.kind !== r) return false;
       if (r === 'ducks' && L.kind === 'seaside') return false;
-      if (r === 'sparrows' && ['rain', 'storm', 'snowstorm'].includes(L.weather)) return false;
+      if (r === 'sparrows' && ['rain', 'storm', 'snowstorm', 'downpour'].includes(L.weather)) return false;
       if (r === 'frogs' && !(L.kind !== 'seaside' && hasOpenWater() && (wet() || L.season === 'spring'))) return false;
-      if (r === 'puddles' && !(planHas(['rain', 'storm']) && !isWinter())) return false;
+      if (r === 'puddles' && !(planHas(WET_SET) && !isWinter())) return false;
+      if (r === 'soak' && !(planHas(['rain', 'storm', 'downpour']) && !isWinter())) return false;
+      if (r === 'whirlwind' && !planHas(['windy'])) return false;
+      if (r === 'frost' && !planHas(['frost'])) return false;
+      if (r === 'bees' && !L.hive) return false;
+      if (r === 'pig' && !L.mud) return false;
+      if (r === 'parrot' && !L.perch) return false;
+      if (r === 'fishpond' && !(L.kind !== 'seaside' && hasOpenWater())) return false;
+      if (r === 'swan' && L.kind === 'seaside') return false;
+      if (r === 'notwinter' && isWinter()) return false;
       if (r === 'farm' && !L.paddock) return false;
       if (r === 'rainbow' && !rainbowPossible()) return false;
       if (r === 'heatwave' && !planHas(['heatwave'])) return false;
@@ -5218,20 +5255,23 @@
   // Each village rolls a weather that suits its season. It changes what villagers can
   // see and hear, brings puddles, lightning, fog, wind, and decides which animals are out.
   const WEATHER_TABLE = {
-    spring: [['clear', 40], ['rain', 35], ['storm', 10], ['windy', 15], ['hail', 6]],
-    summer: [['clear', 50], ['rain', 15], ['storm', 18], ['windy', 8], ['heatwave', 20]],
-    autumn: [['clear', 25], ['rain', 25], ['fog', 25], ['windy', 20], ['storm', 5], ['hail', 6]],
-    winter: [['clear', 40], ['snowstorm', 30], ['fog', 30]],
+    spring: [['clear', 40], ['rain', 28], ['drizzle', 15], ['downpour', 8], ['storm', 10], ['windy', 15], ['hail', 6]],
+    summer: [['clear', 50], ['rain', 12], ['drizzle', 6], ['downpour', 8], ['storm', 16], ['windy', 10], ['heatwave', 20]],
+    autumn: [['clear', 25], ['rain', 20], ['drizzle', 12], ['downpour', 8], ['fog', 22], ['windy', 20], ['frost', 15], ['storm', 5], ['hail', 6]],
+    winter: [['clear', 35], ['snowstorm', 28], ['fog', 25], ['frost', 25]],
   };
-  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', windy: 'Windy', snowstorm: 'Snowstorm', hail: 'Hail', heatwave: 'Heatwave' };
+  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', windy: 'Windy', snowstorm: 'Snowstorm', hail: 'Hail', heatwave: 'Heatwave', drizzle: 'Drizzle', downpour: 'Downpour', frost: 'Frost' };
   const WEATHER_TIP = {
     rain: 'It’s raining: villagers huddle under umbrellas and can’t see or hear as well. Splash in the puddles.',
     storm: 'Thunderstorm! Every thunderclap makes the villagers jump.',
     fog: 'Thick fog: villagers can barely see past their noses. Perfect sneaking weather.',
-    windy: 'Windy: thrown things get blown off course.',
+    windy: 'Windy: thrown things get blown off course, and watch out for the whirlwind.',
     snowstorm: 'Snowstorm: you can hardly see a thing, and neither can they.',
     hail: 'Hail! The villagers are running for cover.',
     heatwave: 'Heatwave: the villagers are slow and sleepy, and some will doze off.',
+    drizzle: 'A light drizzle: the frogs are out, and the puddles are filling up.',
+    downpour: 'A downpour! Huge puddles everywhere: run through one next to a villager to soak them.',
+    frost: 'A hard frost: the paths are slippery, and villagers chasing you might go flying.',
     clear: '',
   };
   function pickWeather(season) {
@@ -5240,11 +5280,11 @@
     for (const [name, w] of table) { r -= w; if (r <= 0) return name; }
     return 'clear';
   }
-  const wet = () => !!L && (L.weather === 'rain' || L.weather === 'storm');
+  const wet = () => !!L && WET_SET.includes(L.weather);
   const WIND = () => (L && L.weather === 'windy' ? 70 : L && L.weather === 'snowstorm' ? 40 : 0);
   // How far villagers can see / hear in this weather
-  const visionMul = () => ({ rain: 0.82, storm: 0.75, fog: 0.55, snowstorm: 0.62, hail: 0.85 }[L && L.weather] || 1);
-  const hearingMul = () => ({ rain: 0.75, storm: 0.7, snowstorm: 0.75, hail: 0.65 }[L && L.weather] || 1);
+  const visionMul = () => ({ rain: 0.82, storm: 0.75, fog: 0.55, snowstorm: 0.62, hail: 0.85, drizzle: 0.93, downpour: 0.68 }[L && L.weather] || 1);
+  const hearingMul = () => ({ rain: 0.75, storm: 0.7, snowstorm: 0.75, hail: 0.65, drizzle: 0.9, downpour: 0.6 }[L && L.weather] || 1);
 
   const weather = [];
   const fx = { flash: 0, nextBolt: 8, thunderAt: -1, ambience: null };
@@ -5254,13 +5294,14 @@
     let n = { winter: 150, autumn: 34, spring: 44 }[S] || 0;
     if (W === 'rain') n = 230; else if (W === 'storm') n = 300; else if (W === 'snowstorm') n = 380; else if (W === 'windy') n = Math.max(n, 70);
     else if (W === 'hail') n = 200; else if (W === 'heatwave') n = 0;
+    else if (W === 'drizzle') n = 110; else if (W === 'downpour') n = 440;
     for (let i = 0; i < n; i++) weather.push({ x: Math.random(), y: Math.random(), s: Math.random(), ph: Math.random() * 6, col: pick(['#c0392b', '#e07b2a', '#f0a040', '#d9a43a']) });
     fx.flash = 0; fx.nextBolt = rr(6, 12); fx.thunderAt = -1;
     startAmbience();
   }
   function drawWeather(ctx, left, top, viewW, viewH, t, dt) {
     const S = L.season, W = L.weather;
-    const rainy = W === 'rain' || W === 'storm';
+    const rainy = WET_SET.includes(W);
     const wind = W === 'windy' ? 0.25 : W === 'snowstorm' ? 0.12 : W === 'storm' ? 0.06 : 0;
     ctx.lineCap = 'round';
     for (const w of weather) {
@@ -5271,15 +5312,16 @@
         ctx.fillStyle = 'rgba(245,250,255,0.9)'; circle(ctx, hx, hy, 1.1 + w.s * 0.9);
         continue;
       }
-      if (rainy) { w.y += (0.9 + w.s * 0.5) * dt; w.x += (0.08 + wind) * dt; }
+      if (rainy) { w.y += (0.9 + w.s * 0.5) * (W === 'downpour' ? 1.3 : W === 'drizzle' ? 0.7 : 1) * dt; w.x += (0.08 + wind) * dt; }
       else if (S === 'winter') { w.y += (0.05 + w.s * 0.05) * (W === 'snowstorm' ? 2.6 : 1) * dt; w.x += (Math.sin(t * 0.8 + w.ph) * 0.004 + wind) * dt; }
       else { w.y += (0.03 + w.s * 0.03) * dt; w.x += (Math.sin(t * 0.6 + w.ph) * 0.02 + 0.01 + wind) * dt; }
       if (w.y > 1.05) { w.y = -0.05; w.x = Math.random(); }
       if (w.x > 1.05) w.x = -0.05; else if (w.x < -0.05) w.x = 1.05;
       const x = left + w.x * viewW, y = top + w.y * viewH;
       if (rainy) {
-        ctx.strokeStyle = `rgba(200,220,240,${0.35 + w.s * 0.3})`; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 2 - wind * 30, y - 9 - w.s * 5); ctx.stroke();
+        const len = W === 'drizzle' ? 0.45 : W === 'downpour' ? 1.5 : 1;
+        ctx.strokeStyle = `rgba(200,220,240,${(0.35 + w.s * 0.3) * (W === 'drizzle' ? 0.7 : 1)})`; ctx.lineWidth = W === 'downpour' ? 1.3 : 1;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - (2 + wind * 30) * len, y - (9 + w.s * 5) * len); ctx.stroke();
       } else if (S === 'winter') { ctx.fillStyle = `rgba(255,255,255,${0.55 + w.s * 0.4})`; circle(ctx, x, y, 0.8 + w.s * 1.6); }
       else {
         ctx.fillStyle = S === 'spring' ? (w.s > 0.5 ? '#ffd1e3' : '#ffffff') : S === 'summer' ? '#8fd16a' : w.col;
@@ -5291,6 +5333,7 @@
     const W = L && L.weather;
     const tint = W === 'storm' ? 'rgb(168,176,198)' : W === 'rain' ? 'rgb(200,208,222)' : W === 'snowstorm' ? 'rgb(222,230,246)'
       : W === 'hail' ? 'rgb(208,214,228)' : W === 'heatwave' ? 'rgb(255,232,200)'
+      : W === 'drizzle' ? 'rgb(216,222,232)' : W === 'downpour' ? 'rgb(166,176,198)' : W === 'frost' ? 'rgb(230,238,255)'
       : { winter: 'rgb(226,234,252)', autumn: 'rgb(255,238,214)', spring: 'rgb(255,250,248)' }[L && L.season];
     if (tint) {
       ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = tint;
@@ -5314,13 +5357,14 @@
   function placePuddles() {
     L.puddles = [];
     if (!wet() || isWinter()) return;
-    for (let n = 0; n < 200 && L.puddles.length < 14; n++) {
+    const big = L.weather === 'downpour';
+    for (let n = 0; n < 300 && L.puddles.length < (big ? 22 : 14); n++) {
       const tx = Math.floor(rr(4, MW - 4)), ty = Math.floor(rr(4, MH - 4)), t0 = getT(tx, ty);
       if (t0 !== PATH && t0 !== GRASS && t0 !== STONE) continue;
       if (t0 === GRASS && rand() < 0.7) continue;
       const x = (tx + 0.5) * TILE, y = (ty + 0.5) * TILE;
       if (L.puddles.some((p) => Math.hypot(p.x - x, p.y - y) < 90)) continue;
-      L.puddles.push({ x, y, rx: rr(14, 22), ry: rr(6, 9), splashT: 0 });
+      L.puddles.push({ x, y, rx: big ? rr(24, 38) : rr(14, 22), ry: big ? rr(10, 15) : rr(6, 9), splashT: 0 });
     }
   }
   function drawPuddles(ctx, t) {
@@ -5337,7 +5381,8 @@
     if (!L) return;
     updateWeatherPlan();
     fx.flash = Math.max(0, fx.flash - dt * 2.2);
-    // Puddle splashes
+    // Puddle splashes (a downpour makes them spread)
+    if (L.weather === 'downpour' && L.puddles) for (const p of L.puddles) { if (p.rx < 44) { p.rx += dt * 0.25; p.ry += dt * 0.1; } }
     if (L.puddles && areaOf(player.x, player.y) === 0) for (const p of L.puddles) {
       p.splashT = Math.max(0, p.splashT - dt);
       const dx = (player.x - p.x) / p.rx, dy = (player.y - p.y) / p.ry;
@@ -5348,6 +5393,10 @@
         run.puddles = (run.puddles || 0) + 1;
         setProgress('puddle', run.puddles);
         if (player.speed > 120) lookTowards(player.x, player.y, 90, () => rpick(['Who’s splashing about?', 'Hm? Splashing?']));
+        player.mud = Math.max(0, (player.mud || 0) - 15); // washes the mud off
+        for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - p.x, v.y - p.y) < p.rx + 26 && player.speed > 120) {
+          if (startleV(v, rpick(['I’m SOAKED!', 'Eugh! My clothes!', 'You little—! I’m drenched!']))) completeTask('soak');
+        }
       }
     }
     // Thunderstorms: lightning, then thunder that makes everyone jump
@@ -5372,17 +5421,17 @@
   function startAmbience() {
     try { if (fx.ambience) { fx.ambience.src.stop(); fx.ambience = null; } } catch (_) { fx.ambience = null; }
     const W = L && L.weather;
-    if (!actx || !(W === 'rain' || W === 'storm' || W === 'windy' || W === 'snowstorm' || W === 'hail')) return;
+    if (!actx || !(WET_SET.includes(W) || W === 'windy' || W === 'snowstorm' || W === 'hail')) return;
     const n = actx.sampleRate * 2, buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     const src = actx.createBufferSource(); src.buffer = buf; src.loop = true;
     const f = actx.createBiquadFilter(); f.type = W === 'windy' || W === 'snowstorm' || W === 'hail' ? 'bandpass' : 'lowpass'; f.frequency.value = W === 'hail' ? 2200 : W === 'windy' || W === 'snowstorm' ? 500 : 2500;
     const g = actx.createGain(); g.gain.value = 0;
     src.connect(f).connect(g).connect(master); src.start();
-    fx.ambience = { src, g, level: W === 'storm' ? 0.07 : W === 'rain' ? 0.05 : 0.04 };
+    fx.ambience = { src, g, level: W === 'storm' || W === 'downpour' ? 0.08 : W === 'rain' ? 0.05 : W === 'drizzle' ? 0.025 : 0.04 };
   }
   function updateAmbienceLevel() {
-    if (!fx.ambience) { if (actx && actx.state === 'running' && L && ['rain', 'storm', 'windy', 'snowstorm', 'hail'].includes(L.weather)) startAmbience(); return; }
+    if (!fx.ambience) { if (actx && actx.state === 'running' && L && ['rain', 'storm', 'drizzle', 'downpour', 'windy', 'snowstorm', 'hail'].includes(L.weather)) startAmbience(); return; }
     const indoors = areaOf(player.x, player.y) > 0;
     const want = muted || paused ? 0 : fx.ambience.level * (indoors ? 0.35 : 1);
     fx.ambience.g.gain.value += (want - fx.ambience.g.gain.value) * 0.05;
@@ -5394,7 +5443,7 @@
   const isWaterish = (x, y) => { const t0 = tileAt(x, y); return t0 === WATER || t0 === ICE; };
   function critterBlocked(c, x, y) {
     if (areaOf(x, y) !== 0 || x < TILE || y < TILE || x > WORLD_W - TILE || y > WORLD_H - TILE) return true;
-    if (isWaterish(x, y)) return !(c.type === 'duck' || c.type === 'frog'); // only ducks and frogs go in the water
+    if (isWaterish(x, y)) return !(c.type === 'duck' || c.type === 'frog' || c.type === 'swan'); // only ducks and frogs go in the water
     return navBlockedPt(x, y) && c.type !== 'squirrel' && c.type !== 'sparrow'; // small things squeeze past trees
   }
   function critterMove(c, tx, ty, speed, dt) {
@@ -5410,7 +5459,7 @@
   function spawnCritters() {
     critters = [];
     const T = TILE, P = L.plaza, W = L.weather;
-    const stormy = W === 'rain' || W === 'storm' || W === 'snowstorm';
+    const stormy = W === 'rain' || W === 'storm' || W === 'snowstorm' || W === 'downpour';
     // Ducks on the pond / river (they stand on the ice in winter)
     if (L.kind !== 'seaside') {
       for (let k = 0; k < 4; k++) {
@@ -5448,6 +5497,7 @@
       }
     }
     spawnFarmNight();
+    spawnWilds();
   }
 
   // Something scary happened near (x, y): birds and frogs bolt (see also farmNightScare)
@@ -5455,6 +5505,7 @@
     for (const c of critters) {
       if (Math.hypot(c.x - x, c.y - y) > r) continue;
       if (FN_TYPES.has(c.type)) { farmNightScare(c, x, y, r); continue; }
+      if (WD_TYPES.has(c.type)) { wildScare(c, x, y, r); continue; }
       if (c.type === 'sparrow' && !c.flying) startFlock(c, x, y);
       if (c.type === 'gull' && c.state !== 'flee') { gullDrop(c); c.state = 'flee'; c.flying = true; c.fleeT = 3; c.fa = Math.atan2(c.y - y, c.x - x); c.cd = 8; if (r < 9999) completeTask('gullscare'); }
       if (c.type === 'duck') {
@@ -5485,7 +5536,7 @@
   }
 
   function updateCritters(dt) {
-    if (critters.some((c) => c.caught || (c.gone === true && c.z > 220))) critters = critters.filter((c) => !c.caught && !(c.gone === true && c.z > 220));
+    if (critters.some((c) => c.caught || c.dead || (c.gone === true && c.z > 220))) critters = critters.filter((c) => !c.caught && !c.dead && !(c.gone === true && c.z > 220));
     const outside = areaOf(player.x, player.y) === 0;
     const pdist = (c) => Math.hypot(player.x - c.x, player.y - c.y);
     for (const c of critters) {
@@ -5494,6 +5545,7 @@
       if (c.bubble) { c.bubble.t -= dt; if (c.bubble.t <= 0) c.bubble = null; }
       const near = outside && started && pdist(c) < 70 && player.speed > 25 && !player.hidden;
       if (FN_TYPES.has(c.type)) { updateFarmNight(c, dt, near); continue; }
+      if (WD_TYPES.has(c.type)) { updateWilds(c, dt, near); continue; }
 
       if (c.type === 'duck') {
         c.panic = Math.max(0, c.panic - dt);
@@ -5638,6 +5690,7 @@
 
   function drawCritter(ctx, c, t) {
     if (FN_TYPES.has(c.type)) { drawFarmNight(ctx, c, t); return; }
+    if (WD_TYPES.has(c.type)) { drawWilds(ctx, c, t); return; }
     if (c.type === 'frog' && c.gone > 0) return;
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -5738,6 +5791,11 @@
       const d = DIRV[player.dir];
       particles.push({ kind: 'print', x: player.x + d[1] * 3 * player.printSide, y: player.y - 1 + d[0] * 2 * player.printSide, life: 9, max: 9 });
     }
+    if (player.mud > 0 && player.speed > 20 && player.printT <= 0 && !onSnow(player.x, player.y)) { // muddy pawprints
+      player.printT = 0.17; player.printSide = -(player.printSide || 1);
+      const d = DIRV[player.dir];
+      particles.push({ kind: 'print', mud: true, x: player.x + d[1] * 3 * player.printSide, y: player.y - 1 + d[0] * 2 * player.printSide, life: 14, max: 14 });
+    }
     if (onIce(player.x, player.y) && player.speed > 95) completeTask('skate');
     if (L.pier && tileAt(player.x, player.y) === BRIDGE && player.y > L.pier.endY - 40) completeTask('pier');
     for (const o of L.extra.leafpiles) { o.h = Math.min(1, o.h + dt * 0.08); o.rustle = Math.max(0, o.rustle - dt); }
@@ -5780,24 +5838,24 @@
     if (rand() < 0.45) {
       const at = 0.3 + rand() * 0.3;
       let next;
-      if (first === 'rain' || first === 'storm' || first === 'fog') next = 'clear'; // clears up / the fog lifts
+      if (WET_SET.includes(first) || first === 'fog' || first === 'frost') next = 'clear'; // clears up / the fog lifts / the frost melts
       else if (season === 'winter') next = pick(['snowstorm', 'fog']);
-      else if (season === 'summer') next = pick(['storm', 'rain', first === 'heatwave' ? 'storm' : 'heatwave']);
-      else next = pick(['rain', 'hail', 'storm']);
+      else if (season === 'summer') next = pick(['storm', 'rain', 'downpour', first === 'heatwave' ? 'storm' : 'heatwave']);
+      else next = pick(['rain', 'hail', 'storm', 'drizzle', 'downpour']);
       if (next !== first) {
         plan.push({ at, w: next });
         if (next === 'hail') plan.push({ at: at + 0.07, w: first });
-        else if (next === 'rain' || next === 'storm') plan.push({ at: Math.min(0.92, at + 0.2 + rand() * 0.15), w: 'clear' });
+        else if (WET_SET.includes(next)) plan.push({ at: Math.min(0.92, at + 0.2 + rand() * 0.15), w: 'clear' });
       }
     }
     return plan;
   }
   const planHas = (names) => !!L && (L.weatherPlan || []).some((s) => names.includes(s.w));
-  const rainbowPossible = () => !!L && (L.weatherPlan || []).some((s, i, a) => i > 0 && s.w === 'clear' && ['rain', 'storm'].includes(a[i - 1].w));
+  const rainbowPossible = () => !!L && (L.weatherPlan || []).some((s, i, a) => i > 0 && s.w === 'clear' && ['rain', 'storm', 'downpour'].includes(a[i - 1].w));
 
   const WEATHER_NEWS = {
     rain: 'It’s starting to rain', storm: 'A storm is rolling in', hail: 'Hail! Everyone’s running for cover',
-    heatwave: 'Phew, a heatwave', snowstorm: 'A snowstorm is blowing in', fog: 'Fog is rolling in', windy: 'The wind is picking up',
+    heatwave: 'Phew, a heatwave', drizzle: 'It’s starting to drizzle', downpour: 'It’s bucketing down!', snowstorm: 'A snowstorm is blowing in', fog: 'Fog is rolling in', windy: 'The wind is picking up',
   };
   function setWeather(w) {
     const was = L.weather;
@@ -5805,9 +5863,11 @@
     L.weather = w;
     spawnWeather();
     if (wet() && !isWinter() && !(L.puddles && L.puddles.length)) placePuddles();
-    if ((was === 'rain' || was === 'storm') && !wet()) startRainbow();
+    if (w === 'downpour' && L.puddles) for (const p of L.puddles) { p.grow = 1; }
+    if (['rain', 'storm', 'downpour'].includes(was) && !wet()) startRainbow();
+    L.whirl = w === 'windy' ? (L.whirl || newWhirl()) : null;
     for (const v of villagers) v.shelter = w === 'hail';
-    toast(w === 'clear' ? (was === 'fog' ? 'The fog has lifted' : 'The sky is clearing') : WEATHER_NEWS[w] || WEATHER_LABEL[w], 'Weather', true);
+    toast(w === 'clear' ? (was === 'fog' ? 'The fog has lifted' : was === 'frost' ? 'The frost is melting' : 'The sky is clearing') : WEATHER_NEWS[w] || WEATHER_LABEL[w], 'Weather', true);
     updateRunBar();
   }
   function updateWeatherPlan() {
@@ -6122,6 +6182,671 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Wild animals (fox, rabbits, badger, deer), water and sky (fish, swan, bees),
+  // pets and pests (parrot, pig, mice, Pepper the pup), and wilder weather
+  // (drizzle, downpours, whirlwinds, frost)
+  // ---------------------------------------------------------------------------
+  const WD_TYPES = new Set(['fox', 'rabbit', 'badger', 'deer', 'pfish', 'swan', 'swarm', 'parrot', 'pig', 'mouse', 'pup']);
+  const WET_SET = ['rain', 'storm', 'drizzle', 'downpour'];
+
+  // A walkable grass spot just inside the forest edge, near (nx, ny)
+  function edgeSpot(nx, ny) {
+    let best = null, bd = 1e9;
+    for (let n = 0; n < 400; n++) {
+      const tx = Math.floor(rr(3, MW - 3)), ty = Math.floor(rr(3, MH - 3));
+      const e = Math.min(tx, ty, MW - 1 - tx, MH - 1 - ty);
+      if (e < 3 || e > 5 || getT(tx, ty) !== GRASS || !navOpen(tx, ty)) continue;
+      const x = (tx + 0.5) * TILE, y = (ty + 0.5) * TILE, d = Math.hypot(x - nx, y - ny) + rr(0, 200);
+      if (d < bd) { bd = d; best = { x, y }; }
+    }
+    return best;
+  }
+  // Follow an A* path (critters that need to get around houses and fences)
+  function wayTo(c, gx, gy, speed, dt) {
+    if (!c.path || c.pathGoal !== gx + ',' + gy) { c.path = findPath(c.x, c.y, gx, gy) || [{ x: gx, y: gy }]; c.pathGoal = gx + ',' + gy; }
+    while (c.path.length && Math.hypot(c.path[0].x - c.x, c.path[0].y - c.y) < 4) c.path.shift();
+    if (!c.path.length) return true;
+    const p = c.path[0], dx = p.x - c.x, dy = p.y - c.y, d = Math.hypot(dx, dy), step = Math.min(d, speed * dt);
+    c.x += dx / d * step; c.y += dy / d * step;
+    if (Math.abs(dx) > 0.5) c.dir = dx > 0 ? 'right' : 'left';
+    c.walk += dt * speed * 0.15; c.moving = true;
+    return false;
+  }
+  // Knock the raccoon flying (goat-style)
+  function knockPlayer(fromX, fromY, k = 240) {
+    const dx = player.x - fromX, dy = player.y - fromY, d = Math.hypot(dx, dy) || 1;
+    player.vx = dx / d * k; player.vy = dy / d * k; player.stun = 0.35; player.hopV = 120; player.hop = 0.01;
+    if (player.held && !player.held.type.heavy) dropHeld(true);
+  }
+
+  // --- Objects: beehive, mud wallow, parrot perch ------------------------------------
+  function makeHive(x, y) {
+    return {
+      kind: 'hive', x, y, hitbox: box(x - 8, y - 5, 16, 6), bounds: { l: x - 14, r: x + 14, t: y - 34, b: y + 4 },
+      draw(ctx, t) {
+        ctx.fillStyle = '#6b4a2e'; ctx.fillRect(x - 9, y - 10, 2, 10); ctx.fillRect(x + 7, y - 10, 2, 10); ctx.fillRect(x - 10, y - 12, 20, 3);
+        const knocked = L.hive && L.hive.angry > 0 ? Math.sin(t * 40) * 1.2 : 0;
+        ctx.fillStyle = '#d9a43a';
+        for (let k = 0; k < 4; k++) roundRect(ctx, x - 9 + k * 1.5 + knocked, y - 18 - k * 5, 18 - k * 3, 6, 3, true);
+        ctx.fillStyle = '#3a2a1a'; ellipse(ctx, x + knocked, y - 14, 2.2, 1.6);
+        if (!L.hive || L.hive.angry <= 0) { // a few lazy bees about the place
+          ctx.fillStyle = '#1d1d22';
+          for (let k = 0; k < 4; k++) { const a = t * 2.4 + k * 1.6; circle(ctx, x + Math.cos(a) * 14, y - 18 + Math.sin(a * 1.7) * 6, 0.9); }
+        }
+      },
+    };
+  }
+  function makeMud(x, y, rx, ry) {
+    return {
+      kind: 'mud', x, y: y - ry - 40, bounds: { l: x - rx, r: x + rx, t: y - ry, b: y + ry },
+      draw(ctx, t) {
+        ctx.fillStyle = '#6b4a2e'; ellipse(ctx, x, y, rx, ry);
+        ctx.fillStyle = '#5a3a20'; ellipse(ctx, x + 4, y + 1, rx * 0.7, ry * 0.6);
+        ctx.fillStyle = 'rgba(160,120,80,0.6)';
+        for (let k = 0; k < 4; k++) { const b = (t * 0.4 + k * 0.27) % 1; ctx.globalAlpha = 1 - b; circle(ctx, x - rx * 0.5 + k * rx * 0.33, y - 1 + Math.sin(k) * 3, 1 + b * 2); }
+        ctx.globalAlpha = 1;
+      },
+    };
+  }
+  function makePerch(x, y) {
+    return {
+      kind: 'perch', x, y, hitbox: box(x - 4, y - 3, 8, 4), bounds: { l: x - 12, r: x + 12, t: y - 44, b: y + 4 },
+      draw(ctx) {
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 1.5, y - 26, 3, 26); ctx.fillRect(x - 9, y - 27, 18, 2.5);
+        ctx.fillStyle = '#5a3a20'; ellipse(ctx, x, y, 6, 2);
+        ctx.fillStyle = '#c9b57e'; ctx.fillRect(x + 6, y - 27, 4, 4); // seed cup
+      },
+    };
+  }
+  // Placed while the map is being built (after the farm)
+  function buildWilds() {
+    const T = TILE, g = L.garden;
+    L.hive = null; L.mud = null; L.perch = null;
+    if (L.season === 'spring' || L.season === 'summer') {
+      const s = g && (freeSpotNear(g.x + g.w + 1, g.y + 1, 1, 1, 4) || freeSpotNear(g.x - 2, g.y + 1, 1, 1, 4));
+      if (s) { const x = (s[0] + 0.5) * T, y = (s[1] + 0.8) * T; L.hive = { x, y, angry: 0, honey: true }; objects.push(makeHive(x, y)); }
+    }
+    const P = L.paddock;
+    const ms = P ? freeSpotNear(P.x + P.w + 1, P.y + P.h - 3, 3, 2, 5) || freeSpotNear(P.x - 4, P.y + 2, 3, 2, 5) : null;
+    const m2 = ms || freeSpotNear(L.plaza.x + 14, L.plaza.y + 2, 3, 2, 8) || randomFreeSpot(3, 2);
+    if (m2) { const x = (m2[0] + 1.5) * T, y = (m2[1] + 1) * T; L.mud = { x, y, rx: 1.4 * T, ry: 0.85 * T }; objects.push(makeMud(x, y, L.mud.rx, L.mud.ry)); }
+    const hs = shuffled(L.houses.slice());
+    for (const h of hs) {
+      const s = freeSpotNear(h.x + h.w + 1, h.y + h.h, 1, 1, 3);
+      if (s) { L.perch = { x: (s[0] + 0.5) * T, y: (s[1] + 0.8) * T }; objects.push(makePerch(L.perch.x, L.perch.y)); break; }
+    }
+  }
+
+  // --- Spawning -------------------------------------------------------------------------
+  function spawnWilds() {
+    const T = TILE, g = L.garden;
+    const mk = (type, x, y, extra) => critters.push(Object.assign({ type, x, y, z: 0, dir: 'left', walk: 0, ph: rand() * 6, tx: null, wait: rr(0, 3), cd: 0 }, extra));
+    // Fox: lurks at the forest edge nearest the hen house
+    if (L.coop) { const e = edgeSpot(L.coop.x, L.coop.y); if (e) mk('fox', e.x, e.y, { hx: e.x, hy: e.y, state: 'lurk', t: rr(15, 35) }); }
+    // Rabbits around the garden
+    if (g && !isWinter()) for (let k = 0; k < 3; k++) {
+      const x = (g.x + rr(-2, g.w + 2)) * T, y = (g.y + (k === 0 ? rr(1, g.h - 1) : rr(-2, g.h + 2))) * T;
+      if (!critterBlocked({ type: 'rabbit' }, x, y)) mk('rabbit', x, y, { hx: x, hy: y, flee: 0, hopZ: 0 });
+    }
+    // Badger (comes out at dusk)
+    if (!isWinter()) { const e = edgeSpot(rr(0, WORLD_W), rr(0, WORLD_H)); if (e) mk('badger', e.x, e.y, { hx: e.x, hy: e.y, charge: 0 }); }
+    // Deer grazing at the forest edge
+    { const e = edgeSpot(rr(0, WORLD_W), rr(0, WORLD_H)); if (e) for (let k = 0; k < 2; k++) mk('deer', e.x + k * 26, e.y + k * 10, { hx: e.x, hy: e.y, look: rr(2, 5), up: false, bolt: 0, gone: 0 }); }
+    // Fish in open water, and a swan
+    if (L.kind !== 'seaside' && hasOpenWater()) {
+      for (let k = 0; k < 5; k++) for (let n = 0; n < 40; n++) {
+        const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * 0.85;
+        const x = (L.pond.cx + Math.cos(a) * L.pond.rx * d) * T, y = (L.pond.cy + Math.sin(a) * L.pond.ry * d) * T;
+        if (tileAt(x, y) === WATER) { mk('pfish', x, y, { flying: true, leap: 0, lx: 0, ly: 0 }); break; }
+      }
+    }
+    if (L.kind !== 'seaside') for (let n = 0; n < 40; n++) {
+      const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * 0.6;
+      const x = (L.pond.cx + Math.cos(a) * L.pond.rx * d) * T, y = (L.pond.cy + Math.sin(a) * L.pond.ry * d) * T;
+      if (isWaterish(x, y)) { mk('swan', x, y, { hx: x, hy: y, chase: 0 }); break; }
+    }
+    // Parrot on its perch
+    if (L.perch) mk('parrot', L.perch.x, L.perch.y + 0.5, { z: 27, flying: true, heard: null, heardT: 0, thiefCD: 0 });
+    // Pig by the mud
+    if (L.mud) mk('pig', L.mud.x + 20, L.mud.y + 6, { hx: L.mud.x, hy: L.mud.y, roll: 0, food: null, oinkT: rr(4, 9) });
+    // Mice indoors
+    (L.rooms || []).forEach((h, k) => {
+      if (!h || (k > 1 && rand() < 0.4)) return;
+      const R = h.room;
+      mk('mouse', (R.x0 + 2 + rand() * 7) * T, (R.y0 + 4 + rand() * 2.5) * T, { room: R, flying: true, flee: 0 });
+    });
+    // Pepper, a yappy little terrier who hangs about the plaza
+    { const P = L.plaza, x = (P.x + 3 + rand() * 6) * T, y = (P.y + 3 + rand() * 6) * T; mk('pup', x, y, { hx: x, hy: y, friend: false, yapT: 0, food: null, lookCD: 0, nipCD: 0 }); }
+    // A whirlwind on windy days
+    L.whirl = L.weather === 'windy' ? newWhirl() : null;
+  }
+  function newWhirl() {
+    const P = L.plaza;
+    return { x: (P.x + rr(-12, 18)) * TILE, y: (P.y + rr(-8, 16)) * TILE, a: rand() * Math.PI * 2, t: 0, hitCD: 0 };
+  }
+
+  // --- Per-frame behaviour -------------------------------------------------------------
+  function updateWilds(c, dt, near) {
+    const pd = Math.hypot(player.x - c.x, player.y - c.y);
+    const outside = areaOf(player.x, player.y) === 0;
+    const running = player.speed > WALK_SPEED * 1.15;
+    c.cd = Math.max(0, (c.cd || 0) - dt);
+    switch (c.type) {
+      case 'fox': {
+        if (c.state === 'lurk') {
+          c.t -= dt;
+          if (c.t <= 0 && hens.length) { c.state = 'sneak'; c.path = null; }
+          break;
+        }
+        if (c.state === 'flee') {
+          if (wayTo(c, c.hx, c.hy, 150, dt)) { c.state = 'lurk'; c.t = rr(35, 60); c.path = null; }
+          break;
+        }
+        if (near || (outside && pd < 110 && running && !player.hidden)) { foxFlee(c); break; }
+        if (c.state === 'sneak') {
+          if (wayTo(c, L.coop.x, L.coop.y + 26, 46, dt) || Math.hypot(L.coop.x - c.x, L.coop.y - c.y) < 70) {
+            c.state = 'hunt'; c.t = 14; c.bubble = { text: '*sniff sniff*', t: 1.2 };
+            lookTowards(c.x, c.y, 260, () => rpick(['Is that a fox?!', 'Fox! Mind the hens!', 'Shoo, fox!']));
+          }
+          break;
+        }
+        // hunting: chase the nearest hen around the yard
+        c.t -= dt;
+        let hen = null, hd = 1e9;
+        for (const h of hens) { const d = Math.hypot(h.x - c.x, h.y - c.y); if (d < hd) { hd = d; hen = h; } }
+        if (!hen || c.t <= 0) { c.state = 'flee'; c.path = null; break; }
+        critterMove(c, hen.x, hen.y, 70, dt);
+        for (const h of hens) if (Math.hypot(h.x - c.x, h.y - c.y) < 50) {
+          if (h.panic <= 0.4) { h.bubble = { text: rpick(['BAWK!', 'FOX!', 'Bwaak!']), t: 1 }; if (pd < 300) sfx('cluck'); }
+          h.panic = 1.6; h.fleeA = Math.atan2(h.y - c.y, h.x - c.x) + rr(-0.5, 0.5);
+        }
+        break;
+      }
+      case 'rabbit': {
+        c.flee = Math.max(0, c.flee - dt);
+        c.hopZ = c.moving ? Math.abs(Math.sin(c.walk * 1.4)) * (c.flee > 0 ? 7 : 3) : 0;
+        if (near && c.flee < 0.5) {
+          c.flee = 2.2; c.fa = Math.atan2(c.y - player.y, c.x - player.x); c.bubble = { text: '!', t: 0.6 };
+          completeTask('rabbit');
+        }
+        if (c.flee > 0) {
+          if (Math.random() < dt * 3) c.fa += rr(-1.2, 1.2); // zig-zag
+          if (critterMove(c, c.x + Math.cos(c.fa) * 30, c.y + Math.sin(c.fa) * 30, 150, dt) && c.tx === null) c.fa += Math.PI * rr(0.5, 1.5);
+          c.hx = c.x; c.hy = c.y;
+        } else {
+          c.wait -= dt;
+          if (c.wait <= 0) { c.tx = c.hx + rr(-40, 40); c.ty = c.hy + rr(-30, 30); c.wait = rr(1, 3.5); }
+          if (c.tx && critterMove(c, c.tx, c.ty, 30, dt)) c.tx = null;
+        }
+        break;
+      }
+      case 'badger': {
+        if (duskK < 0.3) break;
+        if (c.charge > 0) {
+          c.charge -= dt;
+          if (!outside || player.inWardrobe) { c.charge = 0; break; }
+          critterMove(c, player.x, player.y, 150, dt);
+          if (pd < 14) {
+            knockPlayer(c.x, c.y, 220); c.bubble = { text: 'GRRRUMPH!', t: 1.2 }; sfx('growl'); sfx('bonk');
+            c.charge = 0; c.cd = 7; completeTask('badger');
+          }
+          break;
+        }
+        if (outside && pd < 50 && !player.hidden && c.cd <= 0) { c.charge = 2; c.bubble = { text: 'Grrr...', t: 0.9 }; sfx('growl'); break; }
+        c.wait -= dt;
+        if (c.wait <= 0) { const e = Math.random() < 0.3 ? edgeSpot(c.x, c.y) : null; c.tx = e ? e.x : c.hx + rr(-120, 120); c.ty = e ? e.y : c.hy + rr(-80, 80); c.wait = rr(3, 6); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 22, dt)) c.tx = null;
+        if (Math.random() < dt * 0.4) c.bubble = { text: '*snuffle*', t: 0.9 };
+        break;
+      }
+      case 'deer': {
+        if (c.gone > 0) { c.gone -= dt; if (c.gone <= 0) { c.x = c.hx + rr(-20, 20); c.y = c.hy + rr(-10, 10); c.bolt = 0; } break; }
+        if (c.bolt > 0) { // bounding off into the trees
+          c.bolt -= dt; c.walk += dt * 16;
+          c.x += Math.cos(c.fa) * 190 * dt; c.y += Math.sin(c.fa) * 190 * dt; c.moving = true;
+          if (c.bolt <= 0) c.gone = rr(25, 40);
+          break;
+        }
+        c.look -= dt;
+        if (c.look <= 0) { c.up = !c.up; c.look = c.up ? rr(1.2, 2) : rr(2.5, 5); }
+        const spooked = outside && started && !player.hidden && ((running && pd < 150) || (c.up && player.speed > 12 && pd < 120) || player.held && pd < 40 && player.held.air);
+        if (spooked) {
+          for (const d of critters) if (d.type === 'deer' && !(d.bolt > 0) && !(d.gone > 0)) {
+            const e = Math.atan2(d.hy - WORLD_H / 2, d.hx - WORLD_W / 2);
+            d.bolt = 1.4; d.fa = e + rr(-0.3, 0.3); d.dir = Math.cos(d.fa) > 0 ? 'right' : 'left'; d.bubble = { text: '!', t: 0.6 };
+          }
+          sfx('flutter');
+          break;
+        }
+        if (outside && pd < 30 && !player.hidden) { completeTask('deer'); c.bubble = { text: '♥', t: 1 }; }
+        if (!c.up) { c.wait -= dt; if (c.wait <= 0) { c.tx = c.hx + rr(-30, 30); c.ty = c.hy + rr(-20, 20); c.wait = rr(3, 6); } if (c.tx && critterMove(c, c.tx, c.ty, 9, dt)) c.tx = null; }
+        else if (player.x !== c.x) c.dir = player.x > c.x ? 'right' : 'left';
+        break;
+      }
+      case 'pfish': {
+        if (c.leap > 0) { // mid-air
+          c.leap -= dt;
+          const k = 1 - c.leap / 0.7;
+          c.x = lerp(c.lx, c.ex, k); c.y = lerp(c.ly, c.ey, k); c.z = Math.sin(k * Math.PI) * 26;
+          if (c.leap <= 0) {
+            c.z = 0;
+            if (c.toPlayer && Math.hypot(player.x - c.x, player.y - c.y) < 26 && !player.held && player.speed < 10) {
+              const it = addItem('fish', player.x, player.y); pickUp(it); c.dead = true;
+              player.bubble = { text: 'Got one!', t: 1.2 }; completeTask('catchfish');
+            } else if (tileAt(c.x, c.y) !== WATER) { addItem('fish', c.x, c.y); c.dead = true; sfx('splat'); } // flopped onto the bank
+            else { splash(c.x, c.y, false); sfx('plop'); c.x = c.lx; c.y = c.ly; }
+            c.toPlayer = false;
+          }
+          break;
+        }
+        // drawn to a raccoon waiting quietly at the water's edge
+        const waiting = outside && player.speed < 5 && (player.idleT || 0) > 1.2 && !player.held && pd < 140;
+        if (waiting) critterMove(c, player.x, player.y, 26, dt);
+        else {
+          c.wait -= dt;
+          if (c.wait <= 0 || c.tx === null) { c.tx = c.x + rr(-40, 40); c.ty = c.y + rr(-25, 25); c.wait = rr(1.5, 3); }
+          if (tileAt(c.tx, c.ty) === WATER) critterMove(c, c.tx, c.ty, 18, dt); else c.tx = null;
+        }
+        if (tileAt(c.x, c.y) !== WATER) { c.x -= (player.x - c.x) * 0.05; c.y -= (player.y - c.y) * 0.05; }
+        c.cd -= dt;
+        if (waiting && pd < 36 && c.cd <= 0) { c.leap = 0.7; c.lx = c.x; c.ly = c.y; c.ex = player.x; c.ey = player.y - 2; c.toPlayer = true; c.cd = 4; sfx('plop'); }
+        else if (c.cd <= -6 && Math.random() < dt * 0.3) { c.leap = 0.7; c.lx = c.x; c.ly = c.y; c.ex = c.x + rr(-14, 14); c.ey = c.y + rr(-4, 4); c.cd = 0; }
+        break;
+      }
+      case 'swan': {
+        if (c.chase > 0) {
+          c.chase -= dt;
+          if (!outside || player.inWardrobe || player.hidden) c.chase = Math.min(c.chase, 0.3);
+          critterMove(c, player.x, player.y, 128, dt);
+          c.walk += dt * 8;
+          if (pd < 14 && c.cd <= 0) {
+            knockPlayer(c.x, c.y, 200); c.bubble = { text: 'HONK!!', t: 1.2 }; sfx('honk'); sfx('bonk');
+            c.cd = 10; c.chase = 0; completeTask('swan');
+          }
+          break;
+        }
+        if (outside && started && pd < 60 && c.cd <= 0 && !player.hidden) { c.chase = 3.5; c.bubble = { text: 'HSSSS!', t: 1 }; sfx('hiss'); break; }
+        if (!isWaterish(c.x, c.y)) { critterMove(c, c.hx, c.hy, 40, dt); break; } // waddle back to the water
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.hx + rr(-60, 60); c.ty = c.hy + rr(-40, 40); c.wait = rr(2, 5); }
+        if (c.tx && isWaterish(c.tx, c.ty) && critterMove(c, c.tx, c.ty, 14, dt)) c.tx = null; else if (c.tx && !isWaterish(c.tx, c.ty)) c.tx = null;
+        break;
+      }
+      case 'swarm': {
+        c.t -= dt;
+        const lost = player.hidden || !outside || player.inWardrobe;
+        if (c.t <= 0 || lost) { if (lost && c.t > 0) player.bubble = { text: 'phew...', t: 1 }; c.dead = true; if (L.hive) L.hive.angry = 0; break; }
+        c.x += (player.x - c.x) * Math.min(1, dt * 1.6); c.y += (player.y - 4 - c.y) * Math.min(1, dt * 1.6);
+        if (pd < 18) { c.sting = (c.sting || 0) - dt; if (c.sting <= 0) { c.sting = 1.1; player.bubble = { text: rpick(['Ow!', 'Ouch!', 'Yowch!']), t: 0.8 }; player.hopV = 110; player.hop = 0.01; sfx('bonk'); } }
+        for (const v of villagers) {
+          if (areaOf(v.x, v.y) !== 0 || Math.hypot(v.x - c.x, v.y - c.y) > 42) continue;
+          if (startleV(v, rpick(['BEES!!', 'Aaah! Bees!', 'Get them off!']), { state: 'sulk' })) { v.stateT = 2.5; completeTask('bees'); }
+        }
+        if (dog && Math.hypot(dog.x - c.x, dog.y - c.y) < 40 && dog.state !== 'return') { dog.state = 'sit'; dog.t = 2; dogSay('Yip!', 1); }
+        break;
+      }
+      case 'parrot': {
+        c.thiefCD = Math.max(0, c.thiefCD - dt);
+        if (c.heard) { c.heardT -= dt; if (c.heardT <= 0) { c.bubble = { text: 'SQUAWK! ' + c.heard, t: 2 }; if (pd < 320) sfx('squawk'); c.heard = null; } }
+        const it = player.held;
+        if (outside && started && it && it.owner && pd < 100 && !player.hidden && c.thiefCD <= 0) {
+          c.thiefCD = 10; c.bubble = { text: 'THIEF! THIEF!', t: 1.8 }; sfx('squawk'); sfx('squawk');
+          lookTowards(player.x, player.y, 260, () => rpick(['Thief? Where?', 'What’s that bird on about?', 'Polly?']));
+          completeTask('parrot');
+        }
+        if (player.x !== c.x && pd < 200) c.dir = player.x > c.x ? 'right' : 'left';
+        break;
+      }
+      case 'pig': {
+        c.oinkT -= dt;
+        if (c.oinkT <= 0) { c.oinkT = rr(6, 12); c.bubble = { text: rpick(['Oink', 'Snrrk', 'Oink oink']), t: 1 }; if (pd < 280) sfx('oink'); }
+        // Food dropped nearby? Gobbled.
+        if (!c.food || !items.includes(c.food) || c.food.held || c.food.air) {
+          c.food = null;
+          for (const f of items) if (isFood(f) && f.touched && !f.held && !f.air && !f.planted && areaOf(f.x, f.y) === 0 && Math.hypot(f.x - c.x, f.y - c.y) < 120) { c.food = f; break; }
+        }
+        if (c.food) {
+          if (critterMove(c, c.food.x, c.food.y, 34, dt) || Math.hypot(c.food.x - c.x, c.food.y - c.y) < 8) {
+            const i2 = items.indexOf(c.food); if (i2 >= 0) items.splice(i2, 1);
+            crumbs(c.x, c.y, 3, 6, '#c9b57e'); c.bubble = { text: 'SNORF!', t: 1 }; if (pd < 280) sfx('oink'); c.food = null;
+          }
+          break;
+        }
+        c.roll = Math.max(0, c.roll - dt);
+        const inMud = L.mud && ((c.x - L.mud.x) / L.mud.rx) ** 2 + ((c.y - L.mud.y) / L.mud.ry) ** 2 < 1;
+        if (inMud && c.roll <= 0 && Math.random() < dt * 0.25) c.roll = 2.5;
+        if (c.roll > 0) break;
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.hx + rr(-55, 55); c.ty = c.hy + rr(-30, 30); c.wait = rr(2, 5); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 16, dt)) c.tx = null;
+        break;
+      }
+      case 'mouse': {
+        const R = c.room, minX = (R.x0 + 1.4) * TILE, maxX = (R.x0 + 9.6) * TILE, minY = (R.y0 + 3) * TILE, maxY = (R.y0 + 6.8) * TILE;
+        const same = areaOf(player.x, player.y) === areaOf(c.x, c.y);
+        c.flee = Math.max(0, c.flee - dt);
+        if (same && pd < 55 && player.speed > 20 && c.flee < 0.3) { c.flee = 1.6; c.fa = Math.atan2(c.y - player.y, c.x - player.x) + rr(-0.4, 0.4); c.bubble = { text: 'eek!', t: 0.6 }; sfx('squeak'); }
+        let tx, ty, sp;
+        if (c.flee > 0) { tx = c.x + Math.cos(c.fa) * 30; ty = c.y + Math.sin(c.fa) * 30; sp = 140; }
+        else { c.wait -= dt; if (c.wait <= 0 || c.tx === null) { c.tx = rr(minX, maxX); c.ty = rr(minY, maxY); c.wait = rr(1, 3); } tx = c.tx; ty = c.ty; sp = c.wait > 0.6 ? 60 : 0; }
+        if (sp) {
+          const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy);
+          if (d > 1) { c.x += dx / d * Math.min(d, sp * dt); c.y += dy / d * Math.min(d, sp * dt); c.dir = dx > 0 ? 'right' : 'left'; c.moving = true; c.walk += dt * 20; }
+        }
+        if (c.x < minX || c.x > maxX) { c.x = clamp(c.x, minX, maxX); c.fa = Math.PI - c.fa; }
+        if (c.y < minY || c.y > maxY) { c.y = clamp(c.y, minY, maxY); c.fa = -c.fa; }
+        if (c.flee > 0) for (const v of villagers) {
+          if (areaOf(v.x, v.y) !== areaOf(c.x, c.y) || Math.hypot(v.x - c.x, v.y - c.y) > 40) continue;
+          if (startleV(v, rpick(['EEEK! A MOUSE!', 'A mouse!!', 'Get it out!']), { state: 'sulk' })) { v.stateT = 2; completeTask('mouse'); }
+        }
+        break;
+      }
+      case 'pup': updatePup(c, dt, pd, outside); break;
+    }
+  }
+
+  function foxFlee(c) {
+    if (c.state === 'flee' || c.state === 'lurk') return;
+    c.state = 'flee'; c.path = null; c.bubble = { text: 'Yip!', t: 0.8 }; sfx('yip');
+    completeTask('fox');
+  }
+
+  function updatePup(c, dt, pd, outside) {
+    c.yapT -= dt; c.lookCD = Math.max(0, c.lookCD - dt); c.nipCD = Math.max(0, c.nipCD - dt);
+    // Snacks win Pepper over
+    if (!c.food || !items.includes(c.food) || c.food.held || c.food.air) {
+      c.food = null;
+      for (const f of items) if (isFood(f) && f.touched && !f.held && !f.air && !f.planted && areaOf(f.x, f.y) === 0 && Math.hypot(f.x - c.x, f.y - c.y) < 140) { c.food = f; break; }
+    }
+    if (c.food) {
+      if (critterMove(c, c.food.x, c.food.y, 120, dt) || Math.hypot(c.food.x - c.x, c.food.y - c.y) < 8) {
+        const it = c.food, i2 = items.indexOf(it); if (i2 >= 0) items.splice(i2, 1);
+        crumbs(c.x, c.y, 3, 6, '#c9b57e'); sfx('chomp'); c.food = null;
+        if (it.touched && !c.friend) {
+          c.friend = true; c.bubble = { text: 'Yip! ♥', t: 1.4 }; sfx('happy');
+          for (let k = 0; k < 4; k++) particles.push({ kind: 'heart', x: c.x + rr(-6, 6), y: c.y, z: 14 + k * 4, life: 1.2, max: 1.2 });
+          completeTask('pepper');
+        }
+      }
+      return;
+    }
+    if (c.friend) {
+      // Trots along at your heels, and yaps at anyone chasing you
+      if (outside && pd > 34) { if (pd > 400) { c.x = player.x - 20; c.y = player.y; } critterMove(c, player.x - 18, player.y + 4, pd > 90 ? 200 : 110, dt); }
+      for (const v of villagers) if (v.state === 'chase' && c.nipCD <= 0 && Math.hypot(v.x - c.x, v.y - c.y) < 50) {
+        c.nipCD = 7; c.bubble = { text: 'YAP! YAP!', t: 1 }; sfx('yip');
+        startleV(v, rpick(['Pepper, no!', 'Off, you little...', 'Gah! The dog!']));
+      }
+      return;
+    }
+    // Not a friend: yaps at the raccoon and gives you away
+    if (outside && started && pd < 130 && !player.hidden) {
+      if (pd > 40) critterMove(c, player.x, player.y, 90, dt);
+      else { c.circle = (c.circle || 0) + dt * 3; critterMove(c, player.x + Math.cos(c.circle) * 34, player.y + Math.sin(c.circle) * 20, 110, dt); }
+      if (c.yapT <= 0) {
+        c.yapT = 1.2; c.bubble = { text: rpick(['Yip! Yip!', 'YAP!', 'Rrrip!']), t: 0.8 }; sfx('yip');
+        if (c.lookCD <= 0) { c.lookCD = 5; lookTowards(player.x, player.y, 190, () => rpick(['What’s Pepper yapping at?', 'Pepper? What is it?'])); }
+      }
+      return;
+    }
+    c.wait -= dt;
+    if (c.wait <= 0) { c.tx = c.hx + rr(-90, 90); c.ty = c.hy + rr(-70, 70); c.wait = rr(1, 3); }
+    if (c.tx && critterMove(c, c.tx, c.ty, 50, dt)) c.tx = null;
+  }
+
+  // Chitter reactions
+  function wildScare(c, x, y, r) {
+    const real = r < 9999, d = Math.hypot(c.x - x, c.y - y);
+    if (c.type === 'fox' && real) foxFlee(c);
+    if (c.type === 'rabbit') { c.flee = 2.2; c.fa = Math.atan2(c.y - y, c.x - x); if (real) completeTask('rabbit'); }
+    if (c.type === 'badger' && real && duskK >= 0.3 && c.cd <= 0 && d < 110) { c.charge = 2; c.bubble = { text: 'GRRR!', t: 0.9 }; sfx('growl'); }
+    if (c.type === 'deer' && !(c.bolt > 0) && !(c.gone > 0)) { c.bolt = 1.4; c.fa = Math.atan2(c.hy - WORLD_H / 2, c.hx - WORLD_W / 2); c.dir = Math.cos(c.fa) > 0 ? 'right' : 'left'; }
+    if (c.type === 'swan' && real && c.cd <= 0) { c.chase = 3.5; c.bubble = { text: 'HSSSS!', t: 1 }; sfx('hiss'); }
+    if (c.type === 'parrot' && real) { c.heard = rpick(['Chirr! Hehe!', 'Skrrt! Skrrt!', 'Mine! Mine!']); c.heardT = 1; }
+    if (c.type === 'pig' && real) { c.bubble = { text: 'OINK!', t: 1 }; sfx('oink'); c.tx = c.x + (c.x - x); c.ty = c.y + (c.y - y); }
+    if (c.type === 'mouse' && real && areaOf(x, y) === areaOf(c.x, c.y)) { c.flee = 1.6; c.fa = Math.atan2(c.y - y, c.x - x); sfx('squeak'); }
+  }
+  // Villagers' words get picked up by the parrot
+  function parrotHear(v, text) {
+    for (const c of critters) if (c.type === 'parrot' && !c.heard && Math.hypot(v.x - c.x, v.y - c.y) < 220 && text.length < 30 && Math.random() < 0.6) { c.heard = text; c.heardT = 1.6; }
+  }
+
+  // Bump or hit the beehive and out comes a swarm (and a jar of honey)
+  function angerHive() {
+    const H = L.hive;
+    if (!H || H.angry > 0) return;
+    H.angry = 1; sfx('buzz');
+    critters.push({ type: 'swarm', x: H.x, y: H.y - 16, z: 0, flying: true, dir: 'left', walk: 0, ph: 0, t: 9 });
+    if (H.honey) { H.honey = false; addItem('honey', H.x + 12, H.y + 6); }
+    player.bubble = { text: 'uh oh', t: 1.2 };
+  }
+  ITEM.honey = { name: 'honey', h: 9, r: 5, draw(c) {
+    c.fillStyle = '#e8a33a'; roundRect(c, -4, -9, 8, 9, 2, true);
+    c.fillStyle = '#f2c14e'; c.fillRect(-3, -7, 3, 5);
+    c.fillStyle = '#c9b57e'; c.fillRect(-4.5, -10, 9, 2.5);
+  } };
+  FOOD.honey = { bites: 2, fill: 20, sweet: true };
+
+  // Whirlwind, frost, mud, puddle soaking: once a frame
+  function updateWildsWorld(dt) {
+    if (!L || !started || paused) return;
+    const outside = areaOf(player.x, player.y) === 0;
+    // Beehive: run into it, or throw something at it
+    const H = L.hive;
+    if (H) {
+      H.angry = Math.max(0, H.angry - dt * 0.05);
+      if (outside && Math.hypot(player.x - H.x, player.y - H.y) < 26 && Math.max(player.speed, H.lastSpd || 0) > 60) angerHive();
+      H.lastSpd = player.speed;
+      for (const it of items) if (it.air && Math.hypot(it.vx, it.vy) > 80 && it.z < 30 && Math.hypot(it.x - H.x, it.y - H.y) < 16) { angerHive(); break; }
+    }
+    // Mud: roll in it, then track it everywhere
+    if (L.mud && outside) {
+      const m = L.mud, k = ((player.x - m.x) / m.rx) ** 2 + ((player.y - m.y) / m.ry) ** 2;
+      if (k < 1) {
+        if (!(player.mud > 20)) { sfx('splat'); for (let n = 0; n < 6; n++) particles.push({ kind: 'shard', col: '#6b4a2e', x: player.x, y: player.y, z: 3, vx: rr(-40, 40), vy: rr(-20, 20), vz: rr(40, 90), life: 0.6, max: 0.6 }); }
+        player.mud = 40; completeTask('mud');
+      }
+    }
+    if (player.mud > 0) {
+      player.mud -= dt * (wet() ? 2 : 1);
+      if (areaOf(player.x, player.y) > 0) completeTask('muddy');
+    }
+    // Whirlwind
+    const W = L.whirl;
+    if (W) {
+      W.t += dt; W.hitCD = Math.max(0, W.hitCD - dt);
+      W.a += rr(-1, 1) * dt * 2;
+      let nx = W.x + Math.cos(W.a) * 55 * dt, ny = W.y + Math.sin(W.a) * 40 * dt;
+      if (nx < 6 * TILE || nx > WORLD_W - 6 * TILE || ny < 6 * TILE || ny > WORLD_H - 6 * TILE || isWaterish(nx, ny)) { W.a += Math.PI * 0.8; nx = W.x; ny = W.y; }
+      W.x = nx; W.y = ny;
+      if (Math.random() < dt * 25) particles.push({ x: W.x + rr(-14, 14), y: W.y + rr(-4, 4), r: rr(2, 4), life: 0.5, max: 0.5, vy: -20 });
+      for (const it of items) {
+        if (it.held || it.air || it.type.heavy || it.planted || it.floating || areaOf(it.x, it.y) !== 0) continue;
+        if (Math.hypot(it.x - W.x, it.y - W.y) < 22) { const a = rr(0, Math.PI * 2); Object.assign(it, { air: true, vz: rr(240, 320), vx: Math.cos(a) * rr(80, 150), vy: Math.sin(a) * rr(50, 100), spin: rr(-12, 12), kicker: null }); }
+      }
+      if (outside && W.hitCD <= 0 && Math.hypot(player.x - W.x, player.y - W.y) < 20 && !player.inWardrobe) {
+        W.hitCD = 4; player.bubble = { text: 'wheeee!', t: 1.3 };
+        knockPlayer(W.x - rr(-5, 5), W.y - rr(-5, 5), 280); player.hopV = 260; player.stun = 0.8; player.spin = 0.9;
+        sfx('whoosh'); completeTask('whirlwind');
+      }
+      for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - W.x, v.y - W.y) < 20) startleV(v, rpick(['Whoa!', 'My hat!', 'What a wind!']));
+    }
+    if (player.spin > 0) { player.spin -= dt; player.dir = ['down', 'right', 'up', 'left'][Math.floor(time * 14) % 4]; }
+  }
+  function drawWhirl(ctx, t) {
+    const W = L.whirl;
+    if (!W) return;
+    ctx.save(); ctx.lineCap = 'round';
+    for (let k = 0; k < 11; k++) {
+      const h = k * 7, r = 6 + k * 2.8, a = t * 9 + k * 0.7;
+      ctx.strokeStyle = `rgba(150,128,92,${0.75 - k * 0.045})`; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.ellipse(W.x + Math.sin(t * 3 + k) * 2, W.y - h, r, r * 0.35, 0, a, a + 4); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(120,100,70,0.3)'; ellipse(ctx, W.x, W.y, 18, 5);
+    for (let k = 0; k < 5; k++) { const a = t * 7 + k * 1.3, h = (t * 30 + k * 13) % 60; ctx.fillStyle = k % 2 ? '#c99a4a' : '#8fbf5a'; circle(ctx, W.x + Math.cos(a) * (6 + h * 0.3), W.y - h, 1.4); }
+    ctx.restore();
+  }
+  // Frost: slippery paths with a white sheen
+  const frosty = (x, y) => !!L && L.weather === 'frost' && areaOf(x, y) === 0 && [PATH, STONE, BRIDGE].includes(tileAt(x, y));
+  function drawFrost(ctx, left, top, viewW, viewH, t) {
+    if (!L || L.weather !== 'frost') return;
+    const x0 = Math.max(0, Math.floor(left / TILE)), y0 = Math.max(0, Math.floor(top / TILE));
+    const x1 = Math.min(MW - 1, Math.ceil((left + viewW) / TILE)), y1 = Math.min(MH - 1, Math.ceil((top + viewH) / TILE));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const t0 = getT(x, y);
+      if (t0 === PATH || t0 === STONE || t0 === BRIDGE) {
+        ctx.fillStyle = 'rgba(225,238,255,0.45)'; ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        if (((x * 7 + y * 13) % 5) === 0) { ctx.fillStyle = `rgba(255,255,255,${0.5 + Math.sin(t * 3 + x + y) * 0.5})`; circle(ctx, x * TILE + 8 + (y % 3) * 5, y * TILE + 9, 0.9); }
+      } else if (t0 === GRASS && ((x * 3 + y * 5) % 4) === 0) { ctx.fillStyle = 'rgba(240,246,255,0.25)'; ctx.fillRect(x * TILE, y * TILE, TILE, TILE); }
+    }
+  }
+  // Villagers chasing you can slip on the frost
+  function frostSlip(v, dt) {
+    if (v.state !== 'chase' || !frosty(v.x, v.y) || Math.random() > dt * 0.5) return;
+    if (startleV(v, rpick(['Whoooa!', 'Oof! Slippery!', 'Woah-oh-oh!']), { state: 'sulk' })) {
+      v.stateT = 2; sfx('thud');
+      for (let k = 0; k < 6; k++) particles.push({ kind: 'shard', col: '#eaf4ff', x: v.x, y: v.y, z: 2, vx: rr(-40, 40), vy: rr(-15, 15), vz: rr(30, 70), life: 0.6, max: 0.6 });
+      completeTask('slip');
+    }
+  }
+
+  // --- Drawing --------------------------------------------------------------------------
+  function drawWilds(ctx, c, t) {
+    if (c.dead) return;
+    if (c.type === 'badger' && duskK < 0.3) return;
+    if (c.type === 'deer' && c.gone > 0) return;
+    if (c.type === 'fox' && c.state === 'lurk') return; // hidden in the trees
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    if (c.type === 'badger') ctx.globalAlpha = Math.min(1, (duskK - 0.3) * 4);
+    if (c.type === 'deer' && c.bolt > 0) ctx.globalAlpha = Math.min(1, c.bolt / 0.6);
+    if (c.type === 'swarm') {
+      for (let k = 0; k < 18; k++) {
+        const a = t * (4 + (k % 5)) + k * 2.1, rad = 4 + (k % 4) * 3;
+        ctx.fillStyle = k % 3 ? '#1d1d22' : '#f2c14e';
+        circle(ctx, Math.cos(a) * rad, -16 + Math.sin(a * 1.3) * rad * 0.7, 1.1);
+      }
+      ctx.restore(); return;
+    }
+    if (c.type === 'pfish') {
+      if (c.z > 0) { // leaping
+        ctx.translate(0, -c.z); ctx.rotate((c.ex > c.lx ? 1 : -1) * (c.leap - 0.35) * 2);
+        ctx.fillStyle = '#c9d4dc'; ellipse(ctx, 0, 0, 6, 2.6);
+        ctx.fillStyle = '#8fa3b1'; poly(ctx, [[-5, 0], [-9, -3], [-9, 3]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 3.5, -0.6, 0.6);
+      } else {
+        ctx.globalAlpha = 0.35; ctx.fillStyle = '#2b4a5e';
+        ctx.rotate(Math.sin(c.ph) * 0.2 + (c.dir === 'left' ? Math.PI : 0)); ellipse(ctx, 0, 0, 6, 2.2);
+        poly(ctx, [[-5, 0], [-9, -2.5], [-9, 2.5]]); ctx.fill();
+      }
+      ctx.restore(); return;
+    }
+    const small = c.type === 'mouse' || c.type === 'rabbit' || c.type === 'parrot';
+    if (c.type !== 'parrot') { ctx.fillStyle = 'rgba(20,30,10,0.22)'; ellipse(ctx, 0, 0, small ? 4 : c.type === 'deer' ? 11 : 8, small ? 1.6 : 2.6); }
+    ctx.translate(0, -(c.z || 0) - (c.hopZ || 0));
+    if (c.dir === 'left') ctx.scale(-1, 1);
+    const step = c.moving ? Math.sin(c.walk * 2) * 2 : 0;
+    switch (c.type) {
+      case 'fox': {
+        ctx.fillStyle = '#2b2d33';
+        ctx.fillRect(-5 + step * 0.5, -5, 1.6, 5); ctx.fillRect(4 - step * 0.5, -5, 1.6, 5);
+        ctx.fillStyle = '#d9682a'; roundRect(ctx, -7, -11, 14, 7, 3.5, true);
+        ctx.beginPath(); ctx.moveTo(-6, -9); ctx.quadraticCurveTo(-16, -12, -15, -4); ctx.quadraticCurveTo(-11, -6, -6, -6); ctx.fill(); // brush
+        ctx.fillStyle = '#f4f2ee'; circle(ctx, -14.5, -5, 1.8);
+        ctx.fillStyle = '#d9682a'; poly(ctx, [[4, -9], [12, -10], [13, -7], [6, -5]]); ctx.fill(); // snout
+        poly(ctx, [[5, -11], [6, -16], [8, -11]]); ctx.fill(); poly(ctx, [[8, -11], [9.5, -15.5], [10.5, -10.5]]); ctx.fill();
+        ctx.fillStyle = '#f4f2ee'; poly(ctx, [[6, -6.5], [12, -7.2], [8, -5]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 13, -8.5, 0.9); circle(ctx, 8.5, -9, 0.7);
+        break;
+      }
+      case 'rabbit': {
+        ctx.fillStyle = '#a08060'; ellipse(ctx, -1, -4, 4.5, 3.5); ellipse(ctx, 3, -7, 2.6, 2.4);
+        ctx.fillStyle = '#a08060'; ellipse(ctx, 2.4, -11, 0.9, 3); ellipse(ctx, 3.8, -11, 0.9, 3);
+        ctx.fillStyle = '#f4f2ee'; circle(ctx, -5, -4, 1.6);
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 4.2, -7.4, 0.6);
+        break;
+      }
+      case 'badger': {
+        ctx.fillStyle = '#2b2d33';
+        ctx.fillRect(-6 + step * 0.4, -4, 2, 4); ctx.fillRect(4 - step * 0.4, -4, 2, 4);
+        ctx.fillStyle = '#7a7a80'; ellipse(ctx, -1, -6.5, 8.5, 4.5);
+        ctx.fillStyle = '#f4f2ee'; poly(ctx, [[5, -10], [13, -6], [12, -3], [5, -4]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; poly(ctx, [[6, -9], [12, -5.6], [12, -4.8], [6, -7.4]]); ctx.fill(); // the stripe
+        circle(ctx, 13, -4.5, 0.9);
+        break;
+      }
+      case 'deer': {
+        const head = c.up ? -10 : -1;
+        ctx.fillStyle = '#6b4a2e';
+        for (const lx of [-6, -3, 4, 7]) ctx.fillRect(lx + (lx < 0 ? step : -step) * 0.5, -11, 1.6, 11);
+        ctx.fillStyle = '#b07d48'; roundRect(ctx, -9, -18, 19, 8, 4, true);
+        ctx.fillStyle = '#f4f2ee'; circle(ctx, -9, -15, 1.8);
+        ctx.fillStyle = '#b07d48'; poly(ctx, [[6, -16], [9, -16], [12, -18 + head], [9, -18 + head]]); ctx.fill(); // neck
+        roundRect(ctx, 9, -21 + head, 7, 5, 2.4, true);
+        poly(ctx, [[10, -21 + head], [9, -25 + head], [12, -21 + head]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 13.5, -19.5 + head, 0.7); circle(ctx, 15.8, -18 + head, 0.6);
+        ctx.fillStyle = '#f4f2ee'; for (const [sx, sy] of [[-4, -16], [0, -15], [3, -16.5]]) circle(ctx, sx, sy, 0.8);
+        break;
+      }
+      case 'swan': {
+        const hiss = c.chase > 0;
+        ctx.fillStyle = '#f8f8f6'; ellipse(ctx, -1, -4, 8, 4.5);
+        poly(ctx, [[-8, -5], [-12, -9], [-6, -7]]); ctx.fill();
+        if (hiss) { poly(ctx, [[-4, -7], [-10, -15], [2, -8]]); ctx.fill(); } // wings up
+        ctx.strokeStyle = '#f8f8f6'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(5, -5);
+        if (hiss) ctx.quadraticCurveTo(8, -7, 11, -7); else ctx.quadraticCurveTo(9, -10, 6, -16);
+        ctx.stroke();
+        ctx.fillStyle = '#e8732a'; if (hiss) { poly(ctx, [[11, -8], [15, -7], [11, -6]]); ctx.fill(); } else { poly(ctx, [[6, -17], [10, -16], [6, -15]]); ctx.fill(); }
+        ctx.fillStyle = '#1d1d22'; circle(ctx, hiss ? 10.5 : 6, hiss ? -8 : -16.5, 0.7);
+        if (isWaterish(c.x, c.y)) { ctx.fillStyle = 'rgba(200,230,255,0.4)'; ellipse(ctx, 0, -0.5, 10, 2); }
+        break;
+      }
+      case 'parrot': {
+        ctx.fillStyle = '#3fae5a'; ellipse(ctx, 0, -5, 3.6, 5);
+        ctx.fillStyle = '#e8453c'; ellipse(ctx, 0.5, -10, 3, 3);
+        ctx.fillStyle = '#3a7fd0'; poly(ctx, [[-2, -3], [-3, 4], [0, 1]]); ctx.fill(); // tail
+        ctx.fillStyle = '#f2c14e'; poly(ctx, [[2.8, -10.5], [5.5, -9.5], [3, -8]]); ctx.fill();
+        ctx.fillStyle = '#f4f2ee'; circle(ctx, 1.6, -10.8, 1.1); ctx.fillStyle = '#1d1d22'; circle(ctx, 1.8, -10.8, 0.5);
+        break;
+      }
+      case 'pig': {
+        const rolling = c.roll > 0;
+        if (rolling) ctx.rotate(Math.sin(t * 6) * 0.6);
+        ctx.fillStyle = '#e89aa6';
+        ctx.fillRect(-6 + step * 0.4, -5, 2.2, 5); ctx.fillRect(4 - step * 0.4, -5, 2.2, 5);
+        ellipse(ctx, 0, -8, 9, 5.5);
+        ellipse(ctx, 8, -8.5, 4, 3.8);
+        ctx.fillStyle = '#d97a8a'; ellipse(ctx, 11.5, -8, 1.8, 1.6); poly(ctx, [[6, -11.5], [7, -14.5], [9, -11.5]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 9.5, -10, 0.7);
+        ctx.strokeStyle = '#d97a8a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(-10, -9, 1.6, 0, Math.PI * 1.6); ctx.stroke();
+        ctx.fillStyle = 'rgba(107,74,46,0.75)'; ellipse(ctx, -3, -6, 3, 2); ellipse(ctx, 3, -10, 2, 1.5); // muddy patches
+        break;
+      }
+      case 'mouse': {
+        ctx.scale(1.3, 1.3);
+        ctx.fillStyle = '#66666e'; ellipse(ctx, 0, -2, 3.4, 2.2); ellipse(ctx, 3, -2.4, 1.8, 1.5);
+        ctx.fillStyle = '#c9a0a8'; circle(ctx, 2.4, -4, 1); circle(ctx, 4.6, -2.2, 0.5);
+        ctx.strokeStyle = '#c9a0a8'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-3, -2); ctx.quadraticCurveTo(-6, -4 + Math.sin(c.ph * 8), -8, -1); ctx.stroke();
+        break;
+      }
+      case 'pup': {
+        const wag = Math.sin(c.ph * (c.friend ? 22 : 12)) * 3;
+        ctx.fillStyle = '#f4f2ee';
+        ctx.fillRect(-5 + step * 0.5, -5, 1.8, 5); ctx.fillRect(3.5 - step * 0.5, -5, 1.8, 5);
+        roundRect(ctx, -6.5, -10, 13, 6.5, 3, true);
+        roundRect(ctx, 4, -14, 7, 6.5, 2.5, true);
+        ctx.fillStyle = '#b07d48'; ellipse(ctx, -2, -8.5, 3, 2.2); poly(ctx, [[5, -14], [6, -17], [8, -14]]); ctx.fill(); // patch + ear
+        ctx.strokeStyle = '#f4f2ee'; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-6, -9); ctx.lineTo(-9, -13 + wag * 0.4); ctx.stroke();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 8.5, -11.8, 0.7); circle(ctx, 11, -10.3, 0.8);
+        ctx.fillStyle = '#c0392b'; ctx.fillRect(3.5, -9, 3, 1.2); // collar
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -6187,6 +6912,13 @@
         for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.5);
         const s = actx.createBufferSource(); s.buffer = b; const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 180;
         const g = actx.createGain(); g.gain.value = 0.9; s.connect(f).connect(g).connect(master); s.start(); break; }
+      case 'growl': tone(110, 90, 0.4, 'sawtooth', 0.06); break;
+      case 'honk': tone(330, 280, 0.16, 'sawtooth', 0.06); tone(320, 260, 0.2, 'sawtooth', 0.05, 0.18); break;
+      case 'oink': tone(240, 180, 0.12, 'sawtooth', 0.05); tone(220, 170, 0.12, 'sawtooth', 0.04, 0.14); break;
+      case 'squeak': tone(2400, 3000, 0.05, 'sine', 0.04); tone(2600, 3200, 0.05, 'sine', 0.035, 0.07); break;
+      case 'yip': tone(900, 600, 0.06, 'square', 0.05); tone(950, 620, 0.06, 'square', 0.045, 0.09); break;
+      case 'buzz': for (let k = 0; k < 4; k++) tone(180, 200, 0.2, 'sawtooth', 0.025, k * 0.18); break;
+      case 'whoosh': noise(0.7, 0.18, 800); break;
       case 'cluck': [700, 900, 760].forEach((f, k) => tone(f, f * 0.7, 0.06, 'square', 0.035, k * 0.07)); break;
       case 'splat': noise(0.12, 0.12, 1500); break;
       case 'creak': tone(180, 240, 0.25, 'sawtooth', 0.025); tone(240, 160, 0.2, 'triangle', 0.03, 0.18); break;
@@ -6386,7 +7118,7 @@
     for (const h of hens) if (h.x > left - pad && h.x < left + viewW + pad && h.y > top - pad && h.y < top + viewH + pad) vis.push({ y: h.y, isHen: true, h });
     if (cat && cat.x > left - pad && cat.x < left + viewW + pad && cat.y > top - pad && cat.y < top + viewH + pad + 40) vis.push({ y: cat.y + 0.5, isCat: true });
 
-    if (!indoors) drawPuddles(ctx, t);
+    if (!indoors) { drawPuddles(ctx, t); drawFrost(ctx, left, top, viewW, viewH, t); }
     // Ground-level effects: dust and ripples
     for (const q of particles) {
       if (q.kind === 'ring') {
@@ -6394,7 +7126,7 @@
         ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r, q.r * 0.45, 0, 0, Math.PI * 2); ctx.stroke();
       } else if (q.kind === 'print') {
-        ctx.fillStyle = `rgba(110,130,165,${(q.life / q.max) * 0.45})`;
+        ctx.fillStyle = q.mud ? `rgba(90,58,30,${(q.life / q.max) * 0.7})` : `rgba(110,130,165,${(q.life / q.max) * 0.45})`;
         ellipse(ctx, q.x, q.y, 2.2, 1.4); circle(ctx, q.x - 1.6, q.y - 2.2, 0.8); circle(ctx, q.x + 1.6, q.y - 2.2, 0.8);
       } else if (!q.kind) {
         ctx.fillStyle = q.soil ? `rgba(110,75,45,${(q.life / q.max) * 0.7})` : `rgba(230,215,180,${(q.life / q.max) * 0.6})`;
@@ -6422,6 +7154,7 @@
       o.draw(ctx, t, fade);
     }
 
+    if (!indoors) drawWhirl(ctx, t);
     // Indoors: black out everything beyond this room's walls (other rooms share the strip)
     if (indoors) {
       const R = indoors.room, rx = R.x0 * TILE, ry = R.y0 * TILE - 10, rw = 11 * TILE, rh = 8 * TILE + 10;
@@ -6558,6 +7291,7 @@
       updateHens(dt);
       updateDusk();
       updateCritters(dt);
+      updateWildsWorld(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
@@ -6605,7 +7339,7 @@
     spawnWeather();
     hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile'); // places to hide
     spawnAmbient();
-    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null });
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0 });
     target = null;
     cam.x = player.x; cam.y = player.y;
   }
@@ -6644,7 +7378,7 @@
   }
 
   // Handy for poking at the game from the browser console
-  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get critters() { return critters; }, fx, setWeather, get duskK() { return duskK; }, online, dailySeed, get cat() { return cat; }, get hideBushes() { return hideBushes; } };
+  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get critters() { return critters; }, fx, setWeather, get duskK() { return duskK; }, online, dailySeed, get cat() { return cat; }, get hideBushes() { return hideBushes; }, butterflies };
 
   const hot = window.claude?.hot;
   if (hot?.ready) hot.ready(() => boot()); else boot();

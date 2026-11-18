@@ -38,6 +38,11 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Hail* (spring, autumn): bouncing hailstones; villagers drop what they're doing and run home to shelter.
   - *Heatwave* (summer): a hazy, sweltering day; villagers move slowly and doze off on benches, and a dozing
     villager sees nothing (steal right from under their nose).
+  - *Drizzle*: light rain that brings out the frogs. *Downpour*: torrential rain, huge spreading puddles, and
+    villagers barely see or hear a thing; run through a puddle next to one to soak them.
+  - *Whirlwind* (on windy days): a dust devil that wanders the village, flinging things into the air and
+    sending you spinning if it catches you.
+  - *Frost* (autumn, winter): icy, slippery paths; villagers chasing you along them may slip and fall.
   - The weather can change partway through the day; the morning card gives the forecast, and a toast tells you
     when it turns. When rain clears up, a rainbow appears with a pot of gold at its end (+3 shinies).
 - **Animals**: ducks on the pond and river (they quack and flee, and eat any food dropped near them),
@@ -47,11 +52,22 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **The farm**: most villages have a fenced field with a gate and a trough. Sheep baa and bunch up when you run
   at them (herd them out through the gate), a cow moos and plods off, and a goat by the gate eats anything
   left lying around (newspapers, hats, washing) and charges if you chitter at it, headbutting you over.
+- **Wild animals**: a fox that sneaks out of the woods to raid the hen house (run or chitter at it to chase it
+  off), rabbits around the garden that bolt in zig-zags, a grumpy badger at dusk that charges if you get too
+  close, and deer at the forest edge that you can only sneak up on by freezing whenever they look up.
+- **Water and sky**: fish in the pond (wait quietly at the edge and one may leap into your paws), a swan that
+  hisses and chases you off, a beehive by the garden in spring and summer (bump it and a swarm chases you;
+  lead it to a villager, or hide in a bush to lose it, and grab the honey), and butterflies you can catch
+  if you walk rather than run.
+- **Pets and pests**: a parrot on a perch that repeats what villagers say and shouts "THIEF!" if you carry
+  someone's things past it, a pig in a mud wallow (roll in it and you leave muddy pawprints everywhere, even
+  indoors, until a puddle or the rain washes you off), mice indoors that send villagers shrieking if you
+  chase one at them, and Pepper, a yappy terrier who gives you away until you win her over with a snack.
 - **At dusk** (the last part of the day, not in winter): windows light up, hedgehogs snuffle out from the
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 91 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 107 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -113,7 +129,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   sparrows, squirrels, frogs, gulls); tint;
   farm and night: `planWeather()` / `setWeather()` / `updateWeatherPlan()`, `startRainbow()` / `drawRainbow()`,
   `buildPaddock()`, `spawnFarmNight()` / `updateFarmNight()` / `drawFarmNight()` (sheep, cow, goat, hedgehogs,
-  owl, fireflies), `updateDusk()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
+  owl, fireflies), `updateDusk()`; wild animals and pets: `buildWilds()` (beehive, mud wallow, perch),
+  `spawnWilds()` / `updateWilds()` / `wildScare()` / `drawWilds()`, `updatePup()`, `parrotHear()`,
+  `updateWildsWorld()` (hive, mud, whirlwind), `drawWhirl()`, `drawFrost()` / `frostSlip()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
   `subscribeScores()`/`postScore()`/`renderBoard()` (db `scores/<user id>`)
 - **Eating**: `FOOD` table, `startEating()`, `updateEating()` (bites, tummy, stuffed, sugar rush), `finishFood()`
