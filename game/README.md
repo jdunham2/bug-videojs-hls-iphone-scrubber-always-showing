@@ -11,8 +11,10 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Walk | WASD / Arrow keys | Drag anywhere |
 | Run | Hold Shift | Drag far |
 | Grab / drop / pet an animal | E | "grab" / "drop" button |
-| Throw | F |
-| Eat what you're carrying | Q | "eat" button | "throw" button |
+| Throw (from a roof or treehouse: drop) | F | "throw" button |
+| Eat what you're carrying | Q | "eat" button |
+| Wear / take off a disguise (hat, bucket, pot, shirt, sock, crown) | G | "wear" button |
+| Bury what you're carrying / dig it back up | B | "bury" / "dig up" button |
 | Chitter (hop, scare butterflies, drop what's in your mouth) | Space | "chitter" button |
 | Toggle minimap | M | — |
 | Show / hide to-do list | T | "To-do" tab |
@@ -53,6 +55,26 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Museum heist* (every castle village, sometimes elsewhere): treasures on plinths behind blinking red
     tripwires, and a guard on patrol. Touch a tripwire while it's on and the alarm goes off and the guard
     gives chase.
+- **Disguises and tricks**:
+  - *Disguises*: hold a hat, bucket, pot, shirt, sock or the museum crown and press G to wear it. Villagers
+    won't notice what you're carrying unless they get close ("Morning, stranger!"), but whoever owns the
+    disguise will recognise their own hat.
+  - *Burying*: B buries what you're carrying on grass, soil or sand, leaving a little mound; B on the mound
+    digs it back up. Buried things go on your trophy shelf at the end of the day.
+  - *Swimming*: walk into any pond, river, moat or sea (not while carrying something heavy). Villagers won't
+    follow you in.
+  - *Roofs*: E at the drainpipe on a house's front corner climbs onto the roof, where villagers never look.
+    F drops things over the edge onto whoever is below, or down the chimney into the house if you're next
+    to it.
+- **The pest controller** (from day 2, every day from day 5): follows your trail around the village, chases
+  you on sight, and sets three cage traps on the paths (step in one and you're stuck while he comes running;
+  throw something at one to spring it safely). Make him jump and he drops his net.
+- **Night raids** (some days from day 2): it's dark apart from lamplight and lit doorways. Most villagers are
+  asleep in bed (walk, don't run, near them or they wake up shouting), and a night watchman patrols with a
+  lantern and calls out the moment he sees you. The day ends at sunrise.
+- **The trophy den**: everything in your hideout (and everything buried) at the end of each day goes on the
+  trophy shelf in the den, kept across runs. Collections of themed things unlock new fur colours (ginger,
+  river blue, candy, silver, midnight, arctic, golden), and there are achievements to earn.
 - **Village events**: some days (about 2 in 5) there's something on, depending on the season:
   - *Village fete* (spring, summer): bunting, and a cake contest with three cakes and a first-prize rosette.
   - *Wedding* (spring to autumn): a flower arch, rows of chairs, confetti, a bouquet and a three-tier cake.
@@ -114,7 +136,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 163 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 178 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -187,6 +209,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   `placeForestObjects()`, `treeAction()` / `updateTree()` / `dropFromTree()`, `shopOf()`, `makeShopCounter()`,
   `placeRace()` / `updateRace()`, `hideSeekStart()` / `hideSeek()`, `buildMuseum()` / `placeMuseumObjects()`,
   `soundAlarm()`, `updateCastleForest()`;
+  tricks, pest control, night and trophies: `wearToggle()` / `drawDisguise()`, `buryAction()` / `updateDigging()`,
+  `canSwim()`, `roofAction()` / `updateRoof()` / `dropFromRoof()`, `placeTraps()` / `pestHunt()`, `drawNight()`,
+  `nightStops()`, `FURS` / `COLLECTIONS` / `ACHIEVEMENTS`, `recordTrophies()`, `renderTrophies()`, `updateTricks()`;
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),

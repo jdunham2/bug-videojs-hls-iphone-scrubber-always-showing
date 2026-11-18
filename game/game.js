@@ -91,6 +91,8 @@
     return {
       name: pick(VILLAGE_A) + pick(kind === 'seaside' ? VILLAGE_B_SEA : kind === 'river' ? VILLAGE_B_RIVER : VILLAGE_B_KIND[kind] || VILLAGE_B),
       event: opts.event !== undefined ? opts.event : pickEvent(season),
+      night: opts.night !== undefined ? opts.night : run.day >= 2 && rand() < 0.22,
+      pest: opts.pest !== undefined ? opts.pest : (run.day >= 2 && rand() < 0.45) || run.day >= 5,
       kind, season, weather: weatherName, weatherPlan: opts.plan || planWeather(season, weatherName), planIdx: 1, roadY, roadX,
       plaza: { x: roadX - 5, y: roadY - 5, w: 12, h: 12 },
       quads,
@@ -320,7 +322,9 @@
 
     // Houses + mailboxes
     for (const h of L.houses) {
-      objects.push(makeHouse(h.x, h.y, h.w, h.h, h.roof));
+      const ho = makeHouse(h.x, h.y, h.w, h.h, h.roof); h.obj = ho;
+      { const d0 = ho.draw; ho.draw = (c, t, f) => { d0(c, t, f); drawPipe(c, h); }; }
+      objects.push(ho);
       objects.push(makeMailbox((h.doorX + 1.2) * TILE, (h.y + h.h + 0.7) * TILE));
       if (shopOf(h)) objects.push(makeShopFront(h, shopOf(h)));
     }
@@ -716,7 +720,7 @@
     const wall = pick(['#e8dcc0', '#efe3cf', '#e2d2b0', '#dfe2d4']);
     const chimneyX = X + W * pick([0.2, 0.75]);
     return {
-      kind: 'house', x: X + W / 2, y: Y + H,
+      kind: 'house', x: X + W / 2, y: Y + H, chimneyX, roofTop, wallTop,
       hitbox: box(X + 2, Y - 4, W - 4, H + 2),
       bounds: { l: X - 10, r: X + W + 10, t: roofTop - 30, b: Y + H + 10 },
       shadow(ctx) {
@@ -1428,7 +1432,7 @@
 
   function solidAt(px, py) {
     const t = getT(Math.floor(px / TILE), Math.floor(py / TILE));
-    return t === WATER || t === WALL;
+    return (t === WATER && !canSwim()) || t === WALL;
   }
   function collides(x, y) {
     if (player.boat) return boatBlocked(x, y);
@@ -1450,6 +1454,7 @@
 
   function updatePlayer(dt, input) {
     if (player.tree) { updateTree(dt, input); return; }
+    if (player.roof) { updateRoof(dt, input); return; }
     let ix = input.x, iy = input.y;
     if (player.stun > 0) { player.stun -= dt; ix = 0; iy = 0; }
     let mag = Math.hypot(ix, iy);
@@ -1462,7 +1467,9 @@
     const heavy = player.held && player.held.type.heavy;
     const running = input.run && !heavy;
     let maxSpd = heavy ? WALK_SPEED * heavyMult() : running ? runSpeed() : WALK_SPEED;
+    player.swim = !player.boat && areaOf(player.x, player.y) === 0 && tileAt(player.x, player.y) === WATER;
     if (player.boat) maxSpd = 80; // rowing
+    else if (player.swim) maxSpd = 70; // paddling
     else if (player.sled) maxSpd = onHill(player.x, player.y) ? 290 : 115;
     else if (player.hidingIn && player.hidingIn.kind === 'drift') maxSpd *= 0.6; // wading through snow
     else if (player.stuffed) maxSpd = Math.min(maxSpd, WALK_SPEED * 0.75); // waddle
@@ -1538,7 +1545,8 @@
   }
 
   // Raccoon rendering --------------------------------------------------------
-  const FUR = '#8b909a', FUR_DARK = '#5a5e68', FUR_LIGHT = '#c9ccd3', MASK = '#2b2d33', WHITE = '#f4f2ee', NOSE = '#1d1d22', RING = '#3c3f47';
+  let FUR = '#8b909a', FUR_DARK = '#5a5e68', FUR_LIGHT = '#c9ccd3', RING = '#3c3f47'; // fur colours can be changed in the den
+  const MASK = '#2b2d33', WHITE = '#f4f2ee', NOSE = '#1d1d22';
 
   function drawRaccoon(ctx, p, t) {
     const moving = p.speed > 6;
@@ -1560,6 +1568,7 @@
     } else {
       drawRaccoonBack(ctx, p, t, moving, bob);
     }
+    if (p === player) drawDisguise(ctx, p);
     if (p.flour > 0) { // dusted white from ears to tail
       ctx.globalAlpha = Math.min(1, p.flour / 5) * 0.72; ctx.fillStyle = '#fbfaf6';
       ellipse(ctx, 0, -9, 11, 8); ellipse(ctx, 0, -17, 8, 6); ellipse(ctx, -9, -8, 5, 3);
@@ -2360,7 +2369,7 @@
     const rx = player.x + d[0] * 12, ry = player.y + d[1] * 9 - 3;
     let best = null, bd = 24;
     for (const it of items) {
-      if (it.held || (it.air && it.z > 12)) continue;
+      if (it.held || (it.air && it.z > 12) || (player.swim && it.type.heavy)) continue;
       const dist = Math.hypot(it.x - rx, it.y - ry) - it.type.r * 0.5;
       if (dist < bd) { bd = dist; best = it; }
     }
@@ -2373,6 +2382,7 @@
     if (boatAction()) return;
     if (sledAction()) return;
     if (treeAction()) return;
+    if (roofAction()) return;
     if (player.held && !(petChoice() === 'wardrobe')) { dropHeld(false); return; }
     const pc = petChoice();
     if (pc === 'dog') { petDog(); return; }
@@ -2402,12 +2412,14 @@
     if (it.stall) { completeTask('stall'); if (['teddy', 'toyboat', 'kite'].includes(it.kind)) completeTask('toystall'); }
     if (it.kind === 'bigfish') completeTask('bigfish');
     if (it.kind === 'present') completeTask('present');
+    if (it.kind === 'net') completeTask('netsteal');
     if (it.shop) {
       const keeper = VILLAGER[it.owner];
       if (keeper && areaOf(keeper.x, keeper.y) === areaOf(it.x, it.y)) completeTask('counter');
       if (it.kind === 'sweets' || it.kind === 'lolly') completeTask('sweets');
       if (it.kind === 'letters') completeTask('letters');
     }
+    if (L.night && it.owner && VILLAGER[it.owner] && VILLAGER[it.owner].dozing > 0 && areaOf(VILLAGER[it.owner].x, VILLAGER[it.owner].y) === areaOf(it.x, it.y)) completeTask('tiptoe');
     if (it.museum) { if (it.kind === 'crown') completeTask('heist'); if (!run.alarms) completeTask('sneaky'); }
     if (it.kind === 'tortoise') completeTask('tortoise');
     if (it.kind === 'rosette') completeTask('rosette');
@@ -2449,6 +2461,7 @@
 
   function throwHeld() {
     if (player.tree) { dropFromTree(); return; }
+    if (player.roof) { dropFromRoof(); return; }
     const it = player.held;
     if (!it || player.inWardrobe) return;
     player.held = null;
@@ -2807,6 +2820,15 @@
       speed: 50, chase: 128, pitch: 160,
       lines: { patrol: ['All quiet.', 'No funny business.', 'Hm hm hm.', 'Lovely treasures, these.'] },
     },
+    {
+      id: 'pest', name: 'the pest controller', skin: '#d9a07a', hair: '#3a2a1a', shirt: '#d9a43a', pants: '#3f5f3a', hat: 'cap', capColor: '#3f5f3a',
+      speed: 52, chase: 140, pitch: 130, lines: {},
+    },
+    {
+      id: 'watch', name: 'the night watchman', skin: '#e8b996', hair: '#5a5a60', shirt: '#2c3a5e', pants: '#1d2436', hat: 'beanie', capColor: '#2c3a5e', beard: true,
+      speed: 40, chase: 120, pitch: 150,
+      lines: { patrol: ['All’s well!', 'Midnight, and all’s well!', 'Who goes there?', '*yawn*'] },
+    },
   );
   const HOME_LINES = ['Home sweet home.', 'Now where did I put that...', 'Ahh, my own chair.'];
   const villagers = [];
@@ -2875,6 +2897,12 @@
           homeStop(6.5, 6, 6),
         ];
       }
+      case 'pest': return [S((P.x + 6) * T, (P.y + 6) * T, 'hunt', 5, 'down')];
+      case 'watch': return [
+        S((P.x + 1) * T, (P.y + 1) * T, 'patrol', 3, 'down'), S((P.x + 11) * T, (P.y + 1) * T, 'patrol', 3, 'left'),
+        S((L.roadX + 0.5) * T, (L.roadY + 12) * T, 'patrol', 4, 'up'), S((P.x + 11) * T, (P.y + 11) * T, 'patrol', 3, 'up'),
+        S((L.roadX - 12) * T, (L.roadY + 1) * T, 'patrol', 4, 'right'), S((P.x + 1) * T, (P.y + 11) * T, 'patrol', 3, 'right'),
+      ];
       case 'guard': {
         const M = L.museum, X = M.x * T, Y = M.y * T, W = M.w * T, H = M.h * T;
         return [
@@ -2899,7 +2927,7 @@
   function spawnVillagers() {
     const mult = run.villagerSpeed;
     for (const d of VILLAGER_DEFS) {
-      if (d.id === 'guard' && !L.museum) continue;
+      if ((d.id === 'guard' && !L.museum) || (d.id === 'pest' && !L.pest) || (d.id === 'watch' && !L.night)) continue;
       const stops = withStall(d.id, stopsFor(d.id)).map((s) => {
         if (navBlockedPt(s.wx, s.wy)) {
           const o = nearestOpen(Math.floor(s.wx / TILE), Math.floor(s.wy / TILE));
@@ -2937,8 +2965,9 @@
   function canSee(v, x, y) {
     if (v.dozing > 0) return false; // fast asleep
     const dx = x - v.x, dy = y - v.y, d = Math.hypot(dx, dy);
-    if (d > run.vision * visionMul() || areaOf(v.x, v.y) !== areaOf(x, y)) return false;
-    if (d > 45) { const f = DIRV[v.dir]; if ((dx * f[0] + dy * f[1]) / d < 0.2) return false; }
+    const nightK = L && L.night && areaOf(v.x, v.y) === 0 ? (v.id === 'watch' ? 0.9 : 0.5) : 1;
+    if (d > run.vision * visionMul() * nightK || areaOf(v.x, v.y) !== areaOf(x, y)) return false;
+    if (d > 45 || (L && L.night && v.id === 'watch')) { const f = DIRV[v.dir]; if ((dx * f[0] + dy * f[1]) / d < 0.2) return false; }
     return lineClear(v.x, v.y - 4, x, y);
   }
 
@@ -3128,6 +3157,7 @@
       const hi = v.stops.findIndex((s) => s.act === 'home');
       if (hi >= 0 && v.stopIdx !== hi && areaOf(v.x, v.y) === 0) { v.stopIdx = hi; toRoute(v); say(v, rpick(['Ow! Hail!', 'Run for it!', 'Ouch, ouch!']), 1.4); return; }
     }
+    if (stop.act === 'sleep' && !(v.dozing > 0) && time > (v.wokeT || 0)) v.dozing = 9999;
     if (L.weather === 'heatwave' && !(v.dozing > 0) && stop.act !== 'play' && Math.random() < dt * 0.06) { v.dozing = rr(7, 12); say(v, 'Zzz...', 1.5); }
     if (v.dozing > 0) {
       v.dozing -= dt; v.actT = Math.max(v.actT, 0.5);
@@ -3245,8 +3275,12 @@
 
       const sees = started && canSeePlayer(v);
       const ph = player.held;
-      if (ph && ph.owner === v.id && sees && !playerInHideout() && v.cooldown <= 0 && !v.held && v.state !== 'chase' && v.state !== 'startled') startChase(v, ph);
+      if (ph && ph.owner === v.id && sees && (!player.disguise || Math.hypot(player.x - v.x, player.y - v.y) < 60) && !playerInHideout() && v.cooldown <= 0 && !v.held && v.state !== 'chase' && v.state !== 'startled') startChase(v, ph);
 
+      if (v.id === 'pest' && (v.state === 'route' || v.state === 'act')) v.state = 'hunt';
+      if (v.id === 'watch' && (v.state === 'route' || v.state === 'act') && sees && Math.hypot(player.x - v.x, player.y - v.y) < 150) { // the watchman calls out
+        v.state = 'chase'; v.target = null; v.stateT = 8; v.lostT = 0; v.lastSeen = { x: player.x, y: player.y }; v.path = null; say(v, 'HALT! Who goes there?!', 1.6, true); sfx('alert');
+      }
       switch (v.state) {
         case 'route': case 'act': routine(v, dt); if (started) tidyScan(v, dt); break;
         case 'chase': chase(v, dt, sees); break;
@@ -3255,6 +3289,7 @@
         case 'sulk': v.stateT -= dt; if (v.stateT <= 0) toRoute(v); break;
         case 'startled': v.stateT -= dt; if (v.stateT <= 0) afterStartle(v); break;
         case 'game': if (v.game) hideSeek(v, dt); else toRoute(v); break;
+        case 'hunt': pestHunt(v, dt); break;
       }
       if (L.weather === 'frost' || L.weather === 'sleet') frostSlip(v, dt);
 
@@ -3519,6 +3554,11 @@
     { id: 'hollow', tier: 'Easy', text: 'Hide in the hollow tree', req: ['hollow'] },
     { id: 'shopbell', tier: 'Easy', text: 'Ring a shop’s doorbell', hint: 'walk into a shop', req: ['shops'] },
     { id: 'alarm', tier: 'Easy', text: 'Set off the museum alarm', hint: 'touch a red tripwire', req: ['museum'] },
+    { id: 'disguise', tier: 'Easy', text: 'Put on a disguise', hint: 'hold a hat, bucket, shirt… and press G' },
+    { id: 'bury', tier: 'Easy', text: 'Bury something', hint: 'press B on grass or sand' },
+    { id: 'swim', tier: 'Easy', text: 'Go for a swim', req: ['swimmable'] },
+    { id: 'roof', tier: 'Easy', text: 'Climb onto a roof', hint: 'E at a drainpipe' },
+    { id: 'trapspring', tier: 'Easy', text: 'Spring a cage trap from a distance', hint: 'throw something at it', req: ['pest'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3583,6 +3623,15 @@
     { id: 'letters', tier: 'Medium', text: 'Swipe the sack of letters from the post office', req: ['postoffice'] },
     { id: 'hideseek', tier: 'Medium', text: 'Win hide-and-seek with Toby', hint: 'go up to him, then hide' },
     { id: 'race', tier: 'Medium', text: 'Beat Biscuit in a race', hint: 'stand on the RACE line, then run', req: ['race'] },
+    { id: 'disguisewalk', tier: 'Medium', text: 'Stroll past someone with their things, in disguise', req: [] },
+    { id: 'bury3', tier: 'Medium', text: 'Bury 3 things', goal: 3 },
+    { id: 'swimescape', tier: 'Medium', text: 'Escape a chaser by swimming', req: ['swimmable'] },
+    { id: 'roofdrop', tier: 'Medium', text: 'Drop something on someone from a roof', hint: 'F from the edge' },
+    { id: 'chimney', tier: 'Medium', text: 'Drop something down a chimney', hint: 'F next to the chimney' },
+    { id: 'pestescape', tier: 'Medium', text: 'Give the pest controller the slip', req: ['pest'] },
+    { id: 'tiptoe', tier: 'Medium', text: 'Steal from a bedroom while its owner sleeps', req: ['night'] },
+    { id: 'watchman', tier: 'Medium', text: 'Sneak right up behind the night watchman', req: ['night'] },
+    { id: 'nighteat', tier: 'Medium', text: 'Have a midnight feast (eat 2 things)', goal: 2, req: ['night'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3622,6 +3671,7 @@
     { id: 'counter', tier: 'Hard', text: 'Steal from a shop counter while the shopkeeper’s in', req: ['shops'] },
     { id: 'heist', tier: 'Hard', text: 'Steal the crown from the museum', req: ['museum'] },
     { id: 'sneaky', tier: 'Hard', text: 'Lift a museum treasure without setting off the alarm', hint: 'the tripwires blink off', req: ['museum'] },
+    { id: 'netsteal', tier: 'Hard', text: 'Steal the pest controller’s net', hint: 'make him jump', req: ['pest'] },
     { id: 'hens', tier: 'Hard', text: 'Get every hen squawking at once' },
     { id: 'eggs3', tier: 'Hard', text: 'Find 3 painted eggs', goal: 3, req: ['spring'] },
     { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
@@ -3733,6 +3783,9 @@
       if (r === 'postoffice' && !(L.shopHouses && [...L.shopHouses.values()].some((x) => x.kind === 'post'))) return false;
       if (r === 'race' && !L.race) return false;
       if (r === 'museum' && !L.museum) return false;
+      if (r === 'pest' && !L.pest) return false;
+      if (r === 'night' && !L.night) return false;
+      if (r === 'swimmable' && !hasOpenWater()) return false;
       if (r === 'farm' && !L.paddock) return false;
       if (r === 'rainbow' && !rainbowPossible()) return false;
       if (r === 'heatwave' && !planHas(['heatwave'])) return false;
@@ -3844,15 +3897,16 @@
     save.earnedTotal = (save.earnedTotal || 0) + total;
     save.runs++;
     if (win) { save.bestDay = Math.max(save.bestDay, run.day); save.day = run.day + 1; } else save.day = 1;
+    const trophyNews = recordTrophies(win);
     writeSave();
     postScore();
     sfx(win ? 'fanfare' : 'hmph');
 
-    const titles = { win: `Day ${run.day} done!`, caught: 'Caught red-pawed!', sunset: 'Sunset!' };
+    const titles = { win: `Day ${run.day} done!`, caught: 'Caught red-pawed!', sunset: L.night ? 'Sunrise!' : 'Sunset!' };
     const subs = {
       win: `${L.name} has been thoroughly ransacked.`,
       caught: 'The villagers have had quite enough of you for one day.',
-      sunset: 'The villagers lock their doors for the night.',
+      sunset: L.night ? 'The village is waking up. Time to scarper.' : 'The villagers lock their doors for the night.',
     };
     document.getElementById('res-title').textContent = titles[reason];
     document.getElementById('res-sub').textContent = subs[reason];
@@ -3862,6 +3916,9 @@
     ];
     if (win) rows.push(['Time left bonus', `+${timeBonus}`], [`Day ${run.day} bonus`, `+${dayBonus}`]);
     rows.push(['Shinies earned', `+${total} ✦`]);
+    const kept = items.filter(inHideout).length + (L.buried || []).length;
+    if (kept) rows.push(['Added to your trophy shelf', `${kept}`]);
+    for (const n of trophyNews) rows.push([n, '★']);
     const dl = document.getElementById('res-stats');
     dl.innerHTML = '';
     rows.forEach(([k, v], i) => {
@@ -3900,10 +3957,10 @@
     updateRunBar();
     document.getElementById('rc-day').textContent = `Day ${run.day}`;
     document.getElementById('rc-town').textContent = L.name;
-    document.getElementById('rc-season').textContent = `${cap(L.season)}${L.weather !== 'clear' ? ', ' + WEATHER_LABEL[L.weather].toLowerCase() : ''} \u00b7 ${KIND_LABEL[L.kind]} village${L.event ? ' \u00b7 ' + EVENT_LABEL[L.event] + '!' : ''}`;
+    document.getElementById('rc-season').textContent = `${cap(L.season)}${L.weather !== 'clear' ? ', ' + WEATHER_LABEL[L.weather].toLowerCase() : ''} \u00b7 ${KIND_LABEL[L.kind]} village${L.event ? ' \u00b7 ' + EVENT_LABEL[L.event] + '!' : ''}${L.night ? ' \u00b7 Night raid!' : ''}`;
     const later = (L.weatherPlan || []).slice(1).find((s) => s.w !== L.weather);
     const forecast = later ? `Forecast: ${later.w === 'clear' ? 'clearing up' : WEATHER_LABEL[later.w].toLowerCase()} later.` : '';
-    document.getElementById('rc-tip').textContent = [EVENT_TIP[L.event], KIND_TIP[L.kind], WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season]].filter(Boolean).join(' ');
+    document.getElementById('rc-tip').textContent = [L.night ? 'Night raid! Most villagers are asleep in bed: walk, don’t run, near them. The night watchman’s lantern sees far.' : '', L.pest ? 'The pest controller is in town: he follows your trail and has set cage traps on the paths.' : '', EVENT_TIP[L.event], KIND_TIP[L.kind], WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season]].filter(Boolean).join(' ');
     const m = Math.floor(run.timeTotal / 60), s = run.timeTotal % 60;
     document.getElementById('rc-tasks').textContent = `${run.tasks.length} tasks`;
     document.getElementById('rc-time').textContent = `${m}:${String(s).padStart(2, '0')} until sunset`;
@@ -3927,6 +3984,7 @@
     showOverlay('den');
   }
   function renderDen() {
+    renderTrophies();
     document.getElementById('den-shinies').textContent = save.shinies;
     document.getElementById('den-best').textContent = save.bestDay ? `Best: Day ${save.bestDay}` : 'No days finished yet';
     document.getElementById('den-go').textContent = `Start Day ${save.day}`;
@@ -4056,6 +4114,7 @@
 
   // Dusk: the world warms, then dims, as sunset nears
   function drawDusk(ctx, left, top, viewW, viewH) {
+    if (L && L.night) { drawNight(ctx, left, top, viewW, viewH); return; }
     if (!started || run.timeTotal <= 0) return;
     const p = 1 - run.timeLeft / run.timeTotal;
     if (p < 0.55) return;
@@ -4143,7 +4202,7 @@
   }
 
   function updateHiding(dt) {
-    if (player.tree) { // villagers never look up
+    if (player.tree || player.roof) { // villagers never look up
       player.hidden = true; player.hidingIn = null;
       const pill = document.getElementById('hidden-pill'); if (pill.hidden === !paused) pill.hidden = paused;
       return;
@@ -4813,6 +4872,7 @@
     if (it.kind === 'lemonade') completeTask('lemonade');
     if (it.contest && it.kind === 'cake') completeTask('cakecontest');
     if (it.kind === 'toffee') completeTask('toffee');
+    if (L.night) { run.nightEats = (run.nightEats || 0) + 1; setProgress('nighteat', run.nightEats); }
     if (f.sweet) { player.sugar = 12; completeTask('sugar'); toast('Sugar rush!', 'Zoom zoom', true); }
     // Did the owner watch you finish it?
     const owner = it.owner && VILLAGER[it.owner];
@@ -6027,7 +6087,7 @@
   let duskK = 0; // 0 in daylight, 1 at sunset
   function updateDusk() {
     const p = run.timeTotal > 0 ? 1 - run.timeLeft / run.timeTotal : 0;
-    duskK = started ? clamp((p - 0.55) / 0.45, 0, 1) : 0;
+    duskK = L && L.night ? 1 : started ? clamp((p - 0.55) / 0.45, 0, 1) : 0;
   }
 
   // Weather can change partway through a day
@@ -7367,6 +7427,9 @@
     L.stalls = null; L.cart = null; L.festCrows = []; L.bonfire = null; L.fireworks = [];
     placeCastleObjects(); placeForestObjects(); placeMuseumObjects(); placeRace();
     if (L.museum) L.homes.guard = L.homes.percy;
+    L.homes.pest = L.homes.percy; L.homes.watch = L.homes.percy;
+    L.lights = objects.filter((o) => o.kind === 'lamp');
+    placeTraps();
     if (L.kind === 'market') {
       L.stalls = [];
       const spots = [[px + 2.6, py + 2.2], [px + 9.4, py + 2.2], [px + 2.6, py + 10.6], [px + 9.4, py + 10.6]];
@@ -7438,6 +7501,8 @@
   }
   // Market day: stallholders spend the morning at their stalls
   function withStall(id, stops) {
+    const ns = nightStops(id);
+    if (ns) return ns; // night raid: everyone's in bed
     const T = TILE, extra = [];
     const s = L.stalls && L.stalls.find((x) => x.owner === id);
     if (s) extra.push({ wx: s.vx, wy: s.vy, act: 'sell', dur: 22, face: 'down', lines: s.lines });
@@ -8753,7 +8818,7 @@
       for (const v of villagers) {
         if (Math.hypot(it.x - v.x, it.y - v.y) > 14) continue;
         it.fromTree = false; sfx('bonk');
-        if (startleV(v, rpick(['OW! From above?!', 'What the—?!', 'Is it raining teapots?!']))) completeTask('treedrop');
+        if (startleV(v, rpick(['OW! From above?!', 'What the—?!', 'Is it raining teapots?!']))) completeTask(it.dropTask || 'treedrop');
         break;
       }
     }
@@ -8778,6 +8843,417 @@
     for (const R of L.rings) if (Math.hypot((player.x - R.x) / 26, (player.y - R.y) / 13) < 0.8) {
       for (let k = 0; k < 16; k++) particles.push({ kind: 'spark', x: R.x + rr(-20, 20), y: R.y + rr(-8, 8), z: rr(4, 20), vx: rr(-20, 20), vy: 0, vz: rr(40, 90), life: 1, max: 1 });
       sfx('happy'); player.bubble = { text: '✨ ooh! ✨', t: 1.4 }; completeTask('fairyring');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Disguises and tricks (G: wear/remove, B: bury/dig up, swimming, roofs),
+  // the pest controller, night raids, and the trophy den.
+  // ---------------------------------------------------------------------------
+  ITEM.net = { name: 'butterfly net', h: 20, r: 6, draw(c) {
+    c.strokeStyle = '#7a5230'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-6, 0); c.lineTo(4, -14); c.stroke();
+    c.strokeStyle = '#d9d2c4'; c.lineWidth = 1; c.beginPath(); c.ellipse(6, -17, 5, 4, 0.6, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = 'rgba(230,226,214,0.45)'; c.beginPath(); c.ellipse(7, -15, 4, 5, 0.6, 0, Math.PI * 2); c.fill();
+  } };
+
+  // --- Disguises -----------------------------------------------------------------------------
+  const WEARABLE = new Set(['hat', 'shirt', 'bucket', 'pot', 'crown', 'sock']);
+  function wearToggle() {
+    if (!started || paused || player.tree || player.roof) return;
+    if (player.disguise) {
+      const it = player.disguise; player.disguise = null;
+      Object.assign(it, { x: player.x + 10, y: player.y + 4, z: 0, held: false, heldBy: null, air: false });
+      items.push(it); sfx('pop'); player.bubble = { text: 'ta-da, it’s me!', t: 1.2 };
+      return;
+    }
+    const it = player.held;
+    if (!it || !WEARABLE.has(it.kind)) { player.bubble = { text: 'can’t wear that', t: 1 }; return; }
+    player.held = null;
+    const i = items.indexOf(it); if (i >= 0) items.splice(i, 1);
+    player.disguise = it; sfx('pick'); sparkle(player.x, player.y, 20);
+    player.bubble = { text: rpick(['very dapper.', 'nobody will know.', '*innocent whistle*']), t: 1.4 };
+    completeTask('disguise');
+  }
+  function drawDisguise(ctx, p) {
+    const d = p.disguise;
+    if (!d) return;
+    const side = p.dir === 'left' || p.dir === 'right', hx = side ? 10.5 : 0, hy = side ? -22 : -26;
+    switch (d.kind) {
+      case 'hat': ctx.fillStyle = '#7a4f8f'; ellipse(ctx, hx, hy + 3, 10, 3); roundRect(ctx, hx - 5.5, hy - 5, 11, 8, 3, true); ctx.fillStyle = '#f2b8c6'; ctx.fillRect(hx - 5.5, hy, 11, 2); break;
+      case 'bucket': ctx.fillStyle = '#9aa0aa'; poly(ctx, [[hx - 7, hy + 4], [hx + 7, hy + 4], [hx + 5, hy - 6], [hx - 5, hy - 6]]); ctx.fill(); ctx.fillStyle = '#c4c8d0'; ctx.fillRect(hx - 5, hy - 6, 10, 2); break;
+      case 'pot': ctx.fillStyle = '#c0582a'; poly(ctx, [[hx - 6.5, hy + 4], [hx + 6.5, hy + 4], [hx + 5, hy - 5], [hx - 5, hy - 5]]); ctx.fill(); ctx.fillStyle = '#d97a4a'; ctx.fillRect(hx - 7, hy + 2, 14, 2.4); break;
+      case 'crown': ctx.fillStyle = '#f2c14e'; poly(ctx, [[hx - 6, hy + 3], [hx + 6, hy + 3], [hx + 7, hy - 5], [hx + 3.5, hy - 1], [hx, hy - 6], [hx - 3.5, hy - 1], [hx - 7, hy - 5]]); ctx.fill(); ctx.fillStyle = '#e8453c'; circle(ctx, hx, hy, 1.3); break;
+      case 'sock': ctx.fillStyle = '#e8453c'; roundRect(ctx, hx - 6, hy - 2, 12, 6, 3, true); ctx.fillStyle = '#ffffff'; ctx.fillRect(hx - 6, hy + 2, 12, 2); circle(ctx, hx + 6, hy - 4, 2.2); break;
+      case 'shirt': ctx.globalAlpha = 0.92; ctx.fillStyle = '#4f93c7'; roundRect(ctx, -9, -17, 18, 11, 4, true); ctx.fillStyle = '#ffffff'; ctx.fillRect(-1, -17, 2, 11); ctx.globalAlpha = 1; break;
+    }
+  }
+
+  // --- Burying loot -------------------------------------------------------------------------------
+  const diggable = (x, y) => areaOf(x, y) === 0 && [GRASS, SOIL, SAND].includes(tileAt(x, y)) && !navBlockedPt(x, y);
+  function buryAction() {
+    if (!started || paused || player.tree || player.roof || player.boat || player.digging) return;
+    L.buried = L.buried || [];
+    const mound = L.buried.find((b) => Math.hypot(b.x - player.x, b.y - player.y) < 20);
+    if (!player.held && mound) { player.digging = { t: 0.8, up: mound }; player.stun = 0.8; sfx('rustle'); return; }
+    const it = player.held;
+    if (!it) { player.bubble = { text: 'nothing to bury', t: 1 }; return; }
+    if (it.type.heavy) { player.bubble = { text: 'too big to bury!', t: 1 }; return; }
+    if (!diggable(player.x, player.y)) { player.bubble = { text: 'can’t dig here', t: 1 }; return; }
+    player.digging = { t: 1, it }; player.stun = 1; sfx('rustle');
+  }
+  function updateDigging(dt) {
+    const D = player.digging;
+    if (!D) return;
+    D.t -= dt;
+    if (Math.random() < dt * 14) puff(player.x + rr(-6, 6), player.y + 2, 1, 'soil');
+    if (D.t > 0) return;
+    player.digging = null;
+    if (D.up) { // dig it back up
+      const b = D.up; L.buried.splice(L.buried.indexOf(b), 1);
+      Object.assign(b.it, { x: b.x, y: b.y, z: 0, held: false, heldBy: null, air: true, vz: 120, vx: 0, vy: 10 });
+      items.push(b.it); sfx('pop');
+      return;
+    }
+    const it = D.it;
+    if (player.held !== it) return;
+    player.held = null;
+    const i = items.indexOf(it); if (i >= 0) items.splice(i, 1);
+    L.buried.push({ x: player.x, y: player.y + 3, it });
+    sfx('pop'); player.bubble = { text: 'safe and sound.', t: 1.2 };
+    run.buried = (run.buried || 0) + 1;
+    completeTask('bury'); setProgress('bury3', run.buried);
+  }
+  function drawMounds(ctx) {
+    if (!L.buried) return;
+    for (const b of L.buried) {
+      ctx.fillStyle = isWinter() ? '#dfe9f2' : '#7a5a3a'; ellipse(ctx, b.x, b.y, 9, 4);
+      ctx.fillStyle = isWinter() ? '#f4f8fb' : '#8a6a46'; ellipse(ctx, b.x - 1, b.y - 1, 6, 2.5);
+      ctx.strokeStyle = 'rgba(60,40,20,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(b.x - 3, b.y - 2); ctx.lineTo(b.x + 3, b.y + 1); ctx.moveTo(b.x + 3, b.y - 2); ctx.lineTo(b.x - 3, b.y + 1); ctx.stroke();
+    }
+  }
+
+  // --- Swimming ------------------------------------------------------------------------------------
+  const canSwim = () => !(player.held && player.held.type.heavy) && !player.boat;
+
+  // --- Roofs -----------------------------------------------------------------------------------------
+  const pipeBase = (h) => ({ x: (h.x + h.w) * TILE - 4, y: (h.y + h.h) * TILE + 8 });
+  function roofRect(h) { const o = h.obj; return { l: h.x * TILE + 8, r: (h.x + h.w) * TILE - 8, t: o.roofTop + 12, b: o.wallTop - 2 }; }
+  function roofAction() {
+    if (!L.houses) return false;
+    if (player.roof) {
+      const h = player.roof, R = roofRect(h);
+      if (player.x > R.r - 26 && player.y > R.b - 24) {
+        const pb = pipeBase(h);
+        player.roof = null; Object.assign(player, { x: pb.x + 8, y: pb.y + 4, vx: 0, vy: 0, dir: 'down' }); sfx('tap');
+      } else player.bubble = { text: 'the drainpipe’s at the corner', t: 1.2 };
+      return true;
+    }
+    if (areaOf(player.x, player.y) !== 0 || (player.held && player.held.type.heavy)) return false;
+    for (const h of L.houses) {
+      if (!h.obj) continue;
+      const pb = pipeBase(h);
+      if (Math.hypot(player.x - pb.x, player.y - pb.y) < 18) {
+        const R = roofRect(h);
+        player.roof = h; Object.assign(player, { x: R.r - 12, y: R.b - 6, vx: 0, vy: 0, dir: 'up' });
+        sfx('creak'); completeTask('roof');
+        return true;
+      }
+    }
+    return false;
+  }
+  const pipeNear = () => !player.roof && areaOf(player.x, player.y) === 0 && L.houses && L.houses.some((h) => h.obj && Math.hypot(player.x - pipeBase(h).x, player.y - pipeBase(h).y) < 18);
+  function updateRoof(dt, input) {
+    const R = roofRect(player.roof);
+    let ix = input.x, iy = input.y;
+    if (player.stun > 0) { player.stun -= dt; ix = iy = 0; }
+    const m = Math.hypot(ix, iy); if (m > 1) { ix /= m; iy /= m; }
+    player.x = clamp(player.x + ix * 80 * dt, R.l, R.r); player.y = clamp(player.y + iy * 60 * dt, R.t, R.b);
+    player.speed = m > 0.15 ? 80 : 0; player.vx = player.vy = 0;
+    if (m > 0.15) { if (Math.abs(ix) > Math.abs(iy)) player.dir = ix > 0 ? 'right' : 'left'; else player.dir = iy > 0 ? 'down' : 'up'; player.walk += dt * 9; }
+    if (player.bubble) { player.bubble.t -= dt; if (player.bubble.t <= 0) player.bubble = null; }
+  }
+  // Throwing from a roof: down the chimney if you're by it, otherwise over the edge onto whoever's below
+  function dropFromRoof() {
+    const it = player.held, h = player.roof;
+    if (!it) return;
+    player.held = null;
+    if (Math.abs(player.x - h.obj.chimneyX) < 16 && player.y < roofRect(h).t + 34 && h.room) {
+      const x = (h.room.x0 + 5.5) * TILE, y = (h.room.y0 + 3.4) * TILE;
+      Object.assign(it, { held: false, heldBy: null, x, y, z: 30, vx: rr(-30, 30), vy: 20, vz: 0, air: true, kicker: 'chimney' });
+      for (let k = 0; k < 12; k++) particles.push({ x: x + rr(-14, 14), y: y + rr(-6, 6), r: rr(3, 6), life: 1, max: 1, vy: -10, soil: true });
+      sfx('thud'); player.bubble = { text: 'ho ho ho!', t: 1.3 };
+      for (const v of villagers) if (areaOf(v.x, v.y) === h.area) startleV(v, rpick(['EEK! Something came down the chimney!', 'Goodness, the chimney!']));
+      completeTask('chimney');
+      return;
+    }
+    Object.assign(it, { held: false, heldBy: null, x: player.x, y: (h.y + h.h) * TILE + 14, z: 70, vx: 0, vy: 0, vz: 0, air: true, kicker: null, fromTree: true, dropTask: 'roofdrop' });
+    sfx('throw');
+  }
+  function drawPipe(ctx, h) {
+    const pb = pipeBase(h), top = h.obj.roofTop + 18;
+    ctx.fillStyle = '#7a7f88'; ctx.fillRect(pb.x - 2, top, 4, pb.y - 8 - top);
+    ctx.fillRect(pb.x - 4, pb.y - 12, 8, 4);
+    ctx.fillStyle = '#5a5e66'; for (let y = top + 10; y < pb.y - 10; y += 14) ctx.fillRect(pb.x - 3, y, 6, 2);
+  }
+
+  // --- The pest controller ---------------------------------------------------------------------------
+  function makeTrapObj(T0) {
+    return {
+      kind: 'trap', x: T0.x, y: T0.y + 0.2, bounds: { l: T0.x - 14, r: T0.x + 14, t: T0.y - 20, b: T0.y + 4 },
+      draw(ctx) {
+        const x = T0.x, y = T0.y;
+        ctx.fillStyle = 'rgba(20,30,10,0.2)'; ellipse(ctx, x, y, 12, 3);
+        if (T0.armed) { ctx.fillStyle = '#f2d06a'; poly(ctx, [[x - 3, y - 1], [x + 3, y - 1], [x, y - 5]]); ctx.fill(); } // the cheese
+        ctx.strokeStyle = '#6a6e76'; ctx.lineWidth = 1;
+        const hgt = 12, door = T0.armed ? -10 : 0;
+        ctx.strokeRect(x - 10, y - hgt, 20, hgt);
+        for (let k = -7; k <= 7; k += 3.5) { ctx.beginPath(); ctx.moveTo(x + k, y - hgt); ctx.lineTo(x + k, y); ctx.stroke(); }
+        ctx.beginPath(); ctx.moveTo(x - 10, y - hgt / 2); ctx.lineTo(x + 10, y - hgt / 2); ctx.stroke();
+        ctx.strokeStyle = '#8a8e96'; ctx.beginPath(); ctx.moveTo(x - 10, y + door); ctx.lineTo(x - 10, y - hgt + door * 0.2); ctx.stroke();
+      },
+    };
+  }
+  function placeTraps() {
+    L.traps = [];
+    if (!L.pest) return;
+    for (let n = 0; n < 300 && L.traps.length < 3; n++) {
+      const tx = Math.floor(rr(4, MW - 4)), ty = Math.floor(rr(4, MH - 4));
+      if (getT(tx, ty) !== PATH || !navOpen(tx, ty)) continue;
+      const x = (tx + 0.5) * TILE, y = (ty + 0.6) * TILE;
+      if (Math.hypot(x - HIDEOUT.x, y - HIDEOUT.y) < 12 * TILE || L.traps.some((t) => Math.hypot(t.x - x, t.y - y) < 10 * TILE)) continue;
+      const T0 = { x, y, armed: true }; L.traps.push(T0); objects.push(makeTrapObj(T0));
+    }
+  }
+  function pestHunt(v, dt) {
+    v.huntT = (v.huntT || 0) - dt;
+    if (v.huntGoal && v.huntT > -6) { // heading for a sprung trap
+      if (travel(v, v.huntGoal.x, v.huntGoal.y + 10, v.chase * 0.9, dt)) { v.huntGoal = null; v.huntT = 0; }
+    } else {
+      if (v.huntT <= 0) {
+        v.huntT = 3;
+        const tr = L.trail || [], p = tr.length > 10 ? tr[tr.length - 10] : tr[0];
+        v.goal = p && areaOf(p.x, p.y) === 0 ? { x: p.x, y: p.y } : { x: (L.plaza.x + rr(0, 12)) * TILE, y: (L.plaza.y + rr(0, 12)) * TILE };
+        if (Math.random() < 0.35) say(v, rpick(['I can smell you, raccoon...', 'Fresh pawprints!', 'Here, ratty ratty...', 'No masked bandits on my watch.']), 1.6);
+      }
+      if (v.goal && travel(v, v.goal.x, v.goal.y, v.speed * 1.2, dt)) v.goal = null;
+    }
+    if (started && canSeePlayer(v) && !playerInHideout() && !player.roof && !player.tree) {
+      v.state = 'chase'; v.target = null; v.stateT = 10; v.lostT = 0; v.lastSeen = { x: player.x, y: player.y }; v.path = null;
+      say(v, rpick(['THERE you are!', 'Gotcha now, you masked menace!', 'Stop, raccoon!']), 1.6, true); sfx('alert');
+    }
+  }
+
+  // --- Night raids -------------------------------------------------------------------------------------
+  let nightCv = null;
+  function drawNight(ctx, left, top, viewW, viewH) {
+    const w = Math.ceil(viewW), h = Math.ceil(viewH);
+    if (!nightCv) nightCv = document.createElement('canvas');
+    if (nightCv.width !== w || nightCv.height !== h) { nightCv.width = w; nightCv.height = h; }
+    const g = nightCv.getContext('2d'), indoors = areaOf(player.x, player.y) > 0;
+    g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, w, h);
+    g.fillStyle = indoors ? 'rgba(10,12,30,0.55)' : 'rgba(8,12,36,0.76)'; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'destination-out';
+    const light = (x, y, r, a = 1) => {
+      const lx = x - left, ly = y - top;
+      if (lx < -r || ly < -r || lx > w + r || ly > h + r) return;
+      const gr = g.createRadialGradient(lx, ly, 0, lx, ly, r);
+      gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(0.6, `rgba(0,0,0,${a * 0.6})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(lx - r, ly - r, r * 2, r * 2);
+    };
+    light(player.x, player.y - 10, 78, 0.75);
+    if (indoors) { const hh = houseOfArea(areaOf(player.x, player.y)); if (hh) light((hh.room.x0 + 5.5) * TILE, (hh.room.y0 + 3) * TILE, 170, 0.75); }
+    else {
+      for (const o of L.lights || []) light(o.x, o.y - 30, 95, 0.95);
+      for (const hs of L.houses) light((hs.doorX + 0.5) * TILE, (hs.y + hs.h) * TILE - 10, 48, 0.8);
+      if (L.bonfire) light(L.bonfire.x, L.bonfire.y - 10, 140, 1);
+      const wt = VILLAGER.watch;
+      if (wt && areaOf(wt.x, wt.y) === 0) light(wt.x + (wt.dir === 'left' ? -8 : 8), wt.y - 14, 120, 1);
+      for (const c of critters) if (c.type === 'firefly' && !c.caught) light(c.x, c.y - c.z, 14, 0.6);
+    }
+    ctx.drawImage(nightCv, left, top, w, h);
+  }
+  function drawLantern(ctx, t) {
+    const wt = VILLAGER.watch;
+    if (!wt || !L.night) return;
+    const x = wt.x + (wt.dir === 'left' ? -9 : 9), y = wt.y - 14 - wt.hop + Math.sin(t * 3) * 1;
+    ctx.strokeStyle = '#3a3530'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x, y - 10); ctx.stroke();
+    ctx.fillStyle = '#3a3530'; ctx.fillRect(x - 3.5, y - 7, 7, 1.5); ctx.fillRect(x - 3.5, y + 2, 7, 1.5);
+    ctx.fillStyle = '#ffd98a'; ctx.fillRect(x - 2.5, y - 5.5, 5, 7.5);
+  }
+  const nightStops = (id) => {
+    if (!L.night || ['watch', 'guard', 'pest'].includes(id)) return null;
+    const h = L.houses[L.homes[id]];
+    if (!h || !h.room) return null;
+    const R = h.room, T = TILE;
+    return [{ wx: (R.bedLeft ? R.x0 + 3.5 : R.x0 + 7.5) * T + (id === 'toby' ? 10 : 0), wy: (R.y0 + 4.3) * T, act: 'sleep', dur: 9999, face: 'down' }];
+  };
+
+  // --- Trophy den: what you've stashed over every run, collections, achievements, fur colours --------
+  const FURS = {
+    classic: { name: 'Classic', c: ['#8b909a', '#5a5e68', '#c9ccd3', '#3c3f47'] },
+    ginger: { name: 'Ginger', c: ['#c98a4a', '#8a5a2a', '#ecc896', '#6b3d1a'] },
+    silver: { name: 'Silver', c: ['#b8bcc4', '#80848c', '#e4e6ea', '#5a5e66'] },
+    golden: { name: 'Golden', c: ['#d9a43a', '#9a6e1e', '#f2d68a', '#7a5212'] },
+    candy: { name: 'Candy', c: ['#e8a0b8', '#b8607e', '#f8d4e0', '#8a3a5a'] },
+    river: { name: 'River blue', c: ['#7a9ab8', '#4a6a88', '#c4d6e6', '#2e4a66'] },
+    arctic: { name: 'Arctic', c: ['#e8ecf0', '#b8c0c8', '#ffffff', '#8a929a'] },
+    midnight: { name: 'Midnight', c: ['#4a4e5a', '#2a2d36', '#7a7e8a', '#1a1c22'] },
+  };
+  const COLLECTIONS = [
+    { id: 'picnic', name: 'Picnic basket', kinds: ['pie', 'sandwich', 'apple', 'bread', 'cheese'], fur: 'ginger' },
+    { id: 'garden', name: 'Garden raid', kinds: ['carrot', 'cabbage', 'gnome', 'pumpkin'], fur: 'river' },
+    { id: 'sweet', name: 'Sweet tooth', kinds: ['sweets', 'lolly', 'cookies', 'cake', 'toffee'], fur: 'candy' },
+    { id: 'toys', name: 'Toy box', kinds: ['teddy', 'toyboat', 'ball', 'kite', 'duck'], fur: 'silver' },
+    { id: 'curios', name: 'Curiosities', kinds: ['trophy', 'clock', 'vase', 'frame', 'candle'], fur: 'midnight' },
+    { id: 'winter', name: 'Winter wonderland', kinds: ['present', 'cocoa', 'sled', 'pinecone'], fur: 'arctic' },
+    { id: 'treasure', name: 'Treasure hunter', kinds: ['crown', 'gem', 'goldvase', 'chest', 'goldpot'], fur: 'golden' },
+  ];
+  const ACHIEVEMENTS = [
+    { id: 'firstwin', name: 'First heist', desc: 'Finish a day', test: (s) => (s.wins || 0) >= 1 },
+    { id: 'day3', name: 'On a roll', desc: 'Reach day 3', test: () => save.bestDay >= 3 },
+    { id: 'day7', name: 'Week of mischief', desc: 'Reach day 7', test: () => save.bestDay >= 7 },
+    { id: 'tasks25', name: 'Busy paws', desc: 'Do 25 tasks', test: (s) => (s.tasks || 0) >= 25 },
+    { id: 'tasks100', name: 'Menace', desc: 'Do 100 tasks', test: (s) => (s.tasks || 0) >= 100 },
+    { id: 'stash30', name: 'Hoarder', desc: 'Stash 30 things in your hideout', test: (s) => (s.stashed || 0) >= 30 },
+    { id: 'eat25', name: 'Bottomless', desc: 'Eat 25 things', test: (s) => (s.eaten || 0) >= 25 },
+    { id: 'kinds20', name: 'Magpie', desc: 'Collect 20 different things', test: () => Object.keys(save.trophies || {}).length >= 20 },
+    { id: 'col1', name: 'Collector', desc: 'Complete a collection', test: () => COLLECTIONS.some(colDone) },
+    { id: 'colall', name: 'Curator', desc: 'Complete every collection', test: () => COLLECTIONS.every(colDone) },
+  ];
+  const colDone = (c) => c.kinds.every((k) => (save.trophies || {})[k] > 0);
+  function applyFur() {
+    const f = FURS[save.fur] && (save.fur === 'classic' || COLLECTIONS.some((c) => c.fur === save.fur && colDone(c))) ? FURS[save.fur] : FURS.classic;
+    [FUR, FUR_DARK, FUR_LIGHT, RING] = f.c;
+  }
+  // At the end of every day: whatever's in the hideout goes on the trophy shelf
+  function recordTrophies(win) {
+    save.trophies = save.trophies || {}; save.stats = save.stats || {};
+    const before = new Set(COLLECTIONS.filter(colDone).map((c) => c.id));
+    const achBefore = new Set(ACHIEVEMENTS.filter((a) => a.test(save.stats)).map((a) => a.id));
+    const stashed = items.filter(inHideout);
+    for (const it of stashed) save.trophies[it.kind] = (save.trophies[it.kind] || 0) + 1;
+    for (const b of L.buried || []) save.trophies[b.it.kind] = (save.trophies[b.it.kind] || 0) + 1;
+    const S = save.stats;
+    S.tasks = (S.tasks || 0) + run.done.size; S.eaten = (S.eaten || 0) + (run.eaten || 0); S.stashed = (S.stashed || 0) + stashed.length;
+    if (win) S.wins = (S.wins || 0) + 1;
+    const news = [];
+    for (const c of COLLECTIONS) if (colDone(c) && !before.has(c.id)) news.push(`Collection complete: ${c.name}! New fur: ${FURS[c.fur].name}`);
+    for (const a of ACHIEVEMENTS) if (a.test(S) && !achBefore.has(a.id)) news.push(`Achievement: ${a.name}`);
+    return news;
+  }
+  const iconCache = {};
+  function itemIcon(kind) {
+    if (iconCache[kind]) return iconCache[kind];
+    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    const g = c.getContext('2d'), T = ITEM[kind];
+    if (T) { const s = Math.min(2.6, 34 / Math.max(T.h, T.r * 2, 8)); g.translate(32, 32 + T.h * s / 2); g.scale(s, s); try { T.draw(g, { ph0: 0.1, walking: false, facing: 1, bites: 0 }, 0); } catch (_) { /* odd drawer */ } }
+    return (iconCache[kind] = c.toDataURL());
+  }
+  function renderTrophies() {
+    const T = save.trophies || {}, S = save.stats || {};
+    const shelf = document.getElementById('den-shelf');
+    if (!shelf) return;
+    shelf.innerHTML = '';
+    const kinds = Object.keys(T).filter((k) => ITEM[k]).sort((a, b) => T[b] - T[a]);
+    if (!kinds.length) shelf.innerHTML = '<p class="hint">Nothing yet: whatever is in your hideout at the end of a day ends up here.</p>';
+    for (const k of kinds) {
+      const li = document.createElement('li');
+      li.innerHTML = '<img alt=""><span class="n"></span>';
+      li.querySelector('img').src = itemIcon(k); li.title = ITEM[k].name;
+      li.querySelector('.n').textContent = `×${T[k]}`;
+      li.setAttribute('aria-label', `${ITEM[k].name}: ${T[k]}`);
+      shelf.appendChild(li);
+    }
+    const cols = document.getElementById('den-cols'); cols.innerHTML = '';
+    for (const c of COLLECTIONS) {
+      const have = c.kinds.filter((k) => T[k] > 0).length, done = have === c.kinds.length;
+      const li = document.createElement('li'); li.className = done ? 'done' : '';
+      li.innerHTML = '<div class="ct"><span class="cn"></span><span class="cp"></span></div><div class="ck"></div><div class="cr"></div>';
+      li.querySelector('.cn').textContent = c.name; li.querySelector('.cp').textContent = `${have}/${c.kinds.length}`;
+      const ck = li.querySelector('.ck');
+      for (const k of c.kinds) { const im = document.createElement('img'); im.src = itemIcon(k); im.alt = ITEM[k] ? ITEM[k].name : k; im.title = im.alt; if (!(T[k] > 0)) im.className = 'missing'; ck.appendChild(im); }
+      li.querySelector('.cr').textContent = done ? `Unlocked: ${FURS[c.fur].name} fur` : `Reward: ${FURS[c.fur].name} fur`;
+      cols.appendChild(li);
+    }
+    const furs = document.getElementById('den-furs'); furs.innerHTML = '';
+    for (const [id, f] of Object.entries(FURS)) {
+      const open = id === 'classic' || COLLECTIONS.some((c) => c.fur === id && colDone(c));
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'fur' + ((save.fur || 'classic') === id ? ' on' : '');
+      b.disabled = !open; b.style.setProperty('--f', f.c[0]); b.style.setProperty('--r', f.c[3]);
+      b.innerHTML = '<span class="sw"></span><span class="fn"></span>'; b.querySelector('.fn').textContent = open ? f.name : 'Locked';
+      b.setAttribute('aria-label', open ? `${f.name} fur` : `${f.name} fur (locked)`);
+      b.addEventListener('click', () => { save.fur = id; writeSave(); applyFur(); audioInit(); sfx('pick'); renderTrophies(); });
+      furs.appendChild(b);
+    }
+    const achs = document.getElementById('den-achs'); achs.innerHTML = '';
+    for (const a of ACHIEVEMENTS) {
+      const ok = a.test(S), li = document.createElement('li'); li.className = ok ? 'got' : '';
+      li.innerHTML = '<span class="ai"></span><span class="an"></span><span class="ad"></span>';
+      li.querySelector('.ai').textContent = ok ? '★' : '☆'; li.querySelector('.an').textContent = a.name; li.querySelector('.ad').textContent = a.desc;
+      achs.appendChild(li);
+    }
+  }
+
+  // --- Per frame -----------------------------------------------------------------------------------------
+  function updateTricks(dt) {
+    if (!L || !started || paused) return;
+    const outside = areaOf(player.x, player.y) === 0;
+    updateDigging(dt);
+    // the trail the pest controller follows
+    L.trailT = (L.trailT || 0) - dt;
+    if (L.trailT <= 0 && outside) { L.trailT = 0.5; (L.trail = L.trail || []).push({ x: player.x, y: player.y }); if (L.trail.length > 30) L.trail.shift(); }
+    // swimming
+    if (player.swim) { player.swimT = (player.swimT || 0) + dt; if (player.swimT > 0.8) completeTask('swim'); if (Math.random() < dt * 3) particles.push({ kind: 'ring', x: player.x + rr(-6, 6), y: player.y - 2, r: 3, life: 0.8, max: 0.8 }); } else player.swimT = 0;
+    // disguised: walk right past the owner of what you're carrying
+    if (player.disguise) for (const v of villagers) {
+      const d = Math.hypot(v.x - player.x, v.y - player.y);
+      if (v.state === 'chase' || !canSeePlayer(v) || d > 170) continue;
+      if (player.disguise.owner === v.id && (v.disCD || 0) < time && v.state !== 'startled') { // that's MY hat!
+        v.disCD = time + 8; v.cooldown = 0;
+        startleV(v, `That’s MY ${player.disguise.type.name}!`, { state: 'chase', target: null }); v.stateT = 8;
+        continue;
+      }
+      if (player.held && player.held.owner === v.id && d > 60 && (v.greetCD || 0) < time) {
+        v.greetCD = time + 12; say(v, rpick(['Morning, stranger!', 'Lovely hat.', 'Oh, hello there!', 'New in town?']), 1.6);
+        completeTask('disguisewalk');
+      }
+    }
+    // chases ending: did you get away?
+    for (const v of villagers) {
+      if (v.state === 'chase' && v.prevState !== 'chase') v.chaseStrikes = run.strikes;
+      if (v.prevState === 'chase' && v.state !== 'chase' && v.state !== 'startled' && run.strikes === v.chaseStrikes) {
+        if (player.swim || (player.swimT === 0 && tileAt(player.x, player.y + 12) === WATER)) completeTask('swimescape');
+        if (v.id === 'pest') completeTask('pestescape');
+      }
+      v.prevState = v.state;
+    }
+    // traps
+    for (const T0 of L.traps || []) {
+      if (!T0.armed) continue;
+      if (outside && !player.roof && !player.tree && !player.boat && Math.hypot(player.x - T0.x, player.y - T0.y) < 9) {
+        T0.armed = false; player.caged = 3.5; player.x = T0.x; player.y = T0.y; sfx('crash'); toast('Trapped! Wriggle free...', 'Snap!', true);
+        const pv = VILLAGER.pest; if (pv) { pv.huntGoal = { x: T0.x, y: T0.y }; pv.huntT = 0; if (pv.state !== 'chase') pv.state = 'hunt'; say(pv, 'Got one! Coming!', 1.4); }
+        continue;
+      }
+      for (const it of items) if (it.air && Math.hypot(it.x - T0.x, it.y - T0.y) < 12 && it.z < 16) { T0.armed = false; sfx('crash'); completeTask('trapspring'); break; }
+    }
+    if (player.caged > 0) {
+      player.caged -= dt; player.stun = Math.max(player.stun, 0.05); player.vx = player.vy = 0;
+      const pv = VILLAGER.pest;
+      if (pv && Math.hypot(pv.x - player.x, pv.y - player.y) < 18) { player.caged = 0; catchPlayer(pv); }
+      if (player.caged <= 0) player.bubble = { text: 'free!', t: 1 };
+    }
+    // night: sleepers wake to a racket; the watchman
+    if (L.night) {
+      for (const v of villagers) {
+        if (!(v.dozing > 0) || !v.stops[v.stopIdx] || v.stops[v.stopIdx].act !== 'sleep') continue;
+        if (areaOf(v.x, v.y) === areaOf(player.x, player.y) && player.speed > WALK_SPEED * 1.15 && Math.hypot(v.x - player.x, v.y - player.y) < 100) {
+          v.dozing = 0; v.wokeT = time + 25; v.cooldown = 0;
+          startleV(v, rpick(['Wha—?! A BURGLAR!', 'Who’s there?!', 'Hnnh? THIEF!']), { state: 'chase', target: null }); v.stateT = 8;
+        }
+      }
+      const wt = VILLAGER.watch;
+      if (wt && outside && !player.hidden && Math.hypot(wt.x - player.x, wt.y - player.y) < 28 && !canSeePlayer(wt) && wt.state !== 'chase') completeTask('watchman');
     }
   }
 
@@ -8936,6 +9412,8 @@
     if (e.code === 'KeyE' && !e.repeat) grabOrDrop();
     if (e.code === 'KeyF' && !e.repeat) throwHeld();
     if (e.code === 'KeyQ' && !e.repeat) startEating();
+    if (e.code === 'KeyG' && !e.repeat) wearToggle();
+    if (e.code === 'KeyB' && !e.repeat) buryAction();
     if (e.code === 'KeyN' && !e.repeat) muted = !muted;
     if (e.code === 'KeyT' && !e.repeat) setTodoOpen(!todoEl.classList.contains('open'));
   });
@@ -8962,7 +9440,17 @@
   eatBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) startEating(); });
   grabBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) grabOrDrop(); });
   throwBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) throwHeld(); });
+  const wearBtn = document.getElementById('wear'), digBtn = document.getElementById('dig');
+  wearBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!paused) wearToggle(); });
+  digBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!paused) buryAction(); });
   function syncTouchButtons() {
+    const canWear = !!player.disguise || !!(player.held && WEARABLE.has(player.held.kind));
+    if (wearBtn.hidden === canWear) wearBtn.hidden = !canWear;
+    const wl = player.disguise ? 'unwear' : 'wear'; if (wearBtn.textContent !== wl) wearBtn.textContent = wl;
+    const nearMound = L && L.buried && !player.held && L.buried.some((b) => Math.hypot(b.x - player.x, b.y - player.y) < 20);
+    const canDig = nearMound || !!(player.held && !player.held.type.heavy && L && diggable(player.x, player.y));
+    if (digBtn.hidden === canDig) digBtn.hidden = !canDig;
+    const dl = nearMound ? 'dig up' : 'bury'; if (digBtn.textContent !== dl) digBtn.textContent = dl;
     const pcl = petChoice();
     const label = player.inWardrobe ? 'out' : pcl === 'wardrobe' ? 'hide' : player.held ? 'drop' : pcl ? 'pet' : 'grab';
     if (grabBtn.textContent !== label) grabBtn.textContent = label;
@@ -9060,7 +9548,7 @@
     for (const h of hens) if (h.x > left - pad && h.x < left + viewW + pad && h.y > top - pad && h.y < top + viewH + pad) vis.push({ y: h.y, isHen: true, h });
     if (cat && cat.x > left - pad && cat.x < left + viewW + pad && cat.y > top - pad && cat.y < top + viewH + pad + 40) vis.push({ y: cat.y + 0.5, isCat: true });
 
-    if (!indoors) { drawPuddles(ctx, t); drawFrost(ctx, left, top, viewW, viewH, t); }
+    if (!indoors) { drawPuddles(ctx, t); drawFrost(ctx, left, top, viewW, viewH, t); drawMounds(ctx); }
     // Ground-level effects: dust and ripples
     for (const q of particles) {
       if (q.kind === 'ring') {
@@ -9083,7 +9571,7 @@
     vis.push(playerEntry);
     vis.sort((a, b) => a.y - b.y);
     for (const o of vis) {
-      if (o.isPlayer) { if (player.boat) drawRowboat(ctx, player.x, player.y + 2, t, player.speed > 10); if (player.sled) drawSledUnder(ctx, player.x, player.y); if (player.tree) { ctx.save(); ctx.translate(0, -52); drawPlayerWithHeld(ctx, t); ctx.restore(); } else drawPlayerWithHeld(ctx, t); continue; }
+      if (o.isPlayer) { if (player.boat) drawRowboat(ctx, player.x, player.y + 2, t, player.speed > 10); if (player.sled) drawSledUnder(ctx, player.x, player.y); if (player.roof) continue; if (player.tree) { ctx.save(); ctx.translate(0, -52); drawPlayerWithHeld(ctx, t); ctx.restore(); } else if (player.swim) { ctx.save(); ctx.beginPath(); ctx.rect(player.x - 40, player.y - 90, 80, 84); ctx.clip(); ctx.translate(0, 4); drawPlayerWithHeld(ctx, t); ctx.restore(); ctx.strokeStyle = 'rgba(230,245,255,0.7)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(player.x, player.y - 4, 12, 3.5, 0, 0, Math.PI * 2); ctx.stroke(); } else drawPlayerWithHeld(ctx, t); continue; }
       if (o.isItem) { drawItem(ctx, o, t); continue; }
       if (o.isVillager) { drawVillagerWithHeld(ctx, o.v, t); continue; }
       if (o.isDog) { drawDogWithHeld(ctx, t); continue; }
@@ -9096,7 +9584,8 @@
       o.draw(ctx, t, fade);
     }
 
-    if (!indoors) { drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); }
+    if (!indoors) { drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); drawLantern(ctx, t); }
+    if (player.roof) drawPlayerWithHeld(ctx, t);
     // Indoors: black out everything beyond this room's walls (other rooms share the strip)
     if (indoors) {
       const R = indoors.room, rx = R.x0 * TILE, ry = R.y0 * TILE - 10, rw = 11 * TILE, rh = 8 * TILE + 10;
@@ -9127,6 +9616,8 @@
     }
     const pc = petChoice();
     if (pc === 'wardrobe') drawPrompt(ctx, { x: nearWardrobe.x, y: nearWardrobe.y, z: 0, owner: null, type: { h: 74, name: 'hide in wardrobe' } }, t);
+    else if (player.roof && started && player.x > roofRect(player.roof).r - 26 && player.y > roofRect(player.roof).b - 24) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'climb down' } }, t);
+    else if (pipeNear() && started && !target) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'climb the drainpipe' } }, t);
     else if (player.tree && started && (player.tree.t < 0.15 || player.tree.t > 0.85)) drawPrompt(ctx, { x: player.x, y: player.y - 52, z: 0, owner: null, type: { h: 30, name: 'climb down' } }, t);
     else if (ladderNear() && started) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'climb up' } }, t);
     else if (player.boat && started) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'get out' } }, t);
@@ -9241,6 +9732,7 @@
       updateKinds(dt);
       updateSnowWorld(dt);
       updateCastleForest(dt);
+      updateTricks(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
@@ -9280,6 +9772,7 @@
     buildNav();
     placeItems();
     spawnVillagers();
+    if (VILLAGER.pest) { const net = addItem('net', VILLAGER.pest.x, VILLAGER.pest.y, { owner: 'pest' }); Object.assign(net, { held: true, heldBy: VILLAGER.pest }); VILLAGER.pest.held = net; }
     spawnDog();
     spawnCat();
     spawnHens();
@@ -9288,13 +9781,14 @@
     spawnWeather();
     hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack' || o.kind === 'drift' || o.kind === 'igloo' || o.kind === 'armour' || o.kind === 'hollowtree'); // places to hide
     spawnAmbient();
-    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0, sled: false, tongueDone: false, tree: null });
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0, sled: false, tongueDone: false, tree: null, disguise: null, digging: null, roof: null, caged: 0, swim: false });
     target = null;
     cam.x = player.x; cam.y = player.y;
   }
 
   function boot() {
     loadSave();
+    applyFur();
     setupRun(save.day);
     run.seed = dailySeed(save.day);
     newVillage(run.seed);
