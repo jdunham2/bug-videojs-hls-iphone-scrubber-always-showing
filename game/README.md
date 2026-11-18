@@ -99,6 +99,16 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Sleet* (spring, autumn, winter): half rain, half snow, and slippery paths.
   - *Blizzard* (winter): a near whiteout; the wind shoves you along and drifts pile up as it blows.
   - *Surprise snow* (late autumn, early spring): snow falling outside winter.
+  - *Raining frogs* (rarely, in spring and summer): frogs fall from the sky and hop about, startling villagers.
+  - *Lightning*: in a thunderstorm, bolts sometimes strike a tree near you, knocking things flying, making
+    villagers jump and leaving the tree smoking; too close and you get zapped.
+  - *Floods*: a downpour slowly spreads the pond out over the low ground around it; wading is slow, and
+    things lying in the water drift about.
+  - *Solar eclipse* (some days, announced on the morning card): for half a minute the sky goes dark as night
+    and the villagers stop to stare.
+  - *Rainy-day fun*: gusts snatch umbrellas out of villagers' hands (they chase after them, and you can grab
+    them first), gutters spill onto anyone passing a house's front corner, everyone leaves muddy prints, and
+    chittering in a puddle makes a splash that soaks anyone nearby.
   - *Frost* (autumn, winter): icy, slippery paths; villagers chasing you along them may slip and fall.
   - The weather can change partway through the day; the morning card gives the forecast, and a toast tells you
     when it turns. When rain clears up, a rainbow appears with a pot of gold at its end (+3 shinies).
@@ -106,6 +116,13 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   sparrow flocks that scatter when you run at them (they shelter from bad weather), squirrels that dash up
   trees (and Biscuit barks up the tree, drawing villagers' eyes), frogs by the water in rain and spring, and
   seaside seagulls that swoop down and steal food out of your mouth (chitter to scare them off).
+- **Rainy-day critters**: snails come out in the rain (or in spring) leaving shiny trails and hide in their
+  shells if you get close; worms pop up in wet grass and a blackbird swoops for them (grab one first); spider
+  webs on the fences sparkle with dew in the rain, fog, frost and early morning; dragonflies dart over the
+  water; and a ladybird lands on your nose if you stand still by a bush long enough.
+- **River and seaside animals**: crabs on the beach pinch your toes (making you drop things), a seal lazes at
+  the end of the pier and claps for a fish, otters play in the river or lake and swim circles round you if
+  you swim with them, and a heron fishes at the water's edge and gobbles any fish left lying about.
 - **The farm**: most villages have a fenced field with a gate and a trough. Sheep baa and bunch up when you run
   at them (herd them out through the gate), a cow moos and plods off, and a goat by the gate eats anything
   left lying around (newspapers, hats, washing) and charges if you chitter at it, headbutting you over.
@@ -136,7 +153,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 178 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 195 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -212,6 +229,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   tricks, pest control, night and trophies: `wearToggle()` / `drawDisguise()`, `buryAction()` / `updateDigging()`,
   `canSwim()`, `roofAction()` / `updateRoof()` / `dropFromRoof()`, `placeTraps()` / `pestHunt()`, `drawNight()`,
   `nightStops()`, `FURS` / `COLLECTIONS` / `ACHIEVEMENTS`, `recordTrophies()`, `renderTrophies()`, `updateTricks()`;
+  rainy days and wild weather: `spawnRainCritters()` / `updateRainCritter()` / `rainScare()` / `drawRainCritter()`,
+  `placeWebs()`, `lightningStrike()` / `drawBolt()`, `inFlood()` / `drawFlood()`, `drawGutters()`, `puddleJump()`,
+  `updateRainy()` (worms, frog rain, webs, floods, umbrellas, gutters, prints, eclipse);
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
