@@ -74,7 +74,7 @@
 
   const VILLAGE_B_RIVER = ['ford', 'bridge', 'brook', 'wade', 'water', 'burn'];
   const VILLAGE_B_SEA = ['haven', 'port', 'sands', 'cove', 'bay', 'quay'];
-  const VILLAGE_B_KIND = { market: ['market', 'cross', 'chester', 'borough'], windmill: ['mill', 'hill', 'down', 'barrow'], lake: ['mere', 'lake', 'water', 'pool'] };
+  const VILLAGE_B_KIND = { market: ['market', 'cross', 'chester', 'borough'], windmill: ['mill', 'hill', 'down', 'barrow'], lake: ['mere', 'lake', 'water', 'pool'], castle: ['castle', 'keep', 'tower', 'gate'], forest: ['wood', 'grove', 'holt', 'shaw'] };
   function genLayout(opts = {}) {
     const kind = opts.kind || pick(KIND_NAMES);
     const season = opts.season || pick(SEASON_NAMES);
@@ -279,6 +279,8 @@
       carvePath(g.gateX, outY, solid);
     }
     if (L.jetty) carvePath(L.jetty.baseX - L.jetty.sx, L.jetty.baseY - L.jetty.sy, solid);
+    if (L.castle) carvePath(L.castle.out[0], L.castle.out[1], solid);
+    if (L.museum) carvePath(L.museum.x + Math.floor(L.museum.w / 2) - 1, L.museum.y + L.museum.h, solid);
 
     // Who lives where: Bertram nearest his garden, everyone else at random
     {
@@ -320,6 +322,7 @@
     for (const h of L.houses) {
       objects.push(makeHouse(h.x, h.y, h.w, h.h, h.roof));
       objects.push(makeMailbox((h.doorX + 1.2) * TILE, (h.y + h.h + 0.7) * TILE));
+      if (shopOf(h)) objects.push(makeShopFront(h, shopOf(h)));
     }
 
     // Plaza props
@@ -390,7 +393,7 @@
       }
       return null;
     };
-    for (let n = 0; n < 75; n++) { const s = openSpot(1); if (s) objects.push(makeTree((s[0] + rr(0.3, 0.7)) * TILE, (s[1] + rr(0.5, 0.9)) * TILE)); }
+    for (let n = 0; n < (L.kind === 'forest' ? 180 : 75); n++) { const s = openSpot(1); if (s) objects.push(makeTree((s[0] + rr(0.3, 0.7)) * TILE, (s[1] + rr(0.5, 0.9)) * TILE)); }
     for (let n = 0; n < 45; n++) { const s = openSpot(0); if (s) objects.push(makeBush((s[0] + 0.5) * TILE, (s[1] + 0.75) * TILE)); }
     for (let n = 0; n < 25; n++) { const s = openSpot(0); if (s) objects.push(makeRock((s[0] + 0.5) * TILE, (s[1] + 0.7) * TILE)); }
     // Reeds along the water's sandy edge
@@ -440,7 +443,8 @@
     const slots = bedLeft ? [x0 + 4.4, x0 + 6.6, x0 + 8.9] : [x0 + 2.1, x0 + 4.4, x0 + 6.6];
     const set = shuffled([who.includes('rosa') ? 'stove' : 'fireplace', 'shelf', 'wardrobe']);
     set.forEach((kind, i) => objects.push(makeFurniture(kind, slots[i] * T, back)));
-    objects.push(makeTableIn((x0 + 5.5) * T, (y0 + 5) * T));
+    const shop = shopOf(h);
+    objects.push(shop ? makeShopCounter((x0 + 5.5) * T, (y0 + 5) * T, shop.col) : makeTableIn((x0 + 5.5) * T, (y0 + 5) * T));
     h.room.armchair = { x: (bedLeft ? x0 + 8.8 : x0 + 2.2) * T, y: (y0 + 6.8) * T };
     objects.push(makeArmchair(h.room.armchair.x, h.room.armchair.y, h.room.rug));
     objects.push(makePlant((bedLeft ? x0 + 1.5 : x0 + 9.5) * T, (y0 + 6.8) * T));
@@ -634,6 +638,12 @@
     Object.assign(player, { x: h.exitIn.x, y: h.exitIn.y, vx: 0, vy: 0, dir: 'up', doorCD: 0.6 });
     cam.x = player.x; cam.y = player.y;
     sfx('door');
+    const shop = shopOf(h);
+    if (shop) { // ding-a-ling!
+      sfx('shopbell'); completeTask('shopbell');
+      const keeper = VILLAGER[shop.owner];
+      if (keeper && areaOf(keeper.x, keeper.y) === h.area && keeper.state === 'act') { keeper.dir = 'down'; say(keeper, rpick(['Be right with you!', 'Hello? Who’s there?', 'Welcome!']), 1.6); }
+    }
     run.visited.add(h.area);
     completeTask('burgle');
     setProgress('tour', run.visited.size);
@@ -1303,6 +1313,12 @@
         roundRect(g, x + 1, y + 1, 14, 10, 3, true);
       }
     }
+    // Flagstones anywhere else that's paved (castle courtyard, museum gallery)
+    for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+      if (getT(x, y) !== STONE || (x >= L.plaza.x && x < L.plaza.x + L.plaza.w && y >= L.plaza.y && y < L.plaza.y + L.plaza.h)) continue;
+      g.fillStyle = '#a9a496'; g.fillRect(x * TILE, y * TILE, TILE, TILE);
+      for (const [ox, oy, w, h] of [[1, 1, 14, 14], [17, 1, 14, 14], [1, 17, 14, 14], [17, 17, 14, 14]]) { g.fillStyle = grng() < 0.5 ? '#bcb7a8' : '#b2ad9e'; roundRect(g, x * TILE + ox, y * TILE + oy, w, h, 2, true); }
+    }
     // Plaza mosaic circle
     g.strokeStyle = '#8f8a7c'; g.lineWidth = 4;
     g.beginPath(); g.arc(PX + 6 * TILE, PY + 6 * TILE, 3.3 * TILE, 0, Math.PI * 2); g.stroke();
@@ -1433,6 +1449,7 @@
   let solidObjects = [];
 
   function updatePlayer(dt, input) {
+    if (player.tree) { updateTree(dt, input); return; }
     let ix = input.x, iy = input.y;
     if (player.stun > 0) { player.stun -= dt; ix = 0; iy = 0; }
     let mag = Math.hypot(ix, iy);
@@ -1511,6 +1528,7 @@
     if (player.held && !player.held.type.heavy) dropHeld(true);
     if (cat && cat.state !== 'flee' && Math.hypot(cat.x - player.x, cat.y - player.y) < chitterRadius()) catFlee(player.x, player.y);
     critterScare(player.x, player.y, chitterRadius() * 1.1);
+    fairyCheck();
     for (const v of villagers) {
       if (Math.hypot(v.x - player.x, v.y - player.y) < chitterRadius() && startleV(v, rpick(['Eek!', 'Gah!', 'Yikes!']))) completeTask('jump');
     }
@@ -2241,8 +2259,14 @@
       const tableY = (y0 + 5) * T + 1;
       const warm = isWinter() ? 'cocoa' : 'teapot';
       const onTable = who.includes('rosa') ? ['cake', warm] : who.includes('mabel') ? ['cookies', warm] : [pick(['bread', 'cheese', 'teapot', 'cookies']), pick(['bread', 'cheese', 'vase'])];
-      addItem(onTable[0], (x0 + 5.5) * T - 15, tableY, { z: 22, owner });
-      addItem(onTable[1], (x0 + 5.5) * T + 15, tableY, { z: 22, owner });
+      const shop = shopOf(h);
+      if (shop) { // the shop counter: the day's goods laid out
+        const goods = shop.owner === 'rosa' ? ['cake', ...shop.goods] : shop.goods;
+        goods.forEach((k, i) => { addItem(k, (x0 + 5.5) * T - 36 + i * (72 / Math.max(1, goods.length - 1)), tableY - 2, { z: 22, owner: shop.owner }).shop = true; });
+      } else {
+        addItem(onTable[0], (x0 + 5.5) * T - 15, tableY, { z: 22, owner });
+        addItem(onTable[1], (x0 + 5.5) * T + 15, tableY, { z: 22, owner });
+      }
       const floorKinds = shuffled(['slippers', 'book', 'vase', 'clock', 'frame', 'candle', 'umbrella', 'book']).slice(0, 3);
       if (who.includes('toby')) floorKinds.push('teddy', 'toyboat');
       if (who.includes('ollie')) floorKinds.push('trophy');
@@ -2348,6 +2372,7 @@
     if (player.inWardrobe) { exitWardrobe(); return; }
     if (boatAction()) return;
     if (sledAction()) return;
+    if (treeAction()) return;
     if (player.held && !(petChoice() === 'wardrobe')) { dropHeld(false); return; }
     const pc = petChoice();
     if (pc === 'dog') { petDog(); return; }
@@ -2377,6 +2402,13 @@
     if (it.stall) { completeTask('stall'); if (['teddy', 'toyboat', 'kite'].includes(it.kind)) completeTask('toystall'); }
     if (it.kind === 'bigfish') completeTask('bigfish');
     if (it.kind === 'present') completeTask('present');
+    if (it.shop) {
+      const keeper = VILLAGER[it.owner];
+      if (keeper && areaOf(keeper.x, keeper.y) === areaOf(it.x, it.y)) completeTask('counter');
+      if (it.kind === 'sweets' || it.kind === 'lolly') completeTask('sweets');
+      if (it.kind === 'letters') completeTask('letters');
+    }
+    if (it.museum) { if (it.kind === 'crown') completeTask('heist'); if (!run.alarms) completeTask('sneaky'); }
     if (it.kind === 'tortoise') completeTask('tortoise');
     if (it.kind === 'rosette') completeTask('rosette');
     if (it.kind === 'weddingcake') completeTask('weddingcake');
@@ -2416,6 +2448,7 @@
   }
 
   function throwHeld() {
+    if (player.tree) { dropFromTree(); return; }
     const it = player.held;
     if (!it || player.inWardrobe) return;
     player.held = null;
@@ -2769,6 +2802,11 @@
       speed: 48, chase: 114, pitch: 120,
       lines: { fish: ['Bite? No bite.', 'Shh. Fish are listening.', 'It was THIS big.'], stroll: ['Morning.'], home: ['Smells fishy in here.'] },
     },
+    {
+      id: 'guard', name: 'the museum', skin: '#e0b090', hair: '#2a2a30', shirt: '#2c3d63', pants: '#1d2a44', hat: 'cap', capColor: '#1d2a44',
+      speed: 50, chase: 128, pitch: 160,
+      lines: { patrol: ['All quiet.', 'No funny business.', 'Hm hm hm.', 'Lovely treasures, these.'] },
+    },
   );
   const HOME_LINES = ['Home sweet home.', 'Now where did I put that...', 'Ahh, my own chair.'];
   const villagers = [];
@@ -2837,6 +2875,15 @@
           homeStop(6.5, 6, 6),
         ];
       }
+      case 'guard': {
+        const M = L.museum, X = M.x * T, Y = M.y * T, W = M.w * T, H = M.h * T;
+        return [
+          S(X + W / 2, Y + H * 0.62, 'patrol', 5, 'down'),
+          S(X + W + 20, Y + H + 14, 'patrol', 4, 'left'),
+          S(X + W / 2, Y + H + 26, 'patrol', 6, 'up'),
+          S(X - 20, Y + H + 14, 'patrol', 4, 'right'),
+        ];
+      }
       default: { // toby
         const sp = shorePoint(plazaAngleFromPond() - 0.7);
         return [
@@ -2852,6 +2899,7 @@
   function spawnVillagers() {
     const mult = run.villagerSpeed;
     for (const d of VILLAGER_DEFS) {
+      if (d.id === 'guard' && !L.museum) continue;
       const stops = withStall(d.id, stopsFor(d.id)).map((s) => {
         if (navBlockedPt(s.wx, s.wy)) {
           const o = nearestOpen(Math.floor(s.wx / TILE), Math.floor(s.wy / TILE));
@@ -3206,6 +3254,7 @@
         case 'return': returnHome(v, dt); break;
         case 'sulk': v.stateT -= dt; if (v.stateT <= 0) toRoute(v); break;
         case 'startled': v.stateT -= dt; if (v.stateT <= 0) afterStartle(v); break;
+        case 'game': if (v.game) hideSeek(v, dt); else toRoute(v); break;
       }
       if (L.weather === 'frost' || L.weather === 'sleet') frostSlip(v, dt);
 
@@ -3463,6 +3512,13 @@
     { id: 'horsekick', tier: 'Easy', text: 'Get kicked by the horse', hint: 'walk behind it', req: ['stable'] },
     { id: 'llama', tier: 'Easy', text: 'Get spat at by the llama', req: ['llama'] },
     { id: 'tortoise', tier: 'Easy', text: "Pick up Granny Mabel's tortoise", req: ['tortoise'] },
+    { id: 'bell', tier: 'Easy', text: 'Ring the castle bell', hint: 'tug the rope', req: ['bell'] },
+    { id: 'armour', tier: 'Easy', text: 'Hide in a suit of armour', req: ['armour'] },
+    { id: 'treehouse', tier: 'Easy', text: 'Climb up into a treehouse', hint: 'E at the ladder', req: ['treehouses'] },
+    { id: 'fairyring', tier: 'Easy', text: 'Chitter in a fairy ring', req: ['rings'] },
+    { id: 'hollow', tier: 'Easy', text: 'Hide in the hollow tree', req: ['hollow'] },
+    { id: 'shopbell', tier: 'Easy', text: 'Ring a shop’s doorbell', hint: 'walk into a shop', req: ['shops'] },
+    { id: 'alarm', tier: 'Easy', text: 'Set off the museum alarm', hint: 'touch a red tripwire', req: ['museum'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3520,6 +3576,13 @@
     { id: 'ducklings', tier: 'Medium', text: 'Lead the ducklings on a parade', hint: 'walk up to them slowly', req: ['ducklings'] },
     { id: 'llamaspit', tier: 'Medium', text: 'Get the llama to spit at a villager', hint: 'annoy it when someone’s near', req: ['llama'] },
     { id: 'tortoisestash', tier: 'Medium', text: "Stash Granny Mabel's tortoise in your hideout", req: ['tortoise'] },
+    { id: 'ropebridge', tier: 'Medium', text: 'Cross the rope bridge between the treehouses', req: ['treehouses'] },
+    { id: 'treedrop', tier: 'Medium', text: 'Drop something on someone from a treehouse', hint: 'F from up top', req: ['treehouses'] },
+    { id: 'logs', tier: 'Medium', text: 'Send the woodpile rolling', hint: 'run into it', req: ['logpile'] },
+    { id: 'sweets', tier: 'Medium', text: 'Pinch something from the sweet shop', req: ['sweetshop'] },
+    { id: 'letters', tier: 'Medium', text: 'Swipe the sack of letters from the post office', req: ['postoffice'] },
+    { id: 'hideseek', tier: 'Medium', text: 'Win hide-and-seek with Toby', hint: 'go up to him, then hide' },
+    { id: 'race', tier: 'Medium', text: 'Beat Biscuit in a race', hint: 'stand on the RACE line, then run', req: ['race'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3555,6 +3618,10 @@
     { id: 'bees', tier: 'Hard', text: 'Lead a swarm of bees to a villager', hint: 'bump the beehive, then run', req: ['bees'] },
     { id: 'weddingcake', tier: 'Hard', text: 'Run off with the wedding cake', req: ['wedding'] },
     { id: 'presents3', tier: 'Hard', text: 'Stash 3 presents in your hideout', goal: 3, req: ['sleigh'] },
+    { id: 'treasure', tier: 'Hard', text: 'Stash the castle’s treasure chest in your hideout', req: ['chest'] },
+    { id: 'counter', tier: 'Hard', text: 'Steal from a shop counter while the shopkeeper’s in', req: ['shops'] },
+    { id: 'heist', tier: 'Hard', text: 'Steal the crown from the museum', req: ['museum'] },
+    { id: 'sneaky', tier: 'Hard', text: 'Lift a museum treasure without setting off the alarm', hint: 'the tripwires blink off', req: ['museum'] },
     { id: 'hens', tier: 'Hard', text: 'Get every hen squawking at once' },
     { id: 'eggs3', tier: 'Hard', text: 'Find 3 painted eggs', goal: 3, req: ['spring'] },
     { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
@@ -3654,6 +3721,18 @@
       if (r === 'drifts' && !(L.drifts && L.drifts.length)) return false;
       if (r === 'snowy' && !(isWinter() || planHas(SNOWY_W))) return false;
       if (r === 'tortoise' && !items.some((it) => it.kind === 'tortoise')) return false;
+      if (r === 'bell' && !L.bell) return false;
+      if (r === 'chest' && !L.castleChest) return false;
+      if (r === 'armour' && !L.castle) return false;
+      if (r === 'treehouses' && !L.treehouses) return false;
+      if (r === 'logpile' && !L.logpile) return false;
+      if (r === 'rings' && !(L.rings && L.rings.length)) return false;
+      if (r === 'hollow' && !L.hollow) return false;
+      if (r === 'shops' && !(L.shopHouses && L.shopHouses.size)) return false;
+      if (r === 'sweetshop' && !(L.shopHouses && [...L.shopHouses.values()].some((x) => x.kind === 'sweets'))) return false;
+      if (r === 'postoffice' && !(L.shopHouses && [...L.shopHouses.values()].some((x) => x.kind === 'post'))) return false;
+      if (r === 'race' && !L.race) return false;
+      if (r === 'museum' && !L.museum) return false;
       if (r === 'farm' && !L.paddock) return false;
       if (r === 'rainbow' && !rainbowPossible()) return false;
       if (r === 'heatwave' && !planHas(['heatwave'])) return false;
@@ -3734,6 +3813,7 @@
     setProgress('everyone', new Set(stashed.filter((it) => it.owner).map((it) => it.owner)).size);
     setProgress('presents3', stashed.filter((it) => it.kind === 'present').length);
     if (stashed.some((it) => it.kind === 'tortoise')) completeTask('tortoisestash');
+    if (stashed.some((it) => it.kind === 'chest')) completeTask('treasure');
   }
 
   // Getting caught ---------------------------------------------------------------
@@ -4063,6 +4143,11 @@
   }
 
   function updateHiding(dt) {
+    if (player.tree) { // villagers never look up
+      player.hidden = true; player.hidingIn = null;
+      const pill = document.getElementById('hidden-pill'); if (pill.hidden === !paused) pill.hidden = paused;
+      return;
+    }
     for (const o of hideBushes) o.rustle = Math.max(0, o.rustle - dt);
     for (const o of solidObjects) if (o.wardrobe && o.creak > 0) o.creak = Math.max(0, o.creak - dt * 2.5);
     if (player.inWardrobe) {
@@ -4091,6 +4176,8 @@
       if (bush.kind === 'haystack') completeTask('hay');
       if (bush.kind === 'drift') completeTask('drift');
       if (bush.kind === 'igloo') completeTask('igloo');
+      if (bush.kind === 'armour') completeTask('armour');
+      if (bush.kind === 'hollowtree') completeTask('hollow');
       // Chasers who weren't right on top of you lose track in the leaves
       for (const v of villagers) {
         if (v.state === 'chase' && Math.hypot(v.x - player.x, v.y - player.y) > 60) {
@@ -4220,6 +4307,7 @@
     d.friendly = Math.max(0, d.friendly - dt);
     if (d.bubble) { d.bubble.t -= dt; if (d.bubble.t <= 0) d.bubble = null; }
     if (d.hop > 0 || d.hopV) { d.hopV -= 600 * dt; d.hop += d.hopV * dt; if (d.hop <= 0) { d.hop = 0; d.hopV = 0; } }
+    if (d.race) return; // racing (see updateRace)
     for (const v of villagers) v.barkCD = Math.max(0, (v.barkCD || 0) - dt);
 
     const outside = areaOf(player.x, player.y) === 0 && !playerInHideout();
@@ -4997,7 +5085,7 @@
   // it looks and what there is to do.
   // ---------------------------------------------------------------------------
   const SEASON_NAMES = ['spring', 'summer', 'autumn', 'winter'];
-  const KIND_NAMES = ['pond', 'river', 'seaside', 'market', 'windmill', 'lake'];
+  const KIND_NAMES = ['pond', 'river', 'seaside', 'market', 'windmill', 'lake', 'castle', 'forest'];
   const SEASON_LOOK = {
     spring: { grass: '#7cba55', patch: ['rgba(110,170,70,0.35)', 'rgba(175,220,120,0.3)'], blade: ['rgba(70,135,50,0.55)', 'rgba(175,225,120,0.5)'], blades: 9000,
       flowers: 1200, petals: ['#ffffff', '#ffd1e3', '#ff9ec4', '#c9b3ff', '#fff3a8'], path: ['#b08b55', '#cfac72'], sand: ['#c9b57e', '#e3cf96'],
@@ -5023,7 +5111,8 @@
     winter: 'Winter: press E on the snow to scoop a snowball. Watch out, the ice is slippery.',
   };
   const KIND_TIP = { pond: '', river: 'A river runs right through the village.', seaside: 'The village sits by the sea, with a pier.',
-    market: 'It’s market day! The stalls are full of goodies, and the stallholders are watching.', windmill: 'A windmill turns on the hill: flour sacks, a wheat field and a hay barn.', lake: 'A big lake with an island in the middle. Take the rowing boat from the jetty.' };
+    market: 'It’s market day! The stalls are full of goodies, and the stallholders are watching.', windmill: 'A windmill turns on the hill: flour sacks, a wheat field and a hay barn.', lake: 'A big lake with an island in the middle. Take the rowing boat from the jetty.',
+    castle: 'Old castle ruins with a moat: ring the bell, hide in the armour, and there’s a treasure chest in the courtyard.', forest: 'A village deep in the woods: treehouses with a rope bridge, a woodpile, fairy rings and a hollow tree.' };
   const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
   // --- Seasonal objects ---------------------------------------------------------
@@ -6969,7 +7058,7 @@
     bonfire: 'Bonfire night! Fireworks after dusk, toffee apples, and a box of rockets by the fire.',
     scarecrows: 'Scarecrow festival: everyone’s made a scarecrow. It would be a shame if they fell over...',
   };
-  const KIND_LABEL = { pond: 'Pond', river: 'Riverside', seaside: 'Seaside', market: 'Market', windmill: 'Windmill', lake: 'Lakeside' };
+  const KIND_LABEL = { pond: 'Pond', river: 'Riverside', seaside: 'Seaside', market: 'Market', windmill: 'Windmill', lake: 'Lakeside', castle: 'Castle', forest: 'Forest' };
   function pickEvent(season) { return rand() < 0.4 ? pick(EVENTS_BY_SEASON[season]) : null; }
 
   // --- New items -----------------------------------------------------------------------------
@@ -7267,11 +7356,17 @@
       const b = place(6, 6);
       if (b) { L.barn = { x: (b.x + 3) * T, y: (b.y + 3.6) * T }; markSolid(b.x, b.y + 1, 6, 3); }
     }
+    L.castle = null; L.treehouses = null; L.museum = null;
+    if (L.kind === 'castle') buildCastle(markSolid, place);
+    if (L.kind === 'forest') buildForest(markSolid, place);
+    if (L.kind === 'castle' || (L.kind !== 'market' && rand() < 0.3)) buildMuseum(markSolid, place);
   }
   // Called from buildMap after the plaza props
   function buildKindLate() {
     const T = TILE, P = L.plaza, px = P.x, py = P.y;
     L.stalls = null; L.cart = null; L.festCrows = []; L.bonfire = null; L.fireworks = [];
+    placeCastleObjects(); placeForestObjects(); placeMuseumObjects(); placeRace();
+    if (L.museum) L.homes.guard = L.homes.percy;
     if (L.kind === 'market') {
       L.stalls = [];
       const spots = [[px + 2.6, py + 2.2], [px + 9.4, py + 2.2], [px + 2.6, py + 10.6], [px + 9.4, py + 10.6]];
@@ -7323,6 +7418,9 @@
       placeFree('bread', L.mill.x + 28, L.mill.y + 10, { owner: 'rosa' });
       placeFree('flour', L.mill.x + 40, L.mill.y + 4);
     }
+    if (L.castleChest) addItem('chest', L.castleChest.x, L.castleChest.y);
+    if (L.plinths) ['crown', 'gem', 'goldvase'].forEach((k, i) => { const p = L.plinths[i]; addItem(k, p.x, p.y - 2, { z: 18, owner: 'guard' }).museum = true; });
+    if (L.rings) for (const R of L.rings) for (let k = 0; k < 2; k++) placeFree('mushroom', R.x + rr(-40, 40), R.y + rr(18, 30));
     if (L.contest) { const it = addItem('bigfish', L.contest.x - 6, L.contest.y - 3, { z: 16, owner: 'ollie' }); it.contest = true; }
     const E = L.event;
     if (E === 'fete') {
@@ -7340,9 +7438,13 @@
   }
   // Market day: stallholders spend the morning at their stalls
   function withStall(id, stops) {
+    const T = TILE, extra = [];
     const s = L.stalls && L.stalls.find((x) => x.owner === id);
-    if (!s) return stops;
-    return [{ wx: s.vx, wy: s.vy, act: 'sell', dur: 22, face: 'down', lines: s.lines }, ...stops];
+    if (s) extra.push({ wx: s.vx, wy: s.vy, act: 'sell', dur: 22, face: 'down', lines: s.lines });
+    const h = L.houses[L.homes[id]], shop = h && h.room && shopOf(h);
+    if (shop && shop.owner === id) extra.push({ wx: (h.room.x0 + 5.5) * T, wy: (h.room.y0 + 3.7) * T, act: 'shop', dur: 20, face: 'down', lines: ['Can I help you?', 'Lovely day for it!', 'Just browsing?', 'Mind the shelves!'] });
+    if (id === 'bertram' && L.kind === 'forest' && L.logpile) extra.push({ wx: L.logpile.x + 37, wy: L.logpile.y + 16, act: 'chop', dur: 12, face: 'up', lines: ['Timber!', 'Chop, chop.', 'Lovely bit of oak, this.'] });
+    return [...extra, ...stops];
   }
 
   // --- Event decorations --------------------------------------------------------------------
@@ -8097,6 +8199,589 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Castle and forest villages, shops to sneak into, and mini-games:
+  // hide-and-seek with Toby, a race against Biscuit, and a museum heist.
+  // ---------------------------------------------------------------------------
+  Object.assign(ITEM, {
+    chest: { name: 'treasure chest', h: 16, r: 10, heavy: true, draw(c) {
+      c.fillStyle = '#7a4f2a'; roundRect(c, -10, -12, 20, 12, 2, true);
+      c.fillStyle = '#8a5a30'; c.beginPath(); c.ellipse(0, -12, 10, 4, 0, Math.PI, 0); c.fill();
+      c.fillStyle = '#c9a33a'; c.fillRect(-10, -9, 20, 1.6); c.fillRect(-1.5, -14, 3, 7);
+      c.fillStyle = '#f2c14e'; circle(c, -5, -14.5, 1.4); circle(c, 4, -15, 1.2);
+    } },
+    crown: { name: 'crown', h: 10, r: 5, draw(c) {
+      c.fillStyle = '#f2c14e'; poly(c, [[-6, 0], [6, 0], [7, -8], [3.5, -4], [0, -9], [-3.5, -4], [-7, -8]]); c.fill();
+      c.fillStyle = '#e8453c'; circle(c, 0, -3, 1.4); c.fillStyle = '#4f93c7'; circle(c, -4, -2.5, 1); circle(c, 4, -2.5, 1);
+    } },
+    gem: { name: 'giant gem', h: 9, r: 5, draw(c) {
+      c.fillStyle = '#5ac8d8'; poly(c, [[-5, -5], [-2.5, -8], [2.5, -8], [5, -5], [0, 1]]); c.fill();
+      c.fillStyle = '#b8f0f8'; poly(c, [[-2.5, -8], [0, -5], [-5, -5]]); c.fill();
+    } },
+    goldvase: { name: 'golden vase', h: 14, r: 5, fragile: true, draw(c) {
+      c.fillStyle = '#d9a43a'; c.beginPath(); c.moveTo(-3, -14); c.quadraticCurveTo(-8, -6, -3, 0); c.lineTo(3, 0); c.quadraticCurveTo(8, -6, 3, -14); c.fill();
+      c.fillStyle = '#f2d06a'; c.fillRect(-1.5, -12, 1.5, 9);
+    } },
+    sweets: { name: 'bag of sweets', h: 9, r: 4, draw(c) {
+      c.fillStyle = '#f2b8c6'; poly(c, [[-4, 0], [4, 0], [3, -7], [-3, -7]]); c.fill();
+      c.fillStyle = '#e8453c'; c.fillRect(-3, -8.5, 6, 1.6);
+      for (const [x, y, col] of [[-1.5, -3, '#4f93c7'], [1.5, -4.5, '#ffd166'], [0, -2, '#8fd16a']]) { c.fillStyle = col; circle(c, x, y, 1.1); }
+    } },
+    lolly: { name: 'lollipop', h: 13, r: 3, draw(c) {
+      c.fillStyle = '#f4f2ee'; c.fillRect(-0.5, -7, 1, 7);
+      c.fillStyle = '#e8453c'; circle(c, 0, -10, 3.5); c.strokeStyle = '#ffffff'; c.lineWidth = 0.9; c.beginPath(); c.arc(0, -10, 2, 0, Math.PI * 1.5); c.stroke();
+    } },
+    letters: { name: 'sack of letters', h: 12, r: 6, draw(c) {
+      c.fillStyle = '#a0703f'; roundRect(c, -6, -11, 12, 11, 4, true);
+      c.fillStyle = '#f4f2ee'; c.fillRect(-4, -14, 5, 4); c.fillRect(0, -13, 5, 3.5);
+      c.fillStyle = '#c0392b'; c.fillRect(-1, -13.5, 1.4, 1.4);
+    } },
+    mushroom: { name: 'mushroom', h: 7, r: 3, draw(c) {
+      c.fillStyle = '#efe3cf'; c.fillRect(-1.2, -4, 2.4, 4);
+      c.fillStyle = '#c0392b'; c.beginPath(); c.ellipse(0, -4, 4, 3, 0, Math.PI, 0); c.fill();
+      c.fillStyle = '#ffffff'; circle(c, -1.5, -5, 0.7); circle(c, 1.4, -5.6, 0.6);
+    } },
+    log: { name: 'log', h: 9, r: 9, heavy: true, draw(c) {
+      c.fillStyle = '#7a5230'; roundRect(c, -10, -9, 20, 9, 4, true);
+      c.fillStyle = '#c9a26a'; ellipse(c, 9, -4.5, 2.5, 4.3); c.strokeStyle = '#8a6a3a'; c.lineWidth = 0.6; c.beginPath(); c.ellipse(9, -4.5, 1.2, 2.2, 0, 0, Math.PI * 2); c.stroke();
+    } },
+  });
+  Object.assign(FOOD, { sweets: { bites: 2, fill: 12, sweet: true }, lolly: { bites: 2, fill: 8, sweet: true }, mushroom: { bites: 1, fill: 8 } });
+
+  // --- Castle -----------------------------------------------------------------------------
+  function makeCastleWall(tx, ty, tower, ruined) {
+    const x = tx * TILE, y = ty * TILE, h = tower ? 70 : ruined ? 18 : 46;
+    return {
+      kind: 'castlewall', x: x + TILE / 2, y: y + TILE, hitbox: box(x, y + 4, TILE, TILE - 4),
+      bounds: { l: x - 8, r: x + TILE + 8, t: y + TILE - h - 20, b: y + TILE + 2 },
+      draw(ctx) {
+        const base = y + TILE, w = tower ? TILE + 10 : TILE, x0 = tower ? x - 5 : x;
+        ctx.fillStyle = '#9a958a'; ctx.fillRect(x0, base - h, w, h);
+        ctx.fillStyle = '#b5b0a4'; ctx.fillRect(x0, base - h, w, 5);
+        ctx.strokeStyle = 'rgba(70,60,50,0.35)'; ctx.lineWidth = 1;
+        for (let yy = base - h + 8; yy < base; yy += 8) { ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x0 + w, yy); ctx.stroke(); for (let xx = x0 + ((yy / 8) % 2 ? 6 : 12); xx < x0 + w; xx += 12) { ctx.beginPath(); ctx.moveTo(xx, yy - 8); ctx.lineTo(xx, yy); ctx.stroke(); } }
+        if (!ruined) { ctx.fillStyle = '#9a958a'; for (let k = 0; k < (tower ? 4 : 3); k++) ctx.fillRect(x0 + k * (w / (tower ? 4 : 3)) + 1, base - h - 7, w / (tower ? 8 : 6), 7); }
+        if (ruined) { ctx.fillStyle = '#7fb350'; circle(ctx, x + 6, base - h + 1, 3); circle(ctx, x + 22, base - h + 2, 2.4); }
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; ctx.fillRect(x0, base - h - (ruined ? 0 : 3), w, 3); }
+        if (tower) { ctx.fillStyle = '#3a3530'; roundRect(ctx, x0 + w / 2 - 3, base - h + 18, 6, 12, 3, true); }
+      },
+    };
+  }
+  function makeBellTower(x, y) {
+    return {
+      kind: 'belltower', x, y, hitbox: box(x - 14, y - 12, 28, 13), bounds: { l: x - 24, r: x + 24, t: y - 130, b: y + 4 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.25)'; ellipse(ctx, x + 10, y, 22, 6); },
+      draw(ctx, t) {
+        ctx.fillStyle = '#a8a396'; ctx.fillRect(x - 14, y - 100, 28, 100);
+        ctx.fillStyle = '#3a3530'; ctx.fillRect(x - 9, y - 92, 18, 22);
+        const sw = L.bellT > 0 ? Math.sin(t * 14) * 0.5 * L.bellT : 0;
+        ctx.save(); ctx.translate(x, y - 90); ctx.rotate(sw);
+        ctx.fillStyle = '#d9a43a'; poly(ctx, [[-6, 14], [6, 14], [4, 2], [-4, 2]]); ctx.fill(); circle(ctx, 0, 2, 4);
+        ctx.restore();
+        ctx.fillStyle = '#7a4f3a'; poly(ctx, [[x - 18, y - 100], [x + 18, y - 100], [x, y - 126]]); ctx.fill();
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; poly(ctx, [[x - 10, y - 108], [x + 10, y - 108], [x, y - 126]]); ctx.fill(); }
+        ctx.strokeStyle = '#c9a26a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + 2, y - 76); ctx.lineTo(x + 2 + sw * 6, y + 6); ctx.stroke(); // the bell rope
+        ctx.fillStyle = '#c9a26a'; circle(ctx, x + 2 + sw * 6, y + 7, 1.8);
+      },
+    };
+  }
+  function makeArmour(x, y) {
+    const o = {
+      kind: 'armour', x, y, r: 12, hitbox: null, rustle: 0,
+      bounds: { l: x - 14, r: x + 14, t: y - 50, b: y + 4 },
+      contains(px, py) { return Math.abs(px - x) < 9 && py > y - 9 && py < y + 4; },
+      draw(ctx, t) {
+        const shake = o.rustle > 0 ? Math.sin(t * 40) * 1 : 0;
+        ctx.save(); ctx.translate(x + shake, y);
+        ctx.fillStyle = '#5a5a60'; ctx.fillRect(-8, -3, 16, 3);
+        ctx.fillStyle = '#b8bcc4'; ctx.fillRect(-5, -16, 4, 13); ctx.fillRect(1, -16, 4, 13);
+        roundRect(ctx, -7, -32, 14, 17, 4, true);
+        ctx.fillStyle = '#9aa0aa'; ctx.fillRect(-7, -24, 14, 2);
+        ctx.fillStyle = '#b8bcc4'; roundRect(ctx, -5, -43, 10, 11, 4, true);
+        ctx.fillStyle = '#2b2d33'; ctx.fillRect(-4, -39, 8, 1.8);
+        ctx.fillStyle = '#c0392b'; poly(ctx, [[0, -43], [4, -50], [1, -43]]); ctx.fill();
+        if (player.hidden && player.hidingIn === o) { ctx.fillStyle = '#ffffff'; circle(ctx, -2, -38, 1); circle(ctx, 2, -38, 1); }
+        ctx.restore();
+      },
+    };
+    return o;
+  }
+  // Built before the houses (needs room): moat, drawbridge, walls, towers, bell tower, armour
+  function buildCastle(markSolid, place) {
+    const r = place(15, 14);
+    if (!r) return;
+    const ox = r.x + 1, oy = r.y + 1, W = 13, H = 12, ix = ox + 2, iy = oy + 2, iw = 9, ih = 8;
+    const pcx = L.plaza.x + 6, pcy = L.plaza.y + 6, ccx = ox + W / 2, ccy = oy + H / 2;
+    const side = Math.abs(pcx - ccx) > Math.abs(pcy - ccy) ? (pcx > ccx ? 'E' : 'W') : (pcy > ccy ? 'S' : 'N');
+    for (let y = oy; y < oy + H; y++) for (let x = ox; x < ox + W; x++) {
+      const inner = x >= ix && x < ix + iw && y >= iy && y < iy + ih;
+      setT(x, y, inner ? STONE : WATER);
+    }
+    // drawbridge + gate
+    let gate = [], out;
+    if (side === 'N' || side === 'S') {
+      const gx = ix + 3, wy = side === 'N' ? iy : iy + ih - 1;
+      for (const x of [gx, gx + 1]) { for (const y of side === 'N' ? [oy, oy + 1] : [oy + H - 2, oy + H - 1]) setT(x, y, BRIDGE); gate.push([x, wy]); }
+      out = [gx, side === 'N' ? oy - 1 : oy + H];
+    } else {
+      const gy = iy + 3, wx = side === 'W' ? ix : ix + iw - 1;
+      for (const y of [gy, gy + 1]) { for (const x of side === 'W' ? [ox, ox + 1] : [ox + W - 2, ox + W - 1]) setT(x, y, BRIDGE); gate.push([wx, y]); }
+      out = [side === 'W' ? ox - 1 : ox + W, gy];
+    }
+    const isGate = (x, y) => gate.some(([gx, gy]) => gx === x && gy === y);
+    const walls = [];
+    for (let x = ix; x < ix + iw; x++) for (let y = iy; y < iy + ih; y++) {
+      if (x !== ix && x !== ix + iw - 1 && y !== iy && y !== iy + ih - 1) continue;
+      if (isGate(x, y)) continue;
+      const corner = (x === ix || x === ix + iw - 1) && (y === iy || y === iy + ih - 1);
+      walls.push([x, y, corner]);
+    }
+    const ruinable = walls.filter((w) => !w[2]);
+    const ruins = new Set([pick(ruinable), pick(ruinable)].map((w) => w[0] + ',' + w[1]));
+    L.castle = { ox, oy, W, H, ix, iy, iw, ih, side, out, walls, ruins };
+    reserve(r.x, r.y, 15, 14);
+    markSolid(ox, oy, W, H);
+  }
+  function placeCastleObjects() {
+    const C = L.castle;
+    if (!C) return;
+    const T = TILE;
+    for (const [x, y, corner] of C.walls) objects.push(makeCastleWall(x, y, corner, C.ruins.has(x + ',' + y)));
+    // bell tower in the corner furthest from the gate, armour along the inside walls
+    const bx = C.side === 'E' ? C.ix + 1.5 : C.ix + C.iw - 1.5, by = C.side === 'N' ? C.iy + C.ih - 2.6 : C.iy + 1.7;
+    L.bell = { x: bx * T, y: by * T, rope: { x: bx * T + 2, y: by * T + 12 } };
+    objects.push(makeBellTower(L.bell.x, L.bell.y));
+    const ax = C.side === 'E' ? C.ix + C.iw - 1.6 : C.ix + 1.6;
+    for (const k of [0, 1]) objects.push(makeArmour(ax * T, (C.iy + 2.2 + k * 2.6) * T));
+    L.castleChest = { x: (C.ix + C.iw / 2) * T, y: (C.iy + C.ih / 2 + 0.3) * T };
+  }
+
+  const leafCol = (k) => (look().trees ? look().trees[0][k] : ['#2f5a3a', '#3a6a4a', '#5a8a6a'][k]);
+  // --- Forest -----------------------------------------------------------------------------
+  function makeTreehouse(x, y, label) {
+    return {
+      kind: 'treehouse', x, y, hitbox: box(x - 9, y - 7, 18, 8), bounds: { l: x - 60, r: x + 60, t: y - 140, b: y + 20 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.25)'; ellipse(ctx, x + 10, y, 50, 12); },
+      draw(ctx, t) {
+        const P = y - 54;
+        const lk = look();
+        ctx.fillStyle = leafCol(0); circle(ctx, x - 26, P - 40, 26); circle(ctx, x + 28, P - 38, 24); circle(ctx, x, P - 58, 30);
+        ctx.fillStyle = '#6b4a2e'; ctx.fillRect(x - 8, P, 16, 54);
+        ctx.fillStyle = '#a0703f'; ctx.fillRect(x - 32, P - 2, 64, 7); // platform
+        ctx.fillStyle = '#c08a52'; ctx.fillRect(x - 18, P - 28, 36, 26);
+        ctx.fillStyle = '#7a4f3a'; poly(ctx, [[x - 23, P - 26], [x + 23, P - 26], [x, P - 44]]); ctx.fill();
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; poly(ctx, [[x - 14, P - 33], [x + 14, P - 33], [x, P - 44]]); ctx.fill(); }
+        ctx.fillStyle = '#3a2418'; ctx.fillRect(x - 5, P - 18, 10, 16);
+        ctx.fillStyle = duskK > 0.35 ? '#ffd98a' : '#9fd3e8'; ctx.fillRect(x + 8, P - 22, 7, 7);
+        ctx.strokeStyle = '#c9a26a'; ctx.lineWidth = 1.4; // ladder
+        ctx.beginPath(); ctx.moveTo(x - 4, P + 5); ctx.lineTo(x - 4, y); ctx.moveTo(x + 4, P + 5); ctx.lineTo(x + 4, y); ctx.stroke();
+        for (let yy = P + 10; yy < y; yy += 7) { ctx.beginPath(); ctx.moveTo(x - 4, yy); ctx.lineTo(x + 4, yy); ctx.stroke(); }
+        ctx.fillStyle = leafCol(2); circle(ctx, x - 34, P - 20, 14); circle(ctx, x + 36, P - 16, 12);
+      },
+    };
+  }
+  function makeRopeBridge(ax, bx, y) {
+    const P = y - 54;
+    return {
+      kind: 'ropebridge', x: (ax + bx) / 2, y: y - 0.5, bounds: { l: ax, r: bx, t: P - 20, b: P + 20 },
+      draw(ctx) {
+        const x0 = ax + 30, x1 = bx - 30, sag = 10;
+        const yAt = (u) => P + 2 + Math.sin(u * Math.PI) * sag;
+        ctx.fillStyle = '#a0703f';
+        for (let u = 0; u <= 1.0001; u += 0.06) { const xx = x0 + (x1 - x0) * u; ctx.fillRect(xx - 2.5, yAt(u) - 1, 5, 4); }
+        ctx.strokeStyle = '#c9a26a'; ctx.lineWidth = 1.2;
+        for (const off of [-12, -6]) { ctx.beginPath(); for (let u = 0; u <= 1.0001; u += 0.05) { const xx = x0 + (x1 - x0) * u, yy = yAt(u) + off + Math.sin(u * Math.PI) * 2; if (u === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy); } ctx.stroke(); }
+      },
+    };
+  }
+  function makeHollowTree(x, y) {
+    const o = {
+      kind: 'hollowtree', x, y, r: 16, hitbox: null, rustle: 0,
+      bounds: { l: x - 34, r: x + 34, t: y - 90, b: y + 6 },
+      contains(px, py) { return Math.abs(px - x) < 10 && py > y - 8 && py < y + 3; },
+      draw(ctx) {
+        const lk = look();
+        ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 17, y - 50, 34, 50);
+        ctx.fillStyle = '#6b4a2e'; ctx.fillRect(x - 13, y - 50, 4, 50); ctx.fillRect(x + 6, y - 50, 3, 50);
+        ctx.fillStyle = '#1d140c'; roundRect(ctx, x - 9, y - 28, 18, 28, 9, true);
+        ctx.fillStyle = leafCol(1); circle(ctx, x - 14, y - 60, 20); circle(ctx, x + 14, y - 62, 18); circle(ctx, x, y - 76, 22);
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; ellipse(ctx, x, y - 92, 16, 5); }
+        if (player.hidden && player.hidingIn === o) { ctx.fillStyle = '#ffffff'; circle(ctx, x - 3, y - 14, 1.6); circle(ctx, x + 3, y - 14, 1.6); ctx.fillStyle = NOSE; circle(ctx, x - 3, y - 14, 0.8); circle(ctx, x + 3, y - 14, 0.8); }
+      },
+    };
+    return o;
+  }
+  function makeLogPile(x, y) {
+    const S = { x, y, rolled: false };
+    L.logpile = S;
+    return {
+      kind: 'logpile', x, y, hitbox: box(x - 22, y - 10, 44, 11), bounds: { l: x - 40, r: x + 40, t: y - 40, b: y + 6 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 4, y, 28, 6); },
+      draw(ctx) {
+        const rows = S.rolled ? [[0, 1]] : [[0, 3], [1, 2], [2, 1]];
+        for (const [row, n] of rows) for (let k = 0; k < n; k++) {
+          const lx = x - (n - 1) * 9 + k * 18, ly = y - 6 - row * 11;
+          ctx.fillStyle = '#7a5230'; ellipse(ctx, lx, ly, 9, 6);
+          ctx.fillStyle = '#c9a26a'; ellipse(ctx, lx, ly, 6.5, 4.5); ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.ellipse(lx, ly, 3, 2, 0, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.fillStyle = '#6b4a2e'; ctx.fillRect(x + 30, y - 12, 14, 12); // chopping block
+        ctx.fillStyle = '#c9a26a'; ellipse(ctx, x + 37, y - 12, 7, 2.5);
+      },
+    };
+  }
+  function makeFairyRing(x, y) {
+    const spots = Array.from({ length: 11 }, (_, k) => { const a = (k / 11) * Math.PI * 2; return [x + Math.cos(a) * 26, y + Math.sin(a) * 13]; });
+    return {
+      kind: 'fairyring', x, y: y - 14, bounds: { l: x - 34, r: x + 34, t: y - 22, b: y + 20 },
+      draw(ctx, t) {
+        for (const [mx, my] of spots) {
+          ctx.fillStyle = '#efe3cf'; ctx.fillRect(mx - 1, my - 3, 2, 3);
+          ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.ellipse(mx, my - 3, 3, 2.2, 0, Math.PI, 0); ctx.fill();
+        }
+        if (duskK > 0.3) for (let k = 0; k < 4; k++) { ctx.fillStyle = `rgba(200,255,220,${0.4 + Math.sin(t * 3 + k) * 0.3})`; circle(ctx, x + Math.cos(t + k * 1.6) * 18, y - 10 + Math.sin(t * 1.3 + k) * 6, 1.2); }
+      },
+    };
+  }
+  function buildForest(markSolid, place) {
+    const T = TILE;
+    const r = place(14, 6);
+    if (r) {
+      const A = { x: (r.x + 2.5) * T, y: (r.y + 4.6) * T }, B = { x: (r.x + 11.5) * T, y: (r.y + 4.6) * T };
+      L.treehouses = [A, B];
+      markSolid(r.x + 2, r.y + 4, 1, 1); markSolid(r.x + 11, r.y + 4, 1, 1);
+    }
+  }
+  function placeForestObjects() {
+    if (L.kind !== 'forest') return;
+    const T = TILE;
+    if (L.treehouses) {
+      const [A, B] = L.treehouses;
+      objects.push(makeTreehouse(A.x, A.y)); objects.push(makeTreehouse(B.x, B.y)); objects.push(makeRopeBridge(A.x, B.x, A.y));
+    }
+    const h = freeSpotNear(L.plaza.x + rr(-8, 20), L.plaza.y + rr(-8, 20), 2, 1, 8) || randomFreeSpot(2, 1);
+    if (h) { const o = makeHollowTree((h[0] + 1) * T, (h[1] + 0.8) * T); objects.push(o); L.hollow = o; }
+    const g = L.garden, lp = freeSpotNear(g.x + g.w + 2, g.y + g.h - 2, 3, 1, 5) || randomFreeSpot(3, 1);
+    if (lp) objects.push(makeLogPile((lp[0] + 1.2) * T, (lp[1] + 0.8) * T));
+    L.rings = [];
+    for (let k = 0; k < 2; k++) { const s = randomFreeSpot(2, 2); if (s) { const R = { x: (s[0] + 1) * T, y: (s[1] + 1.2) * T }; L.rings.push(R); objects.push(makeFairyRing(R.x, R.y)); } }
+  }
+  function rollLogs() {
+    const S = L.logpile;
+    if (!S || S.rolled) return;
+    S.rolled = true; sfx('thud'); sfx('crash'); run.shake = Math.max(run.shake, 0.25);
+    for (let k = 0; k < 4; k++) { const it = addItem('log', S.x + rr(-14, 14), S.y + 10); Object.assign(it, { air: true, z: 10, vz: rr(40, 90), vx: rr(-140, 140), vy: rr(30, 110), kicker: 'logs', owner: 'bertram' }); it.owner = 'bertram'; }
+    lookTowards(S.x, S.y, 300, () => rpick(['My woodpile!', 'TIMBER?!', 'Who knocked that over?']));
+    completeTask('logs');
+  }
+  // Up in the treehouses: E at a ladder climbs up, left/right crosses the rope bridge, E climbs down
+  function treeAction() {
+    if (!L.treehouses) return false;
+    const [A, B] = L.treehouses;
+    if (player.tree) {
+      const t = player.tree.t;
+      if (t > 0.15 && t < 0.85) { player.bubble = { text: 'not from up here!', t: 1 }; return true; }
+      const P = t < 0.5 ? A : B;
+      player.tree = null;
+      Object.assign(player, { x: P.x, y: P.y + 14, vx: 0, vy: 0, dir: 'down' });
+      sfx('tap');
+      return true;
+    }
+    if (player.held && player.held.type.heavy) return false;
+    for (const [P, t] of [[A, 0], [B, 1]]) {
+      if (Math.hypot(player.x - P.x, player.y - (P.y + 12)) < 22) {
+        player.tree = { t, from: t };
+        Object.assign(player, { x: P.x, y: P.y + 1, vx: 0, vy: 0 });
+        sfx('creak'); completeTask('treehouse');
+        return true;
+      }
+    }
+    return false;
+  }
+  const ladderNear = () => !player.tree && L && L.treehouses && L.treehouses.some((P) => Math.hypot(player.x - P.x, player.y - (P.y + 12)) < 22);
+  function updateTree(dt, input) {
+    const [A, B] = L.treehouses, span = B.x - A.x;
+    const ix = player.stun > 0 ? 0 : input.x;
+    const prev = player.tree.t;
+    player.tree.t = clamp(prev + ix * 70 * dt / span, 0, 1);
+    player.x = A.x + span * player.tree.t; player.y = A.y + 1;
+    player.speed = Math.abs(ix) > 0.1 && player.tree.t !== prev ? 70 : 0;
+    if (Math.abs(ix) > 0.1) { player.dir = ix > 0 ? 'right' : 'left'; player.walk += dt * 8; }
+    player.vx = player.vy = 0;
+    const T0 = player.tree;
+    if ((T0.from === 0 && T0.t > 0.9) || (T0.from === 1 && T0.t < 0.1)) { completeTask('ropebridge'); T0.from = T0.t > 0.5 ? 1 : 0; }
+    if (player.bubble) { player.bubble.t -= dt; if (player.bubble.t <= 0) player.bubble = null; }
+  }
+  // Throwing from up high just drops it straight down
+  function dropFromTree() {
+    const it = player.held;
+    if (!it) return;
+    player.held = null;
+    Object.assign(it, { held: false, heldBy: null, x: player.x, y: player.y + 2, z: 50, vx: 0, vy: 0, vz: 0, air: true, kicker: null, fromTree: true });
+    sfx('throw');
+  }
+
+  // --- Shops -------------------------------------------------------------------------------------
+  const SHOPS = { rosa: { kind: 'bakery', label: 'BAKERY', col: '#c0392b', goods: ['bread', 'cookies', 'pie'] }, mabel: { kind: 'sweets', label: 'SWEET SHOP', col: '#d94f7a', goods: ['sweets', 'lolly', 'sweets', 'lolly'] }, percy: { kind: 'post', label: 'POST OFFICE', col: '#c0392b', goods: ['letters', 'parcel', 'parcel'] } };
+  function shopOf(h) {
+    if (!L.shopHouses) {
+      L.shopHouses = new Map();
+      for (const id of ['rosa', 'mabel', 'percy']) { const hh = L.houses[L.homes[id]]; if (hh && L.houses.indexOf(hh) < 6 && !L.shopHouses.has(hh)) L.shopHouses.set(hh, { ...SHOPS[id], owner: id }); }
+    }
+    return L.shopHouses.get(h) || null;
+  }
+  function makeShopCounter(x, y, col) {
+    return {
+      kind: 'counter', x, y, hitbox: box(x - 46, y - 10, 92, 11), bounds: { l: x - 52, r: x + 52, t: y - 34, b: y + 4 },
+      draw(ctx) {
+        ctx.fillStyle = '#8a5a30'; ctx.fillRect(x - 48, y - 22, 96, 22);
+        ctx.fillStyle = '#a0703f'; ctx.fillRect(x - 50, y - 25, 100, 5);
+        ctx.fillStyle = col; ctx.fillRect(x - 48, y - 15, 96, 4);
+        ctx.fillStyle = '#c9a33a'; roundRect(ctx, x + 30, y - 31, 12, 7, 2, true); // the till
+      },
+    };
+  }
+  function makeShopFront(h, S) {
+    const X = h.x * TILE, W = h.w * TILE, by = (h.y + h.h) * TILE, dx = (h.doorX + 0.5) * TILE;
+    return {
+      kind: 'shopfront', x: X + W / 2, y: by + 0.8, bounds: { l: X - 10, r: X + W + 10, t: by - 90, b: by + 6 },
+      draw(ctx, t) {
+        const top = by - TILE * 1.7 - 2;
+        for (let k = 0; k < Math.floor(W / 12); k++) { ctx.fillStyle = k % 2 ? '#f4f2ee' : S.col; ctx.fillRect(X + k * 12, top, 12, 7); }
+        ctx.fillStyle = '#f4e3b8'; roundRect(ctx, dx - 34, top - 16, 68, 13, 3, true);
+        ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 1.2; ctx.strokeRect(dx - 34, top - 16, 68, 13);
+        ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 7.5px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(S.label, dx, top - 6.5);
+        ctx.fillStyle = '#d9a43a'; circle(ctx, dx + 14, by - 40, 2.4); // the doorbell
+      },
+    };
+  }
+
+  // --- Mini-games -------------------------------------------------------------------------------
+  // Race against Biscuit along the road, from the RACE banner to the FINISH banner
+  function makeBanner(x, y, label, chequer) {
+    return {
+      kind: 'banner', x, y: y + 2 * TILE + 8, bounds: { l: x - 30, r: x + 30, t: y - 60, b: y + 2 * TILE + 10 },
+      draw(ctx) {
+        const yb = y + 2 * TILE + 6;
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 2, y - 50, 3, yb - y + 50); // one pole each side of the road
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 2, y - 50, 3, 4);
+        ctx.fillStyle = chequer ? '#ffffff' : '#e8453c'; ctx.fillRect(x - 3, y - 48, 6, 2 * TILE + 8);
+        if (chequer) { ctx.fillStyle = '#1d1d22'; for (let k = 0; k < 18; k++) if (k % 2) ctx.fillRect(x - 3 + (k % 4 > 1 ? 3 : 0), y - 48 + k * 4, 3, 4); }
+        ctx.fillStyle = '#f4e3b8'; roundRect(ctx, x - 22, y - 62, 44, 13, 3, true);
+        ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(label, x, y - 52.5);
+      },
+    };
+  }
+  function placeRace() {
+    const T = TILE, P = L.plaza;
+    let sx = 0, fx = 0, west = false, ok = false;
+    for (const w of P.x > MW / 2 ? [true, false] : [false, true]) {
+      sx = w ? P.x - 2 : P.x + P.w + 2; fx = w ? sx - 18 : sx + 18; west = w;
+      if (fx < 7 || fx > MW - 7) continue;
+      ok = true;
+      for (let x = Math.min(sx, fx); x <= Math.max(sx, fx); x++) { const t0 = getT(x, L.roadY); if (t0 !== PATH && t0 !== BRIDGE && t0 !== STONE) { ok = false; break; } }
+      if (ok) break;
+    }
+    if (!ok) return;
+    L.race = { sx: (sx + 0.5) * T, fx: (fx + 0.5) * T, y: (L.roadY + 1) * T, dir: west ? -1 : 1, state: null, t: 0 };
+    objects.push(makeBanner(L.race.sx, L.roadY * T - 2, 'RACE', false));
+    objects.push(makeBanner(L.race.fx, L.roadY * T - 2, 'FINISH', true));
+  }
+  function updateRace(dt) {
+    const R = L.race;
+    if (!R || !dog) return;
+    const onStart = areaOf(player.x, player.y) === 0 && Math.abs(player.x - R.sx) < 18 && player.y > R.y - TILE - 4 && player.y < R.y + TILE + 6;
+    if (!R.state) {
+      R.cd = Math.max(0, (R.cd || 0) - dt);
+      if (onStart && player.speed < 20 && R.cd <= 0 && !player.held) {
+        R.state = 'count'; R.t = 3.2; dog.race = true; dog.x = R.sx; dog.y = R.y + 14; dog.path = null; dogSay('Woof! (race?)', 1.6);
+        player.bubble = { text: 'ready...', t: 1 };
+      }
+      return;
+    }
+    if (R.state === 'count') {
+      R.t -= dt;
+      const n = Math.ceil(R.t - 0.2);
+      if (n !== R.lastN) { R.lastN = n; if (n > 0) { toast(String(n), 'Race!', true); sfx('tap'); } }
+      if ((player.x - R.sx) * R.dir > 14) { R.state = null; R.cd = 2; dog.race = false; toast('False start!', 'Race', true); return; }
+      if (!onStart && Math.abs(player.x - R.sx) > 30) { R.state = null; dog.race = false; return; }
+      if (R.t <= 0.2) { R.state = 'go'; toast('GO!', 'Race!', true); sfx('ding'); dogSay('WOOF!', 1); }
+      return;
+    }
+    // racing: Biscuit gallops along the road
+    moveToward(dog, R.fx + R.dir * 10, R.y + 14, 140, dt);
+    dog.moving = true;
+    const pDone = (player.x - R.fx) * R.dir > 0, dDone = (dog.x - R.fx) * R.dir > 0;
+    if (pDone || dDone) {
+      if (pDone && !dDone) { toast('You beat Biscuit!', 'Race', true); dogSay('Woof?!', 1.4); completeTask('race'); }
+      else { toast('Biscuit wins!', 'Race', true); dogSay('Woof woof! ♥', 1.4); }
+      R.state = null; R.cd = 5; dog.race = false; dog.state = 'sit'; dog.t = 2;
+    }
+  }
+  // Hide-and-seek with Toby: get near him and he starts counting; stay hidden until he gives up
+  function hideSeekStart(v) {
+    v.state = 'game'; v.game = { phase: 'count', t: 8, n: 0 }; v.path = null;
+    say(v, 'Hide and seek! I’ll count to 10!', 2);
+  }
+  function hideSeek(v, dt) {
+    const g = v.game;
+    g.t -= dt;
+    if (g.phase === 'count') {
+      v.dir = 'up'; // eyes covered, facing away
+      const n = Math.min(10, Math.floor((8 - g.t) / 0.8) + 1);
+      if (n !== g.n) { g.n = n; say(v, n < 10 ? `${n}...` : 'Ready or not, here I come!', 0.8); }
+      if (g.t <= 0) { g.phase = 'seek'; g.t = 22; g.goal = null; }
+      return;
+    }
+    // seeking: wander from spot to spot, peeking about
+    if (canSeePlayer(v) && Math.hypot(player.x - v.x, player.y - v.y) < 150) {
+      say(v, 'FOUND YOU! Hee hee!', 2); v.game = null; v.hsCD = 45; toRoute(v); return;
+    }
+    if (g.t <= 0) {
+      say(v, 'I give up! You win!', 2.2); v.game = null; v.hsCD = 60; toRoute(v); completeTask('hideseek'); return;
+    }
+    if (!g.goal || travel(v, g.goal.x, g.goal.y, v.speed * 1.3, dt)) {
+      g.goal = null;
+      g.look = (g.look || 0) - dt;
+      if (g.look <= 0) {
+        g.look = 1.2;
+        const near = hideBushes.filter((o) => areaOf(o.x, o.y) === 0 && Math.hypot(o.x - v.x, o.y - v.y) < 300);
+        const o = near.length && Math.random() < 0.6 ? pick(near) : null;
+        const x = o ? o.x + rr(-30, 30) : v.x + rr(-160, 160), y = o ? o.y + rr(14, 30) : v.y + rr(-100, 100);
+        if (!navBlockedPt(x, y) && areaOf(x, y) === 0) g.goal = { x, y };
+        if (Math.random() < 0.4) say(v, rpick(['Where are you?', 'Are you behind here?', 'I can hear you...', 'Hmm...']), 1.2);
+      }
+    }
+  }
+
+  // Museum: treasures on plinths, blinking tripwires, and a guard on patrol
+  function makePlinth(x, y) {
+    return {
+      kind: 'plinth', x, y, hitbox: box(x - 9, y - 7, 18, 8), bounds: { l: x - 12, r: x + 12, t: y - 26, b: y + 3 },
+      draw(ctx) { ctx.fillStyle = '#e8e4da'; ctx.fillRect(x - 8, y - 18, 16, 18); ctx.fillStyle = '#d4cfc2'; ctx.fillRect(x - 10, y - 20, 20, 4); ctx.fillRect(x - 10, y - 3, 20, 3); },
+    };
+  }
+  function makeMuseum(M) {
+    const X = M.x * TILE, Y = M.y * TILE, W = M.w * TILE, H = M.h * TILE;
+    return {
+      kind: 'museum', x: X + W / 2, y: Y + 4, hitbox: box(X, Y - 4, W, 10), bounds: { l: X - 10, r: X + W + 10, t: Y - 80, b: Y + 10 },
+      draw(ctx) {
+        ctx.fillStyle = '#e8e4da'; ctx.fillRect(X, Y - 54, W, 58);
+        ctx.fillStyle = '#d4cfc2'; for (let k = 0; k < 6; k++) ctx.fillRect(X + 10 + k * (W - 20) / 5 - 4, Y - 50, 8, 52);
+        ctx.fillStyle = '#c9c3b4'; poly(ctx, [[X - 6, Y - 54], [X + W + 6, Y - 54], [X + W / 2, Y - 78]]); ctx.fill();
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; poly(ctx, [[X + 10, Y - 60], [X + W - 10, Y - 60], [X + W / 2, Y - 78]]); ctx.fill(); }
+        ctx.fillStyle = '#5a5248'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('MUSEUM', X + W / 2, Y - 60);
+      },
+    };
+  }
+  function buildMuseum(markSolid, place) {
+    const r = place(11, 9);
+    if (!r) return;
+    const M = { x: r.x + 1, y: r.y + 1, w: 9, h: 7 };
+    // the gallery: a stone floor behind the facade, open at the front (south) through a gap in the railings
+    for (let y = M.y + 1; y < M.y + M.h; y++) for (let x = M.x; x < M.x + M.w; x++) setT(x, y, STONE);
+    L.museum = M;
+    reserve(r.x, r.y, 11, 9);
+    markSolid(M.x, M.y, M.w, M.h);
+  }
+  function placeMuseumObjects() {
+    const M = L.museum;
+    if (!M) return;
+    const T = TILE, X = M.x * T, Y = M.y * T, W = M.w * T, H = M.h * T;
+    objects.push(makeMuseum(M));
+    // railings down the sides and along the front, with a gap in the middle
+    for (let y = M.y + 1; y < M.y + M.h; y++) { objects.push(makeFence(M.x, y, 'v')); objects.push(makeFence(M.x + M.w - 1, y, 'v')); }
+    const gx = M.x + Math.floor(M.w / 2) - 1;
+    for (let x = M.x; x < M.x + M.w; x++) if (x !== gx && x !== gx + 1) objects.push(makeFence(x, M.y + M.h - 1, 'h'));
+    L.museumGate = { x: (gx + 1) * T, y: (M.y + M.h - 0.5) * T };
+    L.plinths = [[0.25, 0.42], [0.5, 0.32], [0.75, 0.42]].map(([u, v]) => ({ x: X + W * u, y: Y + H * v + 10 }));
+    for (const p of L.plinths) objects.push(makePlinth(p.x, p.y));
+    // tripwires: across the entrance, and in front of each plinth
+    const gy = L.museumGate.y - 18;
+    L.lasers = [
+      { x1: X + T * 1.2, y1: gy, x2: X + W - T * 1.2, y2: gy, ph: 0 },
+      ...L.plinths.map((p, i) => ({ x1: p.x - 22, y1: p.y + 14, x2: p.x + 22, y2: p.y + 14, ph: 1.1 * (i + 1) })),
+    ];
+  }
+  const laserOn = (l) => ((time + l.ph) % 3.4) < 2.1;
+  function segDist(px, py, l) {
+    const dx = l.x2 - l.x1, dy = l.y2 - l.y1, u = clamp(((px - l.x1) * dx + (py - l.y1) * dy) / (dx * dx + dy * dy), 0, 1);
+    return Math.hypot(px - (l.x1 + dx * u), py - (l.y1 + dy * u));
+  }
+  function drawLasers(ctx, t) {
+    if (!L.lasers) return;
+    for (const l of L.lasers) {
+      ctx.fillStyle = '#5a5248'; ctx.fillRect(l.x1 - 2, l.y1 - 14, 4, 15); ctx.fillRect(l.x2 - 2, l.y2 - 14, 4, 15);
+      if (!laserOn(l)) continue;
+      ctx.strokeStyle = `rgba(255,40,40,${0.6 + Math.sin(t * 20) * 0.2})`; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(l.x1, l.y1 - 8); ctx.lineTo(l.x2, l.y2 - 8); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,90,90,0.25)'; ctx.lineWidth = 4; ctx.stroke();
+    }
+  }
+  function soundAlarm() {
+    if ((L.alarmT || 0) > 0) return;
+    L.alarmT = 4; run.alarms = (run.alarms || 0) + 1;
+    toast('ALARM! The guard is coming!', 'Museum', true);
+    completeTask('alarm');
+    const gd = VILLAGER.guard, it = player.held && player.held.museum ? player.held : null;
+    if (gd) { gd.cooldown = 0; startleV(gd, 'INTRUDER!', { state: 'chase', target: it }); if (!it) { gd.stateT = 8; } }
+    lookTowards(player.x, player.y, 400, () => rpick(['The museum alarm!', 'A burglar?!', 'What’s that racket?']));
+  }
+
+  // --- Per frame ---------------------------------------------------------------------------------
+  function updateCastleForest(dt) {
+    if (!L || !started || paused) return;
+    const outside = areaOf(player.x, player.y) === 0;
+    // the castle bell: walk into the rope
+    L.bellT = Math.max(0, (L.bellT || 0) - dt);
+    if (L.bell && outside && L.bellT <= 0 && Math.hypot(player.x - L.bell.rope.x, player.y - L.bell.rope.y) < 14) {
+      L.bellT = 3;
+      for (let k = 0; k < 4; k++) setTimeout(() => sfx('bell'), k * 520);
+      for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.random() < 0.7) startleV(v, rpick(['The castle bell?!', 'Who’s ringing that?', 'Goodness!']));
+      critterScare(L.bell.x, L.bell.y, 400);
+      completeTask('bell');
+    }
+    // the woodpile
+    const S = L.logpile;
+    if (S && !S.rolled && outside) {
+      if (Math.hypot(player.x - S.x, player.y - (S.y - 2)) < 32 && Math.max(player.speed, S.lastSpd || 0) > 120) rollLogs();
+      S.lastSpd = player.speed;
+    }
+    // things dropped from the treehouses
+    for (const it of items) {
+      if (!it.fromTree) continue;
+      if (!it.air) { it.fromTree = false; continue; }
+      if (it.z > 26) continue;
+      for (const v of villagers) {
+        if (Math.hypot(it.x - v.x, it.y - v.y) > 14) continue;
+        it.fromTree = false; sfx('bonk');
+        if (startleV(v, rpick(['OW! From above?!', 'What the—?!', 'Is it raining teapots?!']))) completeTask('treedrop');
+        break;
+      }
+    }
+    // museum tripwires
+    L.alarmT = Math.max(0, (L.alarmT || 0) - dt);
+    if (L.lasers && outside && !player.hidden) for (const l of L.lasers) {
+      if (laserOn(l) && segDist(player.x, player.y - 2, l) < 5) { soundAlarm(); break; }
+    }
+    if (L.alarmT > 0 && Math.random() < dt * 4) sfx('alarm');
+    // Toby: hide-and-seek when you come up to him
+    const tb = VILLAGER.toby;
+    if (tb) {
+      tb.hsCD = Math.max(0, (tb.hsCD || 0) - dt);
+      if ((tb.state === 'act' || tb.state === 'route') && tb.hsCD <= 0 && outside && areaOf(tb.x, tb.y) === 0 && !player.held && !player.tree &&
+        Math.hypot(player.x - tb.x, player.y - tb.y) < 40 && player.speed < 10 && (player.idleT || 0) > 0.8 && !(isWinter() && tb.fightOn)) hideSeekStart(tb);
+    }
+    updateRace(dt);
+  }
+  // A chitter inside a fairy ring
+  function fairyCheck() {
+    if (!L.rings) return;
+    for (const R of L.rings) if (Math.hypot((player.x - R.x) / 26, (player.y - R.y) / 13) < 0.8) {
+      for (let k = 0; k < 16; k++) particles.push({ kind: 'spark', x: R.x + rr(-20, 20), y: R.y + rr(-8, 8), z: rr(4, 20), vx: rr(-20, 20), vy: 0, vz: rr(40, 90), life: 1, max: 1 });
+      sfx('happy'); player.bubble = { text: '✨ ooh! ✨', t: 1.4 }; completeTask('fairyring');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -8162,6 +8847,9 @@
         for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.5);
         const s = actx.createBufferSource(); s.buffer = b; const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 180;
         const g = actx.createGain(); g.gain.value = 0.9; s.connect(f).connect(g).connect(master); s.start(); break; }
+      case 'bell': tone(520, 515, 1.2, 'triangle', 0.09); tone(1040, 1030, 0.9, 'sine', 0.04); break;
+      case 'alarm': tone(880, 660, 0.18, 'square', 0.04); break;
+      case 'shopbell': tone(1760, 1750, 0.25, 'triangle', 0.05); tone(2200, 2190, 0.3, 'triangle', 0.04, 0.12); break;
       case 'jingle': [1800, 2200, 2000].forEach((f, k) => tone(f, f * 1.02, 0.07, 'triangle', 0.025, k * 0.05)); break;
       case 'neigh': tone(700, 900, 0.15, 'sawtooth', 0.035); tone(900, 500, 0.35, 'sawtooth', 0.03, 0.14); break;
       case 'peep': tone(2200, 2600, 0.06, 'sine', 0.035); break;
@@ -8395,7 +9083,7 @@
     vis.push(playerEntry);
     vis.sort((a, b) => a.y - b.y);
     for (const o of vis) {
-      if (o.isPlayer) { if (player.boat) drawRowboat(ctx, player.x, player.y + 2, t, player.speed > 10); if (player.sled) drawSledUnder(ctx, player.x, player.y); drawPlayerWithHeld(ctx, t); continue; }
+      if (o.isPlayer) { if (player.boat) drawRowboat(ctx, player.x, player.y + 2, t, player.speed > 10); if (player.sled) drawSledUnder(ctx, player.x, player.y); if (player.tree) { ctx.save(); ctx.translate(0, -52); drawPlayerWithHeld(ctx, t); ctx.restore(); } else drawPlayerWithHeld(ctx, t); continue; }
       if (o.isItem) { drawItem(ctx, o, t); continue; }
       if (o.isVillager) { drawVillagerWithHeld(ctx, o.v, t); continue; }
       if (o.isDog) { drawDogWithHeld(ctx, t); continue; }
@@ -8408,7 +9096,7 @@
       o.draw(ctx, t, fade);
     }
 
-    if (!indoors) { drawWhirl(ctx, t); drawSpits(ctx); }
+    if (!indoors) { drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); }
     // Indoors: black out everything beyond this room's walls (other rooms share the strip)
     if (indoors) {
       const R = indoors.room, rx = R.x0 * TILE, ry = R.y0 * TILE - 10, rw = 11 * TILE, rh = 8 * TILE + 10;
@@ -8439,6 +9127,8 @@
     }
     const pc = petChoice();
     if (pc === 'wardrobe') drawPrompt(ctx, { x: nearWardrobe.x, y: nearWardrobe.y, z: 0, owner: null, type: { h: 74, name: 'hide in wardrobe' } }, t);
+    else if (player.tree && started && (player.tree.t < 0.15 || player.tree.t > 0.85)) drawPrompt(ctx, { x: player.x, y: player.y - 52, z: 0, owner: null, type: { h: 30, name: 'climb down' } }, t);
+    else if (ladderNear() && started) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'climb up' } }, t);
     else if (player.boat && started) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'get out' } }, t);
     else if (boatNear() && started && !(target && itemReach(target) < 14)) drawPrompt(ctx, { x: L.boat.x, y: L.boat.y, z: 0, owner: null, type: { h: 16, name: 'row the boat' } }, t);
     else if (pc === 'dog') drawPrompt(ctx, { x: dog.x, y: dog.y, z: 0, owner: null, type: { h: 24, name: 'pet Biscuit' } }, t);
@@ -8550,6 +9240,7 @@
       updateWildsWorld(dt);
       updateKinds(dt);
       updateSnowWorld(dt);
+      updateCastleForest(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
@@ -8595,9 +9286,9 @@
     placePuddles();
     spawnCritters();
     spawnWeather();
-    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack' || o.kind === 'drift' || o.kind === 'igloo'); // places to hide
+    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack' || o.kind === 'drift' || o.kind === 'igloo' || o.kind === 'armour' || o.kind === 'hollowtree'); // places to hide
     spawnAmbient();
-    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0, sled: false, tongueDone: false });
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0, sled: false, tongueDone: false, tree: null });
     target = null;
     cam.x = player.x; cam.y = player.y;
   }

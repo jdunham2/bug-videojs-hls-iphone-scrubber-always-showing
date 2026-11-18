@@ -19,7 +19,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Mute sound | N | — |
 
 ## What's in the game
-- **Seasons and village kinds**: every daily village rolls one of four seasons and one of six kinds.
+- **Seasons and village kinds**: every daily village rolls one of four seasons and one of eight kinds.
   - *Spring*: blossom trees, drifting petals, Mrs. Fennick's tulip beds to trample, painted eggs hidden by bushes.
   - *Summer*: washing drying on lines (steal it), Rosa's lemonade on the picnic table.
   - *Autumn*: orange and red trees, falling leaves, chimney smoke, leaf piles to jump in (noisy) or hide in.
@@ -36,6 +36,23 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Lakeside*: a big lake with an island in the middle and a jetty. Press E by the rowing boat to climb in,
     row anywhere on the water, and E again to climb out onto the nearest land; villagers can't follow you to
     the island. There's also a fishing contest with a prize fish on the table.
+  - *Castle*: old castle ruins in a moat, reached over a drawbridge: crumbling walls and towers, a bell tower
+    (walk into the rope and the bell makes the whole village jump), suits of armour to hide in, and a heavy
+    treasure chest in the courtyard.
+  - *Forest*: extra-thick woods, two treehouses joined by a rope bridge (E at a ladder to climb up; left and
+    right to cross; villagers never look up; F drops things on whoever's below), Bertram chopping wood by a
+    woodpile you can send rolling, fairy rings of mushrooms (chitter inside one), and a hollow tree to hide in.
+- **Shops**: Rosa's house is the bakery, Granny Mabel's the sweet shop and Percy's the post office. Each has a
+  sign and awning outside, a doorbell that rings when you walk in, a counter of goods inside, and the
+  shopkeeper spends part of the day behind it.
+- **Mini-games**:
+  - *Hide-and-seek*: stop next to Toby and he counts to ten, then comes looking (he checks the bushes). Stay
+    hidden until he gives up.
+  - *Race*: stand still on the RACE line on the road by the plaza; after the countdown, beat Biscuit to the
+    FINISH banner (you'll need to run).
+  - *Museum heist* (every castle village, sometimes elsewhere): treasures on plinths behind blinking red
+    tripwires, and a guard on patrol. Touch a tripwire while it's on and the alarm goes off and the guard
+    gives chase.
 - **Village events**: some days (about 2 in 5) there's something on, depending on the season:
   - *Village fete* (spring, summer): bunting, and a cake contest with three cakes and a first-prize rosette.
   - *Wedding* (spring to autumn): a flower arch, rows of chairs, confetti, a bouquet and a three-tier cake.
@@ -97,7 +114,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 145 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 163 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -166,6 +183,10 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   wheat, barn, jetty, contest, event decorations), `buildLakeIsland()`, `buildJetty()`, `boatAction()`,
   `withStall()` (stallholders' rounds), `updateKinds()` (rowing, cart, flour, scarecrows, fireworks), `pickEvent()`;
   snow and year-round animals: `buildSnowFeatures()` / `placeSnowItems()` (hill, igloo, drifts, eaves, stable),
+  castle, forest, shops and mini-games: `buildCastle()` / `placeCastleObjects()`, `buildForest()` /
+  `placeForestObjects()`, `treeAction()` / `updateTree()` / `dropFromTree()`, `shopOf()`, `makeShopCounter()`,
+  `placeRace()` / `updateRace()`, `hideSeekStart()` / `hideSeek()`, `buildMuseum()` / `placeMuseumObjects()`,
+  `soundAlarm()`, `updateCastleForest()`;
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
