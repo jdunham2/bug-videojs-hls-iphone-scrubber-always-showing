@@ -258,6 +258,7 @@ details.help[open] summary{margin-bottom:10px}
         <dt>Craft menu (J)</dt><dd>Opens pets, rides and every recipe you have the ingredients for. Close it with its Close button, J or Esc. I hides the weapon and build bars for a clear view; their keys still work.</dd>
         <dt>Weapon bar</dt><dd>A hundred and ten weapons, from iron fists to star lance; scroll the bar sideways to see them all. Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
         <dt>The world</dt><dd>Twice as big as before, with lakes (and lava in the Ashlands) you have to walk around. The map in the top-right corner shows you, your friends, your buildings and the bosses.</dd>
+        <dt>More placeables</dt><dd>Barricade (cheap wall), sentry gun (fast fire), tesla coil (shocks and freezes), cannon tower (explosive shells), glue trap (slows animals to a crawl), healing well (heals and cures poison), and farms that grow things for you: chicken coop (feathers), mushroom bed, flax field and an ore drill (scrap iron).</dd>
         <dt>Defences</dt><dd>Archer, frost and venom towers and a mortar pit fire on their own. A healing totem heals you nearby, a stone gate is a very tough door, a spiked wall hurts whatever attacks it, and a bonfire keeps animals (not bosses) from coming close.</dd>
         <dt>Your house</dt><dd>A finished house can be furnished. A workbench, forge, pantry and trophy wall only work inside it, each adds a house level, and each gives a bonus: cheaper builds and weapons, walls that repair at dawn, stronger food, and more damage for every boss you have beaten. At level 5 the walls take 30% less damage. The arrow-slit wall works as a window you can shoot out of.</dd>
         <dt>More builds</dt><dd>Iron door, arrow-slit wall (you can shoot through it, animals cannot pass), shock fence, ballista, landmine, fire grate, scarecrow (keeps flying animals away), torch post, and a garden plot and beehive that grow herbs, berries and honey over time.</dd>
@@ -342,12 +343,23 @@ const B = {
   brick: {name: 'Brick wall',   cost: {clay: 4, coal: 1},           hp: 260, solid: 1},
   obswall:{name: 'Obsidian wall', cost: {obsidian: 3, stone: 4},    hp: 520, solid: 1, unlock: 3},
   kiln:  {name: 'Kiln',         cost: {clay: 8, stone: 6},          hp: 90},
+  barricade:{name: 'Barricade', cost: {wood: 2},                    hp: 45, solid: 1},
+  sentry:{name: 'Sentry gun',   cost: {iron: 12, wood: 4},          hp: 100, solid: 1, unlock: 2},
+  tesla: {name: 'Tesla coil',   cost: {iron: 8, crystal: 4, silver: 2}, hp: 100, solid: 1, unlock: 3},
+  cannon:{name: 'Cannon tower', cost: {stone: 14, iron: 10, coal: 4}, hp: 160, solid: 1, unlock: 4},
+  glue:  {name: 'Glue trap',    cost: {resin: 3, flax: 1},          hp: 40},
+  well:  {name: 'Healing well', cost: {stone: 10, crystal: 2, herbs: 3}, hp: 120, unlock: 2},
+  coop:  {name: 'Chicken coop', cost: {wood: 8, berries: 2},        hp: 50},
+  shroomfarm:{name: 'Mushroom bed', cost: {wood: 4, herbs: 2},      hp: 40},
+  flaxfield:{name: 'Flax field', cost: {wood: 4, flax: 2},          hp: 40},
+  drill: {name: 'Ore drill',    cost: {iron: 14, stone: 8, coal: 2}, hp: 110, unlock: 3},
 };
 /* auto-firing defences */
 const GUNS = {turret: {range: 340, cd: 1.1, dmg: 18, spd: 900, pierce: 0}, ballista: {range: 580, cd: 2.4, dmg: 70, spd: 1150, pierce: 2},
   archer: {range: 450, cd: .8, dmg: 22, spd: 950, pierce: 0}, frost: {range: 360, cd: 1.2, dmg: 8, spd: 800, pierce: 0, stun: .9},
-  spitter: {range: 320, cd: 1.5, dmg: 4, spd: 700, pierce: 0, poison: 1}, mortarpit: {range: 650, cd: 4, dmg: 20, spd: 520, pierce: 0, boom: 70}};
-const FARMS = {garden: {every: 40, yields: ['herb', 'berry']}, hive: {every: 55, yields: ['honey']}};
+  spitter: {range: 320, cd: 1.5, dmg: 4, spd: 700, pierce: 0, poison: 1}, mortarpit: {range: 650, cd: 4, dmg: 20, spd: 520, pierce: 0, boom: 70},
+  sentry: {range: 360, cd: .3, dmg: 7, spd: 1300, pierce: 0}, tesla: {range: 300, cd: 1.6, dmg: 28, spd: 1600, pierce: 1, stun: .5}, cannon: {range: 540, cd: 3.2, dmg: 20, spd: 700, pierce: 0, boom: 85}};
+const FARMS = {garden: {every: 40, yields: ['herb', 'berry']}, hive: {every: 55, yields: ['honey']}, coop: {every: 45, yields: ['feather']}, shroomfarm: {every: 40, yields: ['shroom']}, flaxfield: {every: 45, yields: ['flax']}, drill: {every: 60, yields: ['scrap']}};
 
 const GEAR = {
   gaxe:  {name: 'Golden axe',  cost: {gold: 6, wood: 4}, msg: 'Golden axe ready. It chops three at a time and hits hard.'},
@@ -716,7 +728,7 @@ function nightReward(n) { // every survived night: a gift, and on nights 1-5 som
   const fx = G.fixMsg || ''; G.fixMsg = '';
   return 'Night ' + n + ' survived. ' + r[0] + ' Gift: ' + costText(give) + '.' + fx;
 }
-const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'ward', 'bone', 'tar', 'brazier', 'idoor', 'slit', 'efence', 'ballista', 'mine', 'flametrap', 'scarecrow', 'torch', 'garden', 'hive', 'bench', 'forge', 'pantry', 'trophy', 'archer', 'frost', 'spitter', 'mortarpit', 'totem', 'sgate', 'swall', 'bonfire', 'brick', 'obswall', 'kiln', 'remove'];
+const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'ward', 'bone', 'tar', 'brazier', 'idoor', 'slit', 'efence', 'ballista', 'mine', 'flametrap', 'scarecrow', 'torch', 'garden', 'hive', 'bench', 'forge', 'pantry', 'trophy', 'archer', 'frost', 'spitter', 'mortarpit', 'totem', 'sgate', 'swall', 'bonfire', 'brick', 'obswall', 'kiln', 'barricade', 'sentry', 'tesla', 'cannon', 'glue', 'well', 'coop', 'shroomfarm', 'flaxfield', 'drill', 'remove'];
 const TKEY = i => TOOLS[i] === 'remove' ? 'X' : i < 9 ? '' + (i + 1) : i === 9 ? '0' : i === 10 ? 'L' : '';
 const WPN = {
   axe:     {name: 'Axe', note: 'chops'},
@@ -1494,11 +1506,11 @@ function updPets(dt) {
 /* things lying in the world: walk over them to pick them up */
 let items = [], iid = 0;
 const IK = ['herb', 'scrap', 'crate', 'hide', 'shroom', 'feather', 'bone', 'gem', 'berry', 'honey', 'resin', 'sulfur', 'wool', 'clay', 'flax', 'salt'], STOCK = {clay: 24, flax: 34, salt: 10, herb: 50, scrap: 28, crate: 12, shroom: 24, feather: 14, bone: 14, gem: 8, berry: 40, honey: 14, resin: 20, sulfur: 14};
-function dropItem(type, x, y) { if (!client() && items.length < 650) items.push({id: ++iid, type, x: clamp(x, 30, WORLD - 30), y: clamp(y, 30, WORLD - 30)}); }
+function dropItem(type, x, y, world) { if (!client() && items.length < (world ? 650 : 760)) /* world stock fills to 650; farms and kills always have room */ items.push({id: ++iid, type, x: clamp(x, 30, WORLD - 30), y: clamp(y, 30, WORLD - 30)}); }
 function stock() { // top the world back up; called for a new game and at every dawn
   if (client()) return;
   for (const k in STOCK) { let n = Math.round(STOCK[k] * TSCALE * (k === 'salt' && ['salt', 'dunes', 'mesa'].includes(G.map) ? 4 : 1)) - items.filter(i => i.type === k).length; for (let t = 0; n > 0 && t < 400; t++) { let x = rnd(80, WORLD - 80), y = rnd(80, WORLD - 80);
-    if (k === 'clay') { const pd = ponds[Math.random() * ponds.length | 0]; if (!pd) break; const g = rnd(0, TAU); x = pd.x + Math.cos(g) * (pd.r + 34); y = pd.y + Math.sin(g) * (pd.r + 34); } /* clay sits on lake shores */ if (dist(x, y, CX, CY) > 260 && !inPond(x, y, 20)) { dropItem(k, x, y); n--; } } }
+    if (k === 'clay') { const pd = ponds[Math.random() * ponds.length | 0]; if (!pd) break; const g = rnd(0, TAU); x = pd.x + Math.cos(g) * (pd.r + 34); y = pd.y + Math.sin(g) * (pd.r + 34); } /* clay sits on lake shores */ if (dist(x, y, CX, CY) > 260 && !inPond(x, y, 20)) { dropItem(k, x, y, 1); n--; } } }
 }
 function grab(it) {
   let txt, col = '#ebe6d3';
@@ -2059,6 +2071,7 @@ function updPlayer(dt) {
       s.grow = fm.every; const cx = s.tx * T + 24, cy = s.ty * T + 24;
       if (items.filter(i => dist(i.x, i.y, cx, cy) < 90).length < 3) { const a = rnd(0, TAU); dropItem(fm.yields[Math.random() * fm.yields.length | 0], cx + Math.cos(a) * 46, cy + Math.sin(a) * 46); }
     }
+    if (s.type === 'well' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 180) { P.hp = Math.min(P.max, P.hp + 8 * dt); if (P.poison > 0) P.poison = 0; }
     if (s.type === 'totem' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 150) P.hp = Math.min(P.max, P.hp + 5 * dt);
     if (s.type === 'brazier' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 160) P.hp = Math.min(P.max, P.hp + 6 * dt);
   }
@@ -2140,6 +2153,7 @@ function update(dt) {
       a.hp -= 34 * dt; tile.hp -= 3 * dt; if (Math.random() < dt * 10) burst(a.x, a.y, '#ff8a2a', 2);
       if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; gridDelta(tile.tx, tile.ty); }
     }
+    if (tile && tile.type === 'glue' && !d.passive && !d.fly) { spd *= A[a.type].boss ? .45 : .15; tile.hp -= 2 * dt; if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; gridDelta(tile.tx, tile.ty); } }
     if (tile && tile.type === 'tar' && !d.passive && !d.fly) spd *= A[a.type].boss ? .6 : .3; // stuck in tar
     if (tile && tile.type === 'spikes' && !d.passive && !d.fly) {
       a.hp -= 16 * dt; spd *= .45; tile.hp -= 5 * dt; if (Math.random() < dt * 6) burst(a.x, a.y, '#b03a2a', 1);
@@ -2539,6 +2553,18 @@ function initScene() {
   GEO.brazier = merge([[cyl(4, 6, 22, 6), '#3d444b', M(0, 11, 0)], [cyl(14, 8, 10, 8), '#2b3035', M(0, 26, 0)], [cyl(15, 15, 2, 8), '#59626b', M(0, 31, 0)], [dod(4.5), '#1c1c1c', M(4, 31, 3)], [dod(4), '#1c1c1c', M(-5, 31, -2)], [cyl(10, 12, 3, 6), '#59626b', M(0, 1.5, 0)]]);
   GEO.ward = merge([[cyl(13, 16, 8, 8), '#77776f', M(0, 4, 0)], [cone(8, 36, 5), '#7fd8f0', M(0, 26, 0)], [cone(4.5, 20, 5), '#b8ecfa', M(8, 16, 4, 1, 1, 1, 0, 0, -.35)], [cone(4, 16, 5), '#5cc0de', M(-7, 14, -5, 1, 1, 1, .3, 0, .35)]]);
   GEO.bone = merge([...[-18, -9, 0, 9, 18].map((x, i) => [cyl(3, 3.6, 46 + (i % 2) * 8, 6), i % 2 ? '#e7dfc8' : '#d6cdb0', M(x, 23 + (i % 2) * 4, (i % 2) * 4 - 2)]), [box(48, 4, 5), '#b9ae8c', M(0, 30, 0)], [box(48, 4, 5), '#b9ae8c', M(0, 12, 0)], ...[-18, 0, 18].map(x => [sph(), '#e7dfc8', M(x, 48, 0, 4.2)])]);
+  GEO.barricade = merge([[box(48, 4, 6), '#7a5532', M(0, 10, 0)], [box(48, 4, 6), '#8a6238', M(0, 26, 0)], ...[-18, 0, 18].map(x => [box(5, 34, 5), '#5d3f24', M(x, 17, 0)]), [box(46, 4, 4), '#6e4c2c', M(0, 18, 0, 1, 1, 1, 0, 0, .5)]]);
+  GEO.sentry = merge([[box(34, 16, 34), '#3d444b', M(0, 8, 0)], [cyl(6, 8, 14, 8), '#59626b', M(0, 22, 0)]]);
+  GEO.sentryHead = merge([[box(16, 10, 14), '#2b3035', M(0, 0, 0)], [cyl(1.6, 1.6, 24, 6), '#1c1c1c', M(18, 2, -3, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(1.6, 1.6, 24, 6), '#1c1c1c', M(18, 2, 3, 1, 1, 1, 0, 0, Math.PI / 2)], [box(6, 4, 10), '#d1503a', M(-4, 6, 0)]]);
+  GEO.tesla = merge([[cyl(14, 18, 10, 10), '#3d444b', M(0, 5, 0)], [cyl(5, 6, 44, 8), '#59626b', M(0, 32, 0)], ...[18, 30, 42].map(y => [new THREE.TorusGeometry(9, 1.6, 4, 14), '#c9a227', M(0, y, 0, 1, 1, 1, Math.PI / 2, 0, 0)]), [sph(), '#bfe8ff', M(0, 60, 0, 8)]]);
+  GEO.cannon = merge([[box(44, 30, 44), '#7a7c75', M(0, 15, 0)], ...[[-18, -18], [18, -18], [-18, 18], [18, 18]].map(([x, z]) => [box(10, 10, 10), '#8a8c84', M(x, 35, z)]), [box(46, 4, 46), '#6c6e68', M(0, 31, 0)]]);
+  GEO.cannonHead = merge([[cyl(6, 7, 34, 10), '#2b2f33', M(14, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [sph(), '#3d444b', M(-2, 0, 0, 9)], [cyl(8, 8, 3, 10), '#59626b', M(31, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)]]);
+  GEO.glue = merge([[cyl(20, 21, 1.6, 12), '#e0b030', M(0, .8, 0)], [sph(), '#f2c14e', M(5, 2, -4, 4, 1.4, 4)], [sph(), '#d8a020', M(-7, 2, 5, 3, 1.2, 3)], [box(42, 1, 3), '#8a6238', M(0, .5, -20)]]);
+  GEO.well = merge([[cyl(18, 20, 14, 12), '#8a8c84', M(0, 7, 0)], [cyl(15, 15, 2, 12), '#7fd8f0', M(0, 13, 0)], [box(3, 34, 3), '#6e4c2c', M(-17, 24, 0)], [box(3, 34, 3), '#6e4c2c', M(17, 24, 0)], [cone(26, 14, 4), '#5d3f24', M(0, 46, 0, 1, 1, 1, 0, Math.PI / 4, 0)]]);
+  GEO.coop = merge([[box(36, 22, 28), '#a57c4c', M(0, 15, 0)], [cone(26, 16, 4), '#c0392b', M(0, 34, 0, 1, 1, 1, 0, Math.PI / 4, 0)], ...[[-14, -10], [14, -10], [-14, 10], [14, 10]].map(([x, z]) => [box(3, 8, 3), '#5d3f24', M(x, 4, z)]), [box(8, 8, 1), '#2a1d10', M(0, 14, 14.5)], [sph(), '#f2eee4', M(12, 4, 18, 3)], [sph(), '#f2eee4', M(-10, 4, 20, 3)]]);
+  GEO.shroomfarm = merge([[box(44, 6, 44), '#3a2a1a', M(0, 3, 0)], ...[[-12, -12], [6, -10], [-8, 8], [12, 10], [0, 0]].flatMap(([x, z], i) => [[cyl(1.6, 2, 7, 6), '#efe6cf', M(x, 9, z)], [sph(), i % 2 ? '#c0392b' : '#d8a050', M(x, 13, z, 5, 3, 5)]])]);
+  GEO.flaxfield = merge([[box(44, 4, 44), '#5a4228', M(0, 2, 0)], ...Array.from({length: 16}, (_, i) => { const x = (i % 4) * 10 - 15, z = (i / 4 | 0) * 10 - 15; return [cyl(.6, .6, 20, 4), '#8aa060', M(x, 12, z)]; }), ...Array.from({length: 16}, (_, i) => { const x = (i % 4) * 10 - 15, z = (i / 4 | 0) * 10 - 15; return [sph(), '#6a9ae0', M(x, 22, z, 1.8)]; })]);
+  GEO.drill = merge([[box(36, 10, 36), '#3d444b', M(0, 5, 0)], ...[[-14, -14], [14, -14], [-14, 14], [14, 14]].map(([x, z]) => [box(3, 50, 3), '#59626b', M(x * .6, 30, z * .6, 1, 1, 1, z > 0 ? -.2 : .2, 0, x > 0 ? .2 : -.2)]), [cyl(4, 4, 30, 8), '#8a949e', M(0, 20, 0)], [cone(5, 10, 8), '#c9ccc4', M(0, 2, 0, 1, 1, 1, Math.PI, 0, 0)], [box(14, 10, 14), '#d1503a', M(0, 54, 0)]]);
   GEO.brick = merge([[box(48, 56, 48), '#a4583a', M(0, 28, 0)], ...[6, 18, 30, 42].flatMap((y, i) => [[box(49, 1.2, 49), '#d8c8b0', M(0, y, 0)], [box(1.2, 11, 49), '#d8c8b0', M(i % 2 ? -12 : 12, y + 6, 0)], [box(49, 11, 1.2), '#d8c8b0', M(0, y + 6, i % 2 ? 12 : -12)]]), [box(50, 4, 50), '#8a4a30', M(0, 58, 0)]]);
   GEO.obswall = merge([[box(48, 60, 48), '#1e1428', M(0, 30, 0)], [box(50, 6, 50), '#3a2650', M(0, 62, 0)], ...[[-14, 12], [10, 30], [-6, 46], [16, 18]].map(([x, y]) => [box(10, 4, 49), '#4a2a6a', M(x, y, 0, 1, 1, 1, 0, 0, .4)])]);
   GEO.kiln = merge([[cyl(18, 22, 30, 10), '#b4683a', M(0, 15, 0)], [cone(18, 20, 10), '#a45a30', M(0, 40, 0)], [cyl(4, 4, 12, 8), '#8a4a30', M(0, 54, 0)], [box(12, 10, 3), '#1c1c1c', M(0, 10, 19)]]);
