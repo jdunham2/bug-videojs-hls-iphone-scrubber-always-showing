@@ -119,11 +119,11 @@ const CHARS=[
   {id:'mushroom',name:'Mushroom',role:'Spore Bomb',desc:'Everything it touches goes pop.',weapon:'lobber',mods:{boom:18,atkSpd:-10},lines:[],k:2.8,fy:.37,es:.12,ez:.06},
   {id:'pepper',name:'Pepper',role:'Hot Head',desc:'Fast, furious and slightly on fire.',weapon:'flamer',mods:{atkSpd:18,speed:10,armor:-3,maxHp:-3},lines:[],k:2.8,fy:.55,es:.1,ez:.06},
   {id:'pumpkin',name:'Pumpkin',role:'Big Gourd',desc:'Too big to fail. Too slow to dodge.',weapon:'axe',mods:{maxHp:20,thorns:10,dmg:-10,speed:-3},lines:[['Bigger body','neu']],r:23,k:2.3,fy:.58,es:.15,ez:.065},
-  {id:'cabbage',name:'Cabbage',role:'Layered',desc:'Peel one layer, find another.',weapon:'spear',mods:{shield:1,maxHp:10,speed:-8,dmg:-10},lines:[['Built-in shield blocks a hit every 8s','pos']],k:2.3,fy:.55,es:.13,ez:.065},
+  {id:'cabbage',name:'Cabbage',role:'Layered',desc:'Peel one layer, find another.',weapon:'spear',mods:{shield:1,maxHp:10,speed:-8},lines:[['Built-in shield blocks a hit every 8s','pos']],k:2.3,fy:.55,es:.13,ez:.065},
   {id:'cauli',name:'Cauliflower',role:'Big Brain',desc:'Thinks its way out of every swarm.',weapon:'zapper',mods:{dmg:-12},lines:[['+50% experience','pos'],['Level-ups offer 5 choices','pos']],xpMul:1.5,choices:5,k:2.3,fy:.62,es:.12,ez:.06},
-  {id:'lemon',name:'Lemon',role:'Sour',desc:'Every hit leaves a bitter taste.',weapon:'smg',mods:{poison:3,crit:8,maxHp:-4},lines:[['Every hit poisons aliens','pos']],k:2.6,fy:.5,es:.11,ez:.06},
+  {id:'lemon',name:'Lemon',role:'Sour',desc:'Every hit leaves a bitter taste.',weapon:'smg',mods:{poison:2,crit:5,maxHp:-4},lines:[['Every hit poisons aliens','pos']],k:2.6,fy:.5,es:.11,ez:.06},
   {id:'banana',name:'Banana',role:'Slippery',desc:'Hard to catch, easy to bruise.',weapon:'knife',mods:{dodge:25,speed:15,maxHp:-8},lines:[],k:3.4,fy:.48,fx:.04,es:.065,ez:.042},
-  {id:'melon',name:'Watermelon',role:'Heavyweight',desc:'Only needs a few weapons. Swings them hard.',weapon:'shotgun',mods:{dmg:60,maxHp:10,speed:-5},maxW:3,lines:[['Only 3 weapon slots','neg']],k:2.3,fy:.55,es:.14,ez:.065},
+  {id:'melon',name:'Watermelon',role:'Heavyweight',desc:'Only needs a few weapons. Swings them hard.',weapon:'shotgun',mods:{dmg:100,maxHp:10,speed:-5},maxW:3,lines:[['Only 3 weapon slots','neg']],k:2.3,fy:.55,es:.14,ez:.065},
   {id:'grapes',name:'Grapes',role:'Bunch',desc:'There are always more of us.',weapon:'pistol',startW:['pistol','pistol'],mods:{dmg:-25},maxW:8,lines:[['8 weapon slots','pos'],['Starts with two Pistols','neu']],k:3,fy:.42,es:.1,ez:.055},
 ];
 
