@@ -359,6 +359,7 @@
     placeSeasonal();
     buildPaddock();
     buildWilds();
+    buildSnowFeatures();
 
     // Forest border: dense trees around the edge
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
@@ -1445,6 +1446,8 @@
     const running = input.run && !heavy;
     let maxSpd = heavy ? WALK_SPEED * heavyMult() : running ? runSpeed() : WALK_SPEED;
     if (player.boat) maxSpd = 80; // rowing
+    else if (player.sled) maxSpd = onHill(player.x, player.y) ? 290 : 115;
+    else if (player.hidingIn && player.hidingIn.kind === 'drift') maxSpd *= 0.6; // wading through snow
     else if (player.stuffed) maxSpd = Math.min(maxSpd, WALK_SPEED * 0.75); // waddle
     else if (player.sugar > 0) maxSpd *= 1.25;                         // zoom
     const tx = ix * maxSpd, ty = iy * maxSpd;
@@ -1453,7 +1456,8 @@
       if (v < target) return Math.min(target, v + rate * dt);
       return Math.max(target, v - rate * dt);
     };
-    const slip = onIce(player.x, player.y) ? 0.14 : frosty(player.x, player.y) ? 0.3 : 1; // ice: hard to start, harder to stop
+    const slip = player.sled ? 0.22 : onIce(player.x, player.y) ? 0.14 : frosty(player.x, player.y) ? 0.3 : 1;
+    if (player.sled && onHill(player.x, player.y)) player.vy += 320 * dt; // downhill! // ice: hard to start, harder to stop
     const rateX = (Math.abs(tx) > 0.01 ? ACCEL : FRICTION) * slip;
     const rateY = (Math.abs(ty) > 0.01 ? ACCEL : FRICTION) * slip;
     player.vx = approach(player.vx, tx, rateX);
@@ -2257,6 +2261,7 @@
     }
     placeSeasonalItems();
     placeKindItems();
+    placeSnowItems();
     const trees = objects.filter((o) => o.kind === 'tree' && o.x > 5 * T && o.x < WORLD_W - 5 * T && o.y > 5 * T && o.y < WORLD_H - 5 * T);
     for (let n = 0; n < 10 && trees.length; n++) {
       const tr = trees.splice(Math.floor(rand() * trees.length), 1)[0];
@@ -2342,6 +2347,7 @@
     if (!started) return;
     if (player.inWardrobe) { exitWardrobe(); return; }
     if (boatAction()) return;
+    if (sledAction()) return;
     if (player.held && !(petChoice() === 'wardrobe')) { dropHeld(false); return; }
     const pc = petChoice();
     if (pc === 'dog') { petDog(); return; }
@@ -2370,6 +2376,8 @@
     if (it.kind === 'egg') completeTask('egg');
     if (it.stall) { completeTask('stall'); if (['teddy', 'toyboat', 'kite'].includes(it.kind)) completeTask('toystall'); }
     if (it.kind === 'bigfish') completeTask('bigfish');
+    if (it.kind === 'present') completeTask('present');
+    if (it.kind === 'tortoise') completeTask('tortoise');
     if (it.kind === 'rosette') completeTask('rosette');
     if (it.kind === 'weddingcake') completeTask('weddingcake');
     if (it.kind === 'bouquet') completeTask('bouquet');
@@ -2431,7 +2439,7 @@
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
       if (it.held && !it.heldBy && player.held !== it) Object.assign(it, { held: false, air: true, vz: 0 }); // let go somehow: just drop it
-      if (it.held) { const hp = it.heldBy ? (it.heldBy === dog ? heldPosDog() : it.heldBy.type === 'gull' ? heldPosGull(it.heldBy) : heldPosV(it.heldBy)) : heldPos(time); it.x = hp.x; it.y = hp.y; it.z = hp.z; continue; }
+      if (it.held) { const hp = it.heldBy ? (it.heldBy === dog ? heldPosDog() : it.heldBy.type === 'gull' ? heldPosGull(it.heldBy) : it.heldBy.carrier ? heldPosCritter(it.heldBy) : heldPosV(it.heldBy)) : heldPos(time); it.x = hp.x; it.y = hp.y; it.z = hp.z; continue; }
       if (it.ghost && !overlapsPlayer(it)) it.ghost = false;
 
       // Beach balls get kicked when you run into them
@@ -2485,7 +2493,7 @@
           sfx('bonk');
           if (v.id === 'fennick') completeTask('bonk');
           if (v.id === 'rosa' && it.kind === 'boot') completeTask('boot');
-          if (it.kind === 'snowball') { completeTask('snowballhit'); shatter(it); items.splice(i, 1); }
+          if (it.kind === 'snowball') { completeTask('snowballhit'); if (v.id === 'toby') { run.tobyHits = (run.tobyHits || 0) + 1; setProgress('snowfight', run.tobyHits); if (run.tobyHits >= 3) say(v, 'OK, OK, you win!', 1.8); } shatter(it); items.splice(i, 1); }
           startleV(v, 'Ow!', it.owner === v.id ? { state: 'fetch', target: it } : { state: 'chase', target: null });
           break;
         }
@@ -3199,7 +3207,7 @@
         case 'sulk': v.stateT -= dt; if (v.stateT <= 0) toRoute(v); break;
         case 'startled': v.stateT -= dt; if (v.stateT <= 0) afterStartle(v); break;
       }
-      if (L.weather === 'frost') frostSlip(v, dt);
+      if (L.weather === 'frost' || L.weather === 'sleet') frostSlip(v, dt);
 
       // Villagers are solid: nudge the raccoon out of the way
       const dx = player.x - v.x, dy = player.y - v.y, d = Math.hypot(dx, dy);
@@ -3444,6 +3452,17 @@
     { id: 'row', tier: 'Easy', text: 'Row the boat out onto the lake', hint: 'press E by the boat at the jetty', req: ['boat'] },
     { id: 'rosette', tier: 'Easy', text: 'Swipe the first-prize rosette', req: ['fete'] },
     { id: 'toffee', tier: 'Easy', text: 'Eat a toffee apple', req: ['bonfire'] },
+    { id: 'robin', tier: 'Easy', text: 'Get close to a robin', hint: 'don’t run', req: ['robins'] },
+    { id: 'snowyowl', tier: 'Easy', text: 'Startle the snowy owl into flight', hint: 'chitter at it', req: ['snowyowl'] },
+    { id: 'icicles', tier: 'Easy', text: 'Knock the icicles off a house', hint: 'throw something at the front', req: ['winter'] },
+    { id: 'snowflake', tier: 'Easy', text: 'Catch a snowflake on your tongue', hint: 'stand still and look up', req: ['snowy'] },
+    { id: 'sledge', tier: 'Easy', text: 'Sledge down the hill', hint: 'E by the sledge at the top', req: ['hill'] },
+    { id: 'drift', tier: 'Easy', text: 'Burrow into a snowdrift', req: ['drifts'] },
+    { id: 'igloo', tier: 'Easy', text: 'Hide in the igloo', req: ['igloo'] },
+    { id: 'horse', tier: 'Easy', text: 'Feed the horse', hint: 'drop some food near it', req: ['stable'] },
+    { id: 'horsekick', tier: 'Easy', text: 'Get kicked by the horse', hint: 'walk behind it', req: ['stable'] },
+    { id: 'llama', tier: 'Easy', text: 'Get spat at by the llama', req: ['llama'] },
+    { id: 'tortoise', tier: 'Easy', text: "Pick up Granny Mabel's tortoise", req: ['tortoise'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3492,6 +3511,15 @@
     { id: 'bouquet', tier: 'Medium', text: 'Steal the wedding bouquet', req: ['wedding'] },
     { id: 'firework', tier: 'Medium', text: 'Set off a firework', hint: 'throw a rocket into the bonfire', req: ['bonfire'] },
     { id: 'scarecrows', tier: 'Medium', text: 'Knock down 3 festival scarecrows', goal: 3, hint: 'throw things at them', req: ['scarecrows'] },
+    { id: 'stoat', tier: 'Medium', text: 'Make the stoat drop a stolen egg', hint: 'it raids the hen house', req: ['stoat'] },
+    { id: 'present', tier: 'Medium', text: 'Swipe a present off the reindeer’s sleigh', hint: 'startle the reindeer', req: ['sleigh'] },
+    { id: 'roofsnow', tier: 'Medium', text: 'Dump roof snow on someone', hint: 'hit the house as they pass the door', req: ['winter'] },
+    { id: 'sledbump', tier: 'Medium', text: 'Crash your sledge into someone', req: ['hill'] },
+    { id: 'buildsnowman', tier: 'Medium', text: 'Build your own snowman', hint: 'drop 3 snowballs together', req: ['winter'] },
+    { id: 'snowfight', tier: 'Medium', text: 'Win a snowball fight with Toby', hint: 'hit him 3 times', goal: 3, req: ['winter'] },
+    { id: 'ducklings', tier: 'Medium', text: 'Lead the ducklings on a parade', hint: 'walk up to them slowly', req: ['ducklings'] },
+    { id: 'llamaspit', tier: 'Medium', text: 'Get the llama to spit at a villager', hint: 'annoy it when someone’s near', req: ['llama'] },
+    { id: 'tortoisestash', tier: 'Medium', text: "Stash Granny Mabel's tortoise in your hideout", req: ['tortoise'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3526,6 +3554,7 @@
     { id: 'deer', tier: 'Hard', text: 'Sneak right up to a deer', hint: 'freeze when it looks up' },
     { id: 'bees', tier: 'Hard', text: 'Lead a swarm of bees to a villager', hint: 'bump the beehive, then run', req: ['bees'] },
     { id: 'weddingcake', tier: 'Hard', text: 'Run off with the wedding cake', req: ['wedding'] },
+    { id: 'presents3', tier: 'Hard', text: 'Stash 3 presents in your hideout', goal: 3, req: ['sleigh'] },
     { id: 'hens', tier: 'Hard', text: 'Get every hen squawking at once' },
     { id: 'eggs3', tier: 'Hard', text: 'Find 3 painted eggs', goal: 3, req: ['spring'] },
     { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
@@ -3576,7 +3605,7 @@
   const chitterRadius = () => 95 * (1 + 0.35 * lvl('chitter'));
 
   function setupRun(day) {
-    Object.assign(run, { day, eaten: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
+    Object.assign(run, { day, eaten: 0, tobyHits: 0, crows: 0, fireflies: 0, puddles: 0, eggs: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
     run.maxStrikes = 3 + lvl('fur');
     run.timeTotal = Math.min(540, 360 + 30 * (day - 1)) + 60 * lvl('day');
     run.timeLeft = run.timeTotal;
@@ -3592,7 +3621,7 @@
       if (SEASON_NAMES.includes(r) && L.season !== r) return false;
       if (KIND_NAMES.includes(r) && L.kind !== r) return false;
       if (r === 'ducks' && L.kind === 'seaside') return false;
-      if (r === 'sparrows' && ['rain', 'storm', 'snowstorm', 'downpour'].includes(L.weather)) return false;
+      if (r === 'sparrows' && ['rain', 'storm', 'snowstorm', 'downpour', 'sleet', 'blizzard'].includes(L.weather)) return false;
       if (r === 'frogs' && !(L.kind !== 'seaside' && hasOpenWater() && (wet() || L.season === 'spring'))) return false;
       if (r === 'puddles' && !(planHas(WET_SET) && !isWinter())) return false;
       if (r === 'soak' && !(planHas(['rain', 'storm', 'downpour']) && !isWinter())) return false;
@@ -3613,6 +3642,18 @@
       if (r === 'mill' && !L.mill) return false;
       if (r === 'wheatfield' && !L.wheat) return false;
       if (r === 'barn' && !L.barn) return false;
+      if (r === 'robins' && !critters.some((c) => c.type === 'robin')) return false;
+      if (r === 'stoat' && !critters.some((c) => c.type === 'stoat')) return false;
+      if (r === 'snowyowl' && !critters.some((c) => c.type === 'snowyowl')) return false;
+      if (r === 'sleigh' && !critters.some((c) => c.type === 'sleigh')) return false;
+      if (r === 'stable' && !critters.some((c) => c.type === 'horse')) return false;
+      if (r === 'ducklings' && !L.ducklings) return false;
+      if (r === 'llama' && !critters.some((c) => c.type === 'llama')) return false;
+      if (r === 'hill' && !L.hill) return false;
+      if (r === 'igloo' && !L.igloo) return false;
+      if (r === 'drifts' && !(L.drifts && L.drifts.length)) return false;
+      if (r === 'snowy' && !(isWinter() || planHas(SNOWY_W))) return false;
+      if (r === 'tortoise' && !items.some((it) => it.kind === 'tortoise')) return false;
       if (r === 'farm' && !L.paddock) return false;
       if (r === 'rainbow' && !rainbowPossible()) return false;
       if (r === 'heatwave' && !planHas(['heatwave'])) return false;
@@ -3691,6 +3732,8 @@
     const gnomes = items.filter((it) => it.kind === 'gnome');
     if (gnomes.length >= 2 && gnomes.every(inHideout)) completeTask('gnomes');
     setProgress('everyone', new Set(stashed.filter((it) => it.owner).map((it) => it.owner)).size);
+    setProgress('presents3', stashed.filter((it) => it.kind === 'present').length);
+    if (stashed.some((it) => it.kind === 'tortoise')) completeTask('tortoisestash');
   }
 
   // Getting caught ---------------------------------------------------------------
@@ -4046,6 +4089,8 @@
       completeTask(bush.kind === 'bed' ? 'bed' : bush.kind === 'leafpile' ? 'leafhide' : 'hide');
       if (bush.kind === 'wheat') completeTask('wheat');
       if (bush.kind === 'haystack') completeTask('hay');
+      if (bush.kind === 'drift') completeTask('drift');
+      if (bush.kind === 'igloo') completeTask('igloo');
       // Chasers who weren't right on top of you lose track in the leaves
       for (const v of villagers) {
         if (v.state === 'chase' && Math.hypot(v.x - player.x, v.y - player.y) > 60) {
@@ -5309,12 +5354,12 @@
   // Each village rolls a weather that suits its season. It changes what villagers can
   // see and hear, brings puddles, lightning, fog, wind, and decides which animals are out.
   const WEATHER_TABLE = {
-    spring: [['clear', 40], ['rain', 28], ['drizzle', 15], ['downpour', 8], ['storm', 10], ['windy', 15], ['hail', 6]],
+    spring: [['clear', 40], ['snowfall', 4], ['sleet', 5], ['rain', 28], ['drizzle', 15], ['downpour', 8], ['storm', 10], ['windy', 15], ['hail', 6]],
     summer: [['clear', 50], ['rain', 12], ['drizzle', 6], ['downpour', 8], ['storm', 16], ['windy', 10], ['heatwave', 20]],
-    autumn: [['clear', 25], ['rain', 20], ['drizzle', 12], ['downpour', 8], ['fog', 22], ['windy', 20], ['frost', 15], ['storm', 5], ['hail', 6]],
-    winter: [['clear', 35], ['snowstorm', 28], ['fog', 25], ['frost', 25]],
+    autumn: [['clear', 25], ['snowfall', 5], ['sleet', 7], ['rain', 20], ['drizzle', 12], ['downpour', 8], ['fog', 22], ['windy', 20], ['frost', 15], ['storm', 5], ['hail', 6]],
+    winter: [['clear', 35], ['snowstorm', 24], ['blizzard', 12], ['sleet', 12], ['fog', 22], ['frost', 22]],
   };
-  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', windy: 'Windy', snowstorm: 'Snowstorm', hail: 'Hail', heatwave: 'Heatwave', drizzle: 'Drizzle', downpour: 'Downpour', frost: 'Frost' };
+  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', windy: 'Windy', snowstorm: 'Snowstorm', hail: 'Hail', heatwave: 'Heatwave', drizzle: 'Drizzle', downpour: 'Downpour', frost: 'Frost', sleet: 'Sleet', blizzard: 'Blizzard', snowfall: 'Snow' };
   const WEATHER_TIP = {
     rain: 'It’s raining: villagers huddle under umbrellas and can’t see or hear as well. Splash in the puddles.',
     storm: 'Thunderstorm! Every thunderclap makes the villagers jump.',
@@ -5325,6 +5370,9 @@
     heatwave: 'Heatwave: the villagers are slow and sleepy, and some will doze off.',
     drizzle: 'A light drizzle: the frogs are out, and the puddles are filling up.',
     downpour: 'A downpour! Huge puddles everywhere: run through one next to a villager to soak them.',
+    sleet: 'Sleet: half rain, half snow. Miserable for villagers, and the paths are slippery.',
+    blizzard: 'Blizzard! You can barely see, the wind shoves you along, and drifts pile up to burrow into.',
+    snowfall: 'Surprise snow! Stand still and look up to catch a snowflake.',
     frost: 'A hard frost: the paths are slippery, and villagers chasing you might go flying.',
     clear: '',
   };
@@ -5335,10 +5383,10 @@
     return 'clear';
   }
   const wet = () => !!L && WET_SET.includes(L.weather);
-  const WIND = () => (L && L.weather === 'windy' ? 70 : L && L.weather === 'snowstorm' ? 40 : 0);
+  const WIND = () => (L && L.weather === 'windy' ? 70 : L && L.weather === 'blizzard' ? 60 : L && L.weather === 'snowstorm' ? 40 : 0);
   // How far villagers can see / hear in this weather
-  const visionMul = () => ({ rain: 0.82, storm: 0.75, fog: 0.55, snowstorm: 0.62, hail: 0.85, drizzle: 0.93, downpour: 0.68 }[L && L.weather] || 1);
-  const hearingMul = () => ({ rain: 0.75, storm: 0.7, snowstorm: 0.75, hail: 0.65, drizzle: 0.9, downpour: 0.6 }[L && L.weather] || 1);
+  const visionMul = () => ({ rain: 0.82, storm: 0.75, fog: 0.55, snowstorm: 0.62, hail: 0.85, drizzle: 0.93, downpour: 0.68, sleet: 0.8, blizzard: 0.45, snowfall: 0.9 }[L && L.weather] || 1);
+  const hearingMul = () => ({ rain: 0.75, storm: 0.7, snowstorm: 0.75, hail: 0.65, drizzle: 0.9, downpour: 0.6, sleet: 0.75, blizzard: 0.55 }[L && L.weather] || 1);
 
   const weather = [];
   const fx = { flash: 0, nextBolt: 8, thunderAt: -1, ambience: null };
@@ -5349,6 +5397,7 @@
     if (W === 'rain') n = 230; else if (W === 'storm') n = 300; else if (W === 'snowstorm') n = 380; else if (W === 'windy') n = Math.max(n, 70);
     else if (W === 'hail') n = 200; else if (W === 'heatwave') n = 0;
     else if (W === 'drizzle') n = 110; else if (W === 'downpour') n = 440;
+    else if (W === 'sleet') n = 280; else if (W === 'blizzard') n = 560; else if (W === 'snowfall') n = 170;
     for (let i = 0; i < n; i++) weather.push({ x: Math.random(), y: Math.random(), s: Math.random(), ph: Math.random() * 6, col: pick(['#c0392b', '#e07b2a', '#f0a040', '#d9a43a']) });
     fx.flash = 0; fx.nextBolt = rr(6, 12); fx.thunderAt = -1;
     startAmbience();
@@ -5356,7 +5405,8 @@
   function drawWeather(ctx, left, top, viewW, viewH, t, dt) {
     const S = L.season, W = L.weather;
     const rainy = WET_SET.includes(W);
-    const wind = W === 'windy' ? 0.25 : W === 'snowstorm' ? 0.12 : W === 'storm' ? 0.06 : 0;
+    const snowy = S === 'winter' || W === 'snowfall' || W === 'blizzard' || W === 'sleet';
+    const wind = W === 'windy' ? 0.25 : W === 'blizzard' ? 0.4 : W === 'snowstorm' ? 0.12 : W === 'sleet' ? 0.1 : W === 'storm' ? 0.06 : 0;
     ctx.lineCap = 'round';
     for (const w of weather) {
       if (W === 'hail') { // hailstones pelting down, bouncing
@@ -5366,17 +5416,18 @@
         ctx.fillStyle = 'rgba(245,250,255,0.9)'; circle(ctx, hx, hy, 1.1 + w.s * 0.9);
         continue;
       }
-      if (rainy) { w.y += (0.9 + w.s * 0.5) * (W === 'downpour' ? 1.3 : W === 'drizzle' ? 0.7 : 1) * dt; w.x += (0.08 + wind) * dt; }
-      else if (S === 'winter') { w.y += (0.05 + w.s * 0.05) * (W === 'snowstorm' ? 2.6 : 1) * dt; w.x += (Math.sin(t * 0.8 + w.ph) * 0.004 + wind) * dt; }
+      const sleetRain = W === 'sleet' && w.s > 0.5;
+      if (rainy || sleetRain) { w.y += (0.9 + w.s * 0.5) * (W === 'downpour' ? 1.3 : W === 'drizzle' || sleetRain ? 0.7 : 1) * dt; w.x += (0.08 + wind) * dt; }
+      else if (snowy) { w.y += (0.05 + w.s * 0.05) * (W === 'snowstorm' ? 2.6 : W === 'blizzard' ? 3.6 : W === 'sleet' ? 4 : 1) * dt; w.x += (Math.sin(t * 0.8 + w.ph) * 0.004 + wind) * dt; }
       else { w.y += (0.03 + w.s * 0.03) * dt; w.x += (Math.sin(t * 0.6 + w.ph) * 0.02 + 0.01 + wind) * dt; }
       if (w.y > 1.05) { w.y = -0.05; w.x = Math.random(); }
       if (w.x > 1.05) w.x = -0.05; else if (w.x < -0.05) w.x = 1.05;
       const x = left + w.x * viewW, y = top + w.y * viewH;
-      if (rainy) {
+      if (rainy || sleetRain) {
         const len = W === 'drizzle' ? 0.45 : W === 'downpour' ? 1.5 : 1;
         ctx.strokeStyle = `rgba(200,220,240,${(0.35 + w.s * 0.3) * (W === 'drizzle' ? 0.7 : 1)})`; ctx.lineWidth = W === 'downpour' ? 1.3 : 1;
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - (2 + wind * 30) * len, y - (9 + w.s * 5) * len); ctx.stroke();
-      } else if (S === 'winter') { ctx.fillStyle = `rgba(255,255,255,${0.55 + w.s * 0.4})`; circle(ctx, x, y, 0.8 + w.s * 1.6); }
+      } else if (snowy) { ctx.fillStyle = `rgba(255,255,255,${0.55 + w.s * 0.4})`; circle(ctx, x, y, (0.8 + w.s * 1.6) * (W === 'blizzard' ? 1.3 : W === 'sleet' ? 0.8 : 1)); }
       else {
         ctx.fillStyle = S === 'spring' ? (w.s > 0.5 ? '#ffd1e3' : '#ffffff') : S === 'summer' ? '#8fd16a' : w.col;
         ctx.beginPath(); ctx.ellipse(x, y, S === 'spring' ? 2 : 3, S === 'spring' ? 1.3 : 1.7, t * 2 + w.ph, 0, Math.PI * 2); ctx.fill();
@@ -5387,6 +5438,7 @@
     const W = L && L.weather;
     const tint = W === 'storm' ? 'rgb(168,176,198)' : W === 'rain' ? 'rgb(200,208,222)' : W === 'snowstorm' ? 'rgb(222,230,246)'
       : W === 'hail' ? 'rgb(208,214,228)' : W === 'heatwave' ? 'rgb(255,232,200)'
+      : W === 'sleet' ? 'rgb(198,204,216)' : W === 'blizzard' ? 'rgb(222,228,242)' : W === 'snowfall' ? 'rgb(234,238,250)'
       : W === 'drizzle' ? 'rgb(216,222,232)' : W === 'downpour' ? 'rgb(166,176,198)' : W === 'frost' ? 'rgb(230,238,255)'
       : { winter: 'rgb(226,234,252)', autumn: 'rgb(255,238,214)', spring: 'rgb(255,250,248)' }[L && L.season];
     if (tint) {
@@ -5397,12 +5449,12 @@
   // Screen-space weather overlays: fog with a clear patch around you, lightning flashes
   function drawWeatherOverlay(ctx, indoors, left, top) {
     const W = L && L.weather;
-    if (!indoors && (W === 'fog' || W === 'snowstorm')) {
+    if (!indoors && (W === 'fog' || W === 'snowstorm' || W === 'blizzard')) {
       const px = (player.x - left) * zoom, py = (player.y - 12 - top) * zoom; // the clear patch follows you
-      const inner = Math.min(vw, vh) * (W === 'fog' ? 0.16 : 0.22), outer = Math.min(vw, vh) * (W === 'fog' ? 0.52 : 0.7);
+      const inner = Math.min(vw, vh) * (W === 'fog' ? 0.16 : W === 'blizzard' ? 0.13 : 0.22), outer = Math.min(vw, vh) * (W === 'fog' ? 0.52 : W === 'blizzard' ? 0.45 : 0.7);
       const g = ctx.createRadialGradient(px, py, inner, px, py, outer);
       const c = W === 'fog' ? '226,232,236' : '236,242,250';
-      g.addColorStop(0, `rgba(${c},0)`); g.addColorStop(1, `rgba(${c},${W === 'fog' ? 0.9 : 0.6})`);
+      g.addColorStop(0, `rgba(${c},0)`); g.addColorStop(1, `rgba(${c},${W === 'fog' ? 0.9 : W === 'blizzard' ? 0.85 : 0.6})`);
       ctx.fillStyle = g; ctx.fillRect(0, 0, vw, vh);
     }
     if (fx.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(0.75, fx.flash)})`; ctx.fillRect(0, 0, vw, vh); }
@@ -5475,17 +5527,17 @@
   function startAmbience() {
     try { if (fx.ambience) { fx.ambience.src.stop(); fx.ambience = null; } } catch (_) { fx.ambience = null; }
     const W = L && L.weather;
-    if (!actx || !(WET_SET.includes(W) || W === 'windy' || W === 'snowstorm' || W === 'hail')) return;
+    if (!actx || !(WET_SET.includes(W) || ['windy', 'snowstorm', 'hail', 'sleet', 'blizzard'].includes(W))) return;
     const n = actx.sampleRate * 2, buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     const src = actx.createBufferSource(); src.buffer = buf; src.loop = true;
-    const f = actx.createBiquadFilter(); f.type = W === 'windy' || W === 'snowstorm' || W === 'hail' ? 'bandpass' : 'lowpass'; f.frequency.value = W === 'hail' ? 2200 : W === 'windy' || W === 'snowstorm' ? 500 : 2500;
+    const f = actx.createBiquadFilter(); f.type = ['windy', 'snowstorm', 'hail', 'blizzard'].includes(W) ? 'bandpass' : 'lowpass'; f.frequency.value = W === 'hail' ? 2200 : W === 'windy' || W === 'snowstorm' ? 500 : 2500;
     const g = actx.createGain(); g.gain.value = 0;
     src.connect(f).connect(g).connect(master); src.start();
-    fx.ambience = { src, g, level: W === 'storm' || W === 'downpour' ? 0.08 : W === 'rain' ? 0.05 : W === 'drizzle' ? 0.025 : 0.04 };
+    fx.ambience = { src, g, level: W === 'storm' || W === 'downpour' || W === 'blizzard' ? 0.08 : W === 'rain' ? 0.05 : W === 'drizzle' ? 0.025 : 0.04 };
   }
   function updateAmbienceLevel() {
-    if (!fx.ambience) { if (actx && actx.state === 'running' && L && ['rain', 'storm', 'drizzle', 'downpour', 'windy', 'snowstorm', 'hail'].includes(L.weather)) startAmbience(); return; }
+    if (!fx.ambience) { if (actx && actx.state === 'running' && L && ['rain', 'storm', 'drizzle', 'downpour', 'windy', 'snowstorm', 'hail', 'sleet', 'blizzard'].includes(L.weather)) startAmbience(); return; }
     const indoors = areaOf(player.x, player.y) > 0;
     const want = muted || paused ? 0 : fx.ambience.level * (indoors ? 0.35 : 1);
     fx.ambience.g.gain.value += (want - fx.ambience.g.gain.value) * 0.05;
@@ -5513,7 +5565,7 @@
   function spawnCritters() {
     critters = [];
     const T = TILE, P = L.plaza, W = L.weather;
-    const stormy = W === 'rain' || W === 'storm' || W === 'snowstorm' || W === 'downpour';
+    const stormy = ['rain', 'storm', 'snowstorm', 'downpour', 'sleet', 'blizzard'].includes(W);
     // Ducks on the pond / river (they stand on the ice in winter)
     if (L.kind !== 'seaside') {
       for (let k = 0; k < 4; k++) {
@@ -5552,6 +5604,7 @@
     }
     spawnFarmNight();
     spawnWilds();
+    spawnSnowAnimals();
   }
 
   // Something scary happened near (x, y): birds and frogs bolt (see also farmNightScare)
@@ -5560,6 +5613,7 @@
       if (Math.hypot(c.x - x, c.y - y) > r) continue;
       if (FN_TYPES.has(c.type)) { farmNightScare(c, x, y, r); continue; }
       if (WD_TYPES.has(c.type)) { wildScare(c, x, y, r); continue; }
+      if (SN_TYPES.has(c.type)) { snowScare(c, x, y, r); continue; }
       if (c.type === 'sparrow' && !c.flying) startFlock(c, x, y);
       if (c.type === 'gull' && c.state !== 'flee') { gullDrop(c); c.state = 'flee'; c.flying = true; c.fleeT = 3; c.fa = Math.atan2(c.y - y, c.x - x); c.cd = 8; if (r < 9999) completeTask('gullscare'); }
       if (c.type === 'duck') {
@@ -5600,6 +5654,7 @@
       const near = outside && started && pdist(c) < 70 && player.speed > 25 && !player.hidden;
       if (FN_TYPES.has(c.type)) { updateFarmNight(c, dt, near); continue; }
       if (WD_TYPES.has(c.type)) { updateWilds(c, dt, near); continue; }
+      if (SN_TYPES.has(c.type)) { updateSnowAnimals(c, dt, near); continue; }
 
       if (c.type === 'duck') {
         c.panic = Math.max(0, c.panic - dt);
@@ -5745,6 +5800,7 @@
   function drawCritter(ctx, c, t) {
     if (FN_TYPES.has(c.type)) { drawFarmNight(ctx, c, t); return; }
     if (WD_TYPES.has(c.type)) { drawWilds(ctx, c, t); return; }
+    if (SN_TYPES.has(c.type)) { drawSnowAnimal(ctx, c, t); return; }
     if (c.type === 'frog' && c.gone > 0) return;
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -5892,8 +5948,8 @@
     if (rand() < 0.45) {
       const at = 0.3 + rand() * 0.3;
       let next;
-      if (WET_SET.includes(first) || first === 'fog' || first === 'frost') next = 'clear'; // clears up / the fog lifts / the frost melts
-      else if (season === 'winter') next = pick(['snowstorm', 'fog']);
+      if (WET_SET.includes(first) || ['fog', 'frost', 'sleet', 'snowfall', 'blizzard'].includes(first)) next = 'clear'; // clears up / the fog lifts / the frost melts
+      else if (season === 'winter') next = pick(['snowstorm', 'fog', 'blizzard', 'sleet']);
       else if (season === 'summer') next = pick(['storm', 'rain', 'downpour', first === 'heatwave' ? 'storm' : 'heatwave']);
       else next = pick(['rain', 'hail', 'storm', 'drizzle', 'downpour']);
       if (next !== first) {
@@ -5909,7 +5965,7 @@
 
   const WEATHER_NEWS = {
     rain: 'It’s starting to rain', storm: 'A storm is rolling in', hail: 'Hail! Everyone’s running for cover',
-    heatwave: 'Phew, a heatwave', drizzle: 'It’s starting to drizzle', downpour: 'It’s bucketing down!', snowstorm: 'A snowstorm is blowing in', fog: 'Fog is rolling in', windy: 'The wind is picking up',
+    heatwave: 'Phew, a heatwave', drizzle: 'It’s starting to drizzle', downpour: 'It’s bucketing down!', sleet: 'Ugh, sleet', blizzard: 'A blizzard is blowing in!', snowfall: 'It’s snowing!', snowstorm: 'A snowstorm is blowing in', fog: 'Fog is rolling in', windy: 'The wind is picking up',
   };
   function setWeather(w) {
     const was = L.weather;
@@ -6741,7 +6797,7 @@
     ctx.restore();
   }
   // Frost: slippery paths with a white sheen
-  const frosty = (x, y) => !!L && L.weather === 'frost' && areaOf(x, y) === 0 && [PATH, STONE, BRIDGE].includes(tileAt(x, y));
+  const frosty = (x, y) => !!L && (L.weather === 'frost' || L.weather === 'sleet') && areaOf(x, y) === 0 && [PATH, STONE, BRIDGE].includes(tileAt(x, y));
   function drawFrost(ctx, left, top, viewW, viewH, t) {
     if (!L || L.weather !== 'frost') return;
     const x0 = Math.max(0, Math.floor(left / TILE)), y0 = Math.max(0, Math.floor(top / TILE));
@@ -7463,6 +7519,584 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Winter animals (robins, a stoat, a snowy owl, a reindeer with a sleigh),
+  // more snowy weather (sleet, blizzards, surprise snow, roof snow, icicles),
+  // snow fun (a sledging hill, snowmen, Toby's snowball fights, drifts, an
+  // igloo) and year-round animals (a horse, ducklings, a llama, a tortoise)
+  // ---------------------------------------------------------------------------
+  const SN_TYPES = new Set(['robin', 'stoat', 'snowyowl', 'sleigh', 'horse', 'mamaduck', 'duckling', 'llama']);
+  const SNOWY_W = ['snowstorm', 'blizzard', 'snowfall', 'sleet'];
+  const snowing = () => !!L && (isWinter() || SNOWY_W.includes(L.weather));
+
+  Object.assign(ITEM, {
+    present: { name: 'present', h: 10, r: 6, draw(c, it) {
+      const col = ['#c0392b', '#3f7f6a', '#4f6fa8', '#7a4f8f'][Math.floor((it ? it.ph0 : 0) * 10) % 4];
+      c.fillStyle = col; c.fillRect(-6, -10, 12, 10);
+      c.fillStyle = '#f2c14e'; c.fillRect(-1, -10, 2, 10); c.fillRect(-6, -6, 12, 2);
+      c.beginPath(); c.ellipse(-2.5, -11, 2.5, 1.5, -0.4, 0, Math.PI * 2); c.fill(); c.beginPath(); c.ellipse(2.5, -11, 2.5, 1.5, 0.4, 0, Math.PI * 2); c.fill();
+    } },
+    sled: { name: 'sledge (E to ride)', h: 6, r: 10, draw(c) {
+      c.strokeStyle = '#5a3a20'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-11, 0); c.lineTo(9, 0); c.quadraticCurveTo(13, 0, 12, -4); c.stroke();
+      c.fillStyle = '#c0392b'; c.fillRect(-10, -6, 18, 4);
+      c.fillStyle = '#5a3a20'; c.fillRect(-8, -2.5, 1.5, 2.5); c.fillRect(5, -2.5, 1.5, 2.5);
+    } },
+    tortoise: { name: 'tortoise', h: 8, r: 6, draw(c, it, t) {
+      const k = it && it.walking ? Math.sin((t || 0) * 6) * 1 : 0;
+      c.fillStyle = '#8a9a5a'; for (const [x, y] of [[-4, -1], [4, -1]]) c.fillRect(x - 1 + k * (x > 0 ? 1 : -1), y, 2.2, 2);
+      c.fillStyle = '#9aaa6a'; ellipse(c, (it && it.facing < 0 ? -6 : 6), -3, 2.4, 2);
+      c.fillStyle = '#6b5a3a'; ellipse(c, 0, -4, 6, 4.5);
+      c.fillStyle = '#8a7a4a'; for (const [x, y] of [[-2.5, -5], [2.5, -5], [0, -2.5], [0, -6.8]]) circle(c, x, y, 1.4);
+      c.fillStyle = '#1d1d22'; circle(c, (it && it.facing < 0 ? -7 : 7), -3.4, 0.5);
+    } },
+  });
+
+  // --- Objects: icicles + roof snow, snowdrifts, igloo, sledging hill, stable ---------------
+  function makeEaves(h, i) {
+    const X = h.x * TILE, W = h.w * TILE, eave = (h.y + h.h) * TILE - TILE * 1.7 - 2;
+    const S = { fallen: false, heap: 0 };
+    (L.roofs = L.roofs || [])[i] = S;
+    const ics = Array.from({ length: Math.floor(W / 9) }, (_, k) => [X + 5 + k * 9 + rr(-2, 2), rr(5, 12)]);
+    return {
+      kind: 'eaves', x: X + W / 2, y: (h.y + h.h) * TILE + 1, bounds: { l: X - 10, r: X + W + 10, t: eave - 4, b: (h.y + h.h) * TILE + 30 },
+      draw(ctx) {
+        if (!S.fallen) { ctx.fillStyle = 'rgba(220,238,250,0.9)'; for (const [x, l] of ics) poly(ctx, [[x - 2, eave], [x + 2, eave], [x, eave + l]]), ctx.fill(); }
+        if (S.heap > 0) { // a heap of snow that slid off the roof
+          const dx = (h.doorX + 0.5) * TILE, by = (h.y + h.h) * TILE + 14;
+          ctx.fillStyle = '#f4f8fb'; ellipse(ctx, dx - 20, by, 22, 7); ellipse(ctx, dx + 16, by + 2, 18, 6);
+          ctx.fillStyle = '#dce8f2'; ellipse(ctx, dx - 16, by + 3, 12, 3);
+        }
+      },
+    };
+  }
+  function roofHit(i) {
+    const S = L.roofs && L.roofs[i], h = L.houses[i];
+    if (!S || S.fallen || !isWinter()) return;
+    S.fallen = true; S.heap = 1;
+    const X = h.x * TILE, W = h.w * TILE, by = (h.y + h.h) * TILE;
+    sfx('whoosh'); sfx('crash');
+    for (let k = 0; k < 40; k++) particles.push({ kind: 'shard', col: k % 4 ? '#f4f8fb' : '#cfe6f5', x: X + rr(4, W - 4), y: by + rr(0, 20), z: rr(30, 60), vx: rr(-20, 20), vy: rr(0, 30), vz: rr(-60, 10), life: 0.9, max: 0.9 });
+    completeTask('icicles');
+    for (const v of villagers) {
+      if (areaOf(v.x, v.y) !== 0 || v.x < X - 16 || v.x > X + W + 16 || v.y < by - 4 || v.y > by + 44) continue;
+      if (startleV(v, rpick(['BRRR! Snow down my neck!', 'Eek! Cold!', 'Who did that?!']), { state: 'sulk' })) { v.stateT = 2.2; completeTask('roofsnow'); }
+    }
+  }
+  function makeDrift(x, y, rx) {
+    const o = {
+      kind: 'drift', x, y, r: rx, hitbox: null, rustle: 0, grow: 0,
+      bounds: { l: x - rx - 6, r: x + rx + 6, t: y - 26, b: y + 6 },
+      contains(px, py) { const dx = (px - x) / (rx * 0.8), dy = (py - (y - 4)) / 9; return o.grow > 0.6 && dx * dx + dy * dy < 1; },
+      draw(ctx, t) {
+        const g = Math.min(1, o.grow), sh = o.rustle > 0 ? Math.sin(t * 40) * 1.2 : 0;
+        ctx.fillStyle = '#e4eef7'; ellipse(ctx, x + sh, y - 3 * g, rx * g, 9 * g);
+        ctx.fillStyle = '#f8fbfd'; ellipse(ctx, x - 3 + sh, y - 6 * g, rx * 0.8 * g, 7 * g);
+        if (player.hidden && player.hidingIn === o) {
+          const ex = player.x, ey = player.y - 12;
+          ctx.fillStyle = MASK; ellipse(ctx, ex, ey, 7, 2.8);
+          ctx.fillStyle = '#ffffff'; circle(ctx, ex - 3, ey, 1.6); circle(ctx, ex + 3, ey, 1.6);
+          ctx.fillStyle = NOSE; circle(ctx, ex - 3, ey, 0.8); circle(ctx, ex + 3, ey, 0.8);
+        }
+      },
+    };
+    return o;
+  }
+  function makeIgloo(x, y) {
+    const o = {
+      kind: 'igloo', x, y, r: 26, hitbox: null, rustle: 0,
+      bounds: { l: x - 34, r: x + 34, t: y - 44, b: y + 6 },
+      contains(px, py) { const dx = (px - x) / 24, dy = (py - (y - 8)) / 12; return dx * dx + dy * dy < 1; },
+      shadow(ctx) { ctx.fillStyle = 'rgba(60,80,110,0.2)'; ellipse(ctx, x + 6, y, 32, 8); },
+      draw(ctx) {
+        ctx.fillStyle = '#eef4fa'; ctx.beginPath(); ctx.ellipse(x, y - 2, 30, 34, 0, Math.PI, 0); ctx.fill();
+        ctx.strokeStyle = '#c9d8e6'; ctx.lineWidth = 1;
+        for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.ellipse(x, y - 2, 30, 34 - k * 9, 0, Math.PI, 0); ctx.stroke(); }
+        for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(x + k * 11, y - 2); ctx.lineTo(x + k * 8, y - 14); ctx.stroke(); }
+        ctx.fillStyle = '#e4eef7'; roundRect(ctx, x - 10, y - 20, 20, 20, 9, true);
+        ctx.fillStyle = '#3a4a5e'; roundRect(ctx, x - 7, y - 15, 14, 15, 7, true);
+        if (player.hidden && player.hidingIn === o) {
+          ctx.fillStyle = '#ffffff'; circle(ctx, x - 3, y - 8, 1.6); circle(ctx, x + 3, y - 8, 1.6);
+          ctx.fillStyle = NOSE; circle(ctx, x - 3, y - 8, 0.8); circle(ctx, x + 3, y - 8, 0.8);
+        }
+      },
+    };
+    return o;
+  }
+  function makeHill(H) {
+    const X = H.x * TILE, Y = H.y * TILE, W = H.w * TILE, Ht = H.h * TILE;
+    return {
+      kind: 'hill', x: X + W / 2, y: Y - 60, bounds: { l: X - 10, r: X + W + 10, t: Y - 20, b: Y + Ht + 10 },
+      draw(ctx) {
+        const g = ctx.createLinearGradient(0, Y, 0, Y + Ht);
+        g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#dbe7f2');
+        ctx.fillStyle = g; roundRect(ctx, X, Y, W, Ht, 20, true);
+        ctx.strokeStyle = 'rgba(150,175,200,0.5)'; ctx.lineWidth = 1;
+        for (let k = 1; k < 5; k++) { ctx.beginPath(); ctx.moveTo(X + 10, Y + k * Ht / 5); ctx.quadraticCurveTo(X + W / 2, Y + k * Ht / 5 + 8, X + W - 10, Y + k * Ht / 5); ctx.stroke(); }
+        ctx.fillStyle = '#5a3a20'; ctx.fillRect(X + W - 18, Y + 4, 2, 22);
+        ctx.fillStyle = '#f4e3b8'; roundRect(ctx, X + W - 40, Y + 2, 34, 11, 2, true);
+        ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('SLEDGING', X + W - 23, Y + 10);
+      },
+    };
+  }
+  const onHill = (x, y) => { const H = L && L.hill; return !!H && x > H.x * TILE && x < (H.x + H.w) * TILE && y > H.y * TILE && y < (H.y + H.h) * TILE; };
+  function makeStable(x, y) {
+    return {
+      kind: 'stable', x, y, hitbox: box(x - 40, y - 34, 80, 22), bounds: { l: x - 48, r: x + 48, t: y - 90, b: y + 4 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ctx.fillRect(x - 36, y - 14, 86, 10); },
+      draw(ctx) {
+        ctx.fillStyle = '#8a5a3a'; ctx.fillRect(x - 42, y - 62, 84, 50);
+        ctx.fillStyle = '#6b4226'; poly(ctx, [[x - 48, y - 60], [x + 48, y - 60], [x + 36, y - 84], [x - 36, y - 84]]); ctx.fill();
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; poly(ctx, [[x - 44, y - 66], [x + 44, y - 66], [x + 34, y - 84], [x - 34, y - 84]]); ctx.fill(); }
+        ctx.fillStyle = '#3a2418'; ctx.fillRect(x - 16, y - 50, 32, 38);
+        ctx.fillStyle = '#a0703f'; ctx.fillRect(x - 18, y - 30, 36, 18); // the half door
+        ctx.strokeStyle = '#6b4226'; ctx.lineWidth = 1.5; ctx.strokeRect(x - 18, y - 30, 36, 18);
+        ctx.fillStyle = '#e6c56a'; ctx.fillRect(x + 26, y - 26, 12, 14);
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 38, y - 24, 14, 10); // a water bucket
+      },
+    };
+  }
+
+  // Built with the map (needs room)
+  function buildSnowFeatures() {
+    const T = TILE;
+    L.hill = null; L.igloo = null; L.stable = null; L.drifts = [];
+    if (isWinter()) {
+      const quads = shuffled([...L.homeQs, L.pondQ, L.gardenQ]);
+      for (const q of quads) { const r = fitRect(q, 6, 9, 60); if (r) { reserve(r.x, r.y, 6, 9); L.hill = { x: r.x + 1, y: r.y + 1, w: 4, h: 7 }; objects.push(makeHill(L.hill)); break; } }
+      const s = freeSpotNear(L.plaza.x + rr(-6, 18), L.plaza.y + rr(-6, 18), 3, 2, 8) || randomFreeSpot(3, 2);
+      if (s) { L.igloo = { x: (s[0] + 1.5) * T, y: (s[1] + 1.6) * T }; objects.push(makeIgloo(L.igloo.x, L.igloo.y)); }
+      for (let k = 0; k < 7; k++) { const d = randomFreeSpot(2, 1); if (d) { const o = makeDrift((d[0] + 1) * T, (d[1] + 0.8) * T, rr(22, 30)); o.grow = 1; objects.push(o); L.drifts.push(o); } }
+      L.houses.forEach((h, i) => objects.push(makeEaves(h, i)));
+    }
+    const P = L.paddock;
+    const st = (P && (freeSpotNear(P.x - 4, P.y + 1, 3, 2, 5) || freeSpotNear(P.x + P.w + 1, P.y + 1, 3, 2, 5))) || randomFreeSpot(3, 2);
+    if (st) { L.stable = { x: (st[0] + 1.5) * T, y: (st[1] + 1.6) * T }; objects.push(makeStable(L.stable.x, L.stable.y)); }
+  }
+  function placeSnowItems() {
+    if (L.hill) placeFree('sled', (L.hill.x + 2) * TILE, (L.hill.y + 0.8) * TILE);
+    const h = L.houses[L.homes.mabel];
+    if (h) placeFree('tortoise', (h.doorX - 1.5) * TILE, (h.y + h.h + 1.6) * TILE, { owner: 'mabel' });
+  }
+
+  // --- Spawning ----------------------------------------------------------------------------------
+  function spawnSnowAnimals() {
+    const T = TILE;
+    const mk = (type, x, y, extra) => critters.push(Object.assign({ type, x, y, z: 0, dir: 'left', walk: 0, ph: rand() * 6, tx: null, wait: rr(0, 3), cd: 0 }, extra));
+    if (L.season === 'winter' || L.season === 'autumn') {
+      const fences = objects.filter((o) => o.kind === 'fence' && o.y < WORLD_H);
+      for (let k = 0; k < 3 && fences.length; k++) { const f = fences[Math.floor(rand() * fences.length)]; mk('robin', f.x + rr(-6, 6), f.y + 1, { z: 13, hx: f.x, hy: f.y + 1, hz: 13, flying: true, flyT: 0 }); }
+    }
+    if (isWinter()) {
+      if (L.coop) { const e = edgeSpot(L.coop.x, L.coop.y); if (e) mk('stoat', e.x, e.y, { hx: e.x, hy: e.y, state: 'lurk', t: rr(10, 25), carrier: true, carry: null }); }
+      const tall = (L.squirrelTrees || []).filter((tr) => tr.canopy);
+      if (tall.length) { const tr = tall[Math.floor(rand() * tall.length)]; mk('snowyowl', tr.x, tr.y + 1, { z: tr.y - tr.canopy.cy + tr.canopy.r * 0.6, flying: true, gone: false, circleT: 0 }); }
+      mk('sleigh', -80, (L.roadY + 1.1) * T, { flying: true, vx: 0, wait: rr(6, 14), presents: 4, dirX: 1, spook: 0 });
+    }
+    // Year-round animals
+    if (L.stable) mk('horse', L.stable.x + rr(-10, 10), L.stable.y + 28, { hx: L.stable.x, hy: L.stable.y + 28, face: 1, food: null, neighT: rr(6, 12), kickCD: 0 });
+    if (!isWinter() && L.kind !== 'seaside') {
+      const sp = shorePoint(rand() * Math.PI * 2);
+      mk('mamaduck', sp.x, sp.y, { hx: sp.x, hy: sp.y, flying: false });
+      const mum = critters[critters.length - 1];
+      let lead = mum;
+      for (let k = 0; k < 4; k++) { mk('duckling', sp.x - (k + 1) * 9, sp.y, { leader: lead, mum, follow: 'mum', flying: false }); lead = critters[critters.length - 1]; }
+      L.ducklings = true;
+    } else L.ducklings = false;
+    {
+      const P = L.paddock, base = P ? { x: (P.gx + 1) * T + 60, y: (P.gateBottom ? P.y + P.h + 2 : P.y - 2) * T } : { x: (L.plaza.x + 15) * T, y: (L.plaza.y + 3) * T };
+      if (!navBlockedPt(base.x, base.y)) mk('llama', base.x, base.y, { hx: base.x, hy: base.y, annoy: 0, spitCD: 0 });
+    }
+    L.spits = [];
+  }
+  const heldPosCritter = (c) => ({ x: c.x + (c.dir === 'right' ? 8 : -8), y: c.y + 0.5, z: (c.z || 0) + 3 });
+
+  // --- Behaviour -------------------------------------------------------------------------------------
+  function updateSnowAnimals(c, dt, near) {
+    const pd = Math.hypot(player.x - c.x, player.y - c.y);
+    const outside = areaOf(player.x, player.y) === 0;
+    const running = player.speed > WALK_SPEED * 1.15;
+    c.cd = Math.max(0, (c.cd || 0) - dt);
+    switch (c.type) {
+      case 'robin': {
+        if (c.flyT > 0) { // flitting to another perch
+          c.flyT -= dt; c.walk += dt * 30;
+          c.x += Math.cos(c.fa) * 90 * dt; c.y += Math.sin(c.fa) * 50 * dt; c.z = 13 + Math.sin((1 - c.flyT / 1.4) * Math.PI) * 30;
+          if (c.flyT <= 0) { c.hx = c.x; c.hy = c.y; c.z = 2; c.hz = 2; }
+          break;
+        }
+        if (outside && pd < 70 && running && !player.hidden) { c.flyT = 1.4; c.fa = Math.atan2(c.y - player.y, c.x - player.x) + rr(-0.6, 0.6); sfx('flutter'); break; }
+        if (outside && pd < 24 && !player.hidden && c.cd <= 0) { c.cd = 5; c.bubble = { text: '♪ tweet ♪', t: 1.2 }; completeTask('robin'); }
+        c.wait -= dt;
+        if (c.wait <= 0) { c.wait = rr(0.8, 2.5); c.dir = Math.random() < 0.5 ? 'left' : 'right'; c.z = c.hz + 2; }
+        c.z = Math.max(c.hz, c.z - dt * 20);
+        break;
+      }
+      case 'stoat': {
+        const scared = outside && !player.hidden && ((pd < 70 && running) || pd < 30);
+        if (c.state === 'flee') { if (wayTo(c, c.hx, c.hy, 150, dt)) { c.state = 'lurk'; c.t = rr(30, 50); c.path = null; } break; }
+        if (scared && c.state !== 'lurk') { stoatDrop(c, true); break; }
+        if (c.state === 'lurk') { c.t -= dt; if (c.t <= 0) { c.state = 'sneak'; c.path = null; } break; }
+        if (c.state === 'sneak') {
+          const egg = items.find((it) => it.kind === 'egg' && !it.held && !it.air && Math.hypot(it.x - L.coop.x, it.y - L.coop.y) < 140);
+          if (!egg) { c.state = 'flee'; c.path = null; break; }
+          if (wayTo(c, egg.x, egg.y, 60, dt) || Math.hypot(egg.x - c.x, egg.y - c.y) < 8) {
+            Object.assign(egg, { held: true, heldBy: c, air: false }); c.carry = egg; c.state = 'carry'; c.path = null; c.bubble = { text: '*snatch*', t: 0.8 };
+            lookTowards(c.x, c.y, 200, () => rpick(['A stoat! After the eggs!', 'Oi! My eggs!']));
+          }
+          break;
+        }
+        if (c.state === 'carry') {
+          if (wayTo(c, c.hx, c.hy, 85, dt)) { // got away with it
+            const i2 = items.indexOf(c.carry); if (i2 >= 0) items.splice(i2, 1);
+            c.carry = null; c.state = 'lurk'; c.t = rr(25, 45); c.path = null;
+          }
+        }
+        break;
+      }
+      case 'snowyowl': {
+        if (c.gone) { c.circleT += dt; c.x += Math.cos(c.circleT * 1.2) * 70 * dt; c.y += Math.sin(c.circleT * 1.2) * 40 * dt; c.z = 60 + Math.sin(c.circleT) * 10; c.walk += dt * 22; if (c.circleT > 12) { c.gone = false; c.z = c.homeZ; c.x = c.hx; c.y = c.hy; } break; }
+        if (c.homeZ === undefined) { c.homeZ = c.z; c.hx = c.x; c.hy = c.y; }
+        if (player.x !== c.x && pd < 220) c.dir = player.x > c.x ? 'right' : 'left';
+        break;
+      }
+      case 'sleigh': {
+        if (c.vx === 0) {
+          c.wait -= dt;
+          if (c.wait <= 0) { c.vx = 75 * c.dirX; c.x = c.dirX > 0 ? -60 : WORLD_W + 60; c.presents = Math.max(c.presents, 2); }
+          break;
+        }
+        c.spook = Math.max(0, c.spook - dt);
+        c.x += c.vx * (c.spook > 0 ? 2.2 : 1) * dt; c.dir = c.vx > 0 ? 'right' : 'left'; c.moving = true; c.walk += dt * 12;
+        if (Math.random() < dt * 2 && pd < 400) sfx('jingle');
+        if (outside && !player.hidden && c.spook <= 0 && ((near && pd < 60) || pd < 30)) sleighSpook(c);
+        if ((c.vx > 0 && c.x > WORLD_W + 80) || (c.vx < 0 && c.x < -80)) { c.vx = 0; c.dirX = -c.dirX; c.wait = rr(30, 50); }
+        break;
+      }
+      case 'horse': {
+        c.kickCD = Math.max(0, c.kickCD - dt);
+        c.neighT -= dt;
+        if (c.neighT <= 0) { c.neighT = rr(9, 16); c.bubble = { text: 'Neighhh', t: 1.2 }; if (pd < 300) sfx('neigh'); }
+        if (!c.food || !items.includes(c.food) || c.food.held || c.food.air) {
+          c.food = null;
+          for (const f of items) if (isFood(f) && f.touched && !f.held && !f.air && areaOf(f.x, f.y) === 0 && Math.hypot(f.x - c.x, f.y - c.y) < 90) { c.food = f; break; }
+        }
+        if (c.food) {
+          if (critterMove(c, c.food.x, c.food.y, 30, dt) || Math.hypot(c.food.x - c.x, c.food.y - c.y) < 10) {
+            const i2 = items.indexOf(c.food); if (i2 >= 0) items.splice(i2, 1);
+            crumbs(c.x, c.y, 6, 6, '#c9b57e'); c.food = null; c.bubble = { text: 'Neigh! ♥', t: 1.3 }; sfx('neigh');
+            for (let k = 0; k < 3; k++) particles.push({ kind: 'heart', x: c.x + rr(-6, 6), y: c.y, z: 26 + k * 4, life: 1.2, max: 1.2 });
+            completeTask('horse');
+          }
+          c.face = c.dir === 'right' ? 1 : -1;
+          break;
+        }
+        // Never walk behind a horse
+        const behind = Math.sign(player.x - c.x) === -c.face && Math.abs(player.y - c.y) < 14 && Math.abs(player.x - c.x) < 30;
+        if (outside && behind && player.speed > 15 && c.kickCD <= 0) {
+          c.kickCD = 4; c.kick = 0.4; c.bubble = { text: 'NEIGH!', t: 1 }; sfx('neigh'); sfx('bonk');
+          knockPlayer(c.x, c.y, 260); completeTask('horsekick');
+        }
+        c.kick = Math.max(0, (c.kick || 0) - dt);
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.hx + rr(-36, 36); c.ty = c.hy + rr(-6, 14); c.wait = rr(3, 7); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 14, dt)) c.tx = null;
+        c.face = c.dir === 'right' ? 1 : -1;
+        break;
+      }
+      case 'mamaduck': {
+        const kidsGone = critters.some((d) => d.type === 'duckling' && d.follow === 'player');
+        if (kidsGone && outside) { // waddles after you, quacking crossly
+          if (pd > 40) critterMove(c, player.x, player.y, 34, dt);
+          if (Math.random() < dt * 0.8) { c.bubble = { text: 'QUACK! QUACK!', t: 0.9 }; if (pd < 260) sfx('quack'); }
+          break;
+        }
+        c.wait -= dt;
+        if (c.wait <= 0) { const sp = shorePoint(Math.atan2(c.y / TILE - L.pond.cy, c.x / TILE - L.pond.cx) + rr(-0.5, 0.5)); c.tx = sp.x; c.ty = sp.y; c.wait = rr(3, 6); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 18, dt)) c.tx = null;
+        break;
+      }
+      case 'duckling': {
+        if (c.follow === 'mum' && outside && !player.hidden && pd < 36 && player.speed > 15 && !running) {
+          // imprint on the raccoon: the whole line follows you now
+          for (const d of critters) if (d.type === 'duckling') d.follow = 'player';
+          L.paradeT = 0; c.bubble = { text: 'peep!', t: 0.8 }; sfx('peep');
+        }
+        if (c.follow === 'player' && (running || !outside || player.hidden)) { for (const d of critters) if (d.type === 'duckling') d.follow = 'mum'; sfx('peep'); }
+        const leadIdx = critters.filter((d) => d.type === 'duckling').indexOf(c);
+        let lx, ly;
+        if (c.follow === 'player') {
+          const ducks = critters.filter((d) => d.type === 'duckling');
+          const prev = leadIdx === 0 ? player : ducks[leadIdx - 1];
+          lx = prev.x; ly = prev.y;
+        } else { lx = c.leader.x; ly = c.leader.y; }
+        if (Math.hypot(lx - c.x, ly - c.y) > 11) critterMove(c, lx, ly, Math.max(30, Math.hypot(lx - c.x, ly - c.y) * 3), dt);
+        if (leadIdx === 0 && c.follow === 'player') {
+          L.paradeT = (L.paradeT || 0) + dt;
+          if (Math.random() < dt * 0.7) { c.bubble = { text: 'peep peep', t: 0.7 }; if (pd < 200) sfx('peep'); }
+          if (L.paradeT > 12) completeTask('ducklings');
+        }
+        break;
+      }
+      case 'llama': {
+        c.annoy = Math.max(0, c.annoy - dt); c.spitCD = Math.max(0, c.spitCD - dt);
+        const front = Math.sign(player.x - c.x) === (c.dir === 'right' ? 1 : -1);
+        if (outside && pd < 44 && front && !player.hidden && c.annoy <= 0 && player.speed > 10) { c.annoy = 5; c.bubble = { text: 'Hmmmph.', t: 1 }; }
+        if (c.annoy > 0) {
+          let tgt = null, td = 1e9;
+          for (const v of villagers) { const d = Math.hypot(v.x - c.x, v.y - c.y); if (areaOf(v.x, v.y) === 0 && d < 110 && d < td) { td = d; tgt = v; } }
+          if (!tgt && outside && pd < 110 && !player.hidden) tgt = player;
+          if (tgt) {
+            c.dir = tgt.x > c.x ? 'right' : 'left';
+            if (c.spitCD <= 0) { c.spitCD = 1.6; c.bubble = { text: 'PTOO!', t: 0.7 }; sfx('spit'); L.spits.push({ x: c.x + (c.dir === 'right' ? 10 : -10), y: c.y, z: 26, tgt, t: 1.2 }); }
+          }
+          break;
+        }
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.hx + rr(-60, 60); c.ty = c.hy + rr(-40, 40); c.wait = rr(2, 5); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 20, dt)) c.tx = null;
+        break;
+      }
+    }
+  }
+  function stoatDrop(c, scared) {
+    if (c.carry) {
+      const it = c.carry; c.carry = null;
+      Object.assign(it, { held: false, heldBy: null, x: c.x, y: c.y, z: 4, air: true, vz: 40, vx: rr(-30, 30), vy: rr(-10, 10), ghost: true });
+      if (scared) completeTask('stoat');
+    }
+    c.state = 'flee'; c.path = null; c.bubble = { text: 'Chk!', t: 0.7 };
+  }
+  function sleighSpook(c) {
+    c.spook = 1.2; c.bubble = { text: 'Snort!', t: 0.8 }; sfx('jingle'); sfx('jingle');
+    if (c.presents > 0) {
+      c.presents--;
+      const it = addItem('present', c.x - (c.vx > 0 ? 20 : -20), c.y);
+      Object.assign(it, { air: true, z: 14, vz: 90, vx: rr(-40, 40), vy: rr(20, 60), spin: rr(-6, 6), kicker: 'sleigh' });
+    }
+  }
+  function snowScare(c, x, y, r) {
+    const real = r < 9999;
+    if (c.type === 'robin' && !(c.flyT > 0)) { c.flyT = 1.4; c.fa = Math.atan2(c.y - y, c.x - x) + rr(-0.6, 0.6); }
+    if (c.type === 'stoat' && real && c.state !== 'lurk') stoatDrop(c, true);
+    if (c.type === 'snowyowl' && real && !c.gone && Math.hypot(c.x - x, c.y - y) < 150) { c.gone = true; c.circleT = 0; c.bubble = { text: 'HOOO!', t: 1 }; sfx('hoot'); sfx('flutter'); completeTask('snowyowl'); }
+    if (c.type === 'sleigh' && real && c.vx !== 0 && c.spook <= 0) sleighSpook(c);
+    if (c.type === 'llama' && real) { c.annoy = 6; c.bubble = { text: 'HMMMPH!', t: 1 }; }
+    if (c.type === 'duckling' && c.follow === 'player') { for (const d of critters) if (d.type === 'duckling') d.follow = 'mum'; }
+    if (c.type === 'mamaduck' && real) { c.bubble = { text: 'QUACK!', t: 0.8 }; sfx('quack'); }
+  }
+
+  // --- Once a frame: weather extras, sledging, snowmen, Toby's snowballs, tortoise, spit --------
+  function updateSnowWorld(dt) {
+    if (!L || !started || paused) return;
+    const outside = areaOf(player.x, player.y) === 0;
+    // Blizzard: wind shoves you along, and drifts pile up over the paths
+    if (L.weather === 'blizzard' && outside) {
+      if (!collides(player.x + 22 * dt, player.y) && !player.hidden) player.x += 22 * dt;
+      L.driftT = (L.driftT || 0) - dt;
+      if (L.driftT <= 0 && L.drifts.length < 22) {
+        L.driftT = 3;
+        for (let n = 0; n < 20; n++) {
+          const x = player.x + rr(-350, 350), y = player.y + rr(-250, 250), t0 = tileAt(x, y);
+          if (areaOf(x, y) !== 0 || ![PATH, GRASS, STONE].includes(t0) || navBlockedPt(x, y) || L.drifts.some((d) => Math.hypot(d.x - x, d.y - y) < 60) || Math.hypot(x - player.x, y - player.y) < 60) continue;
+          const o = makeDrift(x, y, rr(22, 32)); objects.push(o); L.drifts.push(o); hideBushes.push(o); break;
+        }
+      }
+    }
+    for (const d of L.drifts) d.grow = Math.min(1, d.grow + dt * 0.15);
+    // Snowflakes on your tongue: stand still, face up
+    if (snowing() && outside && player.dir === 'up' && (player.idleT || 0) > 1.5 && !player.held) {
+      if (!player.tongueDone) { player.tongueDone = true; player.bubble = { text: 'mmm, snow!', t: 1.4 }; completeTask('snowflake'); }
+    } else if ((player.idleT || 0) < 0.2) player.tongueDone = false;
+    // Roof snow: something thrown hard against the front of a house
+    if (L.roofs) for (const it of items) {
+      if (!it.air || Math.hypot(it.vx, it.vy) < 90) continue;
+      L.houses.forEach((h, i) => { if (it.x > h.x * TILE && it.x < (h.x + h.w) * TILE && it.y > (h.y + h.h) * TILE - 4 && it.y < (h.y + h.h) * TILE + 10) roofHit(i); });
+    }
+    // Sledging
+    if (player.sled) {
+      if (onHill(player.x, player.y) && player.speed > 170) completeTask('sledge');
+      if (player.speed > 110) for (const v of villagers) {
+        if (areaOf(v.x, v.y) !== 0 || Math.hypot(v.x - player.x, v.y - player.y) > 16) continue;
+        if (startleV(v, rpick(['WHOA!', 'Mind out!', 'Oof! A sledging raccoon!']), { state: 'sulk' })) { v.stateT = 2; sfx('thud'); completeTask('sledbump'); }
+      }
+      if (Math.random() < dt * player.speed * 0.15) particles.push({ kind: 'shard', col: '#f4f8fb', x: player.x + rr(-6, 6), y: player.y, z: 1, vx: rr(-20, 20), vy: -player.vy * 0.1, vz: rr(20, 50), life: 0.4, max: 0.4 });
+    }
+    // Build your own snowman: three snowballs dropped together
+    if (isWinter()) {
+      const balls = items.filter((it) => it.kind === 'snowball' && !it.held && !it.air && areaOf(it.x, it.y) === 0);
+      for (const b of balls) {
+        const near = balls.filter((o) => Math.hypot(o.x - b.x, o.y - b.y) < 26);
+        if (near.length >= 3) {
+          for (const o of near.slice(0, 3)) items.splice(items.indexOf(o), 1);
+          const s = makeSnowman(b.x, b.y + 4); objects.push(s); solidObjects.push(s); L.extra.snowmen.push(s);
+          sparkle(b.x, b.y, 20); sfx('happy'); player.bubble = { text: 'ta-da!', t: 1.4 };
+          completeTask('buildsnowman');
+          break;
+        }
+      }
+    }
+    // Snowball fights: Toby pelts you if he spots you
+    const tb = VILLAGER.toby;
+    if (tb && isWinter() && (tb.state === 'act' || tb.state === 'route') && areaOf(tb.x, tb.y) === 0 && outside && !player.hidden) {
+      tb.snowCD = (tb.snowCD || 0) - dt;
+      const d = Math.hypot(player.x - tb.x, player.y - tb.y);
+      if (tb.snowCD <= 0 && d < 170 && d > 30 && canSeePlayer(tb)) {
+        tb.snowCD = rr(2.2, 3.5);
+        if (!tb.fightOn) { tb.fightOn = true; say(tb, 'SNOWBALL FIGHT!', 1.6); }
+        const it = addItem('snowball', tb.x, tb.y - 2), tt = d / 230;
+        Object.assign(it, { air: true, z: 14, vx: (player.x + player.vx * tt * 0.5 - tb.x) / tt, vy: (player.y + player.vy * tt * 0.5 - tb.y) / tt, vz: 760 * tt / 2 - 14 / tt, kicker: 'toby', fromToby: true });
+      }
+    }
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      if (!it.fromToby || !it.air || Math.hypot(it.x - player.x, it.y - player.y) > 12 || it.z > 24) continue;
+      items.splice(i, 1);
+      for (let k = 0; k < 8; k++) particles.push({ kind: 'shard', col: '#f4f8fb', x: player.x, y: player.y, z: 12, vx: rr(-40, 40), vy: rr(-20, 20), vz: rr(30, 80), life: 0.5, max: 0.5 });
+      sfx('splat'); player.bubble = { text: 'brrr!', t: 1 }; player.stun = Math.max(player.stun, 0.25);
+    }
+    // The tortoise plods about
+    for (const it of items) {
+      if (it.kind !== 'tortoise') continue;
+      it.walking = false;
+      if (it.held || it.air || it.floating) continue;
+      it.tw = (it.tw || 0) - dt;
+      if (it.tw <= 0) { it.tw = rr(3, 7); it.ta = Math.random() * Math.PI * 2; it.facing = Math.cos(it.ta) >= 0 ? 1 : -1; }
+      const nx = it.x + Math.cos(it.ta) * 5 * dt, ny = it.y + Math.sin(it.ta) * 3 * dt;
+      if (!itemBlocked(it, nx, ny) && tileAt(nx, ny) !== WATER) { it.x = nx; it.y = ny; it.walking = true; } else it.tw = 0;
+    }
+    // Llama spit in flight
+    for (let i = L.spits.length - 1; i >= 0; i--) {
+      const s = L.spits[i], tg = s.tgt;
+      s.t -= dt;
+      const dx = tg.x - s.x, dy = tg.y - s.y, d = Math.hypot(dx, dy);
+      if (d > 1) { s.x += dx / d * Math.min(d, 240 * dt); s.y += dy / d * Math.min(d, 240 * dt); }
+      s.z = Math.max(8, s.z - dt * 20);
+      if (d < 8) {
+        L.spits.splice(i, 1);
+        for (let k = 0; k < 6; k++) particles.push({ kind: 'drop', x: tg.x, y: tg.y, z: 14, vx: rr(-30, 30), vy: rr(-15, 15), vz: rr(20, 60), life: 0.5, max: 0.5 });
+        if (tg === player) { player.bubble = { text: 'Ew! Llama spit!', t: 1.4 }; player.stun = Math.max(player.stun, 0.3); completeTask('llama'); }
+        else if (startleV(tg, rpick(['EUGH! Llama spit!', 'Disgusting!', 'In my hair?!']), { state: 'sulk' })) { tg.stateT = 2; completeTask('llamaspit'); }
+        continue;
+      }
+      if (s.t <= 0) L.spits.splice(i, 1);
+    }
+  }
+  function drawSpits(ctx) {
+    if (!L || !L.spits) return;
+    for (const s of L.spits) { ctx.fillStyle = 'rgba(220,235,210,0.9)'; circle(ctx, s.x, s.y - s.z, 2.2); ctx.fillStyle = 'rgba(255,255,255,0.8)'; circle(ctx, s.x - 0.6, s.y - s.z - 0.6, 0.8); }
+  }
+  // E by the sledge sits on it; E again climbs off
+  function sledAction() {
+    if (player.sled) {
+      player.sled = false;
+      const it = addItem('sled', player.x + 12, player.y + 4); it.touched = true;
+      return true;
+    }
+    if (player.held || player.boat || !target || target.kind !== 'sled') return false;
+    items.splice(items.indexOf(target), 1);
+    Object.assign(player, { sled: true }); sfx('tap');
+    player.bubble = { text: 'wheee?', t: 1 };
+    return true;
+  }
+  function drawSledUnder(ctx, x, y) {
+    ctx.save(); ctx.translate(x, y + 2);
+    ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-13, 0); ctx.lineTo(11, 0); ctx.quadraticCurveTo(15, 0, 14, -5); ctx.stroke();
+    ctx.fillStyle = '#c0392b'; ctx.fillRect(-12, -6, 22, 4);
+    ctx.restore();
+  }
+
+  // --- Drawing the animals ---------------------------------------------------------------------
+  function drawSnowAnimal(ctx, c, t) {
+    ctx.save(); ctx.translate(c.x, c.y);
+    const big = c.type === 'horse' || c.type === 'llama' || c.type === 'sleigh';
+    if (c.type !== 'robin' && c.type !== 'snowyowl') { ctx.fillStyle = 'rgba(20,30,10,0.22)'; ellipse(ctx, 0, 0, big ? 16 : c.type === 'duckling' ? 3 : 7, big ? 4 : 2); }
+    ctx.translate(0, -(c.z || 0));
+    if (c.dir === 'left') ctx.scale(-1, 1);
+    const step = c.moving ? Math.sin(c.walk * 2) * 2 : 0;
+    switch (c.type) {
+      case 'robin': {
+        const flap = c.flyT > 0 ? Math.sin(c.walk) * 3 : 0;
+        ctx.fillStyle = '#7a5a3a'; ellipse(ctx, 0, -3, 3.4, 3); if (flap) { poly(ctx, [[-1, -4], [-5, -7 - flap], [1, -3]]); ctx.fill(); }
+        ctx.fillStyle = '#e8592a'; ellipse(ctx, 1.4, -2.6, 2, 2);
+        ctx.fillStyle = '#7a5a3a'; poly(ctx, [[-3, -3], [-6, -5], [-5.5, -2]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 2, -4.4, 0.5); ctx.fillStyle = '#e8a33a'; poly(ctx, [[3.2, -3.8], [4.8, -3.4], [3.2, -3]]); ctx.fill();
+        break;
+      }
+      case 'stoat': {
+        ctx.fillStyle = '#f8f8f6';
+        ctx.beginPath(); ctx.moveTo(-9, -4); ctx.quadraticCurveTo(-3, -9 + step * 0.5, 3, -5); ctx.lineTo(3, -3); ctx.quadraticCurveTo(-3, -6, -9, -2); ctx.fill();
+        ellipse(ctx, 5, -5.5, 3, 2.4);
+        ctx.fillStyle = '#1d1d22'; poly(ctx, [[-9, -4], [-13, -5], [-12, -2], [-9, -2]]); ctx.fill(); // black-tipped tail
+        circle(ctx, 6.5, -6, 0.6); circle(ctx, 8, -5.2, 0.6);
+        break;
+      }
+      case 'snowyowl': {
+        const flap = c.gone ? Math.sin(c.walk * 2) * 4 : 0;
+        ctx.fillStyle = '#f8f8f6'; ellipse(ctx, 0, -7, 5.2, 6.8);
+        if (c.gone) { poly(ctx, [[-3, -8], [-13, -12 - flap], [-3, -4]]); ctx.fill(); poly(ctx, [[3, -8], [13, -12 - flap], [3, -4]]); ctx.fill(); }
+        ctx.fillStyle = '#1d1d22'; for (const [x, y] of [[-2, -5], [2, -4], [0, -7.5], [-2.5, -2.5], [2.5, -2]]) circle(ctx, x, y, 0.5);
+        ctx.fillStyle = '#f2c14e'; circle(ctx, -2, -11, 1.7); circle(ctx, 2, -11, 1.7);
+        ctx.fillStyle = '#1d1d22'; circle(ctx, -2, -11, 0.8); circle(ctx, 2, -11, 0.8);
+        break;
+      }
+      case 'sleigh': {
+        // the reindeer out in front, the sleigh full of presents behind
+        ctx.fillStyle = '#7a5a3a';
+        for (const lx of [10, 13, 20, 23]) ctx.fillRect(lx + (lx % 2 ? step : -step) * 0.5, -12, 1.8, 12);
+        roundRect(ctx, 8, -19, 18, 8, 4, true);
+        poly(ctx, [[22, -17], [26, -17], [29, -24], [26, -25]]); ctx.fill();
+        roundRect(ctx, 26, -28, 8, 6, 2.5, true);
+        ctx.fillStyle = '#e8453c'; circle(ctx, 34, -25, 1.6);
+        ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(28, -28); ctx.lineTo(26, -34); ctx.lineTo(23, -36); ctx.moveTo(26, -34); ctx.lineTo(29, -37); ctx.moveTo(31, -28); ctx.lineTo(32, -34); ctx.lineTo(35, -36); ctx.stroke();
+        ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, -15); ctx.lineTo(-2, -10); ctx.stroke();
+        ctx.fillStyle = '#f2c14e'; circle(ctx, 14, -14, 1.2); // bell
+        ctx.strokeStyle = '#c9a33a'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-30, 0); ctx.lineTo(-2, 0); ctx.quadraticCurveTo(3, 0, 2, -5); ctx.stroke();
+        ctx.fillStyle = '#c0392b'; poly(ctx, [[-30, -4], [-2, -4], [0, -14], [-26, -14], [-30, -20]]); ctx.fill();
+        const cols = ['#3f7f6a', '#4f6fa8', '#f2c14e', '#7a4f8f'];
+        for (let k = 0; k < c.presents; k++) { ctx.fillStyle = cols[k % 4]; ctx.fillRect(-26 + k * 6, -22 - (k % 2) * 3, 6, 7); ctx.fillStyle = '#ffffff'; ctx.fillRect(-23.5 + k * 6, -22 - (k % 2) * 3, 1, 7); }
+        break;
+      }
+      case 'horse': {
+        const kick = c.kick > 0 ? -6 : 0;
+        ctx.fillStyle = '#c98a4a';
+        ctx.fillRect(-10 + (kick ? 0 : step * 0.5), -14, 2.6, 14 + (kick ? -4 : 0));
+        ctx.save(); if (kick) { ctx.translate(-8, -12); ctx.rotate(0.9); ctx.translate(8, 12); } ctx.fillRect(-7, -14, 2.6, 14); ctx.restore();
+        ctx.fillRect(6 - step * 0.5, -14, 2.6, 14); ctx.fillRect(9 + step * 0.5, -14, 2.6, 14);
+        roundRect(ctx, -12, -24, 25, 11, 5, true);
+        poly(ctx, [[8, -22], [13, -22], [18, -33], [13, -34]]); ctx.fill();
+        roundRect(ctx, 14, -36, 10, 6, 2.5, true);
+        ctx.fillStyle = '#3a2418'; ctx.fillRect(9, -33, 3, 10); // mane
+        ctx.beginPath(); ctx.moveTo(-12, -21); ctx.quadraticCurveTo(-18, -16, -16, -8 + Math.sin(c.ph * 2)); ctx.lineWidth = 2.4; ctx.strokeStyle = '#3a2418'; ctx.stroke();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 18, -34, 0.8);
+        ctx.fillStyle = '#f4f2ee'; ctx.fillRect(21, -35, 2, 4);
+        break;
+      }
+      case 'mamaduck': case 'duckling': {
+        const s = c.type === 'duckling' ? 0.55 : 1, bob = c.moving ? Math.abs(Math.sin(c.walk * 2)) : 0;
+        ctx.scale(s, s); ctx.translate(0, -bob);
+        ctx.fillStyle = c.type === 'duckling' ? '#f7d74a' : '#a08060'; ellipse(ctx, 0, -4, 6, 4);
+        ctx.fillStyle = c.type === 'duckling' ? '#f7d74a' : '#8a6a4a'; circle(ctx, 5, -8, 3.2);
+        ctx.fillStyle = '#e8a33a'; poly(ctx, [[7.5, -8.5], [11, -7.6], [7.5, -6.6]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 6, -9, 0.7);
+        break;
+      }
+      case 'llama': {
+        ctx.fillStyle = '#efe3cf';
+        for (const lx of [-7, -4, 5, 8]) ctx.fillRect(lx + (lx < 0 ? step : -step) * 0.4, -12, 2.2, 12);
+        roundRect(ctx, -10, -21, 21, 10, 5, true);
+        roundRect(ctx, 7, -38, 6, 19, 3, true);
+        roundRect(ctx, 8, -42, 9, 7, 3, true);
+        poly(ctx, [[8.5, -42], [8, -47], [10.5, -42]]); ctx.fill(); poly(ctx, [[12, -42], [12, -47], [14, -42]]); ctx.fill();
+        ctx.fillStyle = '#c0392b'; ctx.fillRect(-3, -21, 8, 4); // a little blanket
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 14, -40, 0.8);
+        if (c.annoy > 0) { ctx.strokeStyle = '#1d1d22'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(12.5, -42); ctx.lineTo(15.5, -41); ctx.stroke(); }
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -7528,6 +8162,10 @@
         for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.5);
         const s = actx.createBufferSource(); s.buffer = b; const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 180;
         const g = actx.createGain(); g.gain.value = 0.9; s.connect(f).connect(g).connect(master); s.start(); break; }
+      case 'jingle': [1800, 2200, 2000].forEach((f, k) => tone(f, f * 1.02, 0.07, 'triangle', 0.025, k * 0.05)); break;
+      case 'neigh': tone(700, 900, 0.15, 'sawtooth', 0.035); tone(900, 500, 0.35, 'sawtooth', 0.03, 0.14); break;
+      case 'peep': tone(2200, 2600, 0.06, 'sine', 0.035); break;
+      case 'spit': noise(0.12, 0.12, 2800); tone(300, 120, 0.08, 'square', 0.03); break;
       case 'growl': tone(110, 90, 0.4, 'sawtooth', 0.06); break;
       case 'honk': tone(330, 280, 0.16, 'sawtooth', 0.06); tone(320, 260, 0.2, 'sawtooth', 0.05, 0.18); break;
       case 'oink': tone(240, 180, 0.12, 'sawtooth', 0.05); tone(220, 170, 0.12, 'sawtooth', 0.04, 0.14); break;
@@ -7757,7 +8395,7 @@
     vis.push(playerEntry);
     vis.sort((a, b) => a.y - b.y);
     for (const o of vis) {
-      if (o.isPlayer) { if (player.boat) drawRowboat(ctx, player.x, player.y + 2, t, player.speed > 10); drawPlayerWithHeld(ctx, t); continue; }
+      if (o.isPlayer) { if (player.boat) drawRowboat(ctx, player.x, player.y + 2, t, player.speed > 10); if (player.sled) drawSledUnder(ctx, player.x, player.y); drawPlayerWithHeld(ctx, t); continue; }
       if (o.isItem) { drawItem(ctx, o, t); continue; }
       if (o.isVillager) { drawVillagerWithHeld(ctx, o.v, t); continue; }
       if (o.isDog) { drawDogWithHeld(ctx, t); continue; }
@@ -7770,7 +8408,7 @@
       o.draw(ctx, t, fade);
     }
 
-    if (!indoors) drawWhirl(ctx, t);
+    if (!indoors) { drawWhirl(ctx, t); drawSpits(ctx); }
     // Indoors: black out everything beyond this room's walls (other rooms share the strip)
     if (indoors) {
       const R = indoors.room, rx = R.x0 * TILE, ry = R.y0 * TILE - 10, rw = 11 * TILE, rh = 8 * TILE + 10;
@@ -7911,6 +8549,7 @@
       updateCritters(dt);
       updateWildsWorld(dt);
       updateKinds(dt);
+      updateSnowWorld(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
@@ -7956,9 +8595,9 @@
     placePuddles();
     spawnCritters();
     spawnWeather();
-    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack'); // places to hide
+    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack' || o.kind === 'drift' || o.kind === 'igloo'); // places to hide
     spawnAmbient();
-    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0 });
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0, sled: false, tongueDone: false });
     target = null;
     cam.x = player.x; cam.y = player.y;
   }

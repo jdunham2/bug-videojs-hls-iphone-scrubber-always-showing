@@ -57,6 +57,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     villagers barely see or hear a thing; run through a puddle next to one to soak them.
   - *Whirlwind* (on windy days): a dust devil that wanders the village, flinging things into the air and
     sending you spinning if it catches you.
+  - *Sleet* (spring, autumn, winter): half rain, half snow, and slippery paths.
+  - *Blizzard* (winter): a near whiteout; the wind shoves you along and drifts pile up as it blows.
+  - *Surprise snow* (late autumn, early spring): snow falling outside winter.
   - *Frost* (autumn, winter): icy, slippery paths; villagers chasing you along them may slip and fall.
   - The weather can change partway through the day; the morning card gives the forecast, and a toast tells you
     when it turns. When rain clears up, a rainbow appears with a pot of gold at its end (+3 shinies).
@@ -78,11 +81,23 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   someone's things past it, a pig in a mud wallow (roll in it and you leave muddy pawprints everywhere, even
   indoors, until a puddle or the rain washes you off), mice indoors that send villagers shrieking if you
   chase one at them, and Pepper, a yappy terrier who gives you away until you win her over with a snack.
+- **Winter animals**: robins on the fences (walk up quietly), a white stoat that sneaks into the hen house
+  and runs off with an egg (scare it and it drops it), a snowy owl in the trees, and a reindeer pulling a
+  sleigh of presents along the road (startle it and a present falls off).
+- **Year-round animals**: a horse by its stable (feed it, but never walk behind it), a mother duck and her
+  ducklings (walk up slowly and they follow you instead; run and they scurry back to mum, who chases you,
+  quacking), a llama that spits at whoever annoys it (or whoever is nearest), and Granny Mabel's tortoise,
+  which plods about and can be carried off.
+- **Snow fun** (winter): a sledging hill (E by the sledge to ride it; crash into villagers at the bottom),
+  three snowballs dropped together make your own snowman, Toby starts a snowball fight when he spots you
+  (hit him three times to win), snowdrifts to burrow into, an igloo to hide in, and something thrown hard at
+  the front of a house knocks off the icicles and dumps the roof snow on anyone by the door. Stand still
+  and look up while it's snowing to catch a snowflake on your tongue.
 - **At dusk** (the last part of the day, not in winter): windows light up, hedgehogs snuffle out from the
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 124 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 145 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -149,7 +164,10 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   `updateWildsWorld()` (hive, mud, whirlwind), `drawWhirl()`, `drawFrost()` / `frostSlip()`;
   new villages and events: `buildKindEarly()` / `buildKindLate()` / `placeKindItems()` (stalls, cart, windmill,
   wheat, barn, jetty, contest, event decorations), `buildLakeIsland()`, `buildJetty()`, `boatAction()`,
-  `withStall()` (stallholders' rounds), `updateKinds()` (rowing, cart, flour, scarecrows, fireworks), `pickEvent()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
+  `withStall()` (stallholders' rounds), `updateKinds()` (rowing, cart, flour, scarecrows, fireworks), `pickEvent()`;
+  snow and year-round animals: `buildSnowFeatures()` / `placeSnowItems()` (hill, igloo, drifts, eaves, stable),
+  `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
+  (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
   `subscribeScores()`/`postScore()`/`renderBoard()` (db `scores/<user id>`)
 - **Eating**: `FOOD` table, `startEating()`, `updateEating()` (bites, tummy, stuffed, sugar rush), `finishFood()`
