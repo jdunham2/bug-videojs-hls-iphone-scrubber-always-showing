@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 15, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 16, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -530,7 +530,35 @@ const RAILS = [];
   D.camp = { x: (X + 20) * T, y: 9 * T };
   D.start = { x: (X + 20) * T, y: 4 * T + 8 };
 }
-const nearCaveSite = (tx, ty, d) => Math.hypot(tx - CAVE_D.camp.x / T, ty - CAVE_D.camp.y / T) < d || Math.hypot(tx - CAVE_D.x0 - 20, ty - 4) < 3 || RAILS.some(R => R.pts.some(([x, y]) => Math.hypot(tx - x / T, ty - y / T) < 2.5));
+const nearCaveSite = (tx, ty, d) => Math.hypot(tx - CAVE_D.camp.x / T, ty - CAVE_D.camp.y / T) < d || Math.hypot(tx - CAVE_D.x0 - 20, ty - 4) < 3 || RAILS.some(R => R.pts.some(([x, y]) => Math.hypot(tx - x / T, ty - y / T) < 2.5)) || Math.hypot(tx - CAVE_D.x0 - 28, ty - 38) < 4;
+// ---------- the Prism Vault: a crystal vault in Glimmerdeep's south cavern ----------
+const VAULT = { x: (CAVE_D.x0 + 28) * T, y: 38 * T + 4, tx: CAVE_D.x0 + 28, ty: 38 };
+for (let y = 35; y <= 40; y++) for (let lx = 25; lx <= 31; lx++) if (tiles[y * W + CAVE_D.x0 + lx] === DEEP) tiles[y * W + CAVE_D.x0 + lx] = LAND;
+ENTRANCES.push(VAULT); pathLine(CAVE_D.x0 + 24, 36, CAVE_D.x0 + 28, 39);
+const VAULT_D = makeDungeon('vault', 'The Prism Vault', 15, VAULT, { tint: 'rgb(200,200,240)',
+  gateMsg: 'A crystal seal blocks the way. Strike the three crystal switches in the gallery.', bossDoorMsg: 'A door of solid amethyst. The Mole King keeps its key.',
+  objective: g => !g.open.sw ? 'Strike the three crystal switches in the dark gallery to open the seal.'
+    : !g.open.lock ? (g.keys ? 'Use the small key on the door in the west wall, north of the chasm.' : 'Find a small key. Look in the alcove east of the chasm hall. Ride the mine cart to cross the chasm.')
+    : !S.defeated.mole ? 'Defeat the Mole King. Stand by a crystal pillar when he tunnels: he will crash into it.'
+    : !g.open.boss ? 'Open the amethyst door north of the chasm with the Boss Key.'
+    : !S.defeated.hydra ? 'Defeat the Crystal Hydra. Dodge a head\'s bite, then strike it while it is stuck in the ground.' : 'The vault is still. Take the stairs back up.' });
+{
+  const D = VAULT_D;
+  carve(D, 6, 1, 33, 10);                          // the Crystal Hydra's lair
+  carve(D, 19, 11, 20, 12);
+  carve(D, 12, 13, 27, 24);                        // the chasm hall
+  for (let x = 12; x <= 27; x++) for (let y = 16; y <= 20; y++) dset(D, x, y, DEEP);
+  carve(D, 28, 21, 30, 23);                        // key alcove (south bank)
+  carve(D, 1, 13, 10, 24);                         // the Mole King's den
+  carve(D, 3, 26, 36, 33);                         // the dark gallery
+  carve(D, 19, 34, 20, 34); entryHall(D);
+  addDoor(D, 'sw', 'switch', [[19, 25], [20, 25]], GATE);
+  addDoor(D, 'lock', 'lock', [[11, 14], [11, 15]], LOCK, [10, 14]);
+  addDoor(D, 'boss', 'boss', [[19, 11], [20, 11]], BDOOR);
+  for (const [i, x, y] of [[1, 5, 27], [2, 34, 27], [3, 20, 32]]) D.switches.push({ id: 'p' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
+  for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
+  RAILS.push({ pts: [[(D.x0 + 23) * T + 16, 22 * T + 16], [(D.x0 + 23) * T + 16, 14 * T + 8]] });
+}
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -723,6 +751,7 @@ function drawDungeonTile(c, x, y) {
     c.fillStyle = '#2a1a16'; if (floorLike(tileAt(x, y - 1))) c.fillRect(px, py, T, 4); if (floorLike(tileAt(x, y + 1))) c.fillRect(px, py + T - 4, T, 4); if (floorLike(tileAt(x - 1, y))) c.fillRect(px, py, 4, T); if (floorLike(tileAt(x + 1, y))) c.fillRect(px + T - 4, py, 4, T);
     return;
   }
+  if (t === DEEP) { c.fillStyle = '#030308'; c.fillRect(px, py, T, T); if (floorLike(tileAt(x, y - 1))) { c.fillStyle = '#2a2638'; c.fillRect(px, py, T, 12); c.fillStyle = '#1a1826'; c.fillRect(px, py + 8, T, 4); } return; }
   if (t === POOL) spr(c, 'w_c', px, py);
   else if (floorLike(t)) {
     const h = hash(x, y); spr(c, h < 0.03 ? 'd_floor2' : h < 0.12 ? 'd_floor1' : 'd_floor0', px, py);
@@ -810,6 +839,7 @@ const ITEMS = {
   dragonscale: { name: 'Dragon Scale', price: 600 },
   stormcore: { name: 'Storm Core', price: 650 },
   soulgem: { name: 'Soul Gem', price: 700 },
+  prismheart: { name: 'Prism Heart', price: 700 },
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
@@ -844,6 +874,7 @@ const ARMORS = {
   fur:     { name: 'Jarl\'s Fur Mantle', hearts: 4, tint: ['#4a3524', '#a07b56', '#efe6d8'], cost: { horn: 1, goo: 8 }, warm: true, desc: '+4 hearts, and too warm to be slowed by ice, webs or chills.' },
   dragonscale: { name: 'Dragonscale Mail', hearts: 6, tint: ['#3a0e0a', '#8a2a1a', '#ffb347'], cost: { dragonscale: 1, obsidian: 6 }, sturdy: true, fireproof: true, desc: 'Scales of the Magma Drake. +6 hearts, barely knocked back, and fire only deals 1 damage.' },
   barkskin: { name: 'Barkskin Mail', hearts: 5, tint: ['#2a1c10', '#5a3e26', '#7fb85a'], cost: { heartwood: 1, herb: 10 }, regen: true, desc: 'Grown from the Rotroot\'s heart. +5 hearts, and slowly heals you anywhere.' },
+  prismplate: { name: 'Prismatic Plate', hearts: 6, tint: ['#2a2050', '#a593ff', '#9fe8ff'], cost: { prismheart: 1, glimmer: 6 }, speed: 1.15, sturdy: true, desc: 'Grown from the Hydra\'s heart. +6 hearts, 15% faster, and hits barely knock you back.' },
   glimmermail: { name: 'Glimmer Mail', hearts: 4, tint: ['#2a3a6a', '#5a7ab0', '#9fe8ff'], cost: { glimmer: 8, crystal: 4 }, speed: 1.1, desc: 'Light crystal scales. +4 hearts and 10% faster movement.' },
   gravecoat: { name: 'Gravewarden Coat', hearts: 4, tint: ['#14121a', '#3a3650', '#b8a8ff'], cost: { ectoplasm: 8, stone: 4 }, sturdy: true, desc: '+4 hearts, and hits barely knock you back.' },
   windweave: { name: 'Windweave Cloak', hearts: 3, tint: ['#3a5a7a', '#9fd4f5', '#ffffff'], cost: { feather: 8, goo: 4 }, speed: 1.25, desc: 'Woven from gale feathers. +3 hearts and 25% faster movement.' },
@@ -893,6 +924,9 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'vault', giver: 'quill', name: 'The Prism Vault', req: 'deep', goal: { boss: ['mole', 'hydra'] }, reward: { gold: 520, items: { crystal: 14 } },
+    offer: ['In the south cavern there\'s a sealed vault of pure crystal. The old miners called it the Prism Vault.', 'The Mole King guards its door, and something with three heads sleeps at the bottom. Bring me back a story, friend.'],
+    done: ['A three-headed crystal hydra! I\'ll be telling this one for years. That Prism Heart will make armor fit for a king.'] },
   { id: 'shards', giver: 'quill', name: 'Prickly Neighbors', goal: { kill: [['shardback', 4], ['geode', 2]] }, reward: { gold: 150, items: { glimmer: 4 } },
     offer: ['Careful where you step, friend! Shardbacks fire splinters when you hit them, and the geode golems pack a punch.', 'Clear out four shardbacks and two geodes so I can get back to digging. Hit a shardback, then step back!'],
     done: ['Ha! The tunnels are mine again. Here, some glimmerstone. It makes a mighty sharp blade.'] },
@@ -1057,7 +1091,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1238,6 +1272,12 @@ dSpawn(TOMB_D, [['scarab', 15, 37], ['scarab', 24, 37], ['scarab', 21, 40], ['mu
 dChest(TOMB_D, 'key', 'key', 37, 26); dChest(TOMB_D, 'hall', 'gold', 32, 13);
 dPillars(TOMB_D, [[15, 14], [29, 14], [15, 19], [29, 19]]);
 for (const [x, y] of [[14, 41], [25, 41], [5, 23], [34, 23]]) addRes('pot', TOMB_D.x0 + x, y);
+dSpawn(VAULT_D, [['glimbat', 15, 38], ['glimbat', 17, 37], ['shardback', 24, 39], ['shardback', 8, 29], ['geode', 30, 30], ['glimbat', 14, 27], ['glimbat', 16, 28], ['burrower', 22, 31], ['shardback', 33, 32],
+  ['burrower', 16, 22], ['shardback', 25, 23], ['geode', 15, 14], ['glimbat', 24, 14]]);
+dChest(VAULT_D, 'key', 'key', 30, 22); dChest(VAULT_D, 'hall', 'gold', 13, 14);
+dPillars(VAULT_D, [[12, 29], [27, 29], [6, 32], [33, 27]]);
+for (const [x, y] of [[14, 41], [25, 41], [36, 33], [3, 26], [12, 24]]) addRes('pot', VAULT_D.x0 + x, y);
+for (const [x, y] of [[4, 31], [35, 30], [26, 13], [12, 23]]) addRes('crystal', VAULT_D.x0 + x, y);
 dSpawn(OSS_D, [['skeleton', 15, 38], ['bat', 24, 37], ['skeleton', 24, 39], ['skeleton', 10, 30], ['skeleton', 29, 29], ['shade', 14, 28], ['shade', 26, 31], ['hound', 20, 29], ['banshee', 32, 30],
   ['skeleton', 16, 17], ['shade', 22, 20], ['banshee', 25, 15], ['hound', 14, 22]]);
 dChest(OSS_D, 'key', 'key', 30, 21); dChest(OSS_D, 'hall', 'gold', 13, 14);
@@ -1285,6 +1325,12 @@ const BOSS_INFO = {
   scarab: { name: 'The Golden Scarab', hp: 80, contact: 40, wake: 5 * T, col: '#ffd65a',
     seq: { 1: ['scuttle', 'roll', 'scuttle', 'beam'], 2: ['roll', 'dive', 'beam', 'scuttle', 'roll'], 3: ['beam', 'roll', 'dive', 'roll', 'beam', 'scuttle'] },
     lines: { 2: 'The Golden Scarab takes flight!', 3: 'The Golden Scarab blazes like the sun!' } },
+  mole:   { name: 'The Mole King', hp: 60, contact: 30, wake: 4 * T, col: '#c9a37a',
+    seq: { 1: ['burrow', 'rocks', 'burrow'], 2: ['burrow', 'quake', 'burrow', 'rocks'], 3: ['burrow', 'quake', 'pups', 'burrow', 'rocks', 'burrow'] },
+    lines: { 2: 'The Mole King shakes the vault! New pillars rise!', 3: 'The Mole King calls his diggers!' } },
+  hydra:  { name: 'The Crystal Hydra', hp: 96, contact: 0, wake: 5.5 * T, col: '#a593ff',
+    seq: { 1: ['fight'], 2: ['fight'], 3: ['fight'] },
+    lines: { 2: 'The Crystal Hydra roars! Glimmerbats swarm!', 3: 'The Crystal Hydra strikes in a frenzy!' } },
   shadow: { name: 'Your Shadow', hp: 50, contact: 0, wake: 4 * T, col: '#6a5a9a',
     seq: { 1: ['mirror', 'mirror', 'daggers'], 2: ['mirror', 'daggers', 'lunge', 'mirror'], 3: ['mirror', 'daggers', 'lunge', 'mirror', 'lunge'] },
     lines: { 2: 'Your Shadow learns your tricks!', 3: 'Your Shadow mirrors you from every side!' } },
@@ -1339,6 +1385,8 @@ const BOSSES = [
   makeBoss('jarl', FROST_D.camp.x, FROST_D.camp.y, { cx: FROST_D.camp.x, cy: FROST_D.camp.y, r: 5.6 * T }),
   makeBoss('mummy', (TOMB_D.x0 + 5) * T + 16, 16 * T, roomArena(TOMB_D, 1, 12, 10, 20)),
   makeBoss('scarab', (TOMB_D.x0 + 20) * T, 5 * T, roomArena(TOMB_D, 8, 1, 31, 10)),
+  makeBoss('mole', (VAULT_D.x0 + 5) * T + 16, 18 * T + 16, roomArena(VAULT_D, 1, 13, 10, 24)),
+  makeBoss('hydra', (VAULT_D.x0 + 20) * T, 4 * T, roomArena(VAULT_D, 6, 1, 33, 10)),
   makeBoss('shadow', (OSS_D.x0 + 5) * T + 16, 19 * T, roomArena(OSS_D, 1, 13, 10, 24)),
   makeBoss('lich', (OSS_D.x0 + 20) * T, 5 * T, roomArena(OSS_D, 6, 1, 33, 10)),
   makeBoss('aegis', (SPIRE_D.x0 + 5) * T + 16, 19 * T, roomArena(SPIRE_D, 1, 13, 10, 24)),
@@ -1553,6 +1601,7 @@ const ICON_DRAW = {
   feather: c => { c.save(); c.translate(16, 16); c.rotate(-0.6); c.fillStyle = '#c8b89a'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#efe6d8'; c.beginPath(); c.ellipse(-1, -3, 3, 10, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-0.5, -12, 1.5, 26); c.restore(); },
   chime: c => { c.fillStyle = '#8a6a44'; c.fillRect(6, 4, 20, 3); c.strokeStyle = '#c8c0b0'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(9 + i * 5, 7); c.lineTo(9 + i * 5, 12); c.stroke(); } for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#7fe0f0' : '#bfefff'; c.fillRect(8 + i * 5, 12, 3, 10 + (i % 2) * 6); } c.fillStyle = '#ffffff'; c.fillRect(8, 13, 1, 6); },
   bloom: c => { c.fillStyle = '#3d6a44'; c.fillRect(15, 18, 2, 12); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.fillStyle = i % 2 ? '#ff7a2a' : '#ffb347'; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 13 + Math.sin(a) * 6, 5, 3, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe08a'; circle(c, 16, 13, 3.5); },
+  prismheart: c => { c.fillStyle = 'rgba(165,147,255,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#4a3a7a'; c.beginPath(); c.moveTo(16, 27); c.bezierCurveTo(2, 18, 6, 4, 16, 11); c.bezierCurveTo(26, 4, 30, 18, 16, 27); c.fill(); c.fillStyle = '#a593ff'; c.beginPath(); c.moveTo(16, 24); c.bezierCurveTo(6, 17, 9, 7, 16, 13); c.bezierCurveTo(23, 7, 26, 17, 16, 24); c.fill(); c.fillStyle = '#9fe8ff'; c.fillRect(11, 12, 3, 4); },
   soulgem: c => { c.fillStyle = 'rgba(127,224,122,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#2a4a2a'; diamond(c, 16, 16, 9, 12); c.fillStyle = '#7fe07a'; diamond(c, 16, 16, 7, 9); c.fillStyle = '#e6ffe0'; c.fillRect(12, 13, 3, 3); c.fillRect(17, 13, 3, 3); c.fillStyle = '#2a4a2a'; c.fillRect(14, 19, 4, 1); },
   stormcore: c => { c.fillStyle = 'rgba(127,224,240,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#3a4a6a'; circle(c, 16, 16, 9); c.fillStyle = '#7fe0f0'; circle(c, 16, 16, 6); c.strokeStyle = '#fff6a8'; c.lineWidth = 2; c.beginPath(); c.moveTo(18, 6); c.lineTo(13, 16); c.lineTo(19, 16); c.lineTo(14, 26); c.stroke(); },
   dragonscale: c => { c.fillStyle = '#5a1a14'; c.beginPath(); c.moveTo(16, 3); c.quadraticCurveTo(29, 12, 16, 29); c.quadraticCurveTo(3, 12, 16, 3); c.fill(); c.fillStyle = '#c8402a'; c.beginPath(); c.moveTo(16, 6); c.quadraticCurveTo(25, 13, 16, 25); c.quadraticCurveTo(7, 13, 16, 6); c.fill(); c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(16, 9); c.quadraticCurveTo(21, 14, 16, 20); c.quadraticCurveTo(11, 14, 16, 9); c.fill(); c.fillStyle = '#fff2c4'; c.fillRect(14, 11, 2, 4); },
@@ -1579,8 +1628,8 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem'];
-const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart'];
+const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
   if (DH) return DH.objective(dgs(DH));
@@ -1700,6 +1749,12 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">The Prism Vault</div>
+      <dl class="controls">
+      <dt>Getting in</dt><dd>A crystal-crusted door in Glimmerdeep's south cavern.</dd>
+      <dt>Inside</dt><dd>Strike three crystal switches in the dark gallery. A chasm splits the next hall: ride the mine cart across.</dd>
+      <dt>Mole King</dt><dd>He tunnels toward you and bursts up where you stand. Wait beside a crystal pillar: he crashes into it and is stunned. His new pillars rise each phase.</dd>
+      <dt>Crystal Hydra</dt><dd>Three heads strike from above: one bites, one spits shards, one fires a beam. Dodge the red ring of a bite, then strike the head while it is stuck in the ground. Shatter all three.</dd></dl>
       <div class="label">Glimmerdeep</div>
       <dl class="controls">
       <dt>Getting there</dt><dd>Ride the Deep Lift beside the Old Mine entrance. The lift at Glimmer Camp takes you back up.</dd>
@@ -1999,6 +2054,8 @@ function onAction() {
   if (brl) { face({ x: brl.x, y: brl.y }); doAct('sword', hitEnemies); return true; }
   const jar = AB && AB.type === 'lich' && AB.jars && AB.state !== 'dazed' && AB.jars.find(j => j.hp > 0 && Math.hypot(j.x - P.x, j.y - P.y) < 70);
   if (jar) { face({ x: jar.x, y: jar.y }); doAct('sword', hitEnemies); return true; }
+  const hh = AB && AB.type === 'hydra' && AB.heads && AB.heads.find(h => !h.dead && h.state === 'stuck' && Math.hypot(h.x - P.x, h.y - P.y) < 110);
+  if (hh) { face({ x: hh.x, y: hh.y }); doAct('sword', hitEnemies); return true; }
   if (AB && bossHittable(AB) && Math.hypot(AB.x - P.x, AB.y - P.y) < 110) { face(AB); doAct('sword', hitEnemies); return true; }
   if (res) {
     face(res);
@@ -2126,6 +2183,7 @@ function hitEnemies(a) {
   const AB = activeBoss();
   if (AB && AB.decoys) for (const dc of AB.decoys) if (!dc.popped && Math.hypot(dc.x - hx, dc.y - 26 - AB.z - hy) < rad + 26) { dc.popped = true; burst(dc.x, dc.y - 40, '#dff6ff', 16); floatText(dc.x, dc.y - 80, 'Just a reflection!', '#c8e8ff'); SFX.play('mine'); hit = true; }
   hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitLanterns(hx, hy, rad);
+  if (AB && AB.type === 'hydra' && hitHydra(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && bossHittable(AB) && Math.hypot(AB.x - hx, AB.y - (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 50 : 26) - AB.z - hy) < rad + (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 40 : 30)) { if (AB.decoys && AB.decoys.some(dc => !dc.popped)) { AB.decoys = []; wizardDazeQuiet(AB, 'Found her! Strike now!'); } damageBoss(AB, dmg); hit = true; }
   deflect(hx, hy, rad + 6);
   hitSwitches(hx, hy, rad);
@@ -2237,6 +2295,7 @@ function pushOut(b, r) {
   for (const n of NPCS) pushCircle(b, n.x, n.y, r + (n.bench ? 18 : 10));
   for (const d of decor) if (d.solid) pushCircle(b, d.x, d.y, r + d.solid);
   for (const B of BOSSES) if (B.rocks && B.active) for (const k of B.rocks) pushCircle(b, k.x, k.y, r + 15);
+  for (const B of BOSSES) if (B.pillars && B.active) for (const k of B.pillars) if (k.hp > 0) pushCircle(b, k.x, k.y, r + 14);
   for (const D of DUNGEONS) { for (const c of D.chests) pushCircle(b, c.x, c.y, r + 11); for (const sw of D.switches) pushCircle(b, sw.x, sw.y, r + 10); }
   for (const q of RECTS) {
     if (b.x > q.x0 - r && b.x < q.x1 + r && b.y > q.y0 - r && b.y < q.y1 + r) {
@@ -2684,7 +2743,7 @@ function updateProjectiles(dt, fainted) {
 
 // ---------- bosses ----------
 const activeBoss = () => BOSSES.find(B => B.active);
-const bossHittable = B => B && B.active && B.z < 30 && !['dying', 'wake', 'vanish', 'appear', 'dead', 'sink', 'lurk', 'burrow', 'under', 'hidden', 'diving'].includes(B.state);
+const bossHittable = B => B && B.active && B.type !== 'hydra' && B.z < 30 && !['dying', 'wake', 'vanish', 'appear', 'dead', 'sink', 'lurk', 'burrow', 'under', 'hidden', 'diving', 'rumble'].includes(B.state);
 let blizzard = 0;
 function bossBar() {
   const B = activeBoss(), el = $('bossbar'); el.hidden = !B; if (!B) return;
@@ -2798,6 +2857,13 @@ function bossStart(B, action) {
     else if (action === 'lash') { B.state = 'lashWind'; B.st = B.phase === 3 ? 0.45 : 0.6; }
     else if (action === 'curse') { B.state = 'curse'; B.st = 0.8; }
     else if (action === 'sarcophagus') { B.state = 'sink'; B.st = 0.5; SFX.play('wisp'); }
+  } else if (B.type === 'mole') {
+    if (action === 'burrow') { B.state = 'burrow'; B.st = 0.4; SFX.play('crumble'); }
+    else if (action === 'rocks') { B.state = 'rocks'; B.st = 0.6; }
+    else if (action === 'quake') { B.state = 'quake'; B.st = 0.7; }
+    else if (action === 'pups') { B.state = 'pups'; B.st = 0.8; }
+  } else if (B.type === 'hydra') {
+    B.state = 'fight';
   } else if (B.type === 'shadow') {
     if (action === 'mirror') B.state = 'mirror';
     else if (action === 'daggers') { B.state = 'daggers'; B.st = 0.6; }
@@ -2881,6 +2947,8 @@ function finishBoss(B) {
   if (B.type === 'jarl') { drop(B.x, B.y - 10, 'gold', 20, 10); drop(B.x, B.y - 10, 'horn', 1); banner('Jarl Frostbeard defeated!', '#ffe08a'); }
   if (B.type === 'mummy') { drop(B.x, B.y - 10, 'gold', 16, 5); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mummy King crumbles!', '#ffe08a'); }
   if (B.type === 'scarab') { drop(B.x, B.y - 10, 'gold', 30, 10); drop(B.x, B.y - 10, 'sunstone', 1); banner('The Golden Scarab falls!', '#ffe08a'); }
+  if (B.type === 'mole') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'glimmer', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mole King is dethroned!', '#ffe08a'); }
+  if (B.type === 'hydra') { drop(B.x, B.y - 10, 'gold', 45, 10); drop(B.x, B.y - 10, 'prismheart', 1); banner('The Crystal Hydra shatters!', '#ffe08a'); }
   if (B.type === 'shadow') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'ectoplasm', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('Your Shadow fades into the light!', '#ffe08a'); }
   if (B.type === 'lich') { B.jars = []; drop(B.x, B.y - 10, 'gold', 45, 10); drop(B.x, B.y - 10, 'soulgem', 1); banner('The Lich King is destroyed! The dead rest at last.', '#ffe08a'); }
   if (B.type === 'aegis') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'crystal', 4); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Colossus Sentinel crumbles!', '#ffe08a'); }
@@ -2912,7 +2980,7 @@ function updateBosses(dt, fainted) {
       Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: B.hx, y: B.hy, z: 0, ring: null, alpha: 1 });
       for (const e of enemies) if (e.minion) e.remove = true;
       projectiles.length = 0; bossBar();
-      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; if (B.type === 'wraith') blizzard = 0;
+      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; if (B.type === 'wraith') blizzard = 0;
     if (!fainted) toast(`${B.name} waits for your return.`);
       continue;
     }
@@ -2929,8 +2997,8 @@ function updateBosses(dt, fainted) {
       continue;
     }
     if (B.state === 'wake' || B.state === 'rest') { B.st -= dt; if (B.type === 'wraith') B.z += (20 + Math.sin(B.anim * 2) * 6 - B.z) * Math.min(1, dt * 4); if (B.type === 'wizard') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * 0.1; if (B.type === 'bat') B.z += (46 - B.z) * Math.min(1, dt * 4); if (B.st <= 0) bossNext(B); }
-    else ({ shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
-    const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving'].includes(B.state);
+    else ({ mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
+    const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'fight'].includes(B.state);
     if (B.active && !harmless && B.z < 14 && d < I.contact && !fainted) damagePlayer(2, B);
   }
 }
@@ -4478,7 +4546,16 @@ function drawDarkness(c, camX, camY, k) {
   const light = (wx, wy, r) => { const x = sx(wx), y = sy(wy), R = r * k; if (x < -R || y < -R || x > darkCv.width + R || y > darkCv.height + R) return; const g = d.createRadialGradient(x, y, R * 0.25, x, y, R); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)'); d.fillStyle = g; d.fillRect(x - R, y - R, R * 2, R * 2); };
   light(P.x, P.y - 20, gearW().glow ? 230 : 160);
   const HD = dungeonAt(P.x);
-  if (HD === CAVE_D) {
+  if (HD === VAULT_D) {
+    const g = dgs(VAULT_D);
+    for (const sw of VAULT_D.switches) light(sw.x, sw.y - 30, g.switches[sw.id] ? 175 : 30);
+    for (const t of VAULT_D.torches) light((VAULT_D.x0 + t.x) * T + 16, t.y * T + 24, 70 + Math.sin(time * 9 + t.x) * 4);
+    for (const r of resources) if (r.alive && r.type === 'crystal' && r.x > VAULT_D.x0 * T && r.x < (VAULT_D.x0 + DW) * T) light(r.x, r.y - 16, 85);
+    for (const n of NPCS) if (n.id.startsWith('cart_2')) light(n.x, n.y - 20, 90);
+    light((VAULT_D.x0 + 20) * T, 42 * T, 90);
+    for (const B of BOSSES) if (B.active && B.type === 'mole') { for (const pl of B.pillars || []) if (pl.hp > 0) light(pl.x, pl.y - 30, 70); light(B.x, B.y - 20, 60); }
+    for (const B of BOSSES) if (B.active && B.type === 'hydra') { light(B.x, B.y - 30, 150); for (const h of B.heads || []) if (!h.dead) light(h.x, h.y - h.z - 10, 70); }
+  } else if (HD === CAVE_D) {
     for (const r of resources) if (r.alive && r.type === 'crystal' && r.x > CAVE_D.x0 * T && r.x < (CAVE_D.x0 + DW) * T) light(r.x, r.y - 16, 85 + Math.sin(time * 2 + r.seed * 9) * 6);
     for (const o of decor) if (o.glowcap) light(o.x, o.y - 8, 46);
     light(CAVE_D.camp.x + 10, CAVE_D.camp.y + 60, 210 + Math.sin(time * 9) * 6);
@@ -4756,6 +4833,143 @@ function drawGlowcap(c, o) {
   c.fillStyle = `rgba(160,220,255,${g * 0.25})`; circle(c, o.x, o.y - 8, 14);
   for (const [ox, h] of [[-5, 8], [2, 12], [7, 6]]) { c.fillStyle = '#d8ccb4'; c.fillRect(o.x + ox - 1, o.y - h, 2, h); c.fillStyle = col; ellipse(c, o.x + ox, o.y - h, 4, 2.5); }
 }
+// ---------- the Mole King: tunnels under you, crashes into crystal pillars ----------
+function molePillars(B) { if (B.pillarPhase !== B.phase || !B.pillars) { B.pillarPhase = B.phase; B.pillars = [[3, 15.5], [8, 15.5], [3, 22], [8, 22]].map(([x, y]) => ({ x: (VAULT_D.x0 + x) * T + 16, y: y * T + 16, hp: 1 })); } return B.pillars; }
+function updateMole(B, dt, fainted, d) {
+  const A = B.arena, pills = molePillars(B);
+  switch (B.state) {
+    case 'surfaced': B.st -= dt; if (B.st <= 0) bossRest(B, 0.1); break;
+    case 'burrow': B.st -= dt; if (B.st <= 0) { B.state = 'under'; B.st = B.phase === 3 ? 1.4 : 2; SFX.play('crumble'); } break;
+    case 'under': {
+      B.st -= dt; const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * Math.min(dd, 150 * dt); B.y += dy / dd * Math.min(dd, 150 * dt); clampBoss(B);
+      if (Math.random() < dt * 14) particles.push({ x: B.x + (rng() - 0.5) * 30, y: B.y, vx: (rng() - 0.5) * 30, vy: -40, life: 0.4, color: '#6a5a4a', size: 4 });
+      if (B.st <= 0) { B.state = 'rumble'; B.st = 0.6; impact(3); }
+      break;
+    }
+    case 'rumble': B.st -= dt; if (B.st <= 0) {
+      const pl = pills.find(q => q.hp > 0 && Math.hypot(q.x - B.x, q.y - B.y) < 60);
+      impact(10); SFX.play('slam'); burst(B.x, B.y, '#6a5a4a', 20);
+      if (pl) { pl.hp = 0; for (let i = 0; i < 18; i++) { const a = rng() * Math.PI * 2, v = 80 + rng() * 140; particles.push({ x: pl.x, y: pl.y - 30, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 90, life: 0.7, color: i % 2 ? '#a593ff' : '#e6e0ff', size: 5 }); } B.state = 'dazed'; B.st = 2.8; floatText(B.x, B.y - 100, 'He hit his head on the crystal! Strike now!', '#ffe08a'); }
+      else { if (!fainted && !P.dash && d < 44) damagePlayer(2, B); B.state = 'surfaced'; B.st = 1.1; }
+    } break;
+    case 'rocks': B.st -= dt; if (B.st <= 0) { for (let i = 0; i < 3; i++) projectiles.push({ kind: 'rock', sx: B.x, sy: B.y - 40, x: B.x, y: B.y - 40, tx: P.x + (rng() - 0.5) * 60, ty: P.y + (rng() - 0.5) * 40, t: -i * 0.18, dur: 0.75, z: 0 }); SFX.play('swing'); bossRest(B, 0.8); } break;
+    case 'quake': B.st -= dt; if (B.st <= 0) { impact(8); SFX.play('crumble'); for (let i = 0; i < 6; i++) { const tx = i === 0 ? P.x : A.x0 + 50 + rng() * (A.x1 - A.x0 - 100), ty = i === 0 ? P.y : A.y0 + 70 + rng() * (A.y1 - A.y0 - 90); projectiles.push({ kind: 'rock', fall: true, tx, ty, x: tx, y: ty, t: -i * 0.2, dur: 0.9, z: 320 }); } bossRest(B, 0.8); } break;
+    case 'pups': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['burrower', 'burrower'], 3); bossRest(B, 0.5); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+  }
+}
+function drawMole(c, B) {
+  for (const pl of molePillars(B)) {
+    shadow(c, pl.x, pl.y + 2, 16, 5);
+    if (pl.hp <= 0) { c.fillStyle = '#5a4a7a'; for (const [ox, oy] of [[-10, -3], [2, -4], [-4, 0], [8, 1]]) c.fillRect(pl.x + ox, pl.y + oy, 6, 4); continue; }
+    const g = 0.5 + Math.sin(time * 3 + pl.x) * 0.2; c.fillStyle = `rgba(165,147,255,${g * 0.3})`; circle(c, pl.x, pl.y - 30, 26);
+    c.fillStyle = '#6a5a9a'; c.beginPath(); c.moveTo(pl.x - 14, pl.y); c.lineTo(pl.x - 10, pl.y - 44); c.lineTo(pl.x, pl.y - 58); c.lineTo(pl.x + 10, pl.y - 44); c.lineTo(pl.x + 14, pl.y); c.closePath(); c.fill();
+    c.fillStyle = '#a593ff'; c.beginPath(); c.moveTo(pl.x - 8, pl.y - 4); c.lineTo(pl.x - 6, pl.y - 42); c.lineTo(pl.x, pl.y - 52); c.lineTo(pl.x + 2, pl.y - 6); c.closePath(); c.fill(); c.fillStyle = '#e6e0ff'; c.fillRect(pl.x - 4, pl.y - 40, 2, 14);
+  }
+  const x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y;
+  if (B.state === 'under' || B.state === 'rumble') {
+    c.fillStyle = '#3a2e24'; ellipse(c, x, y, 26, 9); c.fillStyle = '#6a5a4a'; for (let i = 0; i < 5; i++) circle(c, x - 16 + i * 8, y - 3 + Math.sin(time * 12 + i) * 2, 4);
+    if (B.state === 'rumble') { const pr = 1 - B.st / 0.6; c.strokeStyle = `rgba(236,82,87,${0.4 + pr * 0.5})`; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y, 44, 18, 0, 0, Math.PI * 2); c.stroke(); }
+    return;
+  }
+  const up = B.state === 'burrow' ? Math.max(0, B.st) / 0.4 : 1;
+  c.fillStyle = '#3a2e24'; ellipse(c, x, y + 2, 34, 11);
+  c.save(); c.beginPath(); c.rect(x - 60, y - 110, 120, 112); c.clip();
+  const by = y + (1 - up) * 60;
+  c.globalAlpha = 1; bossFlash(c, B);
+  c.fillStyle = '#5a4030'; ellipse(c, x, by - 32, 32, 34); c.fillStyle = '#7a5a40'; ellipse(c, x - 6, by - 38, 22, 24); c.fillStyle = '#c9a37a'; ellipse(c, x, by - 22, 18, 14);
+  c.fillStyle = '#f2b0a0'; circle(c, x, by - 44, 6); c.fillStyle = '#1a1210'; c.fillRect(x - 13, by - 52, 5, 4); c.fillRect(x + 8, by - 52, 5, 4);
+  c.fillStyle = '#efe6d8'; for (const s of [-1, 1]) { c.fillRect(x + s * 26 - 4, by - 26, 8, 3); c.fillRect(x + s * 28 - 2, by - 22, 3, 6); }
+  c.fillStyle = '#d9a23c'; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(x + i * 6 - 3, by - 62); c.lineTo(x + i * 6, by - 72 - (i === 0 ? 4 : 0)); c.lineTo(x + i * 6 + 3, by - 62); c.fill(); }
+  c.fillStyle = '#a593ff'; circle(c, x, by - 66, 3);
+  c.restore(); c.globalAlpha = 1;
+  if (B.state === 'rocks' || B.state === 'quake') bossWarn(c, { x }, y - 100);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 50, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 90, 24);
+}
+// ---------- the Crystal Hydra: three heads, each only hurt when stuck after a bite ----------
+function hydraHeads(B) {
+  if (!B.heads) { const per = Math.round(B.max / 3); B.heads = [-1, 0, 1].map(s => ({ s, hx: B.hx + s * 130, hy: B.hy + (s ? 50 : 70), x: B.hx + s * 130, y: B.hy + 60, z: 40, hp: per, max: per, state: 'idle', st: 1 + Math.abs(s) * 0.8, dead: false })); }
+  return B.heads;
+}
+function hitHydra(B, hx, hy, rad, dmg) {
+  if (!B.active || B.state === 'dying') return false;
+  let hit = false;
+  for (const h of hydraHeads(B)) {
+    if (h.dead || Math.hypot(h.x - hx, h.y - 20 - h.z - hy) > rad + 30) continue;
+    if (h.state !== 'stuck') { floatText(h.x, h.y - 60, 'Too high!', '#c8bcff'); continue; }
+    const n = dmg * 2; h.hp -= n; hit = true; h.hurt = 0.15;
+    if (h.hp <= 0) { h.dead = true; h.hp = 0; impact(10); SFX.play('crumble'); for (let i = 0; i < 20; i++) { const a = rng() * Math.PI * 2, v = 80 + rng() * 160; particles.push({ x: h.x, y: h.y - 20, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 100, life: 0.8, color: i % 2 ? '#a593ff' : '#9fe8ff', size: 5 }); } floatText(h.x, h.y - 80, 'Head shattered!', '#ffe08a'); }
+    if (B.heads.every(q => q.dead)) damageBoss(B, Math.max(1, B.hp)); else damageBoss(B, n);
+    break;
+  }
+  return hit;
+}
+function updateHydra(B, dt, fainted, d) {
+  const heads = hydraHeads(B), live = heads.filter(h => !h.dead), rate = B.phase === 3 ? 1.1 : B.phase === 2 ? 1.5 : 2;
+  B.cd = (B.cd || 1.5) - dt;
+  if (B.cd <= 0 && live.length) {
+    B.cd = rate; const idle = live.filter(h => h.state === 'idle');
+    if (idle.length) { const h = idle[Math.floor(rng() * idle.length)], r = rng(); if (r < 0.55) { h.state = 'biteWind'; h.st = 0.75; } else if (r < 0.8) { h.state = 'shardsWind'; h.st = 0.5; } else { h.state = 'beamWind'; h.st = 0.8; } }
+    if (B.phase >= 2 && rng() < 0.3) summonMinions(B, ['glimbat', 'glimbat'], 4);
+  }
+  for (const h of heads) {
+    h.hurt = Math.max(0, (h.hurt || 0) - dt);
+    if (h.dead) { h.z = Math.max(0, h.z - 60 * dt); continue; }
+    const home = () => { const sway = Math.sin(B.anim * 1.5 + h.s) * 14; h.x += (h.hx + sway - h.x) * Math.min(1, dt * 3); h.y += (h.hy - h.y) * Math.min(1, dt * 3); h.z += (40 - h.z) * Math.min(1, dt * 3); };
+    switch (h.state) {
+      case 'idle': home(); break;
+      case 'biteWind': home(); h.st -= dt; h.tx = P.x; h.ty = P.y; if (h.st <= 0) { h.state = 'bite'; h.st = 0.25; h.sx = h.x; h.sy = h.y; SFX.play('dash'); } break;
+      case 'bite': { h.st -= dt; const k = 1 - Math.max(0, h.st) / 0.25; h.x = h.sx + (h.tx - h.sx) * k; h.y = h.sy + (h.ty - h.sy) * k; h.z = 40 * (1 - k); if (!h.bit && !fainted && !P.dash && Math.hypot(P.x - h.x, P.y - h.y) < 30) { h.bit = true; damagePlayer(2, h); } if (h.st <= 0) { h.state = 'stuck'; h.st = 1.7; h.bit = false; h.z = 0; impact(6); SFX.play('slam'); burst(h.x, h.y, '#a593ff', 12); } break; }
+      case 'stuck': h.st -= dt; if (h.st <= 0) { h.state = 'idle'; } break;
+      case 'shardsWind': home(); h.st -= dt; if (h.st <= 0) { const a = Math.atan2(P.y - (h.y - h.z), P.x - h.x), n = B.phase === 1 ? 3 : 5; for (let i = 0; i < n; i++) { const o = (i - (n - 1) / 2) * 0.25; projectiles.push({ kind: 'shard', x: h.x, y: h.y - h.z - 10, vx: Math.cos(a + o) * 190, vy: Math.sin(a + o) * 190, ang: a + o, t: 0, life: 1.8 }); } SFX.play('mine'); h.state = 'idle'; } break;
+      case 'beamWind': home(); h.st -= dt; h.dir = Math.atan2(P.y - h.y, P.x - h.x); if (h.st <= 0) { h.state = 'beam'; h.st = 1.4; SFX.play('boss'); } break;
+      case 'beam': {
+        home(); h.st -= dt; const want = Math.atan2(P.y - h.y, P.x - h.x); let da = want - h.dir; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2; h.dir += Math.max(-0.8 * dt, Math.min(0.8 * dt, da));
+        const ex = h.x, ey = h.y - h.z - 10; if (!fainted && !P.dash && segDist(P.x, P.y - 14, ex, ey, ex + Math.cos(h.dir) * 420, ey + Math.sin(h.dir) * 420) < 14) damagePlayer(2, { x: P.x - Math.cos(h.dir) * 20, y: P.y - Math.sin(h.dir) * 20 });
+        if (h.st <= 0) h.state = 'idle'; break;
+      }
+    }
+  }
+}
+function drawHydra(c, B) {
+  const heads = hydraHeads(B), x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y, g = 0.6 + Math.sin(time * 3) * 0.25;
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, x, y + 6, 70, 18);
+  // necks
+  for (const h of heads) { const hy = h.y - h.z - 10; c.strokeStyle = h.dead ? '#3a3050' : '#5a4a8a'; c.lineWidth = 16; c.lineCap = 'round'; c.beginPath(); c.moveTo(x + h.s * 30, y - 40); c.quadraticCurveTo(x + h.s * 70, y - 90, h.x, hy); c.stroke(); c.strokeStyle = h.dead ? '#2a2440' : '#7a6ab0'; c.lineWidth = 8; c.stroke(); c.lineCap = 'butt'; }
+  // body
+  c.globalAlpha = 1; bossFlash(c, B);
+  c.fillStyle = '#4a3a7a'; ellipse(c, x, y - 30, 64, 40); c.fillStyle = '#6a5a9a'; ellipse(c, x - 10, y - 40, 44, 26);
+  for (const [ox, h2] of [[-40, 30], [-18, 44], [8, 50], [32, 36], [50, 22]]) { c.fillStyle = '#a593ff'; c.beginPath(); c.moveTo(x + ox - 7, y - 50); c.lineTo(x + ox, y - 50 - h2); c.lineTo(x + ox + 7, y - 50); c.closePath(); c.fill(); }
+  c.fillStyle = `rgba(159,232,255,${g})`; circle(c, x, y - 28, 12); c.fillStyle = '#ffffff'; circle(c, x - 3, y - 31, 3);
+  c.globalAlpha = 1;
+  // heads
+  for (const h of heads) {
+    const hx = h.x, hy = h.y - h.z - 10, f = P.x < hx ? -1 : 1;
+    if (h.state === 'bite' || h.state === 'stuck') { c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, h.x, h.y + 4, 22, 7); }
+    if (h.state === 'biteWind') { c.strokeStyle = `rgba(236,82,87,${0.5 + Math.sin(time * 16) * 0.3})`; c.lineWidth = 2; c.beginPath(); c.ellipse(P.x, P.y, 28, 11, 0, 0, Math.PI * 2); c.stroke(); }
+    if (h.state === 'beamWind') { c.strokeStyle = 'rgba(159,232,255,.4)'; c.lineWidth = 2; c.setLineDash([6, 6]); c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx + Math.cos(h.dir) * 420, hy + Math.sin(h.dir) * 420); c.stroke(); c.setLineDash([]); }
+    if (h.state === 'beam') { c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = 'rgba(159,232,255,.6)'; c.lineWidth = 14; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx + Math.cos(h.dir) * 420, hy + Math.sin(h.dir) * 420); c.stroke(); c.strokeStyle = '#ffffff'; c.lineWidth = 4; c.stroke(); c.restore(); }
+    if (h.dead) { c.fillStyle = '#3a3050'; ellipse(c, hx, hy, 12, 8); continue; }
+    c.globalAlpha = h.hurt > 0 ? 0.55 : 1;
+    c.fillStyle = '#5a4a8a'; ellipse(c, hx, hy, 20, 14); ellipse(c, hx + f * 16, hy + 4, 13, 8);
+    c.fillStyle = '#a593ff'; for (const o of [-8, 0, 8]) { c.beginPath(); c.moveTo(hx + o - 4, hy - 10); c.lineTo(hx + o - f * 4, hy - 24); c.lineTo(hx + o + 4, hy - 10); c.fill(); }
+    c.fillStyle = h.state === 'stuck' ? '#ffe08a' : '#9fe8ff'; circle(c, hx + f * 8, hy - 4, 3.5);
+    c.fillStyle = '#efe6d8'; for (let i = 0; i < 3; i++) c.fillRect(hx + f * (12 + i * 5) - 1, hy + 8, 2, 4);
+    c.globalAlpha = 1;
+    if (h.state === 'stuck') drawStars(c, hx, hy - 30, 14);
+    if (h.max) healthBar(c, hx, hy - 34, h.hp / h.max);
+  }
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 60, z: 0, anim: B.anim });
+}
+function drawVaultGate(c) {
+  const x = VAULT.x, y = VAULT.y;
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, x, y - 2, 60, 12);
+  c.fillStyle = '#2a2638'; c.beginPath(); c.moveTo(x - 56, y); c.lineTo(x - 40, y - 64); c.lineTo(x - 10, y - 84); c.lineTo(x + 24, y - 78); c.lineTo(x + 50, y - 56); c.lineTo(x + 58, y); c.closePath(); c.fill();
+  for (const [ox, oy, h] of [[-40, -40, 34], [-22, -70, 30], [30, -60, 36], [44, -24, 26], [4, -82, 26]]) { c.fillStyle = '#a593ff'; c.beginPath(); c.moveTo(x + ox - 7, y + oy); c.lineTo(x + ox, y + oy - h); c.lineTo(x + ox + 7, y + oy); c.closePath(); c.fill(); c.fillStyle = '#e6e0ff'; c.fillRect(x + ox - 2, y + oy - h * 0.7, 2, h * 0.5); }
+  c.fillStyle = '#0a0812'; c.beginPath(); c.moveTo(x - 16, y); c.lineTo(x - 16, y - 34); c.quadraticCurveTo(x, y - 50, x + 16, y - 34); c.lineTo(x + 16, y); c.closePath(); c.fill();
+  const g = 0.35 + Math.sin(time * 2.5) * 0.15; c.fillStyle = `rgba(165,147,255,${g})`; c.fillRect(x - 12, y - 12, 24, 12);
+}
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -5005,7 +5219,7 @@ function drawTent(c, o) {
   c.fillStyle = 'rgba(242,248,255,.85)'; c.beginPath(); c.moveTo(o.x - 10, o.y - 40); c.lineTo(o.x, o.y - 52); c.lineTo(o.x + 10, o.y - 40); c.closePath(); c.fill();
   c.fillStyle = '#c0392b'; c.fillRect(o.x - 1, o.y - 66, 2, 16); c.fillRect(o.x + 1, o.y - 66, 10, 6);
 }
-function drawBossAny(c, B) { ({ shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
+function drawBossAny(c, B) { ({ mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
 function drawJarl(c, B) {
   let sx = 1, sy = 1, ox = 0;
   if (B.state === 'stride') { const k = Math.abs(Math.sin(B.anim * 7)); sy = 1 - k * 0.05; sx = 1 + k * 0.03; }
@@ -5486,7 +5700,7 @@ function render() {
   const inViewT = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   if (CD === TOMB_D) drawTraps(ctx, inViewT);
   if (CD === CINDER_D || CD === FORGE_D) drawCinderGround(ctx, camX, camY, viewW, viewH, inViewT);
-  if (CD === CAVE_D) drawRails(ctx, inViewT);
+  if (CD === CAVE_D || CD === VAULT_D) drawRails(ctx, inViewT);
   if (CD === SKY_D || CD === SPIRE_D) drawSkyOverlay(ctx, camX, camY, viewW, viewH, CD === SKY_D);
   const inView = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   for (const p of pickups) {
@@ -5515,7 +5729,7 @@ function render() {
     else if (kind === 1) drawEnemy(ctx, o);
     else if (kind === 7) drawBossAny(ctx, o);
     else if (kind === 8) drawChest(ctx, o);
-    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : drawCryptDoor)(ctx);
+    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : drawCryptDoor)(ctx);
     else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) { if (P.ride) drawCart(ctx, P.x, P.y + 6); drawPlayer(ctx); if (P.ride) drawCartFront(ctx, P.x, P.y + 6); }
@@ -5567,8 +5781,8 @@ function render() {
     if (CD === CINDER_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(255,90,30,0)'); g.addColorStop(1, `rgba(140,40,20,${0.36 + Math.sin(time * 0.8) * 0.05})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === MIRE_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.25, cvs.width / 2, cvs.height / 2, cvs.height * 0.8); g.addColorStop(0, 'rgba(150,190,140,0)'); g.addColorStop(1, `rgba(150,190,140,${0.42 + Math.sin(time * 0.5) * 0.06})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (blizzard > 0) { ctx.fillStyle = `rgba(235,245,255,${Math.min(0.6, blizzard * 0.6)})`; ctx.fillRect(0, 0, cvs.width, cvs.height); }
-    if (inD && !CD.outdoor && CD !== OSS_D) { const px = (P.x - camX) * k, py = (P.y - 20 - camY) * k, g = ctx.createRadialGradient(px, py, 90 * k, px, py, 340 * k); g.addColorStop(0, 'rgba(6,4,12,0)'); g.addColorStop(1, 'rgba(6,4,12,.72)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
-    if (CD === DUSK_D || CD === OSS_D || CD === CAVE_D) drawDarkness(ctx, camX, camY, k);
+    if (inD && !CD.outdoor && CD !== OSS_D && CD !== VAULT_D) { const px = (P.x - camX) * k, py = (P.y - 20 - camY) * k, g = ctx.createRadialGradient(px, py, 90 * k, px, py, 340 * k); g.addColorStop(0, 'rgba(6,4,12,0)'); g.addColorStop(1, 'rgba(6,4,12,.72)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
+    if (CD === DUSK_D || CD === OSS_D || CD === CAVE_D || CD === VAULT_D) drawDarkness(ctx, camX, camY, k);
     if (fade > 0) { ctx.fillStyle = `rgba(0,0,0,${fade})`; ctx.fillRect(0, 0, cvs.width, cvs.height); }
   }
   mctx.imageSmoothingEnabled = false;
