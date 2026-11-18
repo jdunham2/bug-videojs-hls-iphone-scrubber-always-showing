@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 18, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 19, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -607,6 +607,30 @@ const DART_TRAPS = [];
   for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
   for (const [x, y, dir, off] of [[11, 17, 1, 0], [11, 20, 1, 0.8], [11, 23, 1, 1.6], [28, 16, -1, 0.4], [28, 19, -1, 1.2]]) DART_TRAPS.push({ x: (D.x0 + x) * T + (dir > 0 ? 30 : 2), y: y * T + 4, dir, off, last: -1 });
 }
+// ---------- Petalfall Vale: a hidden blossom valley beyond the Frostmoor's mountain pass ----------
+const LILY = 23;
+const VALE_D = makeDungeon('vale', 'Petalfall Vale', 18, null, { outdoor: true, theme: 'blossom',
+  objective: g => 'The village of Petalfall sits by the mountain pass. Grandmother Wren tends the shrine. Cross the ponds on the lily pads, but keep moving: they sink if you stand still.' });
+const KOI_SPOTS = [];
+{
+  const D = VALE_D, X = D.x0;
+  for (let y = 0; y < H; y++) for (let lx = 0; lx < DW; lx++) {
+    const x = X + lx, dx = (lx - 19.5) / 18.5, dy = (y - 23) / 21;
+    const d = Math.hypot(dx, dy) + (vnoise(x / 5 + 400, y / 5) - 0.5) * 0.3;
+    tiles[y * W + x] = y < 44 && d < 0.93 ? LAND : DEEP; region[y * W + x] = 15;
+  }
+  for (let y = 2; y < 9; y++) for (let lx = 16; lx <= 24; lx++) tiles[y * W + X + lx] = LAND;
+  const pond = (cx0, cy0, rx, ry) => { for (let y = cy0 - ry; y <= cy0 + ry; y++) for (let lx = cx0 - rx; lx <= cx0 + rx; lx++) if (Math.hypot((lx - cx0) / rx, (y - cy0) / ry) + (vnoise((X + lx) / 3 + 500, y / 3) - 0.5) * 0.25 < 1) tiles[y * W + X + lx] = DEEP; };
+  pond(9, 24, 5, 4); pond(31, 19, 5, 4); pond(20, 34, 9, 5);
+  for (let y = 33; y <= 35; y++) for (let lx = 19; lx <= 21; lx++) tiles[y * W + X + lx] = LAND; // the islet
+  const pads = (x0, y0, x1, y1) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (let i = 0; i <= n; i++) { const x = Math.round(x0 + (x1 - x0) * i / n + Math.sin(i * 1.3) * 0.6), y = Math.round(y0 + (y1 - y0) * i / n); for (const ox of [0, 1]) { const k = y * W + X + x + ox; if (tiles[k] === DEEP) tiles[k] = LILY; } } };
+  pads(20, 27, 20, 33); pads(20, 35, 20, 41); pads(3, 24, 15, 24); pads(31, 14, 31, 24);
+  for (const [cx0, cy0, rx, ry] of [[9, 24, 4, 3], [31, 19, 4, 3], [20, 34, 8, 4]]) for (let i = 0; i < 3; i++) { const a = i * 2.1 + cx0, x = Math.round(cx0 + Math.cos(a) * rx * 0.6), y = Math.round(cy0 + Math.sin(a) * ry * 0.6); if (tiles[y * W + X + x] === DEEP) KOI_SPOTS.push([X + x, y]); }
+  pathLine(X + 20, 4, X + 20, 16); pathLine(X + 20, 16, X + 9, 19); pathLine(X + 20, 16, X + 30, 25);
+  D.camp = { x: (X + 20) * T, y: 10 * T }; D.islet = { x: (X + 20) * T + 16, y: 34 * T + 16 };
+  D.start = { x: (X + 20) * T, y: 4 * T + 8 };
+}
+const nearValeSite = (tx, ty, d) => Math.hypot(tx - VALE_D.camp.x / T, ty - VALE_D.camp.y / T) < d || Math.hypot(tx - VALE_D.x0 - 20, ty - 4) < 3 || Math.hypot(tx - VALE_D.x0 - 20, ty - 34) < 2;
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -736,6 +760,7 @@ const floorLike = t => t === FLOOR || t === STAIRS || t === BOG || t === WIND ||
 function drawOutdoorTile(c, x, y, px, py, t) {
   if (dungeonAt(px).theme === 'sky') { drawSkyTile(c, x, y, px, py, t); return; }
   if (dungeonAt(px).theme === 'cave') { drawCaveTile(c, x, y, px, py, t); return; }
+  if (dungeonAt(px).theme === 'blossom') { drawBlossomTile(c, x, y, px, py, t); return; }
   if (t === BOG) {
     const hb = hash(x, y); c.fillStyle = '#2e3a1e'; c.fillRect(px, py, T, T); c.fillStyle = '#3d4a26'; c.fillRect(px + 2, py + 2, T - 4, T - 4);
     c.fillStyle = 'rgba(120,140,60,.35)'; ellipse(c, px + 8 + hb * 16, py + 10 + hb * 10, 4, 2); ellipse(c, px + 22 - hb * 10, py + 22, 3, 1.5);
@@ -900,6 +925,7 @@ const ITEMS = {
   ectoplasm: { name: 'Ectoplasm', price: 9 },
   glimmer: { name: 'Glimmerstone', price: 12 },
   jade: { name: 'Jade', price: 11 },
+  petal: { name: 'Spirit Petal', price: 10 },
   sunstone: { name: 'Sunstone', price: 450 },
 };
 // Weapons and armor: craft them at the workbench, then equip one of each.
@@ -912,6 +938,7 @@ const WEAPONS = {
   arcane:  { name: 'Arcane Edge', dmg: 3, col: '#d6b8ff', cost: { gem: 1, crystal: 5 }, beam: true, desc: 'Cut from the Hollow Gem. Triple damage, and fires a sword beam while your hearts are full.' },
   frost:   { name: 'Frostbite Blade', dmg: 3, col: '#9fe8ff', cost: { frostheart: 1, crystal: 6 }, freeze: true, desc: 'Forged from the Frost Heart. Triple damage, and freezes foes so they move at a crawl.' },
   sun:     { name: 'Sunblade', dmg: 4, col: '#ffd65a', cost: { sunstone: 1, crystal: 8 }, beam: true, beamAlways: true, desc: 'Forged from the Sunstone. Quadruple damage, and every swing fires a beam of sunlight.' },
+  bloom:   { name: 'Blossom Blade', dmg: 3, col: '#f2a0c8', cost: { petal: 6, crystal: 4 }, bloom: true, desc: 'Petals bloom along the edge. Triple damage, and some hits restore a heart.' },
   jadefang: { name: 'Jade Fang', dmg: 3, col: '#5ab87a', cost: { jade: 6, goo: 4 }, poison: true, desc: 'Carved from jungle jade. Triple damage, and poisons whatever it cuts.' },
   prism:   { name: 'Prism Blade', dmg: 3, col: '#c8bcff', cost: { glimmer: 6, crystal: 4 }, crit: true, desc: 'Cut from glimmerstone. Triple damage, and one swing in four strikes twice as hard.' },
   soul:    { name: 'Soulreaver', dmg: 5, col: '#7fe07a', cost: { soulgem: 1, ectoplasm: 8 }, lifesteal: true, desc: 'Bound to the Soul Gem. Five times damage, the strongest blade there is, and each foe you defeat restores a heart.' },
@@ -933,6 +960,7 @@ const ARMORS = {
   barkskin: { name: 'Barkskin Mail', hearts: 5, tint: ['#2a1c10', '#5a3e26', '#7fb85a'], cost: { heartwood: 1, herb: 10 }, regen: true, desc: 'Grown from the Rotroot\'s heart. +5 hearts, and slowly heals you anywhere.' },
   serpentscale: { name: 'Serpent Scale Armor', hearts: 7, tint: ['#1a3a1a', '#4a8a3a', '#ffd65a'], cost: { serpenteye: 1, jade: 8 }, sturdy: true, regen: true, desc: 'Scales of the Serpent Queen. +7 hearts, the most of any armor, barely knocked back, and slowly heals you.' },
   prismplate: { name: 'Prismatic Plate', hearts: 6, tint: ['#2a2050', '#a593ff', '#9fe8ff'], cost: { prismheart: 1, glimmer: 6 }, speed: 1.15, sturdy: true, desc: 'Grown from the Hydra\'s heart. +6 hearts, 15% faster, and hits barely knock you back.' },
+  petalrobe: { name: 'Petalweave Robe', hearts: 4, tint: ['#6a3a5a', '#f2a0c8', '#ffe9f2'], cost: { petal: 8, herb: 6 }, regen: true, desc: 'Woven from spirit petals. +4 hearts, and slowly heals you anywhere.' },
   ranger:  { name: 'Ranger\'s Garb', hearts: 4, tint: ['#2a3a1a', '#5a7a3a', '#c9d68a'], cost: { jade: 8, herb: 6 }, speed: 1.2, desc: 'Light jungle leathers. +4 hearts and 20% faster movement.' },
   glimmermail: { name: 'Glimmer Mail', hearts: 4, tint: ['#2a3a6a', '#5a7ab0', '#9fe8ff'], cost: { glimmer: 8, crystal: 4 }, speed: 1.1, desc: 'Light crystal scales. +4 hearts and 10% faster movement.' },
   gravecoat: { name: 'Gravewarden Coat', hearts: 4, tint: ['#14121a', '#3a3650', '#b8a8ff'], cost: { ectoplasm: 8, stone: 4 }, sturdy: true, desc: '+4 hearts, and hits barely knock you back.' },
@@ -983,6 +1011,15 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'moths', giver: 'wren', name: 'Sleepy Wings', goal: { kill: [['moth', 5]] }, reward: { gold: 150, items: { petal: 4 } },
+    offer: ['Oh, a traveler! How lovely. Would you help an old woman? The blossom moths have grown far too many.', 'Their pollen makes everyone so drowsy, the whole village naps past noon. Five of them, if you please. Hold your breath near the pink clouds.'],
+    done: ['Wonderful! Here, take some spirit petals. They shimmer so prettily.'] },
+  { id: 'comb', giver: 'wren', name: 'The Pearl Comb', req: 'moths', hint: 'Find Wren\'s pearl comb on the islet in the south pond', foundText: 'Found it! Bring it to Wren.', goal: { find: 'comb' }, reward: { gold: 170, items: { potion: 3 } },
+    offer: ['A koi leapt up and snatched my pearl comb, then dropped it on the little island in the south pond.', 'You\'ll have to cross on the lily pads. Keep moving, dear: they sink if you stand still!'],
+    done: ['My comb! My mother gave me this. Thank you, thank you.'] },
+  { id: 'tricks', giver: 'wren', name: 'Tricks and Tails', req: 'comb', goal: { kill: [['tanuki', 3], ['fox', 3], ['koi', 3]] }, reward: { gold: 260, items: { crystal: 6, petal: 4 } },
+    offer: ['Tanuki pretend to be pots, spirit foxes make copies of themselves, and the koi leap out to splash passersby.', 'Three of each, if you\'re brave. Watch for pots that blink, and hit a koi while it flops on the shore.'],
+    done: ['Peace in Petalfall again. You\'re always welcome for tea, dear.'] },
   { id: 'temple', giver: 'tavi', name: 'The Serpent Temple', req: 'wilds', goal: { boss: ['chameleon', 'serpent'] }, reward: { gold: 540, items: { crystal: 14 } },
     offer: ['Beneath the ruins lies the Serpent Temple. The old folk worshipped the Serpent Queen there, and she never left.', 'A giant chameleon prowls her garden, unseen. Watch for the grass moving. Then face the Queen herself. Her tail is her weakness.'],
     done: ['You did it! The Wilds will tell stories about you for a hundred years. That eye will make armor no claw can pierce.'] },
@@ -1119,9 +1156,10 @@ function spawnFind(item, rg, x0, w) {
   if (S.found[item] || pickups.some(p => p.item === item)) return;
   for (let i = 0; i < 4000; i++) {
     const x = x0 + 2 + Math.floor(hash(i, 131) * (w - 4)), y = 2 + Math.floor(hash(131, i) * 40);
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
   }
 }
+function spawnComb() { if (S.found.comb || pickups.some(p => p.item === 'comb')) return; pickups.push({ x: VALE_D.islet.x, y: VALE_D.islet.y, vx: 0, vy: 0, item: 'comb', t: 0.4, keep: true }); }
 function spawnRing() {
   if (S.found.ring || pickups.some(p => p.item === 'ring')) return;
   for (let i = 0; i < 4000; i++) {
@@ -1135,6 +1173,7 @@ function acceptQuest(q) {
   if (q.goal.find === 'idol') spawnFind('idol', 8, SUN_D.x0, DW);
   if (q.goal.find === 'bloom') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (q.goal.find === 'chime') spawnFind('chime', 11, SKY_D.x0, DW);
+  if (q.goal.find === 'comb') spawnComb();
   if (q.goal.find === 'jadeidol') spawnFind('jadeidol', 14, JUNGLE_D.x0, DW);
   if (q.goal.find === 'goldpick') spawnFind('goldpick', 13, CAVE_D.x0, DW);
   banner(`New quest: ${q.name}`, '#ffe08a'); SFX.play('collect'); questTick(); save();
@@ -1163,7 +1202,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1179,7 +1218,7 @@ const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const resources = [], enemies = [], pickups = [], particles = [], floats = [], decor = [], animals = [], ambient = [];
 const SOLID = { tree: 11, rock: 12, crystal: 11, pot: 8, crate: 11, vine: 15, obsidian: 12, tallgrass: 0 };
 const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5, pot: 1, crate: 2, vine: 2, obsidian: 5, tallgrass: 1 };
-const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round']];
+const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round'], ['blossom', 'blossom', 'tree_round']];
 function addRes(type, tx, ty) {
   const r = { type, x: tx * T + 16 + (rng() - 0.5) * 10, y: ty * T + 20 + (rng() - 0.5) * 6, hp: RES_HP[type], max: RES_HP[type], alive: true, respawn: 0, shake: 0, seed: rng() };
   if (type === 'tree') { const k = TREE_KINDS[region[ty * W + tx]] || TREE_KINDS[4]; r.key = k[Math.floor(r.seed * k.length)]; }
@@ -1264,10 +1303,17 @@ for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
   for (const [ox, oy] of [[-4, -3], [4, -3], [-4, 3], [4, 3], [-2, -3], [2, -3]]) decor.push({ key: 'pillar', x: TP.x + 16 + ox * T, y: TP.y + oy * T, s: 2.5, solid: 13 });
 }
 for (let i = decor.length - 1; i >= 0; i--) if ((decor[i].templeIdol || decor[i].key === 'pillar') && Math.hypot(decor[i].x - SERP.x, decor[i].y - SERP.y) < 3.2 * T) decor.splice(i, 1);
+for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
+  const x = VALE_D.x0 + lx, t = tiles[y * W + x];
+  if (t !== LAND || nearValeSite(x, y, 5) || !isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1))) continue;
+  const r = rng(), byWater = [tileAt(x + 1, y), tileAt(x - 1, y), tileAt(x, y + 2)].some(q => q === DEEP || q === LILY);
+  if (byWater && r < 0.08) decor.push({ stonelantern: true, x: x * T + 16, y: y * T + 22, solid: 10 });
+  else if (r < 0.12) addRes('tree', x, y); else if (r < 0.15) addRes('herb', x, y); else if (r < 0.21) decor.push({ prop: 'flowers', x: x * T + 16, y: y * T + 22 }); else if (r < 0.22) addRes('rock', x, y);
+}
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
-    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
+    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 15 ? VALE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
   }
   return [cx * T + 300, cy * T];
 }
@@ -1317,6 +1363,10 @@ const ENEMY = {
   raptor:  { name: 'Raptor', proc: 'raptor', ai: 'raptor', hp: 3, sp: 110, dmg: 1, aggro: 230, drops: [['jade', 1], ['gold', 2]], col: '#5a8a3a' },
   dartfrog: { name: 'Dart Frog', proc: 'dartfrog', ai: 'dartfrog', hp: 2, sp: 60, dmg: 1, aggro: 190, drops: [['goo', 1], ['gold', 1]], col: '#3a8ae0' },
   monkey:  { name: 'Thief Monkey', proc: 'monkey', ai: 'monkey', hp: 3, sp: 120, dmg: 1, aggro: 220, drops: [['gold', 3]], col: '#6a4424' },
+  fox:     { name: 'Spirit Fox', proc: 'fox', ai: 'fox', hp: 3, sp: 95, dmg: 1, aggro: 230, drops: [['petal', 1], ['crystal', 1]], col: '#e8a040' },
+  moth:    { name: 'Blossom Moth', proc: 'moth', ai: 'moth', hp: 2, sp: 75, dmg: 1, aggro: 200, drops: [['petal', 1]], col: '#f2a0c8', flyer: true },
+  koi:     { name: 'Leaping Koi', proc: 'koi', ai: 'koi', hp: 3, sp: 40, dmg: 1, aggro: 200, drops: [['gold', 3], ['goo', 1]], col: '#e8703a' },
+  tanuki:  { name: 'Trickster Tanuki', proc: 'tanuki', ai: 'tanuki', hp: 4, sp: 80, dmg: 1, aggro: 200, drops: [['gold', 5]], col: '#8a6a44' },
   icemage: { name: 'Ice Mage', sprite: 'mage_ice', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 2], ['gold', 3]], col: '#9fe8ff' },
   mage:    { name: 'Cultist', sprite: 'mage', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 1], ['gold', 3]], col: '#e08a3c' },
 };
@@ -1330,8 +1380,10 @@ for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['bandit', 4, 2], [
   ['hawk', 11, 5], ['puff', 11, 4], ['windling', 11, 4], ['sentinel', 11, 3], ['hawk', 6, 2], ['hawk', 2, 2], ['windling', 8, 2],
   ['skeleton', 12, 6], ['shade', 12, 4], ['banshee', 12, 3], ['hound', 12, 4], ['bat', 12, 2], ['skeleton', 2, 2], ['hound', 4, 3], ['banshee', 6, 1],
   ['shardback', 13, 4], ['geode', 13, 3], ['burrower', 13, 4], ['shardback', 1, 2], ['burrower', 3, 2],
-  ['snapjaw', 14, 5], ['dartfrog', 14, 5], ['monkey', 14, 3], ['snapjaw', 4, 2], ['dartfrog', 9, 3]])
+  ['snapjaw', 14, 5], ['dartfrog', 14, 5], ['monkey', 14, 3], ['snapjaw', 4, 2], ['dartfrog', 9, 3],
+  ['moth', 15, 5], ['fox', 15, 3], ['tanuki', 15, 4], ['moth', 3, 2], ['tanuki', 4, 2], ['fox', 12, 2]])
   for (let i = 0; i < n; i++) addEnemy(kind, rg);
+for (const [x, y] of KOI_SPOTS) enemies.push(makeEnemy('koi', x * T + 16, y * T + 16));
 for (const rg of [14, 14, 14, 3]) { const [x, y] = randomTileIn(rg, 9); for (let i = 0; i < 2; i++) enemies.push(makeEnemy('raptor', x + i * 30, y)); }
 for (let g = 0; g < 4; g++) { const [x, y] = randomTileIn(13, 9); for (let i = 0; i < 3; i++) enemies.push(makeEnemy('glimbat', x + (i - 1) * 24, y + (i % 2) * 18)); }
 // dungeon creatures never respawn; clearing a room opens its gate
@@ -1516,6 +1568,7 @@ const NPCS = [
   { id: 'zahir', name: 'Zahir', x: SUN_D.mirra.x - 70, y: SUN_D.mirra.y + 36, sheet: 'zahir_idle', walk: 'zahir_walk', verb: 'Trade with', path: [[SUN_D.mirra.x - 70, SUN_D.mirra.y + 36], [SUN_D.mirra.x - 110, SUN_D.mirra.y + 40]] },
   { id: 'amara', name: 'Amara', x: SUN_D.mirra.x + 80, y: SUN_D.mirra.y + 40, sheet: 'amara_idle', walk: 'amara_walk', verb: 'Talk to', path: [[SUN_D.mirra.x + 80, SUN_D.mirra.y + 40], [SUN_D.mirra.x + 120, SUN_D.mirra.y + 50]] },
   { id: 'rosa', name: 'Captain Rosa', x: SUN_D.cove.x - 40, y: SUN_D.cove.y - 10, sheet: 'rosa_idle', walk: 'rosa_walk', verb: 'Talk to', path: [[SUN_D.cove.x - 40, SUN_D.cove.y - 10], [SUN_D.cove.x + 10, SUN_D.cove.y + 20]] },
+  { id: 'wren', name: 'Grandmother Wren', x: VALE_D.camp.x + 60, y: VALE_D.camp.y + 30, sheet: 'wren_idle', walk: 'wren_walk', verb: 'Talk to', path: [[VALE_D.camp.x + 60, VALE_D.camp.y + 30], [VALE_D.camp.x + 90, VALE_D.camp.y + 50]] },
   { id: 'tavi', name: 'Ranger Tavi', x: JUNGLE_D.camp.x + 60, y: JUNGLE_D.camp.y + 30, sheet: 'tavi_idle', walk: 'tavi_walk', verb: 'Talk to', path: [[JUNGLE_D.camp.x + 60, JUNGLE_D.camp.y + 30], [JUNGLE_D.camp.x + 100, JUNGLE_D.camp.y + 50]] },
   { id: 'quill', name: 'Prospector Quill', x: CAVE_D.camp.x + 60, y: CAVE_D.camp.y + 30, sheet: 'quill_idle', walk: 'quill_walk', verb: 'Talk to', path: [[CAVE_D.camp.x + 60, CAVE_D.camp.y + 30], [CAVE_D.camp.x + 100, CAVE_D.camp.y + 50]] },
   { id: 'morrow', name: 'Old Morrow', x: DUSK_D.camp.x + 60, y: DUSK_D.camp.y + 30, sheet: 'morrow_idle', walk: 'morrow_walk', verb: 'Talk to', path: [[DUSK_D.camp.x + 60, DUSK_D.camp.y + 30], [DUSK_D.camp.x + 90, DUSK_D.camp.y + 50]] },
@@ -1650,6 +1703,17 @@ if (HAMLET) {
   for (const [ox, oy, k] of [[-80, 10, 'crate'], [-96, 26, 'barrel'], [110, 10, 'crate']]) decor.push({ key: k, x: JUNGLE_D.camp.x + ox, y: JUNGLE_D.camp.y + oy, s: 2, solid: 10 });
   addSign('Canopy Camp', 'Canopy Camp. Tall grass hides all sorts of things. Hold on to your coin purse.', JUNGLE_D.camp.x - 60, JUNGLE_D.camp.y + 80);
 }
+// the mountain pass from the Frostmoor down to Petalfall Vale
+{
+  const MP = findSpot(range(FROST_D.x0 + 30, FROST_D.x0 + 36), range(8, 18)) || findSpot(range(FROST_D.x0 + 4, FROST_D.x0 + 14), range(6, 20)) || { x: (FROST_D.x0 + 33) * T, y: 12 * T + 4 };
+  addFerry('pass_out', 'Mountain Pass', MP.x + 16, MP.y + 8); NPCS[NPCS.length - 1].verb = 'Go through';
+  addFerry('pass_home', 'Pass to the Frostmoor', (VALE_D.x0 + 24) * T + 16, 4 * T + 8); NPCS[NPCS.length - 1].verb = 'Go through';
+  addSign('Frosty sign', 'Mountain Pass. Legends say a warm valley full of blossoms lies beyond.', MP.x - 50, MP.y + 40);
+  decor.push({ fire: true, x: VALE_D.camp.x + 10, y: VALE_D.camp.y + 60, solid: 12 }, { arch: true, x: VALE_D.x0 * T + 20 * T, y: 15 * T, solid: 0 });
+  for (const ox of [-46, 46]) decor.push({ stonelantern: true, x: VALE_D.x0 * T + 20 * T + ox, y: 15 * T + 10, solid: 10 });
+  for (const [ox, oy, k] of [[-80, 10, 'barrel'], [110, 10, 'barrel2']]) decor.push({ key: k, x: VALE_D.camp.x + ox, y: VALE_D.camp.y + oy, s: 2, solid: 10 });
+  addSign('Petalfall', 'Petalfall. Blossoms fall here all year round. Be kind to the koi, and never trust a pot that blinks.', VALE_D.camp.x - 60, VALE_D.camp.y + 80);
+}
 addFerry('ferry_home', 'Boat to Saltmarsh', (SUN_D.x0 + 21) * T + 6, 3 * T + 16);
 addSign('Mirra Oasis', 'Mirra Oasis. Shade, cool water and Zahir\'s bazaar. Corsair\'s Cove lies down the east path, the Sunken Ruins to the southwest.', SUN_D.mirra.x + 40, SUN_D.mirra.y - 20);
 addSign('Corsair\'s Cove', 'Corsair\'s Cove. No questions asked, no gold returned.', SUN_D.cove.x - 90, SUN_D.cove.y - 40);
@@ -1710,6 +1774,8 @@ const ICON_DRAW = {
   sunstone: c => { c.fillStyle = '#b8862a'; diamond(c, 16, 18, 11, 14); c.fillStyle = '#f4b740'; diamond(c, 16, 18, 9, 11); c.fillStyle = '#ffe9a8'; diamond(c, 14, 15, 3, 5); c.strokeStyle = 'rgba(255,214,90,.8)'; c.lineWidth = 2; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; c.beginPath(); c.moveTo(16 + Math.cos(a) * 12, 16 + Math.sin(a) * 12); c.lineTo(16 + Math.cos(a) * 15, 16 + Math.sin(a) * 15); c.stroke(); } },
   idol: c => { c.fillStyle = '#7a5a14'; c.fillRect(9, 6, 14, 22); c.fillStyle = '#f4b740'; c.fillRect(10, 7, 12, 20); c.fillStyle = '#7a5a14'; c.fillRect(12, 11, 3, 3); c.fillRect(17, 11, 3, 3); c.fillRect(13, 18, 6, 2); c.fillStyle = '#ec5257'; c.fillRect(15, 3, 2, 4); c.fillStyle = '#ffe9a8'; c.fillRect(11, 8, 2, 6); },
   obsidian: c => { c.fillStyle = '#16121c'; c.beginPath(); c.moveTo(6, 28); c.lineTo(10, 10); c.lineTo(16, 3); c.lineTo(21, 12); c.lineTo(26, 28); c.closePath(); c.fill(); c.fillStyle = '#4a3a62'; c.beginPath(); c.moveTo(11, 26); c.lineTo(13, 12); c.lineTo(16, 7); c.lineTo(17, 22); c.closePath(); c.fill(); c.fillStyle = '#c8b8ff'; c.fillRect(14, 9, 2, 6); },
+  petal: c => { c.fillStyle = 'rgba(242,160,200,.3)'; circle(c, 16, 16, 12); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2 - Math.PI / 2; c.fillStyle = i % 2 ? '#f2a0c8' : '#ffc4dc'; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 16 + Math.sin(a) * 6, 5, 3.5, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe08a'; circle(c, 16, 16, 2.5); },
+  comb: c => { c.fillStyle = '#e6e2f0'; c.beginPath(); c.ellipse(16, 12, 11, 6, 0, Math.PI, 0); c.fill(); c.fillStyle = '#c8c0d8'; for (let i = 0; i < 8; i++) c.fillRect(7 + i * 2.4, 12, 1.4, 12); c.fillStyle = '#f2a0c8'; circle(c, 12, 9, 2.5); circle(c, 20, 9, 2.5); c.fillStyle = '#ffffff'; circle(c, 16, 8, 2); },
   jade: c => { c.fillStyle = 'rgba(90,200,120,.3)'; circle(c, 16, 16, 12); c.fillStyle = '#2f6b3a'; c.beginPath(); c.ellipse(16, 17, 10, 8, 0.4, 0, Math.PI * 2); c.fill(); c.fillStyle = '#5ab87a'; c.beginPath(); c.ellipse(15, 16, 7, 5, 0.4, 0, Math.PI * 2); c.fill(); c.fillStyle = '#d6ffe0'; c.fillRect(11, 13, 3, 2); },
   jadeidol: c => { c.fillStyle = '#2f6b3a'; c.fillRect(9, 6, 14, 22); c.fillStyle = '#5ab87a'; c.fillRect(10, 7, 12, 20); c.fillStyle = '#2f6b3a'; c.fillRect(12, 11, 3, 3); c.fillRect(17, 11, 3, 3); c.fillRect(13, 18, 6, 2); c.fillStyle = '#d6ffe0'; c.fillRect(11, 8, 2, 6); c.fillStyle = '#ffd65a'; c.fillRect(14, 3, 4, 3); },
   glimmer: c => { c.fillStyle = 'rgba(159,232,255,.3)'; circle(c, 16, 16, 12); c.fillStyle = '#5a7ab0'; c.beginPath(); c.moveTo(16, 4); c.lineTo(26, 14); c.lineTo(20, 28); c.lineTo(12, 28); c.lineTo(6, 14); c.closePath(); c.fill(); c.fillStyle = '#9fe8ff'; c.beginPath(); c.moveTo(16, 6); c.lineTo(23, 14); c.lineTo(16, 26); c.lineTo(9, 14); c.closePath(); c.fill(); c.fillStyle = '#ffffff'; c.fillRect(13, 10, 2, 6); },
@@ -1746,7 +1812,7 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye'];
 const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
@@ -1867,6 +1933,13 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">Petalfall Vale</div>
+      <dl class="controls">
+      <dt>Getting there</dt><dd>Go through the Mountain Pass in the northeast of the Frostmoor. The pass at Petalfall brings you back.</dd>
+      <dt>Lily pads</dt><dd>Hop across the ponds on lily pads, but keep moving: a pad sinks if you stand on it too long, and you splash back to shore.</dd>
+      <dt>Creatures</dt><dd>Spirit foxes throw foxfire and conjure copies of themselves: strike the copies to pop them. Blossom moths drop sleepy pollen that slows you. Koi leap out of the ponds at you: hit them while they flop on the shore. Trickster tanuki disguise themselves as pots until you come close.</dd>
+      <dt>Spirit petals</dt><dd>Moths and foxes drop spirit petals. They craft the Blossom Blade, whose hits sometimes heal you, and the Petalweave Robe.</dd>
+      <dt>Elsewhere</dt><dd>Blossom moths flutter over the meadow, tanuki hide as pots in the forest, and spirit foxes haunt Duskhollow.</dd></dl>
       <div class="label">The Serpent Temple</div>
       <dl class="controls">
       <dt>Getting in</dt><dd>The stepped temple at the ruins in the southeast of the Verdant Wilds.</dd>
@@ -2211,6 +2284,9 @@ function interact(n) {
   }
   if (n.sign) { say(n.name, [n.text]); return; }
   if (n.id === 'ysolde') { shopName = 'Ysolde\'s Trading Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
+  if (n.boat && n.id === 'pass_out') { const first = !S.found.vale; S.found.vale = true; travel(VALE_D.start.x, VALE_D.start.y, 0, 1, 'Petalfall Vale'); if (first) setTimeout(() => toast('A warm, hidden valley full of falling blossoms. Petalfall village is just south of the pass.', 4500), 1200); return; }
+  if (n.boat && n.id === 'pass_home') { const MP = NPCS.find(m => m.id === 'pass_out'); travel(MP.x, MP.y + 50, 0, 1, 'The Frostmoor'); return; }
+  if (n.id === 'wren') { shopName = 'Wren\'s Tea House'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
   if (n.boat && n.id === 'turtle_out') { const first = !S.found.jungle; S.found.jungle = true; travel(JUNGLE_D.start.x, JUNGLE_D.start.y, 0, 1, 'The Verdant Wilds'); if (first) setTimeout(() => toast('Steamy jungle as far as the eye can see. Canopy Camp is just south of the landing.', 4500), 1200); return; }
   if (n.boat && n.id === 'turtle_home') { const TT = NPCS.find(m => m.id === 'turtle_out'); travel(TT.x, TT.y - 50, 0, -1, 'The Sunward Isles'); return; }
   if (n.id === 'tavi') { shopName = 'Tavi\'s Ranger Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
@@ -2274,6 +2350,9 @@ let skelHint = false, shadeHint = false;
 function damageEnemy(e, dmg, kx, ky) {
   const D = ENEMY[e.kind];
   if (D.ghostly && e.faded) { floatText(e.x, e.y - 44, 'Miss', '#c8d0e0'); burst(e.x, e.y - 20, '#c8d0e0', 4); return false; }
+  if (e.kind === 'koi' && e.mode === 'swim') { floatText(e.x, e.y - 20, 'It\'s underwater!', '#bfe8ff'); return false; }
+  if (e.kind === 'tanuki' && e.mode === 'disguise') { e.mode = 'chase'; e.cd = 0.6; burst(e.x, e.y - 14, '#e6e2d6', 16); floatText(e.x, e.y - 60, 'It\'s a tanuki!', '#ffe08a'); }
+  if (gearW().bloom && rng() < 0.15 && S.hp > 0 && S.hp < maxHp()) { S.hp++; updateHUD(); floatText(P.x, P.y - 60, '+♥', '#f2a0c8'); }
   if (e.kind === 'burrower' && e.state === 'under') { floatText(e.x, e.y - 20, 'It\'s underground!', '#c8b89a'); return false; }
   if (e.kind === 'shardback' && !(e.shardT > time)) { e.shardT = time + 0.9; shardBurst(e); }
   if (e.kind === 'skeleton') {
@@ -2319,6 +2398,7 @@ function hitEnemies(a) {
   const AB = activeBoss();
   if (AB && AB.decoys) for (const dc of AB.decoys) if (!dc.popped && Math.hypot(dc.x - hx, dc.y - 26 - AB.z - hy) < rad + 26) { dc.popped = true; burst(dc.x, dc.y - 40, '#dff6ff', 16); floatText(dc.x, dc.y - 80, 'Just a reflection!', '#c8e8ff'); SFX.play('mine'); hit = true; }
   hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitLanterns(hx, hy, rad);
+  for (const e of enemies) if (e.alive && e.decoys && e.decoys.length) for (let i = e.decoys.length - 1; i >= 0; i--) { const q = e.decoys[i]; if (Math.hypot(q.x - hx, q.y - 10 - hy) < rad + 6) { e.decoys.splice(i, 1); burst(q.x, q.y - 16, '#ffb347', 12); floatText(q.x, q.y - 40, 'Just an illusion!', '#ffd6a0'); hit = true; } }
   if (AB && AB.type === 'hydra' && hitHydra(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && AB.type === 'serpent' && hitSerpent(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && bossHittable(AB) && Math.hypot(AB.x - hx, AB.y - (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 50 : 26) - AB.z - hy) < rad + (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 40 : 30)) { if (AB.decoys && AB.decoys.some(dc => !dc.popped)) { AB.decoys = []; wizardDazeQuiet(AB, 'Found her! Strike now!'); } damageBoss(AB, dmg); hit = true; }
@@ -2383,7 +2463,7 @@ function hitResource(r, a) {
 }
 function killEnemy(e) {
   const D = ENEMY[e.kind];
-  e.alive = false; e.respawn = 25; e.dieT = 0.4; e.state = 'move'; e.faded = false; SFX.play('slime');
+  e.alive = false; e.respawn = 25; e.dieT = 0.4; e.state = 'move'; e.faded = false; e.mode = undefined; e.decoys = []; SFX.play('slime');
   burst(e.x, e.y - 10, D.col, 16);
   for (const [item, n] of D.drops) drop(e.x, e.y - 6, item, n);
   if (e.kind === 'bogslime') for (let i = 0; i < 2; i++) { const m = makeEnemy('bogling', e.x + (i ? 16 : -16), e.y + 4); m.minion = true; m.noRespawn = true; m.spawnT = 0.3; enemies.push(m); }
@@ -2501,7 +2581,7 @@ function update(dt) {
   P.inv = Math.max(0, P.inv - dt); P.slow = Math.max(0, (P.slow || 0) - dt); P.hex = Math.max(0, (P.hex || 0) - dt);
   if (!P.dash && dungeonAt(P.x) === TOMB_D) for (const tr of TRAPS) if (trapState(tr) === 2 && P.x > tr.x + 2 && P.x < tr.x + 30 && P.y > tr.y + 4 && P.y < tr.y + 34) { damagePlayer(1, { x: tr.x + 16, y: tr.y + 40 }); break; }
   if (gearA().regen && S.hp > 0 && S.hp < maxHp()) { P.regenT = (P.regenT || 0) + dt; if (P.regenT > 8) { P.regenT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#7fe0f0'); } }
-  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
+  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - VALE_D.camp.x - 10, P.y - VALE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
   if (S.bridge && !edgeToast && P.y > (H - 6) * T && !inDungeon(P.x)) { edgeToast = true; toast('The mainland lies at the end of the bridge. Keep walking south.', 3500); }
   for (const r of resources) {
     r.shake = Math.max(0, r.shake - dt);
@@ -2512,7 +2592,7 @@ function update(dt) {
   for (const e of enemies) updateEnemy(e, dt, fainted);
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].remove) enemies.splice(i, 1);
   updateProjectiles(dt, fainted);
-  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D) updateJets(dt);
+  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D) updateJets(dt);
   updateBosses(dt, fainted);
   updateWorldLinks(dt);
   for (let i = pickups.length - 1; i >= 0; i--) {
@@ -2524,6 +2604,7 @@ function update(dt) {
       pickups.splice(i, 1);
       if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
       else if (p.item === 'idol') { S.found.idol = true; banner('Found the golden idol!', '#ffe08a'); SFX.play('lucky'); questTick(); }
+      else if (p.item === 'comb') { S.found.comb = true; banner('Found the pearl comb!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'jadeidol') { S.found.jadeidol = true; banner('Found the jade idol!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'goldpick') { S.found.goldpick = true; banner('Found the golden pickaxe!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'chime') { S.found.chime = true; banner('Found the wind chime!', '#ffe08a'); SFX.play('lucky'); questTick(); }
@@ -3746,7 +3827,8 @@ function updateHazards(dt, fainted) {
   for (let i = HAZARDS.length - 1; i >= 0; i--) {
     const h = HAZARDS[i]; h.t += dt; h.tick -= dt;
     if (!fainted && Math.hypot(P.x - h.x, (P.y - h.y) / 0.7) < h.r) {
-      if (!gearA().warm && !h.fire) P.slow = Math.max(P.slow || 0, 0.4);
+      if (h.pollen) { if (!gearA().warm) P.slow = Math.max(P.slow || 0, 1); if (Math.random() < 0.05) floatText(P.x, P.y - 60, 'Sleepy pollen...', '#ffd6ea'); }
+      else if (!gearA().warm && !h.fire) P.slow = Math.max(P.slow || 0, 0.4);
       if (h.tick <= 0) { h.tick = 1; damagePlayer(1, { x: h.x, y: h.y - 40 }); }
     }
     if (h.t > h.life) HAZARDS.splice(i, 1);
@@ -3760,6 +3842,7 @@ function drawHazards(c) {
       for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2, fx = h.x + Math.cos(a) * h.r * 0.5, fy = h.y + Math.sin(a) * h.r * 0.25, fh = (8 + Math.sin(time * 18 + i * 2) * 4) * k; c.fillStyle = `rgba(255,140,40,${0.7 * k})`; ellipse(c, fx, fy - fh * 0.6, 4, fh); c.fillStyle = `rgba(255,230,140,${0.7 * k})`; ellipse(c, fx, fy - fh * 0.4, 2, fh * 0.5); }
       continue;
     }
+    if (h.pollen) { for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + h.t * 0.8, rr = h.r * 0.55; c.fillStyle = `rgba(255,190,220,${0.25 * k})`; circle(c, h.x + Math.cos(a) * rr, h.y - 10 + Math.sin(a) * rr * 0.6, h.r * 0.45); } continue; }
     for (let i = 0; i < 6; i++) {
       const a = i / 6 * Math.PI * 2 + h.t * 0.6, rr = h.r * 0.55;
       c.fillStyle = `rgba(150,200,90,${0.22 * k})`; circle(c, h.x + Math.cos(a) * rr, h.y - 10 + Math.sin(a) * rr * 0.6, h.r * 0.5);
@@ -5160,7 +5243,7 @@ function updateJungleFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
     }
     return true;
   }
-  return false;
+  return updateValeFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander);
 }
 let monkeyHint = false;
 Object.assign(PROC_DRAW, {
@@ -5331,6 +5414,160 @@ function drawSerpentTemple(c) {
   c.fillStyle = '#efe6d8'; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(x + s * 12, y - 30); c.lineTo(x + s * 8, y - 16); c.lineTo(x + s * 5, y - 30); c.closePath(); c.fill(); }
   const g = 0.5 + Math.sin(time * 2) * 0.3; c.fillStyle = `rgba(255,214,90,${g})`; c.fillRect(x - 12, y - 46, 6, 4); c.fillRect(x + 6, y - 46, 6, 4);
 }
+// ---------- sinking lily pads ----------
+const LILY_STATE = new Map();
+let lilyStand = 0, lilyKey = -1;
+function updateLilies(dt, fainted) {
+  for (const [k, st] of LILY_STATE) { st.down -= dt; if (st.down <= 0) { tiles[k] = LILY; LILY_STATE.delete(k); const x = k % W, y = Math.floor(k / W); redrawArea(x, y, x, y); } }
+  if (dungeonAt(P.x) !== VALE_D || P.ride) return;
+  const tx = Math.floor(P.x / T), ty = Math.floor(P.y / T), k = ty * W + tx, t = tiles[k];
+  if (t === LAND || t === PATH) { P.safe = { x: P.x, y: P.y }; lilyStand = 0; lilyKey = -1; return; }
+  if (t === LILY) {
+    if (k !== lilyKey) { lilyKey = k; lilyStand = 0; }
+    lilyStand += dt;
+    if (lilyStand > 1.3) {
+      tiles[k] = DEEP; LILY_STATE.set(k, { down: 3.5 }); redrawArea(tx, ty, tx, ty); SFX.play('slime');
+      for (let i = 0; i < 10; i++) { const a = rng() * Math.PI * 2; particles.push({ x: tx * T + 16, y: ty * T + 16, vx: Math.cos(a) * 60, vy: Math.sin(a) * 40 - 30, life: 0.5, color: '#bfe8ff', size: 3 }); }
+      if (P.safe) { P.x = P.safe.x; P.y = P.safe.y; } floatText(P.x, P.y - 60, 'Splash! The pad sank.', '#bfe8ff');
+      if (!fainted) { P.inv = 0; damagePlayer(1, { x: P.x, y: P.y + 20 }); }
+      lilyStand = 0; lilyKey = -1;
+    }
+  }
+}
+function drawLilyWobble(c) {
+  if (lilyKey < 0 || lilyStand < 0.5) return;
+  const x = (lilyKey % W) * T + 16, y = Math.floor(lilyKey / W) * T + 16, k = (lilyStand - 0.5) / 0.8;
+  c.strokeStyle = `rgba(255,255,255,${0.3 + k * 0.5})`; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y + 4, 14 + k * 8 + Math.sin(time * 30) * 2, 6 + k * 3, 0, 0, Math.PI * 2); c.stroke();
+}
+function drawBlossomTile(c, x, y, px, py, t) {
+  const h = hash(x, y);
+  if (t === DEEP || t === LILY) {
+    c.fillStyle = '#7ec8e8'; c.fillRect(px, py, T, T); c.fillStyle = 'rgba(255,255,255,.18)'; if (h > 0.6) c.fillRect(px + h * 20, py + 8, 8, 2);
+    const landN = q => isLand(q) && q !== LILY;
+    c.fillStyle = '#5aa65c'; if (landN(tileAt(x, y - 1))) c.fillRect(px, py, T, 4); if (landN(tileAt(x, y + 1))) c.fillRect(px, py + T - 3, T, 3); if (landN(tileAt(x - 1, y))) c.fillRect(px, py, 3, T); if (landN(tileAt(x + 1, y))) c.fillRect(px + T - 3, py, 3, T);
+    if (t === LILY) { c.fillStyle = '#3d8448'; c.beginPath(); c.arc(px + 16, py + 17, 13, 0.3, Math.PI * 2 - 0.1); c.lineTo(px + 16, py + 17); c.closePath(); c.fill(); c.fillStyle = '#5ab85a'; c.beginPath(); c.arc(px + 15, py + 16, 10, 0.3, Math.PI * 2 - 0.1); c.lineTo(px + 15, py + 16); c.closePath(); c.fill(); if (h > 0.4) { c.fillStyle = '#f2a0c8'; circle(c, px + 11, py + 12, 3); c.fillStyle = '#ffe9f2'; circle(c, px + 11, py + 12, 1.5); } }
+    return;
+  }
+  spr(c, h < 0.35 ? 'grass1' : 'grass0', px, py);
+  if (t === PATH) spr(c, edgeKey('p_', notPath, x, y), px, py);
+  c.fillStyle = t === PATH ? 'rgba(255,220,230,.12)' : 'rgba(255,200,220,.12)'; c.fillRect(px, py, T, T);
+  if (t !== PATH && h > 0.8) { c.fillStyle = '#f2a0c8'; c.fillRect(px + h * 22, py + 6 + h * 14, 3, 2); c.fillRect(px + 4 + h * 10, py + 22, 2, 2); }
+}
+function drawBlossomTree(c, r) {
+  c.fillStyle = '#5a3a2a'; c.fillRect(-4, -34, 8, 34); c.strokeStyle = '#5a3a2a'; c.lineWidth = 4; c.beginPath(); c.moveTo(0, -24); c.lineTo(-14, -40); c.moveTo(0, -28); c.lineTo(12, -44); c.stroke();
+  const sw = Math.sin(time * 1.5 + r.seed * 9) * 1.5;
+  for (const [ox, oy, rr, col] of [[-16, -44, 14, '#e888b4'], [14, -48, 14, '#e888b4'], [0, -56, 17, '#f2a0c8'], [-8, -50, 11, '#ffc4dc'], [10, -58, 9, '#ffc4dc']]) { c.fillStyle = col; circle(c, ox + sw, oy, rr); }
+  if (Math.random() < 0.02) ambient.push({ kind: 'petal', x: r.x + (Math.random() - 0.5) * 30, y: r.y - 50, life: 4, ph: Math.random() * 6 });
+}
+function drawStoneLantern(c, o) {
+  const x = o.x, y = o.y; shadow(c, x, y + 2, 12, 4);
+  c.fillStyle = '#8a8478'; c.fillRect(x - 4, y - 22, 8, 22); c.fillRect(x - 10, y - 2, 20, 4); c.fillStyle = '#6a6458'; c.fillRect(x - 9, y - 34, 18, 12);
+  c.fillStyle = `rgba(255,220,150,${0.7 + Math.sin(time * 5 + x) * 0.2})`; c.fillRect(x - 5, y - 31, 10, 6);
+  c.fillStyle = '#5a5448'; c.beginPath(); c.moveTo(x - 13, y - 34); c.lineTo(x, y - 44); c.lineTo(x + 13, y - 34); c.closePath(); c.fill();
+}
+function drawBlossomArch(c, o) {
+  const x = o.x, y = o.y; shadow(c, x, y + 2, 40, 6);
+  c.fillStyle = '#c8402a'; c.fillRect(x - 36, y - 80, 9, 82); c.fillRect(x + 27, y - 80, 9, 82); c.fillRect(x - 46, y - 88, 92, 9); c.fillRect(x - 38, y - 70, 76, 6);
+  c.fillStyle = '#2a1a1a'; c.fillRect(x - 50, y - 92, 100, 5);
+}
+function drawPass(c, x, y, home) {
+  shadow(c, x, y + 2, 40, 9);
+  c.fillStyle = home ? '#6a6458' : '#8a8a94'; c.beginPath(); c.moveTo(x - 50, y); c.lineTo(x - 36, y - 60); c.lineTo(x - 6, y - 84); c.lineTo(x + 26, y - 70); c.lineTo(x + 50, y); c.closePath(); c.fill();
+  if (!home) { c.fillStyle = '#f2f6ff'; c.beginPath(); c.moveTo(x - 36, y - 60); c.lineTo(x - 6, y - 84); c.lineTo(x + 26, y - 70); c.lineTo(x + 14, y - 62); c.lineTo(x - 4, y - 70); c.lineTo(x - 20, y - 56); c.closePath(); c.fill(); }
+  else { c.fillStyle = '#e888b4'; for (const [ox, oy] of [[-30, -50], [20, -60], [-8, -76]]) circle(c, x + ox, y + oy, 9); }
+  c.fillStyle = '#0a0812'; c.beginPath(); c.moveTo(x - 18, y); c.lineTo(x - 18, y - 30); c.quadraticCurveTo(x, y - 48, x + 18, y - 30); c.lineTo(x + 18, y); c.closePath(); c.fill();
+  c.fillStyle = '#5a3a22'; c.fillRect(x - 20, y - 34, 4, 34); c.fillRect(x + 16, y - 34, 4, 34); c.fillRect(x - 20, y - 36, 40, 4);
+}
+// ---------- Petalfall creatures: spirit foxes, blossom moths, leaping koi, trickster tanuki ----------
+function updateValeFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
+  const ai = AI(e.kind);
+  if (ai === 'fox') {
+    e.decoys = (e.decoys || []).filter(q => (q.t -= dt) > 0);
+    if (chase) {
+      const want = d > 150 ? 1 : d < 100 ? -1 : 0, a = e.anim * 1.4 + e.hx; moveEnemy(e, (dx / d * want + Math.cos(a) * 0.6) * D.sp * dt, (dy / d * want + Math.sin(a) * 0.6) * D.sp * dt);
+      if (e.cd <= 0) { e.cd = 2.6 + rng(); projectiles.push({ kind: 'wisp', x: e.x, y: e.y - 20, ang: Math.atan2(P.y - e.y, P.x - e.x), t: 0, life: 3 }); SFX.play('wisp'); }
+      e.blink = (e.blink || 3) - dt;
+      if (e.blink <= 0) { e.blink = 5; const spots = []; for (let i = 0; i < 3; i++) { const a = rng() * Math.PI * 2, nx = P.x + Math.cos(a) * 120, ny = P.y + Math.sin(a) * 90; if (walkable(nx, ny)) spots.push([nx, ny]); } if (spots.length) { burst(e.x, e.y - 20, '#ffb347', 10); const [rx, ry] = spots.pop(); e.x = rx; e.y = ry; e.decoys = spots.map(([x, y]) => ({ x, y, t: 4 })); SFX.play('wisp'); } }
+    } else wander(D.sp * 0.5);
+    return true;
+  }
+  if (ai === 'moth') {
+    if (chase) { const a = e.anim * 2 + e.hx, tx = P.x + Math.cos(a) * 90, ty = P.y + Math.sin(a) * 60, ex = tx - e.x, ey = ty - e.y, el = Math.hypot(ex, ey) || 1; moveEnemy(e, ex / el * Math.min(el, D.sp * dt), ey / el * Math.min(el, D.sp * dt)); if (e.cd <= 0) { e.cd = 3.5 + rng(); HAZARDS.push({ x: e.x, y: e.y, r: 46, t: 0, life: 3, tick: 99, pollen: true }); SFX.play('wisp'); } }
+    else moveEnemy(e, Math.cos(e.anim * 2) * 30 * dt + (e.hx - e.x) * 0.3 * dt, Math.sin(e.anim * 2.4) * 20 * dt + (e.hy - e.y) * 0.3 * dt);
+    touch(D.dmg); return true;
+  }
+  if (ai === 'koi') {
+    const water = (x, y) => tileAt(Math.floor(x / T), Math.floor(y / T)) === DEEP;
+    if (e.mode === undefined) e.mode = 'swim';
+    if (e.mode === 'swim') {
+      e.wt = (e.wt || 0) - dt; if (e.wt <= 0) { e.wt = 1 + rng() * 1.5; e.sa = rng() * Math.PI * 2; }
+      const nx = e.x + Math.cos(e.sa) * 40 * dt, ny = e.y + Math.sin(e.sa) * 40 * dt; if (water(nx, ny)) { e.x = nx; e.y = ny; } else e.sa += Math.PI;
+      if (chase && d < 180 && d > 40 && e.cd <= 0) { e.mode = 'leap'; e.st = 0.7; e.sx = e.x; e.sy = e.y; e.tx = P.x; e.ty = P.y; SFX.play('leap'); burst(e.x, e.y, '#bfe8ff', 8); }
+      return true;
+    }
+    if (e.mode === 'leap') {
+      e.st -= dt; const k = 1 - Math.max(0, e.st) / 0.7; e.x = e.sx + (e.tx - e.sx) * k; e.y = e.sy + (e.ty - e.sy) * k; e.lift = Math.sin(Math.PI * k) * 60;
+      if (e.st <= 0) { e.lift = 0; if (!fainted && Math.hypot(P.x - e.x, P.y - e.y) < 28) damagePlayer(1, e); if (water(e.x, e.y)) { e.mode = 'swim'; e.cd = 2; } else { e.mode = 'flop'; e.st = 1.4; } }
+      return true;
+    }
+    if (e.mode === 'flop') { e.st -= dt; if (e.st <= 0) { e.mode = 'leap'; e.st = 0.6; e.sx = e.x; e.sy = e.y; e.tx = e.hx; e.ty = e.hy; e.cd = 2.5; } return true; }
+    return true;
+  }
+  if (ai === 'tanuki') {
+    if (e.mode === undefined) e.mode = 'disguise';
+    if (e.mode === 'disguise') { if (!fainted && d < 60) { e.mode = 'chase'; e.cd = 0.6; burst(e.x, e.y - 14, '#e6e2d6', 16); floatText(e.x, e.y - 50, 'It\'s a tanuki!', '#ffe08a'); SFX.play('wisp'); } return true; }
+    if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { e.state = 'roll'; e.st = 0.5; e.lx = dx / d * 300; e.ly = dy / d * 300; e.hit = false; } return true; }
+    if (e.state === 'roll') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); if (!e.hit && d < 24 && !fainted) { e.hit = true; damagePlayer(D.dmg, e); } if (e.st <= 0) { e.state = 'move'; e.cd = 2; } return true; }
+    if (chase) { moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); if (d < 130 && e.cd <= 0) { e.state = 'windup'; e.st = 0.4; } } else wander(D.sp * 0.6);
+    touch(D.dmg); return true;
+  }
+  return false;
+}
+Object.assign(PROC_DRAW, {
+  fox(c, e, k) {
+    const one = (x, y, ghost) => {
+      const f = P.x < x ? -1 : 1, bob = Math.sin(e.anim * 6) * 2;
+      c.globalAlpha = ghost ? 0.85 : 1;
+      shadow(c, x, y + 2, 11 * k, 3 * k);
+      c.fillStyle = '#e8a040'; for (let i = 0; i < 3; i++) { c.beginPath(); c.ellipse(x - f * (12 + i * 3), y - 14 - i * 5 + bob, 9, 4, -f * (0.6 + i * 0.3), 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = '#ffffff'; circle(c, x - f * 22, y - 26 + bob, 3);
+      c.fillStyle = '#e8a040'; ellipse(c, x, y - 12 + bob, 10 * k, 7 * k); ellipse(c, x + f * 9, y - 20 + bob, 7 * k, 6 * k);
+      c.beginPath(); c.moveTo(x + f * 5, y - 25 + bob); c.lineTo(x + f * 6, y - 33 + bob); c.lineTo(x + f * 10, y - 25 + bob); c.fill(); c.beginPath(); c.moveTo(x + f * 10, y - 25 + bob); c.lineTo(x + f * 13, y - 32 + bob); c.lineTo(x + f * 14, y - 23 + bob); c.fill();
+      c.fillStyle = '#ffffff'; ellipse(c, x + f * 12, y - 18 + bob, 3, 2); c.fillStyle = '#1a1210'; c.fillRect(x + f * 10, y - 22 + bob, 2, 2);
+      c.fillStyle = `rgba(150,200,255,${0.4 + Math.sin(time * 8 + x) * 0.2})`; circle(c, x - f * 22, y - 30 + bob, 4);
+      c.globalAlpha = 1;
+    };
+    for (const q of e.decoys || []) one(q.x, q.y, true);
+    one(e.x, e.y, false);
+  },
+  moth(c, e, k) {
+    const y = e.y - 30 + Math.sin(e.anim * 4) * 4, flap = Math.abs(Math.sin(time * 16 + e.hx));
+    shadow(c, e.x, e.y + 2, 8 * k, 3 * k);
+    for (const s of [-1, 1]) { c.fillStyle = '#f2a0c8'; c.beginPath(); c.ellipse(e.x + s * 8 * flap, y - 3, 8 * flap + 1, 7, s * 0.4, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffe9f2'; circle(c, e.x + s * 8 * flap, y - 4, 2.5 * flap + 0.5); }
+    c.fillStyle = '#6a4a5a'; ellipse(c, e.x, y, 3, 7); c.strokeStyle = '#6a4a5a'; c.lineWidth = 1; c.beginPath(); c.moveTo(e.x - 1, y - 6); c.lineTo(e.x - 4, y - 11); c.moveTo(e.x + 1, y - 6); c.lineTo(e.x + 4, y - 11); c.stroke();
+    if (Math.random() < 0.2) particles.push({ x: e.x, y: y + 4, vx: (Math.random() - 0.5) * 10, vy: 12, life: 0.6, color: '#ffd6ea', size: 2 });
+  },
+  koi(c, e, k) {
+    const lift = e.lift || 0, a = e.mode === 'swim' ? e.sa || 0 : Math.atan2((e.ty || e.y) - (e.sy || e.y), (e.tx || e.x) - (e.sx || e.x));
+    if (e.mode === 'swim') { c.save(); c.globalAlpha = 0.6; c.translate(e.x, e.y); c.rotate(a); c.fillStyle = '#e8703a'; ellipse(c, 0, 0, 14, 6); c.fillStyle = '#ffffff'; ellipse(c, 4, -1, 4, 3); c.beginPath(); c.moveTo(-12, 0); c.lineTo(-20, -5); c.lineTo(-20, 5); c.closePath(); c.fillStyle = '#e8703a'; c.fill(); c.restore(); return; }
+    shadow(c, e.x, e.y + 2, 14 * k, 4 * k);
+    const flop = e.mode === 'flop' ? Math.sin(time * 30) * 0.5 : 0;
+    c.save(); c.translate(e.x, e.y - 12 - lift); c.rotate((Math.cos(a) < 0 ? Math.PI : 0) + flop);
+    c.fillStyle = '#e8703a'; ellipse(c, 0, 0, 16, 8); c.fillStyle = '#ffffff'; ellipse(c, 4, -2, 5, 4); ellipse(c, -6, 2, 4, 3);
+    c.fillStyle = '#e8703a'; c.beginPath(); c.moveTo(-14, 0); c.lineTo(-24, -7); c.lineTo(-24, 7); c.closePath(); c.fill(); c.fillStyle = '#1a1210'; c.fillRect(10, -3, 2, 2);
+    c.restore();
+  },
+  tanuki(c, e, k) {
+    if (e.mode === 'disguise') { drawPot(c, { ...e, x: e.x, y: e.y - 2, shake: 0 }); if (Math.sin(time * 3 + e.hx) > 0.95) { c.fillStyle = '#1a1210'; c.fillRect(e.x - 3, e.y - 16, 2, 2); c.fillRect(e.x + 2, e.y - 16, 2, 2); } return; }
+    const roll = e.state === 'roll', f = P.x < e.x ? -1 : 1, bob = Math.abs(Math.sin(e.anim * 8)) * 2;
+    shadow(c, e.x, e.y + 2, 12 * k, 4 * k);
+    if (roll) { c.save(); c.translate(e.x, e.y - 12); c.rotate(time * 20); c.fillStyle = '#8a6a44'; circle(c, 0, 0, 12); c.fillStyle = '#4a3624'; c.fillRect(-12, -2, 24, 4); c.restore(); return; }
+    c.strokeStyle = '#6a4a2a'; c.lineWidth = 7; c.beginPath(); c.moveTo(e.x - f * 8, e.y - 8); c.quadraticCurveTo(e.x - f * 18, e.y - 10, e.x - f * 16, e.y - 20); c.stroke(); c.strokeStyle = '#3a2a1a'; c.lineWidth = 2; c.beginPath(); c.moveTo(e.x - f * 15, e.y - 13); c.lineTo(e.x - f * 18, e.y - 15); c.stroke();
+    c.fillStyle = '#8a6a44'; ellipse(c, e.x, e.y - 12 - bob, 11 * k, 10 * k); c.fillStyle = '#e6d2b0'; ellipse(c, e.x, e.y - 9 - bob, 6, 6);
+    c.fillStyle = '#8a6a44'; circle(c, e.x + f * 3, e.y - 24 - bob, 8 * k); c.fillStyle = '#3a2a1a'; ellipse(c, e.x + f * 5, e.y - 24 - bob, 6, 3); c.fillStyle = '#ffffff'; c.fillRect(e.x + f * 3 - 2, e.y - 25 - bob, 1.5, 1.5); c.fillRect(e.x + f * 7 - 1, e.y - 25 - bob, 1.5, 1.5);
+    c.fillStyle = '#6a4a2a'; circle(c, e.x - 4, e.y - 31 - bob, 3); circle(c, e.x + 6, e.y - 31 - bob, 3);
+  },
+});
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -5339,6 +5576,7 @@ function updateAmbient(dt) {
     const tx = Math.floor(x / T), ty = Math.floor(y / T), rg = region[ty * W + tx];
     if (isLand(tileAt(tx, ty))) {
       if (rg === 4) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: Math.random() < 0.5 ? '#5aa65c' : '#d9a23c' });
+      else if (rg === 15) ambient.push({ kind: 'petal', x, y: y - 60, life: 4, ph: Math.random() * 6 });
       else if (rg === 14) ambient.push({ kind: 'fly', x, y, life: 6, ph: Math.random() * 6, col: ['#3a8ae0', '#ffd65a', '#e0503a', '#ffffff'][Math.floor(Math.random() * 4)], vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 20 });
       else if (rg === 3) ambient.push({ kind: 'fly', x, y, life: 6, ph: Math.random() * 6, col: ['#ffffff', '#ffd65a', '#f28fb4'][Math.floor(Math.random() * 3)], vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 20 });
       else if (rg === 13) ambient.push({ kind: 'mote', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 6, vy: -3 - Math.random() * 4 });
@@ -5355,6 +5593,7 @@ function updateAmbient(dt) {
   for (let i = ambient.length - 1; i >= 0; i--) {
     const a = ambient[i]; a.life -= dt; a.ph += dt;
     if (a.kind === 'leaf') { a.y += 22 * dt; a.x += Math.sin(a.ph * 2) * 22 * dt; }
+    else if (a.kind === 'petal') { a.y += 20 * dt; a.x += Math.sin(a.ph * 1.8) * 22 * dt + 6 * dt; }
     else if (a.kind === 'ember') { a.y -= 30 * dt; a.x += Math.sin(a.ph * 3) * 14 * dt; }
     else if (a.kind === 'ash') { a.y += 16 * dt; a.x += Math.sin(a.ph * 1.5) * 10 * dt; }
     else if (a.kind === 'spore') { a.y -= 10 * dt; a.x += Math.sin(a.ph * 2) * 8 * dt; }
@@ -5368,6 +5607,7 @@ function updateAmbient(dt) {
 function drawAmbient(c) {
   for (const a of ambient) {
     const fade = Math.min(1, a.life, (a.kind === 'leaf' ? 4 : a.kind === 'fly' ? 6 : 5) - a.life);
+    if (a.kind === 'petal') { c.globalAlpha = Math.max(0, Math.min(1, a.life)) * 0.85; c.fillStyle = a.ph % 2 < 1 ? '#f2a0c8' : '#ffd6ea'; const w = 2 + Math.abs(Math.sin(a.ph * 3)) * 2; c.fillRect(Math.round(a.x - w / 2), Math.round(a.y), Math.round(w), 2); continue; }
     if (a.kind === 'ember') { c.globalAlpha = Math.max(0, Math.min(1, a.life)) * 0.9; c.fillStyle = a.ph % 1 < 0.5 ? '#ffb347' : '#ff7a2a'; c.fillRect(Math.round(a.x), Math.round(a.y), 2, 2); continue; }
     if (a.kind === 'ash') { c.globalAlpha = Math.max(0, Math.min(1, a.life)) * 0.6; c.fillStyle = '#9a928e'; c.fillRect(Math.round(a.x), Math.round(a.y), 2, 2); continue; }
     if (a.kind === 'spore') { c.globalAlpha = Math.max(0, Math.min(1, a.life)) * 0.6; c.fillStyle = '#d6f2a0'; c.fillRect(Math.round(a.x), Math.round(a.y), 2, 2); continue; }
@@ -5433,7 +5673,7 @@ function drawRes(c, r) {
   const g = r.grow === undefined ? 1 : r.grow, pop = g < 1 ? (g < 0.7 ? g / 0.7 * 1.15 : 1.15 - (g - 0.7) / 0.3 * 0.15) : 1;
   const squash = r.shake > 0.1 && r.type !== 'tree' ? 1 + (r.shake - 0.1) * 1.2 : 1;
   withBase(c, r.x + s, r.y + 7, pop * squash, pop / squash, 0, () => {
-    if (r.type === 'tree') { shadow(c, 0, -4, 15, 5); if (r.key === 'palm') drawPalm(c, r); else sprB(c, r.key, 0, 0, 3); }
+    if (r.type === 'tree') { shadow(c, 0, -4, 15, 5); if (r.key === 'palm') drawPalm(c, r); else if (r.key === 'blossom') drawBlossomTree(c, r); else sprB(c, r.key, 0, 0, 3); }
     else if (r.type === 'rock') { shadow(c, 0, -4, 15, 5); sprB(c, 'rock_g', 0, 1, 2.25); }
     else if (r.type === 'herb') { const sw = Math.sin(time * 2 + r.seed * 9) > 0.7 ? 1 : 0; sprB(c, r.key, sw, -1, 2); }
     else if (r.type === 'pot') drawPot(c, { ...r, x: 0, y: -7 });
@@ -6007,7 +6247,7 @@ function drawProp(c, o) {
 
 function drawNPC(c, n) {
   const near = Math.hypot(n.x - P.x, n.y - P.y) < 50;
-  if (n.boat) { if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
+  if (n.boat) { if (n.id.startsWith('pass_')) drawPass(c, n.x, n.y, n.id === 'pass_home'); else if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bed) { drawBed(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText('Bed').width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText('Bed', n.x, n.y + 17); } return; }
   if (n.sign) { drawSign(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bench) {
@@ -6070,6 +6310,7 @@ function render() {
   if (CD === CINDER_D || CD === FORGE_D) drawCinderGround(ctx, camX, camY, viewW, viewH, inViewT);
   if (CD === CAVE_D || CD === VAULT_D) drawRails(ctx, inViewT);
   if (CD === SERP_D) drawDartTraps(ctx);
+  if (CD === VALE_D) drawLilyWobble(ctx);
   if (CD === SKY_D || CD === SPIRE_D) drawSkyOverlay(ctx, camX, camY, viewW, viewH, CD === SKY_D);
   const inView = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   for (const p of pickups) {
@@ -6109,6 +6350,8 @@ function render() {
     else if (kind === 5 && o.windmill) drawWindmill(ctx, o);
     else if (kind === 5 && o.lantern) drawLantern(ctx, o.lantern);
     else if (kind === 5 && o.templeIdol) drawTempleIdol(ctx, o);
+    else if (kind === 5 && o.stonelantern) drawStoneLantern(ctx, o);
+    else if (kind === 5 && o.arch) drawBlossomArch(ctx, o);
     else if (kind === 5 && o.glowcap) drawGlowcap(ctx, o);
     else if (kind === 5 && o.grave) drawGrave(ctx, o);
     else if (kind === 5 && o.fire) drawCampfire(ctx, o);
@@ -6211,6 +6454,7 @@ async function start(hot) {
   if (qState('idol') && qState('idol').state === 'active') spawnFind('idol', 8, SUN_D.x0, DW);
   if (qState('bloom') && qState('bloom').state === 'active') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (qState('chime') && qState('chime').state === 'active') spawnFind('chime', 11, SKY_D.x0, DW);
+  if (qState('comb') && qState('comb').state === 'active') spawnComb();
   if (qState('jadeidol') && qState('jadeidol').state === 'active') spawnFind('jadeidol', 14, JUNGLE_D.x0, DW);
   if (qState('goldpick') && qState('goldpick').state === 'active') spawnFind('goldpick', 13, CAVE_D.x0, DW);
   for (const q of QUESTS) if (questReady(q)) questReadyNotified[q.id] = true;
