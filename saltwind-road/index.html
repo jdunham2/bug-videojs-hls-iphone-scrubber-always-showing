@@ -612,6 +612,8 @@ const GOODS = {
   fine_vase:{name:'Fine Vase',base:70,col:'#d8e8f0',kind:'good',desc:'A well-thrown vase from the Petalfall wheel'},
   landscape_painting:{name:'Landscape Painting',base:65,col:'#5a8ac8',kind:'good',desc:'A fine landscape from Pia’s easel'},
 masterpiece_painting:{name:'Masterpiece Painting',base:240,col:'#d8a840',kind:'good',desc:'Colors so true you can almost feel the breeze'},
+crystal_lockbox:{name:'Crystal Puzzle Box',base:240,col:'#a050e0',kind:'good',desc:'A gem-set box from Cassia the Locksmith. It opens only to your own secret code.'},
+draughts_set:{name:'Carved Draughts Set',base:200,col:'#7a5030',kind:'good',desc:'Agatha Oakes’s old draughts board, with pieces carved by her grandmother.'},
 loom_tapestry:{name:'Picture Tapestry',base:260,col:'#c8503a',kind:'good',desc:'All eight of Mirela’s loom pictures, woven into one wall hanging.'},
 tide_board:{name:'Tide Stones Board',base:200,col:'#2f7686',kind:'good',desc:'Old Tobiah’s well-worn board, with a bag of dark-and-pale stones.'},
 spirit_lantern:{name:'Spirit Lantern',base:220,col:'#c8e8ff',kind:'good',desc:'A friendly spirit glows softly inside this old lantern from Morwenna Grey.'},
@@ -2425,6 +2427,10 @@ const NPCS = [
    hello:["Mushroom dyes give the richest colours, you know.","Every pattern hides a picture.","Mind the threads, they’re still wet."], rumors:["When a row of my loom says ten, all ten squares are woven. Start with the big numbers: they fill in squares for certain even before you know where the run begins."]},
   {id:'tobiah',town:'farhaven',dx:3,dy:-3,name:'Old Tobiah',role:'Tide stones champion',cols:{cloak:'#3a5a6a',skin:'#c89878',hair:'#e8e8e0'},tidestones:true,freeSpot:true,
    hello:["Fancy a game of tide stones?","Forty years I’ve played on this pier.","Corners, lad, corners. Or lass. Corners either way."], rumors:["Never put a stone right beside an empty corner in tide stones. You’re only handing the corner to your opponent."]},
+  {id:'cassia',town:'prismvale',dx:-4,dy:-3,name:'Cassia the Locksmith',role:'Gem locks',cols:{cloak:'#4a3a6a',skin:'#d8b098',hair:'#c8c8d0'},codebreaker:true,freeSpot:true,
+   hello:["Every lock has a story. And a weakness.","Mind the gem cases, they’re priceless.","Fancy testing your wits against one of my locks?"], rumors:["When you try a row on one of my locks, use it to learn something. A row of all one gem tells you how many of that gem are in the code."]},
+  {id:'agatha',town:'tallpine',dx:4,dy:-3,name:'Agatha Oakes',role:'Draughts champion',cols:{cloak:'#6a4a3a',skin:'#e8c8b0',hair:'#e0e0e8'},draughts:true,freeSpot:true,
+   hello:["Come and sit, dear. The board’s all set up.","I’ve played draughts on this porch for sixty years.","You look like a thinker."], rumors:["In draughts, if you can take a piece you must. A clever player uses that: offer one piece to win two."]},
   {id:'bertha',town:'highcairn',dx:-4,dy:3,name:'Big Bertha',role:'Skittles alley',cols:{cloak:'#6a3a2a',skin:'#d8a080',hair:'#c0c0b0'},skittles:true,freeSpot:true,
    hello:["Fancy a game of skittles?","Knock 'em down, love!","Nine pins, two balls, no crying."], rumors:["Aim a touch off center and the pins knock each other down. That's the secret to a strike."]},
   {id:'garrick',town:'hollow',dx:3,dy:-3,name:'Huntmaster Garrick',role:'Champion hunts',cols:{cloak:'#5a4a2a',skin:'#c89070',hair:'#4a3a2a'},huntmaster:true,freeSpot:true,
@@ -4677,6 +4683,8 @@ addEventListener('keydown', e => {
   else if (deco && deco.on && mode === 'talk') { const k = e.key.toLowerCase(), dm = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); decoMove(...dm[k]); } else if (k === ' ' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) decoAct(); } else if (k === 'q' || k === '[' || k === ']') { e.preventDefault(); e.stopImmediatePropagation(); decoCycle(k === 'q' || k === '[' ? -1 : 1); } else if (k === 'x' || k === 'delete' || k === 'backspace') { e.preventDefault(); e.stopImmediatePropagation(); decoStore(); } else if (k === 'escape') { if (deco.hold) { e.preventDefault(); e.stopImmediatePropagation(); if (deco.hold.from) decoReturn(); else deco.hold = null; decoUI(); } else deco = null; } }
   else if (ice && ice.on && mode === 'talk') { const k = e.key.toLowerCase(), dm = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); iceMove(...dm[k]); } else if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); iceAct(false); } else if (k === 'x' || k === 'q') { e.preventDefault(); e.stopImmediatePropagation(); iceAct(true); } else if (k === 'escape') ice = null; }
   else if (axe && axe.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) axeThrow(); } else if (k === 'escape') axe = null; }
+  else if (cbk && cbk.on && mode === 'talk' && !cbk.over) { const k = e.key.toLowerCase(), d = parseInt(k, 10); if (d >= 1 && d <= cbk.L.k) { e.preventDefault(); e.stopImmediatePropagation(); cbk.sel = d - 1; cbkPut(d - 1); } else if (k === 'arrowleft' || k === 'a' || k === 'arrowright' || k === 'd') { e.preventDefault(); e.stopImmediatePropagation(); cbk.sel = (cbk.sel + (k === 'arrowleft' || k === 'a' ? -1 : 1) + cbk.L.k) % cbk.L.k; cbkDraw(); } else if (k === ' ' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cbkPut(cbk.sel); } else if (k === 'backspace' || k === 'delete') { e.preventDefault(); e.stopImmediatePropagation(); cbkUndo(); } else if (k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cbkCheck(); } else if (k === 'escape') cbk = null; }
+  else if (drg && drg.on && mode === 'talk') { const k = e.key.toLowerCase(), dm = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); drgMove(...dm[k]); } else if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) drgClick(drg.cur.x, drg.cur.y); } else if (k === 'escape') drg = null; }
   else if (nono && nono.on && mode === 'talk') { const k = e.key.toLowerCase(), dm = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); nonoMove(...dm[k]); } else if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) nonoAct(false); } else if (k === 'x' || k === 'q') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) nonoAct(true); } else if (k === 'escape') nono = null; }
   else if (rev && rev.on && mode === 'talk') { const k = e.key.toLowerCase(), dm = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); revMove(...dm[k]); } else if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) revPlay(); } else if (k === 'escape') rev = null; }
   else if (spook && spook.on) { const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); spook.keys.add(k); } else if (k === 'escape') spook = null; }
@@ -5955,6 +5963,168 @@ function revDraw() {
   if (t < 1) requestAnimationFrame(() => { if (rev === R) revDraw(); });
   const {d, l} = revCount(R.b), sc = document.getElementById('revScore'); if (sc) sc.innerHTML = `<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#2a2420;border:2px solid #8a7a6a;vertical-align:-1px"></span> You ${d} &nbsp;·&nbsp; <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#f4ecdc;border:2px solid #c8b898;vertical-align:-1px"></span> Tobiah ${l}`;
   const info = document.getElementById('revInfo'); if (info) info.textContent = R.over ? 'Game over' : `${R.msg}${R.turn === 1 && !R.busy ? (isTouch && !PAD.active ? ' Tap a glowing square.' : ' Click a glowing square, or arrows + Space.') : ''}`;
+}
+// ===== gem codebreaker (Cassia the Locksmith, Prismvale) =====
+const CBK_LV = [{name: 'Apprentice lock', n: 4, k: 6, rep: false, tries: 10, pay: 20}, {name: 'Journeyman lock', n: 4, k: 6, rep: true, tries: 10, pay: 35}, {name: 'Master lock', n: 5, k: 7, rep: true, tries: 12, pay: 60}];
+const CBK_GEMS = [['Ruby', '#e8384a'], ['Sapphire', '#3a6ae8'], ['Emerald', '#2ab85a'], ['Topaz', '#f0c030'], ['Amethyst', '#a050e0'], ['Pearl', '#f4f0e4'], ['Onyx', '#2a2a34']];
+let cbk = null;
+function cbkScore(sec, g) { let gold = 0, silver = 0; const a = {}, b = {}; for (let i = 0; i < sec.length; i++) { if (sec[i] === g[i]) gold++; else { a[sec[i]] = (a[sec[i]] || 0) + 1; b[g[i]] = (b[g[i]] || 0) + 1; } } for (const k in b) silver += Math.min(b[k], a[k] || 0); return {gold, silver}; }
+function cbkTalk(n) {
+  const beat = S.cbkBeat || 0;
+  say(`“Every lock in my shop opens to a row of gems in a secret order. Set a row of gems and I’ll tell you how close you are: a <b style="color:#f0c030">gold pin</b> for each gem in exactly the right place, a <b style="color:#c8d0d8">silver pin</b> for each right gem in the wrong place. The pins don’t say which gems they mean, mind.”<br>“Crack the code before you run out of tries.”${S.cbkWins ? `<br><span style="color:var(--muted)">Locks opened: ${S.cbkWins}${S.cbkBest ? ' · ' + CBK_LV.map((L, i) => S.cbkBest[i] ? `${L.name.split(' ')[0]} best ${S.cbkBest[i]} tries` : '').filter(Boolean).join(' · ') : ''}</span>` : ''}`,
+    [...CBK_LV.map((L, i) => ({label: `${L.name} (${L.n} gems, ${L.k} kinds${L.rep ? ', repeats allowed' : ', no repeats'})${i > beat ? ` · open the ${CBK_LV[i - 1].name.toLowerCase()} first` : ''}`, primary: i === Math.min(beat, 2), disabled: i > beat, fn: () => cbkStart(n, i)})), back(n)]);
+}
+function cbkStart(n, li) {
+  const L = CBK_LV[li]; let sec;
+  if (L.rep) sec = Array.from({length: L.n}, () => Math.floor(Math.random()*L.k));
+  else { const p = [...Array(L.k).keys()]; for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i + 1)); [p[i], p[j]] = [p[j], p[i]]; } sec = p.slice(0, L.n); }
+  cbk = {on: true, npc: n, li, L, sec, rows: [], cur: [], sel: 0, over: false, won: false};
+  openPanel(`Codebreaker: ${L.name}`, `<div id="cbkBox" style="user-select:none"></div>`, [{label: 'Leave', fn: () => { cbk = null; closeTalk(); }}]);
+  setTimeout(() => { const box = document.getElementById('cbkBox'); if (!box) return;
+    box.addEventListener('click', e => { const t = e.target.closest('[data-g],[data-act]'); if (!t || !cbk) return; if (t.dataset.g != null) { cbk.sel = +t.dataset.g; cbkPut(+t.dataset.g); } else if (t.dataset.act === 'undo') cbkUndo(); else if (t.dataset.act === 'check') cbkCheck(); });
+    cbkDraw(); }, 30);
+}
+function cbkGem(g, sz, extra) { if (g == null) return `<span style="display:inline-block;width:${sz}px;height:${sz}px;border-radius:50%;background:rgba(255,255,255,.07);border:2px dashed rgba(255,255,255,.18);box-sizing:border-box;${extra || ''}"></span>`; const c = CBK_GEMS[g][1]; return `<span style="display:inline-block;width:${sz}px;height:${sz}px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #fff 0, ${c} 32%, ${c} 60%, rgba(0,0,0,.55) 100%);box-shadow:0 1px 2px rgba(0,0,0,.5);${extra || ''}"></span>`; }
+function cbkPins(s, n) { let h = ''; for (let i = 0; i < n; i++) { const col = i < s.gold ? '#f0c030' : i < s.gold + s.silver ? '#eef2f6' : 'rgba(0,0,0,.45)'; h += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};margin:1px;box-sizing:border-box;${i < s.gold + s.silver ? '' : 'border:1px solid rgba(255,255,255,.12)'}"></span>`; } return `<span style="display:inline-grid;grid-template-columns:repeat(${Math.ceil(n/2)},10px);vertical-align:middle;margin-left:8px">${h}</span>`; }
+function cbkDraw() {
+  const M = cbk, box = document.getElementById('cbkBox'); if (!M || !box) return; const L = M.L, kb = !isTouch || PAD.active;
+  let h = `<div style="text-align:center;margin-bottom:6px">${M.over ? M.sec.map(g => cbkGem(g, 24, 'margin:0 3px')).join('') : M.sec.map(() => `<span style="display:inline-block;width:24px;height:24px;border-radius:5px;background:#5a4a3a;color:#e8d8b0;font-weight:bold;line-height:24px;margin:0 3px">?</span>`).join('')}</div>`;
+  h += '<div style="display:flex;flex-direction:column;align-items:center;gap:3px">';
+  for (let i = 0; i < L.tries; i++) { const r = M.rows[i], live = i === M.rows.length && !M.over, g = r ? r.g : live ? M.cur : [];
+    h += `<div style="display:flex;align-items:center;padding:2px 8px;border-radius:6px;${live ? 'background:rgba(255,200,120,.14);' : ''}opacity:${r || live ? 1 : .45}"><span style="width:20px;color:var(--muted);font-size:11px">${i + 1}</span>${Array.from({length: L.n}, (_, k) => cbkGem(g[k], 20, 'margin:0 2px')).join('')}${r ? cbkPins(r.s, L.n) : `<span style="display:inline-block;width:${Math.ceil(L.n/2)*10 + 8}px"></span>`}</div>`; }
+  h += '</div>';
+  if (!M.over) { h += `<div style="display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:8px">${CBK_GEMS.slice(0, L.k).map(([nm], g) => `<button data-g="${g}" title="${nm}" style="padding:4px 6px;border-radius:8px;border:2px solid ${kb && M.sel === g ? '#ff9a3a' : 'transparent'};background:rgba(255,255,255,.08);cursor:pointer;color:var(--muted);font-size:10px">${cbkGem(g, 22)}<br>${kb ? g + 1 : nm}</button>`).join('')}</div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-top:6px"><button data-act="undo" ${M.cur.length ? '' : 'disabled'} style="padding:5px 12px">⌫ Take back</button><button data-act="check" ${M.cur.length === L.n ? '' : 'disabled'} style="padding:5px 12px;font-weight:bold">✓ Try this row</button></div>`; }
+  h += `<div style="text-align:center;margin-top:6px;color:var(--muted);font-size:12px">${M.over ? (M.won ? 'The lock clicks open!' : 'Out of tries.') : `${L.rep ? 'A gem may appear more than once.' : 'Each gem appears at most once.'} ${kb ? 'Keys 1–' + L.k + ' place gems, Backspace takes back, Enter tries the row.' : ''}`}</div>`;
+  box.innerHTML = h;
+}
+function cbkPut(g) { const M = cbk; if (!M || M.over || M.cur.length >= M.L.n) return; M.cur.push(g); SFX.tick(); cbkDraw(); }
+function cbkUndo() { const M = cbk; if (!M || M.over || !M.cur.length) return; M.cur.pop(); SFX.click(); cbkDraw(); }
+function cbkCheck() {
+  const M = cbk; if (!M || M.over || M.cur.length !== M.L.n) return; const s = cbkScore(M.sec, M.cur); M.rows.push({g: M.cur, s}); M.cur = [];
+  if (s.gold === M.L.n) { M.over = M.won = true; cbkDraw(); return cbkEnd(); }
+  if (M.rows.length >= M.L.tries) { M.over = true; cbkDraw(); return cbkEnd(); }
+  s.gold ? SFX.chime() : SFX.click(); cbkDraw();
+}
+function cbkEnd() {
+  const M = cbk, L = M.L, n = M.npc, used = M.rows.length; S.cbkGames = (S.cbkGames || 0) + 1; let txt;
+  if (M.won) { S.cbkWins = (S.cbkWins || 0) + 1; const first = (S.cbkBeat || 0) <= M.li; S.cbkBeat = Math.max(S.cbkBeat || 0, M.li + 1); S.cbkBest = S.cbkBest || {}; if (!S.cbkBest[M.li] || used < S.cbkBest[M.li]) S.cbkBest[M.li] = used; if (M.li === 2) S.cbkMaster = S.cbkBest[2]; if (M.li === 0 && used <= 4) S.cbkQuick = 1;
+    const c = mgPay('codebreak', L.pay + (L.tries - used)*4); S.coins += c; gainXP(8 + M.li*8); SFX.victory();
+    txt = `<b>Click! The ${L.name.toLowerCase()} opens</b> in ${used} ${used === 1 ? 'try' : 'tries'}.<br>“${used <= 4 ? 'Are you sure you’re not a locksmith yourself?' : 'Nicely reasoned.'}” <span style="color:var(--good)">Cassia pays you ${c} coin.</span>`;
+    if (M.li === 2 && first) { addItem('crystal_lockbox', 1); txt += '<br>“Nobody’s opened my master lock before. Here, take this puzzle box. It opens to a code only you know.” <b style="color:var(--good)">You receive a Crystal Puzzle Box! (You can place it when you decorate your home.)</b>'; }
+  } else { txt = `<b>The lock stays shut.</b> The code was ${M.sec.map(g => CBK_GEMS[g][0]).join(', ')}.<br>“Gold pins first, then work out the silvers. You’ll get it.”`; SFX.hurt(); }
+  renderHUD(); save();
+  setTimeout(() => { if (cbk !== M) return; cbk = null; const nx = M.won && M.li < 2 && S.cbkBeat > M.li + 0 ? M.li + 1 : M.li; openPanel('Codebreaker', txt, [{label: nx !== M.li ? `Next: ${CBK_LV[nx].name}` : 'Another lock', primary: true, fn: () => cbkStart(n, nx)}, ...(nx !== M.li ? [{label: 'Same lock again', fn: () => cbkStart(n, M.li)}] : []), {label: 'Close', fn: closeTalk}]); }, 1600);
+}
+// ===== draughts (Agatha Oakes, Tallpine) =====
+const DRG_LV = [{name: 'Friendly game', pay: 15}, {name: 'Club game', pay: 35}, {name: 'Championship game', pay: 70}];
+let drg = null;
+function drgIn(x, y) { return x >= 0 && y >= 0 && x < 8 && y < 8; }
+function drgDirs(v) { return Math.abs(v) === 2 ? [[1, 1], [-1, 1], [1, -1], [-1, -1]] : v > 0 ? [[1, -1], [-1, -1]] : [[1, 1], [-1, 1]]; }
+function drgJumps(b, x, y, v, path, cap, out) {
+  let any = false;
+  for (const [dx, dy] of drgDirs(v)) { const mx = x + dx, my = y + dy, tx = x + 2*dx, ty = y + 2*dy;
+    if (!drgIn(tx, ty) || Math.sign(b[my][mx]) !== -Math.sign(v) || b[ty][tx] !== 0 || cap.some(([a, c]) => a === mx && c === my)) continue;
+    any = true; const p2 = [...path, [tx, ty]], c2 = [...cap, [mx, my]], crown = Math.abs(v) === 1 && ty === (v > 0 ? 0 : 7);
+    if (crown) out.push({path: p2, cap: c2}); else drgJumps(b, tx, ty, v, p2, c2, out); }
+  if (!any && cap.length) out.push({path, cap});
+}
+function drgMoves(b, p) {
+  const caps = [], steps = [];
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = b[y][x]; if (Math.sign(v) !== p) continue;
+    const c = b.map(r => r.slice()); c[y][x] = 0; drgJumps(c, x, y, v, [[x, y]], [], caps);
+    if (!caps.length) for (const [dx, dy] of drgDirs(v)) { const a = x + dx, d = y + dy; if (drgIn(a, d) && !b[d][a]) steps.push({path: [[x, y], [a, d]], cap: []}); } }
+  return caps.length ? caps : steps;
+}
+function drgApply(b, m) { const n = b.map(r => r.slice()), [sx, sy] = m.path[0], [ex, ey] = m.path[m.path.length - 1]; let v = n[sy][sx]; n[sy][sx] = 0; for (const [a, c] of m.cap) n[c][a] = 0; if (Math.abs(v) === 1 && ey === (v > 0 ? 0 : 7)) v *= 2; n[ey][ex] = v; return n; }
+function drgEval(b, p) { let s = 0; for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = b[y][x]; if (!v) continue; const k = Math.abs(v) === 2, adv = v > 0 ? 7 - y : y; s += Math.sign(v)*(k ? 165 : 100 + adv*3 + (x >= 2 && x <= 5 ? 4 : 0) + ((v > 0 && y === 7) || (v < 0 && y === 0) ? 6 : 0)); } return p*s; }
+function drgSearch(b, p, d, al, be) {
+  const ms = drgMoves(b, p); if (!ms.length) return -10000 - d;
+  if (d <= 0 && !ms[0].cap.length) return drgEval(b, p);
+  if (d <= -6) return drgEval(b, p);
+  for (const m of ms) { const v = -drgSearch(drgApply(b, m), -p, d - 1, -be, -al); if (v > al) al = v; if (al >= be) break; }
+  return al;
+}
+function drgPick(b, p, lv) {
+  const ms = drgMoves(b, p); if (!ms.length) return null;
+  for (let i = ms.length - 1; i > 0; i--) { const k = Math.floor(Math.random()*(i + 1)); [ms[i], ms[k]] = [ms[k], ms[i]]; }
+  if (lv === 0) return ms[0];
+  const depth = lv === 1 ? 2 : 6; let best = ms[0], bv = -Infinity;
+  for (const m of ms) { const v = -drgSearch(drgApply(b, m), -p, depth - 1, -Infinity, -bv); if (v > bv) { bv = v; best = m; } }
+  return best;
+}
+function drgTalk(n) {
+  const beat = S.drgBeat || 0;
+  say(`“A game of draughts, dear? Your pieces move diagonally forward one square. Jump over one of mine into an empty square beyond to take it, and keep jumping if you can. If you can take a piece, you must!”<br>“Reach my side of the board and your piece is crowned a king, which may move backwards too. Take all my pieces, or leave me with no move, and you win.”${S.drgGames ? `<br><span style="color:var(--muted)">Games: ${S.drgGames} · won ${S.drgWins || 0}</span>` : ''}`,
+    [...DRG_LV.map((L, i) => ({label: `${L.name}${i > beat ? ` · win the ${DRG_LV[i - 1].name.toLowerCase()} first` : ''}`, primary: i === Math.min(beat, 2), disabled: i > beat, fn: () => drgStart(n, i)})), back(n)]);
+}
+function drgStart(n, lv) {
+  const b = Array.from({length: 8}, (_, y) => Array.from({length: 8}, (_, x) => (x + y) % 2 === 1 ? (y < 3 ? -1 : y > 4 ? 1 : 0) : 0));
+  drg = {on: true, npc: n, lv, b, turn: 1, sel: null, cur: {x: 0, y: 5}, last: null, quiet: 0, plies: 0, over: false, busy: false, msg: 'Your move. You play the dark pieces, moving up the board.'};
+  openPanel(`Draughts: ${DRG_LV[lv].name}`, `<div id="drgScore" style="text-align:center;margin-bottom:4px;font-weight:bold"></div><canvas id="drgC" width="320" height="320" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%;touch-action:none"></canvas><div id="drgInfo" style="text-align:center;margin-top:6px;color:var(--muted)"></div>`, [{label: 'Resign and leave', fn: () => { if (drg && !drg.over) { S.drgGames = (S.drgGames || 0) + 1; save(); } drg = null; closeTalk(); }}]);
+  setTimeout(() => { const c = document.getElementById('drgC'); if (!c) return;
+    c.addEventListener('pointerdown', e => { e.preventDefault(); const R = drg; if (!R || R.over) return; const r = c.getBoundingClientRect(), s = c.width/r.width, x = Math.floor((e.clientX - r.left)*s/40), y = Math.floor((e.clientY - r.top)*s/40); if (!drgIn(x, y)) return; R.cur = {x, y}; drgClick(x, y); });
+    drgDraw(); }, 30);
+}
+function drgCands() { const R = drg; if (!R.sel) return []; return drgMoves(R.b, 1).filter(m => R.sel.every(([a, c], i) => m.path[i] && m.path[i][0] === a && m.path[i][1] === c)); }
+function drgClick(x, y) {
+  const R = drg; if (!R || R.over || R.turn !== 1 || R.busy) return; const ms = drgMoves(R.b, 1);
+  if (R.b[y][x] > 0 && (!R.sel || R.sel.length === 1)) {
+    if (!ms.some(m => m.path[0][0] === x && m.path[0][1] === y)) { R.msg = ms[0].cap.length ? 'You must take a piece! Choose one that can jump.' : 'That piece has nowhere to go.'; R.sel = null; SFX.hurt(); return drgDraw(); }
+    R.sel = [[x, y]]; R.msg = 'Now choose where it goes.'; SFX.click(); return drgDraw(); }
+  if (!R.sel) { R.msg = 'Pick one of your dark pieces first.'; return drgDraw(); }
+  const nx = drgCands().filter(m => m.path[R.sel.length] && m.path[R.sel.length][0] === x && m.path[R.sel.length][1] === y);
+  if (!nx.length) { if (R.sel.length === 1) { R.sel = null; R.msg = 'Your move.'; } else R.msg = 'Keep jumping: you must finish the capture.'; return drgDraw(); }
+  R.sel = [...R.sel, [x, y]]; SFX.click();
+  const done = nx.find(m => m.path.length === R.sel.length);
+  if (done && nx.every(m => m.path.length === R.sel.length)) { R.sel = null; return drgDo(done, 1); }
+  R.msg = 'Keep jumping!'; drgDraw();
+}
+function drgMove(dx, dy) { const R = drg; if (!R || R.over) return; R.cur.x = (R.cur.x + dx + 8) % 8; R.cur.y = (R.cur.y + dy + 8) % 8; drgDraw(); }
+function drgDo(m, p) {
+  const R = drg; R.b = drgApply(R.b, m); R.last = m; R.plies++; R.quiet = m.cap.length ? 0 : R.quiet + 1; m.cap.length ? SFX.hit() : SFX.click(); R.turn = -p; drgAfter();
+}
+function drgAfter() {
+  const R = drg; if (!R) return; const ms = drgMoves(R.b, R.turn);
+  if (!ms.length) return drgEnd(R.turn === -1 ? 'win' : 'loss');
+  if (R.quiet >= 60 || R.plies >= 220) return drgEnd('draw');
+  if (R.turn === -1) { R.busy = true; R.msg = 'Agatha is thinking…'; drgDraw();
+    setTimeout(() => { if (drg !== R) return; R.busy = false; drgDo(drgPick(R.b, -1, R.lv), -1); }, 550 + Math.random()*300); }
+  else { R.msg = ms[0].cap.length ? 'You must take a piece!' : 'Your move.'; drgDraw(); }
+}
+function drgEnd(res) {
+  const R = drg; R.over = true; drgDraw(); const L = DRG_LV[R.lv], n = R.npc; S.drgGames = (S.drgGames || 0) + 1; let txt;
+  const cnt = s => R.b.flat().filter(v => Math.sign(v) === s).length, mine = cnt(1);
+  if (res === 'win') { S.drgWins = (S.drgWins || 0) + 1; const first = (S.drgBeat || 0) <= R.lv; S.drgBeat = Math.max(S.drgBeat || 0, R.lv + 1);
+    const c = mgPay('draughts', L.pay + mine*2); S.coins += c; gainXP(10 + R.lv*10); SFX.victory();
+    txt = `<b>You win!</b> ${cnt(-1) ? 'Agatha has no move left.' : 'Every one of Agatha’s pieces is taken.'}<br>“${R.lv === 2 ? 'Well! I haven’t lost a championship game since I was a girl.' : 'Oh, well played, dear.'}” <span style="color:var(--good)">Agatha pays you ${c} coin.</span>`;
+    if (R.lv === 2 && first) { addItem('draughts_set', 1); txt += '<br>“Have my old draughts set. My grandmother carved those pieces.” <b style="color:var(--good)">You receive a Carved Draughts Set! (You can place it when you decorate your home.)</b>'; }
+  } else if (res === 'draw') { txt = '<b>A draw.</b> Neither of you can make progress.<br>“A fair result. Shall we go again?”'; SFX.chime(); }
+  else { txt = `<b>Agatha wins.</b> ${mine ? 'You have no move left.' : 'All your pieces are taken.'}<br>“Keep your back row at home as long as you can, dear. It stops me getting kings.”`; SFX.hurt(); }
+  renderHUD(); save();
+  setTimeout(() => { if (drg !== R) return; drg = null; openPanel('Draughts', txt, [{label: 'Play again', primary: true, fn: () => drgStart(n, R.lv)}, ...(res === 'win' && R.lv < 2 ? [{label: `Try the ${DRG_LV[R.lv + 1].name.toLowerCase()}`, fn: () => drgStart(n, R.lv + 1)}] : []), {label: 'Close', fn: closeTalk}]); }, 1400);
+}
+function drgDraw() {
+  const R = drg, c = document.getElementById('drgC'); if (!R || !c) return; const g = c.getContext('2d'), z = 40, kb = !isTouch || PAD.active;
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { g.fillStyle = (x + y) % 2 ? '#7a5030' : '#e8d4a8'; g.fillRect(x*z, y*z, z, z); }
+  if (R.last) for (const [a, b] of R.last.path) { g.fillStyle = 'rgba(255,220,120,.22)'; g.fillRect(a*z, b*z, z, z); }
+  const ms = R.turn === 1 && !R.over && !R.busy ? drgMoves(R.b, 1) : [];
+  if (!R.sel) { for (const m of ms) { const [a, b] = m.path[0]; g.strokeStyle = 'rgba(255,230,140,.6)'; g.lineWidth = 2; g.strokeRect(a*z + 2, b*z + 2, z - 4, z - 4); } }
+  else { for (const [a, b] of R.sel) { g.fillStyle = 'rgba(120,220,255,.25)'; g.fillRect(a*z, b*z, z, z); }
+    for (const m of drgCands()) { const nx = m.path[R.sel.length]; if (nx) { g.fillStyle = 'rgba(140,255,160,.55)'; g.beginPath(); g.arc(nx[0]*z + z/2, nx[1]*z + z/2, 7, 0, 7); g.fill(); } } }
+  const capSoFar = R.sel ? drgCands().find(m => m.path.length >= R.sel.length) : null, gone = new Set(capSoFar ? capSoFar.cap.slice(0, R.sel.length - 1).map(([a, b]) => a + ',' + b) : []);
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { let v = R.b[y][x]; if (!v) continue; let px = x, py = y;
+    if (R.sel && R.sel.length > 1 && x === R.sel[0][0] && y === R.sel[0][1]) { [px, py] = R.sel[R.sel.length - 1]; }
+    const cx = px*z + z/2, cy = py*z + z/2, dark = v > 0; g.globalAlpha = gone.has(x + ',' + y) ? .3 : 1;
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.arc(cx + 1.5, cy + 2.5, z*.36, 0, 7); g.fill();
+    g.fillStyle = dark ? '#2a1e1a' : '#c8402a'; g.beginPath(); g.arc(cx, cy, z*.36, 0, 7); g.fill();
+    g.strokeStyle = dark ? '#5a4436' : '#f07a5a'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, z*.25, 0, 7); g.stroke();
+    if (Math.abs(v) === 2) { g.fillStyle = '#f0c030'; g.beginPath(); g.moveTo(cx - 8, cy + 4); g.lineTo(cx - 8, cy - 3); g.lineTo(cx - 4, cy); g.lineTo(cx, cy - 6); g.lineTo(cx + 4, cy); g.lineTo(cx + 8, cy - 3); g.lineTo(cx + 8, cy + 4); g.fill(); }
+    g.globalAlpha = 1; }
+  if (!R.over && R.turn === 1 && kb) { g.strokeStyle = '#ff9a3a'; g.lineWidth = 3; g.strokeRect(R.cur.x*z + 1.5, R.cur.y*z + 1.5, z - 3, z - 3); }
+  const cnt = s => R.b.flat().filter(v => Math.sign(v) === s).length, sc = document.getElementById('drgScore');
+  if (sc) sc.innerHTML = `<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#2a1e1a;border:2px solid #8a7a6a;vertical-align:-1px"></span> You ${cnt(1)} &nbsp;·&nbsp; <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#c8402a;border:2px solid #f07a5a;vertical-align:-1px"></span> Agatha ${cnt(-1)}`;
+  const info = document.getElementById('drgInfo'); if (info) info.textContent = R.over ? 'Game over' : `${R.msg}${R.turn === 1 && !R.busy ? (kb ? ' Click or arrows + Space.' : ' Tap a piece, then a square.') : ''}`;
 }
 // ===== pony jumping show (Hettie Hurdle, Hollowpine) =====
 let jump = null;
@@ -9518,6 +9688,8 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Codebreaker', 'Cassia the Locksmith in Prismvale has gem locks to crack. Set a row of gems and she gives a gold pin for each gem in the right place and a silver pin for each right gem in the wrong place. Three locks, from apprentice to master; the master lock earns a Crystal Puzzle Box.'],
+  ['Draughts', 'Agatha Oakes in Tallpine plays draughts. Move diagonally forward, jump to take pieces (you must take if you can), and reach the far side to crown a king. Win the friendly, club and championship games; the championship earns her carved set.'],
   ['Loom patterns', 'Mirela the Dyer in Sporehaven has eight picture puzzles on her loom. The numbers beside each row and above each column are the runs of woven squares in that line, in order, with gaps between. Click to weave, right-click (or switch mode) to mark a square empty. Weave all eight for a Picture Tapestry.'],
   ['Tide stones', 'Old Tobiah in Farhaven plays tide stones. Place a dark stone so it traps a line of his pale stones (straight or diagonal) and they all turn dark. Most stones when the board fills wins. Beat him as Beginner, Fisherman and Champion; beating the Champion earns his board.'],
   ['Ghost catching', 'Morwenna Grey in Gravenmoor sends you into the haunted manor after dark (10 coin, 45 seconds). Move the lantern beam with the mouse, a finger, the arrow keys or the stick; ghosts are only faintly visible outside it. Hold a ghost in the light until the ring fills. Wisps are worth 1, purple poltergeists 3, golden ghosts 10. Settle 40 spirits in all for a Spirit Lantern for your home.'],
@@ -10170,6 +10342,8 @@ function padPoll(dt) {
   if (deco && deco.on && mode === 'talk') { [[12, 0, -1], [13, 0, 1], [14, -1, 0], [15, 1, 0]].forEach(([d, dx, dy]) => { if (down(d)) decoMove(dx, dy); }); if (down(OK)) decoAct(); if (down(4)) decoCycle(-1); if (down(5)) decoCycle(1); if (down(2)) decoStore(); if (down(BACK)) { if (deco.hold) { if (deco.hold.from) decoReturn(); else deco.hold = null; decoUI(); } else { deco = null; save(); closeTalk(); } } PAD.prev = B; return; }
   if (ice && ice.on && mode === 'talk') { [[12, 0, -1], [13, 0, 1], [14, -1, 0], [15, 1, 0]].forEach(([d, dx, dy]) => { if (down(d)) iceMove(dx, dy); }); if (down(OK)) iceAct(false); if (down(2)) iceAct(true); if (down(BACK)) { ice = null; closeTalk(); } PAD.prev = B; return; }
   if (axe && axe.on) { if (down(OK)) axeThrow(); if (down(BACK)) { axe = null; closeTalk(); } PAD.prev = B; return; }
+  if (cbk && cbk.on && mode === 'talk' && !cbk.over) { if (down(14)) { cbk.sel = (cbk.sel + cbk.L.k - 1) % cbk.L.k; cbkDraw(); } if (down(15)) { cbk.sel = (cbk.sel + 1) % cbk.L.k; cbkDraw(); } if (down(OK)) cbkPut(cbk.sel); if (down(2)) cbkUndo(); if (down(3)) cbkCheck(); if (down(BACK)) { cbk = null; closeTalk(); } PAD.prev = B; return; }
+  if (drg && drg.on && mode === 'talk') { [[12, 0, -1], [13, 0, 1], [14, -1, 0], [15, 1, 0]].forEach(([d, dx, dy]) => { if (down(d)) drgMove(dx, dy); }); if (down(OK)) drgClick(drg.cur.x, drg.cur.y); if (down(BACK)) { drg = null; closeTalk(); } PAD.prev = B; return; }
   if (nono && nono.on && mode === 'talk') { [[12, 0, -1], [13, 0, 1], [14, -1, 0], [15, 1, 0]].forEach(([d, dx, dy]) => { if (down(d)) nonoMove(dx, dy); }); if (down(OK)) nonoAct(false); if (down(2)) nonoAct(true); if (down(BACK)) { nono = null; closeTalk(); } PAD.prev = B; return; }
   if (rev && rev.on && mode === 'talk') { [[12, 0, -1], [13, 0, 1], [14, -1, 0], [15, 1, 0]].forEach(([d, dx, dy]) => { if (down(d)) revMove(dx, dy); }); if (down(OK)) revPlay(); if (down(BACK)) { rev = null; closeTalk(); } PAD.prev = B; return; }
   if (spook && spook.on) { spook.kx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); spook.ky = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); if (down(BACK)) { spook = null; closeTalk(); } PAD.prev = B; return; }
@@ -11688,6 +11862,8 @@ function mainOptions(n) {
   if (n.potter) o.push({label: 'Throw a pot on the wheel', primary: true, fn: () => potTalk(n)});
   if (n.icecarver) o.push({label: 'Carve ice sculptures', primary: true, fn: () => iceTalk(n)});
   if (n.axethrow) o.push({label: 'Throw axes', primary: true, fn: () => axeTalk(n)});
+  if (n.codebreaker) o.push({label: 'Crack a lock', primary: true, fn: () => cbkTalk(n)});
+  if (n.draughts) o.push({label: 'Play draughts', primary: true, fn: () => drgTalk(n)});
   if (n.loom) o.push({label: 'Weave a pattern', primary: true, fn: () => nonoTalk(n)});
   if (n.tidestones) o.push({label: 'Play tide stones', primary: true, fn: () => revTalk(n)});
   if (n.ghosts) o.push({label: 'Catch ghosts', primary: true, fn: () => spookTalk(n)});
@@ -13476,7 +13652,9 @@ const FURNITURE = {
   ship_in_bottle: {name: 'Ship in a Bottle', w: 1, h: 1, comfort: 12, item: true},
   spirit_lantern: {name: 'Spirit Lantern', w: 1, h: 1, comfort: 12, item: true},
   loom_tapestry: {name: 'Picture Tapestry', w: 1, h: 1, comfort: 12, item: true},
-  tide_board: {name: 'Tide Stones Board', w: 1, h: 1, comfort: 12, item: true}};
+  tide_board: {name: 'Tide Stones Board', w: 1, h: 1, comfort: 12, item: true},
+  crystal_lockbox: {name: 'Crystal Puzzle Box', w: 1, h: 1, comfort: 12, item: true},
+  draughts_set: {name: 'Carved Draughts Set', w: 1, h: 1, comfort: 12, item: true}};
 const DECO_KEYS = Object.keys(FURNITURE);
 const COMFORT_TIERS = [[20, 'Cozy', 2, .05], [45, 'Snug', 4, .1], [80, 'Lovely', 6, .15]];
 function roomState() { S.room = S.room || {items: [], stash: {}}; return S.room; }
@@ -13555,6 +13733,8 @@ function decoPiece(g, k, x, y, w, h, ghost) {
     case 'shelf': box('#7a4a2a', 0, 18, W, 4); box('#c84a4a', 6, 8, 6, 10); box('#e8c040', 16, 4, 8, 14); box('#4a9a5a', 40, 10, 10, 8); break;
     case 'landscape_painting': case 'masterpiece_painting': { const m = k === 'masterpiece_painting'; box(m ? '#d8a840' : '#6a4a2a', 0, 2, W, H - 4); box('#8ac8e8', 3, 5, W - 6, 10); box(m ? '#e8a040' : '#5a9a4a', 3, 15, W - 6, H - 20); if (m) box('#fff0b0', W - 10, 7, 4, 4); break; }
     case 'loom_tapestry': { box('#6a4a2a', 2, 3, W - 4, 3); box('#e8dcc0', 5, 6, W - 10, H - 12); const cs = ['#c84a4a', '#d8507a', '#3a8ac8', '#4a6aa8', '#d8a830', '#3a4a6a', '#c8503a', '#8a5a3a'], cw = (W - 14)/4, ch = (H - 16)/2; for (let i = 0; i < 8; i++) box(cs[i], 7 + (i % 4)*cw, 8 + Math.floor(i/4)*ch, cw - 2, ch - 2); box('#c8a040', 6, H - 6, 2, 4); box('#c8a040', W - 8, H - 6, 2, 4); break; }
+    case 'crystal_lockbox': { box('#5a3a6a', 6, H - 16, W - 12, 12); box('#7a5a8a', 6, H - 18, W - 12, 3); const gc = ['#e8384a', '#3a6ae8', '#2ab85a', '#f0c030']; for (let i = 0; i < 4; i++) box(gc[i], 9 + i*((W - 18)/4), H - 12, 3, 3); break; }
+    case 'draughts_set': { box('#4a2a1a', 4, H - 14, W - 8, 10); for (let i = 0; i < 4; i++) box(i % 2 ? '#e8d4a8' : '#7a5030', 6 + i*((W - 12)/4), H - 13, (W - 12)/4, 7); g.fillStyle = '#c8402a'; g.beginPath(); g.arc(X + W/2 - 5, Y + H - 10, 2.5, 0, 7); g.fill(); g.fillStyle = '#2a1e1a'; g.beginPath(); g.arc(X + W/2 + 5, Y + H - 10, 2.5, 0, 7); g.fill(); break; }
     case 'tide_board': box('#5a3a1a', 4, H - 14, W - 8, 10); box('#2f7686', 6, H - 13, W - 12, 7); g.fillStyle = '#2a2420'; g.beginPath(); g.arc(X + W/2 - 4, Y + H - 10, 2.5, 0, 7); g.fill(); g.fillStyle = '#f4ecdc'; g.beginPath(); g.arc(X + W/2 + 4, Y + H - 10, 2.5, 0, 7); g.fill(); break;
     case 'spirit_lantern': box('#3a3a42', W/2 - 7, 4, 14, 3); box('#3a3a42', W/2 - 8, H - 8, 16, 4); g.fillStyle = 'rgba(200,232,255,.85)'; g.fillRect(X + W/2 - 6, Y + 7, 12, H - 15); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(X + W/2, Y + H/2 - 2, 4, Math.PI, 0); g.lineTo(X + W/2 + 4, Y + H/2 + 4); g.lineTo(X + W/2 - 4, Y + H/2 + 4); g.fill(); box('#1a1a2a', W/2 - 2, H/2 - 3, 1, 2); box('#1a1a2a', W/2 + 1, H/2 - 3, 1, 2); break;
     case 'ship_in_bottle': box('#6a4a2a', 3, H - 8, W - 6, 4); g.fillStyle = 'rgba(190,230,250,.55)'; g.beginPath(); g.ellipse(X + W/2, Y + H - 15, 13, 7, 0, 0, 7); g.fill(); box('#c8e8f8', W - 6, H - 17, 4, 4); box('#7a4a2a', W/2 - 7, H - 14, 14, 3); box('#5a3a1a', W/2 - 1, H - 22, 1, 8); box('#f4f0e0', W/2 - 5, H - 21, 4, 5); box('#f4f0e0', W/2 + 1, H - 20, 4, 4); break;
@@ -14653,6 +14833,11 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['cbk_first','Click!','Open one of Cassia’s gem locks', () => (S.cbkWins || 0) >= 1],
+  ['cbk_quick','Lucky Guess?','Open the apprentice lock in 4 tries or fewer', () => !!S.cbkQuick],
+  ['cbk_master','Master Locksmith','Open Cassia’s master lock', () => (S.cbkBeat || 0) >= 3],
+  ['drg_win','Crowned','Beat Agatha Oakes at draughts', () => (S.drgWins || 0) >= 1],
+  ['drg_champ','Porch Champion','Win a championship game of draughts against Agatha', () => (S.drgBeat || 0) >= 3],
   ['loom_first','Warp and Weft','Weave your first loom pattern for Mirela', () => (S.nonoDone || []).length >= 1],
   ['loom_all','Master Weaver','Weave all eight loom patterns', () => (S.nonoDone || []).length >= NONO_P.length],
   ['rev_win','Turning the Tide','Beat Old Tobiah at tide stones', () => (S.revWins || 0) >= 1],
@@ -15346,8 +15531,10 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 34;
+const WN_VER = 35;
 const WHATS_NEW = [
+  ['Codebreaker', 'Cassia the Locksmith in Prismvale challenges you to crack her gem locks using gold and silver clue pins.'],
+  ['Draughts', 'Agatha Oakes invites you onto her Tallpine porch for a game of draughts.'],
   ['Loom patterns', 'Mirela the Dyer in Sporehaven hides pictures in her weaving. Read the thread counts to reveal them.'],
   ['Tide stones', 'Old Tobiah on the Farhaven pier will play you at tide stones, a game of traps and turned stones.'],
   ['Ghost catching', 'After dark, Morwenna Grey in Gravenmoor lends you a lantern to catch the spirits haunting the old manor.'],
@@ -15434,7 +15621,7 @@ const RECORDS = [
   ['rinkBest', 'Ice rink', v => `${v} points`], ['cartBest', 'Mine cart', v => `${v} m`], ['sledBest', 'Sled run', v => `${v} m`],
   ['logBest', 'Log rolling', v => `${(+v).toFixed(1)} s`], ['snowBest', 'Snowball fight', v => `${v} hits`], ['castleBest', 'Sandcastle', v => `${v} layers`],
   ['kitchenBest', 'Kitchen', v => `${v} dishes served`], ['buskBest', 'Busking', v => `${v} points`], ['moleBest', 'Whack-a-mole', v => `${v} points`],
-  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['cardBest', 'Card duel', v => `${v} rounds in a game`], ['potBest', 'Pottery wheel', v => `${v}% match`], ['lhBest', 'Lighthouse night watch', v => `${v} of 10 ships saved`], ['pieBest', 'Pie-eating contest', v => `${v} pies`], ['paintBest', 'Best painting', v => `${v}% match`], ['gzFast', 'Fastest fox trapped', v => `${v} moves`], ['axeBest', 'Axe throwing', v => `${v} points`], ['crateStarsN', 'Crate gold stars', v => `${v} of 8`], ['bagBest', 'Bagatelle', v => `${v} points`], ['skipBest', 'Stone skipping', v => `${v} skips`], ['ghostBest', 'Ghost catching', v => `${v} points`], ['nonoBest', 'Loom (10×10 pattern)', v => `${Math.floor(v/60)}:${String(v % 60).padStart(2, '0')}`, 1], ['revMargin', 'Tide stones vs the Champion', v => `won by ${v}`], ['diveBest', 'Sunken city dive', v => `${v} treasures in one dive`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
+  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['cardBest', 'Card duel', v => `${v} rounds in a game`], ['potBest', 'Pottery wheel', v => `${v}% match`], ['lhBest', 'Lighthouse night watch', v => `${v} of 10 ships saved`], ['pieBest', 'Pie-eating contest', v => `${v} pies`], ['paintBest', 'Best painting', v => `${v}% match`], ['gzFast', 'Fastest fox trapped', v => `${v} moves`], ['axeBest', 'Axe throwing', v => `${v} points`], ['crateStarsN', 'Crate gold stars', v => `${v} of 8`], ['bagBest', 'Bagatelle', v => `${v} points`], ['skipBest', 'Stone skipping', v => `${v} skips`], ['ghostBest', 'Ghost catching', v => `${v} points`], ['nonoBest', 'Loom (10×10 pattern)', v => `${Math.floor(v/60)}:${String(v % 60).padStart(2, '0')}`, 1], ['revMargin', 'Tide stones vs the Champion', v => `won by ${v}`], ['cbkMaster', 'Codebreaker (master lock)', v => `${v} tries`, 1], ['diveBest', 'Sunken city dive', v => `${v} treasures in one dive`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
   ['Puzzles'],
   ['slideBest', 'Slide puzzle', v => `${v} moves`, 1], ['memBest', 'Memory cards', v => `${v} tries`, 1], ['tileBest', 'Shell Tiles', v => `${v} s`, 1], ['sweepBest', 'Mine sweeping (open sea)', v => `${v} s`, 1], ['pipeBest', 'Aqueduct (grand oasis)', v => `${v} s`, 1], ['lampStarsN', 'Lantern gold stars', v => `${v} of 4`], ['mmBest', 'Code-breaker', v => `${v} guesses`, 1], ['paperBest', 'Paper route', v => `${v} s`, 1],
 ];
@@ -15666,7 +15853,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {get nono(){return nono;}, get rev(){return rev;}, revPick: (b, p, l) => revPick(b, p, l), revMoves: (b, p) => revMoves(b, p), get spook(){return spook;}, spookStart: () => spookStart(), get skip(){return skip;}, skipThrow: (a, p) => skipThrow(a, p), skipPlan: (a, p) => skipPlan(a, p), get pipe(){return pipe;}, pipeStart: (n, i) => pipeStart(n, i), pipeSolved: () => pipeSolved(), pipeGen: n => pipeGen(n), pipeRot: (m, k) => pipeRot(m, k), get lamp(){return lamp;}, lampSolve: (b, n) => lampSolve(b, n), bagStep: (B, dt) => bagStep(B, dt), BG: {BG_LANE, BGH, BG_SLOTV, BG_PEGS, BG_CUPS, BG_ARC}, get sweep(){return sweep;}, sweepStart: (n, i) => sweepStart(n, i), sweepAct: f => sweepAct(f), sweepCount: (x, y) => sweepCount(sweep, x, y), get bag(){return bag;}, bagShoot: pw => bagShoot(pw), bagNudge: d => bagNudge(d), get crate(){return crate;}, crateStart: (n, i) => crateStart(n, i), crateMove: (x, y) => crateMove(x, y), CRATE_LV, get tiles(){return tiles;}, tileClick: i => tileClick(i), tileMoves: () => tileMoves(), tileShuffle: () => tileShuffle(), tileFreeIn: (a, i) => tileFreeIn(new Set(a), i), TILE_POS, get ice(){return ice;}, iceStart: (n, i) => iceStart(n, i), ICE_PUZ, get axe(){return axe;}, axeAim: A => axeAim(A), get isl(){return isl;}, islTick: () => islTick(0), get islSpots(){return islSpots;}, openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get cbk(){return cbk;}, get drg(){return drg;}, cbkScore: (a, b) => cbkScore(a, b), drgPick: (b, p, l) => drgPick(b, p, l), drgMoves: (b, p) => drgMoves(b, p), get nono(){return nono;}, get rev(){return rev;}, revPick: (b, p, l) => revPick(b, p, l), revMoves: (b, p) => revMoves(b, p), get spook(){return spook;}, spookStart: () => spookStart(), get skip(){return skip;}, skipThrow: (a, p) => skipThrow(a, p), skipPlan: (a, p) => skipPlan(a, p), get pipe(){return pipe;}, pipeStart: (n, i) => pipeStart(n, i), pipeSolved: () => pipeSolved(), pipeGen: n => pipeGen(n), pipeRot: (m, k) => pipeRot(m, k), get lamp(){return lamp;}, lampSolve: (b, n) => lampSolve(b, n), bagStep: (B, dt) => bagStep(B, dt), BG: {BG_LANE, BGH, BG_SLOTV, BG_PEGS, BG_CUPS, BG_ARC}, get sweep(){return sweep;}, sweepStart: (n, i) => sweepStart(n, i), sweepAct: f => sweepAct(f), sweepCount: (x, y) => sweepCount(sweep, x, y), get bag(){return bag;}, bagShoot: pw => bagShoot(pw), bagNudge: d => bagNudge(d), get crate(){return crate;}, crateStart: (n, i) => crateStart(n, i), crateMove: (x, y) => crateMove(x, y), CRATE_LV, get tiles(){return tiles;}, tileClick: i => tileClick(i), tileMoves: () => tileMoves(), tileShuffle: () => tileShuffle(), tileFreeIn: (a, i) => tileFreeIn(new Set(a), i), TILE_POS, get ice(){return ice;}, iceStart: (n, i) => iceStart(n, i), ICE_PUZ, get axe(){return axe;}, axeAim: A => axeAim(A), get isl(){return isl;}, islTick: () => islTick(0), get islSpots(){return islSpots;}, openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
