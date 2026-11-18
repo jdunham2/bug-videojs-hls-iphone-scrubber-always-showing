@@ -102,7 +102,7 @@ class Telegraph {
 }
 
 /** Expanding shockwave ring the player has to roll through or outrun. */
-class Shockwave {
+export class Shockwave {
   constructor(game, pos, maxR, damage, delay = 0) {
     this.game = game;
     this.pos = pos.clone();
@@ -184,7 +184,7 @@ const BARRAGE = {
   cannonball: { kind: 'cannonball', count: [4, 6], flight: 1.05, stagger: 0.28, r: 1.9, spread: 5.5, from: 'boss' },
 };
 
-class Barrage {
+export class Barrage {
   constructor(game, boss, player) {
     this.game = game;
     this.boss = boss;
@@ -602,6 +602,7 @@ export class Boss extends Grunt {
       this.game.onSlam(this.aim, 2.2);
       this.waves.push(new Shockwave(this.game, this.aim, 12, b.waveDamage));
       if (this.phase === 2) this.waves.push(new Shockwave(this.game, this.aim, 12, b.waveDamage, 0.45));
+      this.game.coop?.noteShockwave(this, this.aim, b.waveDamage);
       this.enter('recover');
     } else if (this.attack === 'charge') {
       this.hasHit = false;
@@ -609,6 +610,7 @@ export class Boss extends Grunt {
       this.enter('charge');
     } else if (this.attack === 'barrage') {
       this.barrages.push(new Barrage(this.game, this, player));
+      this.game.coop?.noteBarrage(this, player);
       this.barrageCool = 7 + Math.random() * 3;
       this.game.sfx.sample('whoosh', { vol: 0.6, rate: 0.6, jitter: 0 });
       if (this.form.barrage === 'icicle' || this.form.barrage === 'stalactite') this.game.sfx.bossRoar();

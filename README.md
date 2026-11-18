@@ -28,6 +28,18 @@ Open the URL Vite prints (usually http://localhost:5173). `npm run build` produc
 | Mute / restart | M / R | |
 | Developer tuning panel | `` ` `` | |
 
+### Online co-op
+
+Friends who have the game open show up in your camp (with name tags), and you can fight dungeons together, up to four players:
+
+- **Online button** (bottom left in camp): who's here and what they're doing, with a **Join** button for anyone leading a dungeon. When a friend sets off, a "Join" toast pops up too.
+- **The one who starts the dungeon leads:** their game runs the waves, the enemies and the boss, and enemies go after whoever is closest. Everyone else sees the same enemies; their arrows, gadgets, skills and Arrow Volley hit them, and the hits count on the leader's game. Enemy arrows, fire pots, the boss's shockwaves and barrages fly on everyone's screen.
+- **Each player keeps their own** hero, gear, skill picks (everyone picks a skill when a wave is cleared), health and gems: kills drop gems for everyone, and everyone gets the Mission Complete rewards and stars.
+- **Down, not out:** fall in a fight and a friend can get you back up by standing next to you (or you're back at the start of the next wave). The run ends only when everyone is down.
+- Pausing doesn't stop the fight for the others. A friend can leave the party from the pause menu; if the leader leaves, the others head back to camp with what they found.
+
+Online play needs the game opened on claude.ai while signed in: invite friends from the page's **Share** menu. (Run locally, two tabs of the same browser can play together, which is how the tests run.)
+
 ### Touch screens, touchpads and phones
 
 Pick how you play with the buttons on the title screen (or Settings → Controls):
@@ -139,6 +151,7 @@ Recorded CC0 samples (impacts, whooshes, UI, an announcer for combos, multi-kill
 | `src/gear-drops.js`, `src/game-gear.js` | Gear drops in the arena, pickup card, equip on pickup |
 | `src/audio.js`, `src/music.js` | Sound effects and the adaptive soundtrack |
 | `src/input.js`, `src/settings.js` | Keyboard/mouse/gamepad input; settings menu |
+| `src/net.js`, `src/coop.js` | Online play: the live room link, friends in camp, co-op dungeons (host runs enemies, guests mirror them) |
 | `src/touch.js` | Touch controls (twin sticks, buttons, aim assist) and the touch screen / touchpad / mouse choice |
 
 ## Asset pipeline (Meshy)

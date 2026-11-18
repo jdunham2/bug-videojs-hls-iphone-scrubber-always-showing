@@ -34,6 +34,7 @@ import { Particles, DamageNumbers, Shake } from './fx.js';
 import { Sfx } from './audio.js';
 import { Input } from './input.js';
 import { TouchControls } from './touch.js';
+import { Coop } from './coop.js';
 import { UiMethods } from './game-ui.js';
 import { CombatMethods } from './game-combat.js';
 import { FlowMethods } from './game-flow.js';
@@ -151,6 +152,7 @@ export class Game {
     this.input = new Input(r.domElement);
     this.touch = new TouchControls(this);
     this.enemies = [];
+    this.coop = new Coop(this);
 
     this.raycaster = new THREE.Raycaster();
     this.aimPlane = new THREE.Plane(UP, -ARROW_HEIGHT);
@@ -222,6 +224,7 @@ export class Game {
         if (this.state === 'title' || this.state === 'paused') this.showOverlay(this.state);
         return;
       }
+      if (e.target.closest('[data-leave-party]')) return this.coop.leaveParty();
       applySettings(this);
       // Phones: go full screen on the first tap (where the browser allows it).
       if (this.touch.active && this.state === 'title' && !document.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -296,14 +299,15 @@ export class Game {
     this.camTarget.copy(this.player.pos);
   }
 
-  start(fromCheckpoint = false) {
+  /** `join` (online co-op): { mission, difficulty } of the friend's dungeon being joined. */
+  start(fromCheckpoint = false, join = null) {
     if (this.camp.active) this.leaveCamp();
     if (this.tips.current === 'camp') this.tips.hide(); // the dummy tip stays in camp
     this.resetRun();
     const cp = profile.checkpoint;
-    this.difficulty = fromCheckpoint && cp?.difficulty ? difficultyById(cp.difficulty) : selectedDifficulty();
+    this.difficulty = join?.difficulty || (fromCheckpoint && cp?.difficulty ? difficultyById(cp.difficulty) : selectedDifficulty());
     // A mission from the world map, or the Endless Siege (also used to continue from a save point).
-    const pick = selectedMission();
+    const pick = join?.mission || selectedMission();
     this.mission = !fromCheckpoint && pick !== ENDLESS ? pick : null;
     this.mods = modEffects(this.mission?.mods);
     this.setupMission();
@@ -319,6 +323,8 @@ export class Game {
       this.banner(`Wave ${cp.wave + 1}`, 'Continuing from your save point', 1.6);
     }
     this.runUnlocks = [];
+    this.coop.onRunStart();
+    this.endReason = null;
     this.runStartBest = { ...profile.best };
     noteRunStart();
     // Open the pack: provisions bought in camp last for this run.
@@ -342,6 +348,7 @@ export class Game {
     this.tips.hide();
     setTimeout(() => this.state === 'camp' && this.tips.show('camp'), 1500);
     this.resetRun();
+    this.coop.onLeaveRun();
     this.state = 'camp';
     document.body.classList.remove('title-backdrop');
     endProvisions();
@@ -614,7 +621,8 @@ export class Game {
     this.updateAim();
 
     let dt = 0;
-    if (this.state === 'playing') {
+    // Online, a pause can't stop the fight for everyone else: it carries on behind the menu.
+    if (this.state === 'playing' || (this.state === 'paused' && this.coop.inParty())) {
       dt = realDt;
       if (this.slowmo > 0) {
         this.slowmo -= realDt;
@@ -646,6 +654,7 @@ export class Game {
       this.world.update(realDt, this.time);
       this.env.update(realDt, this.time);
     }
+    this.coop.update(realDt);
     this.updateCamera(realDt);
     this.updateHud();
     this.touch.update();
@@ -683,7 +692,7 @@ export class Game {
       if (this.state === 'playing') this.setPaused(true);
       else if (this.state === 'paused') this.setPaused(false);
     }
-    if (i.wasPressed('KeyR') && this.state !== 'title') {
+    if (i.wasPressed('KeyR') && this.state !== 'title' && !this.coop.guest) {
       this.sfx.unlock();
       this.start();
     }
@@ -692,7 +701,9 @@ export class Game {
   simulate(dt) {
     this.elapsed += dt;
     this.player.update(dt, this.input, this.aimPoint, this);
-    for (const e of this.enemies) e.update(dt, this.player);
+    const coop = this.coop;
+    const shared = coop.hosting && coop.partyRemotes().length > 0;
+    for (const e of this.enemies) e.update(dt, shared ? coop.targetFor(e) : this.player);
     this.separate();
     this.arrows.update(dt, [...this.enemies, ...this.hazards.targets], this);
     this.hazards.update(dt);
@@ -715,12 +726,15 @@ export class Game {
     }
     this.enemies = this.enemies.filter((e) => !e.removed);
 
-    if (this.player.dead) {
+    // Online: a guest follows the host's waves; anyone in a party who falls can be got back up.
+    const party = coop.inParty();
+    if (coop.guest) coop.guestUpdate(dt);
+    if (this.player.dead && party) coop.downedUpdate(dt);
+    else if (this.player.dead) {
       this.deathTimer += dt;
       if (this.deathTimer > 1.3) this.gameOver();
-    } else {
-      this.updateWaves(dt);
     }
+    if (!coop.guest && (!this.player.dead || party) && this.state === 'playing') this.updateWaves(dt);
   }
 
   /** Keep grunts from stacking on each other or standing inside the player. */

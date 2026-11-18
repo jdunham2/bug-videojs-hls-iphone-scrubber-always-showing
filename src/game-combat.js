@@ -18,6 +18,7 @@ export class CombatMethods {
       this.sfx.release(charge, perfect, this.panAt(origin));
       return;
     }
+    if (!opts.extra) this.coop?.noteShot(origin, dir, speed, perfect);
     if (opts.extra) return; // Split Shot side arrows share the main shot's sound and stats
     this.tips.done('draw');
     if (perfect) this.tips.done('perfect');
@@ -94,7 +95,9 @@ export class CombatMethods {
   }
 
   onKill(enemy) {
-    this.stats.kills++;
+    this.coop?.noteKill(enemy);
+    // A guest's kill (online): the host's game ran the enemy; the kill counts for them.
+    if (!this.coop?.killer) this.stats.kills++;
     this.bounty('kill');
     this.bounty(`kill:${enemy.kind || 'grunt'}`);
     if (enemy.elite) {
@@ -295,7 +298,8 @@ export class CombatMethods {
       this.deathShown = true;
       this.slowmo = 1.5;
       this.slowmoScale = 0.25;
-      this.banner('You fell', `Wave ${this.wave}`, 2.2);
+      if (this.coop?.inParty()) this.banner('Down!', 'Stand next to a friend to get back up', 2.4);
+      else this.banner('You fell', `Wave ${this.wave}`, 2.2);
       this.input.mouse.down = false;
     }
     this.aberration = Math.min(1, this.aberration + 0.8);

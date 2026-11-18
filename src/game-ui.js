@@ -248,11 +248,11 @@ export class UiMethods {
       const n = o.querySelector('.vr-name');
       if (n && this.reward) n.textContent = this.reward.name;
     } else if (kind === 'paused') {
-      o.innerHTML = `<h1>Paused</h1>${controls}<button>${mode === 'touch' ? 'Tap' : 'Click'} to resume</button>`;
+      o.innerHTML = `<h1>Paused</h1>${this.coop?.inParty() ? '<p class="tag">Playing online: the fight goes on while you\'re paused.</p>' : ''}${controls}<button>${mode === 'touch' ? 'Tap' : 'Click'} to resume</button>${this.coop?.guest ? '<button class="ghost" data-leave-party>Leave the party</button>' : ''}`;
     } else {
       const secs = Math.floor(this.elapsed);
       o.innerHTML = `
-        <h1>You fell</h1>
+        <h1>${this.endReason || 'You fell'}</h1>
         ${this.dailyResult ? `<div class="vscore"><div class="vs-num">${this.dailyResult.score.toLocaleString()}</div><div class="vs-label">Daily Trial score · ${this.dailyResult.isBest ? 'new best today!' : `today's best ${this.dailyResult.best.toLocaleString()}`}</div></div>` : ''}
         <p class="tag">${this.difficulty && this.difficulty.id !== 'adventurer' ? `<b style="color:${this.difficulty.color}">${this.difficulty.name}</b> · ` : ''}${newBest ? 'New best!' : `Best: wave ${profile.best.wave}, ${profile.best.kills} kills`}</p>
         <div class="summary">

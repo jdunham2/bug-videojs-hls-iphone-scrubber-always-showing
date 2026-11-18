@@ -96,6 +96,7 @@ export class ArrowSystem {
       element: opts.element || null,
       pierce: perfect || !!opts.mega,
       hitSet: new Set(),
+      visual: !!opts.visual, // a friend's arrow, shown online: it flies but hits nothing here
       hitCount: 0,
       traveled: 0,
       state: 'flying',
@@ -130,7 +131,7 @@ export class ArrowSystem {
     a.traveled += a.speed * dt;
 
     const hits = [];
-    for (const e of enemies) {
+    for (const e of a.visual ? [] : enemies) {
       if (!e.isHittable() || a.hitSet.has(e)) continue;
       const t = segCircle(px, pz, a.pos.x, a.pos.z, e.pos.x, e.pos.z, e.radius);
       if (t >= 0) hits.push({ e, t });
