@@ -59,7 +59,7 @@ def put(name, im, q=82, **meta):
 # ---------- 3D renders ----------
 HUE = {'i_core': -92, 'i_crown': 92, 'i_chrono': -50}
 TINT = {'i_urn': ((90, 50, 0), (240, 170, 30), (255, 236, 150)), 'i_fshield': ((10, 40, 80), (70, 190, 255), (220, 248, 255))}  # colourise grey models  # hue shift (0-255 scale): purple crystal -> alien green, blue jewel -> ruby red
-ROT = {'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90}
+ROT = {'veg_banana': 58, 'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90}
 FLIP = {'w_knife', 'w_pistol', 'w_smg', 'w_shotgun', 'w_rocket', 'w_zapper', 'w_sniper', 'w_minigun', 'w_bouncer', 'w_lobber', 'w_flamer'}
 for f in sorted(os.listdir(RAW)):
     n = f[:-4]

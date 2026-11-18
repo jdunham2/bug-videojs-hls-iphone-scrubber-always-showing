@@ -119,6 +119,12 @@ const CHARS=[
   {id:'mushroom',name:'Mushroom',role:'Spore Bomb',desc:'Everything it touches goes pop.',weapon:'lobber',mods:{boom:18,atkSpd:-10},lines:[],k:2.8,fy:.37,es:.12,ez:.06},
   {id:'pepper',name:'Pepper',role:'Hot Head',desc:'Fast, furious and slightly on fire.',weapon:'flamer',mods:{atkSpd:18,speed:10,armor:-3,maxHp:-3},lines:[],k:2.8,fy:.55,es:.1,ez:.06},
   {id:'pumpkin',name:'Pumpkin',role:'Big Gourd',desc:'Too big to fail. Too slow to dodge.',weapon:'axe',mods:{maxHp:20,thorns:10,dmg:-10,speed:-3},lines:[['Bigger body','neu']],r:23,k:2.3,fy:.58,es:.15,ez:.065},
+  {id:'cabbage',name:'Cabbage',role:'Layered',desc:'Peel one layer, find another.',weapon:'spear',mods:{shield:1,maxHp:10,speed:-8,dmg:-10},lines:[['Built-in shield blocks a hit every 8s','pos']],k:2.3,fy:.55,es:.13,ez:.065},
+  {id:'cauli',name:'Cauliflower',role:'Big Brain',desc:'Thinks its way out of every swarm.',weapon:'zapper',mods:{dmg:-12},lines:[['+50% experience','pos'],['Level-ups offer 5 choices','pos']],xpMul:1.5,choices:5,k:2.3,fy:.62,es:.12,ez:.06},
+  {id:'lemon',name:'Lemon',role:'Sour',desc:'Every hit leaves a bitter taste.',weapon:'smg',mods:{poison:3,crit:8,maxHp:-4},lines:[['Every hit poisons aliens','pos']],k:2.6,fy:.5,es:.11,ez:.06},
+  {id:'banana',name:'Banana',role:'Slippery',desc:'Hard to catch, easy to bruise.',weapon:'knife',mods:{dodge:25,speed:15,maxHp:-8},lines:[],k:3.4,fy:.48,fx:.04,es:.065,ez:.042},
+  {id:'melon',name:'Watermelon',role:'Heavyweight',desc:'Only needs a few weapons. Swings them hard.',weapon:'shotgun',mods:{dmg:60,maxHp:10,speed:-5},maxW:3,lines:[['Only 3 weapon slots','neg']],k:2.3,fy:.55,es:.14,ez:.065},
+  {id:'grapes',name:'Grapes',role:'Bunch',desc:'There are always more of us.',weapon:'pistol',startW:['pistol','pistol'],mods:{dmg:-25},maxW:8,lines:[['8 weapon slots','pos'],['Starts with two Pistols','neu']],k:3,fy:.42,es:.1,ez:.055},
 ];
 
 /* Unlocks: progress is kept in this browser (localStorage). Characters not listed start unlocked. */
@@ -130,8 +136,14 @@ const UNLOCKS={
   pepper:{txt:'Unlock a 4-weapon set bonus',goal:1,val:p=>p.set4},
   mushroom:{txt:'Defeat 1,500 aliens across runs',goal:1500,val:p=>p.kills},
   pumpkin:{txt:'Defeat a final boss',goal:1,val:p=>p.wins},
+  cabbage:{txt:'Take 1,000 damage across runs',goal:1000,val:p=>p.dmgTaken||0},
+  cauli:{txt:'Reach level 20 in one run',goal:20,val:p=>p.maxLevel||0},
+  lemon:{txt:'Land 1,000 critical hits',goal:1000,val:p=>p.crits},
+  banana:{txt:'Dodge 50 attacks across runs',goal:50,val:p=>p.dodges||0},
+  melon:{txt:'Win a run on Danger 2 or higher',goal:1,val:p=>Object.values(p.medals).some(v=>v>=2)?1:0},
+  grapes:{txt:'Win a Full 20-wave run',goal:1,val:p=>Object.keys(p.fmedals).length?1:0},
 };
-const profDefaults=()=>({best:0,kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{},fmedals:{},len:10,wunlocked:[],wseen:[],eseen:[],crits:0,meleeK:0,boomK:0,full6:0,elites:0,wk:{}});
+const profDefaults=()=>({best:0,kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{},fmedals:{},len:10,wunlocked:[],wseen:[],eseen:[],crits:0,dmgTaken:0,maxLevel:0,dodges:0,meleeK:0,boomK:0,full6:0,elites:0,wk:{}});
 const PROF=Object.assign(profDefaults(),{best:store.get('bd_best',0)},store.get('bd_prof',{}));
 /* Danger levels stack: each one includes every level below it. Win on your highest unlocked level to open the next. */
 const DANGERS=[
@@ -332,7 +344,7 @@ function newRun(ch){
   run={char:ch,len,waves:RUN_LENS[len].waves,last:RUN_LENS[len].waves.length,danger:Math.min(PROF.dsel,PROF.danger),bosses:[],wave:0,mats:0,kills:0,pendingLv:0,crates:0,items:{},weapons:[],shop:[],rerolls:0,combo:0,comboT:0,bestCombo:0,gemChain:0,lastGem:0,lsCd:0,matBump:0,hpTrail:S.maxHp,time:0,totalMats:0,auraT:0};
   P={x:AW/2,y:AH/2,vx:0,vy:0,r:ch.r||18,hp:S.maxHp,iframes:0,walk:0,moving:false,lx:1,ly:0,level:0,xp:0,regenAcc:0,blink:2};
   const bl=Object.keys(BOSSES); run.finalBoss=pick(bl); const others=bl.filter(x=>x!==run.finalBoss); run.midBoss=pick(others); run.twinBoss=pick(others);
-  run.setLv={}; addWeapon(ch.weapon,0);
+  run.setLv={}; (ch.startW||[ch.weapon]).forEach(w=>addWeapon(w,0));
 }
 function setCounts(){const c={};for(const w of run.weapons)for(const k of WEAPONS[w.id].sets)c[k]=(c[k]||0)+1;return c}
 function setTier(set,n){let t=-1;SETS[set].tiers.forEach(([need],i)=>{if(n>=need)t=i});return t}
@@ -348,11 +360,12 @@ const maxHp=()=>Math.max(1,Math.round(S.maxHp));
 const xpNeed=l=>(l+3)*(l+3);
 
 /* ================= weapons ================= */
+const maxW=()=>(run&&run.char.maxW)||6;
 function addWeapon(id,tier){
-  if(run.weapons.length>=6){const m=run.weapons.find(w=>w.id===id&&w.tier===tier&&tier<3);if(!m)return false;m.tier++;m.flash=1;recalc();return true}
+  if(run.weapons.length>=maxW()){const m=run.weapons.find(w=>w.id===id&&w.tier===tier&&tier<3);if(!m)return false;m.tier++;m.flash=1;recalc();return true}
   run.weapons.push({id,tier,cd:rand(.1,.5),aim:-Math.PI/2,ext:0,thrust:null,recoil:0,flash:0,spin:0}); recalc(); if(run.weapons.length>=6&&!PROF.full6){PROF.full6=1;checkUnlocks()} return true;
 }
-function canAddWeapon(id,tier){return run.weapons.length<6||run.weapons.some(w=>w.id===id&&w.tier===tier&&tier<3)}
+function canAddWeapon(id,tier){return run.weapons.length<maxW()||run.weapons.some(w=>w.id===id&&w.tier===tier&&tier<3)}
 function wDmg(def,t){const base=def.dmg*TIER_DMG[t]+(def.melee?S.melee:S.ranged)*(def.flame||def.spin?.4:1);const mul=(1+S.dmg/100)*(def.melee?1:(run.char.rangedMul||1));return Math.max(1,base*mul)}
 function wCd(def,t){const as=S.atkSpd+(run&&run.rageT>0?S.rage:0);const a=as>=0?1+as/100:1/(1-as/100);return def.cd*TIER_CD[t]/a}
 function wRange(def){return Math.max(60,def.range+S.range*(def.melee?.5:1))}
@@ -513,11 +526,12 @@ function fireMissile(){
 }
 function hurtPlayer(d,src){
   if(P.iframes>0||state!=='wave')return;
-  if(Math.random()*100<Math.min(60,S.dodge)){P.iframes=.25;texts.push({x:P.x,y:P.y-34,vy:-80,t:0,life:.6,s:18,txt:'DODGE',c:'#9fd0ff'});sfx('dodge');return}
+  if(Math.random()*100<Math.min(60,S.dodge)){P.iframes=.25;texts.push({x:P.x,y:P.y-34,vy:-80,t:0,life:.6,s:18,txt:'DODGE',c:'#9fd0ff'});sfx('dodge');PROF.dodges=(PROF.dodges||0)+1;return}
   if(S.shield&&run.shieldReady){run.shieldReady=false;run.shieldT=8;P.iframes=.5;texts.push({x:P.x,y:P.y-34,vy:-80,t:0,life:.7,s:20,txt:'BLOCKED',c:'#6fe3ff'});fx.push({k:'ring',x:P.x,y:P.y,r0:P.r*1.6,r1:P.r*4,t:0,life:.35,c:'#6fe3ff',w:6});sfx('dodge');return}
   const ar=S.armor; const mul=ar>=0?15/(15+ar):1+(-ar)/15;
   d=Math.max(1,Math.round(d*mul));
   run.dmgBy=run.dmgBy||{}; const dk=src?src.type:'shot'; run.dmgBy[dk]=(run.dmgBy[dk]||0)+d;
+  PROF.dmgTaken=(PROF.dmgTaken||0)+d;
   P.hp-=d; P.iframes=.75; hurtFlash=1; shake=Math.max(shake,11); freezeT=Math.max(freezeT,.07);
   texts.push({x:P.x,y:P.y-34,vy:-80,t:0,life:.8,s:22,txt:'-'+d,c:'#ff5d6c'});
   for(let i=0;i<12;i++){const a=rand(0,TAU),s=rand(80,240);parts.push({x:P.x,y:P.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,t:0,life:rand(.3,.5),c:'#c2185b',s:rand(3,6),g:300})}
@@ -854,9 +868,9 @@ function collectGem(g){
   sfx('gem',run.gemChain); addXp(g.val);
 }
 function addXp(v){
-  P.xp+=v;
+  P.xp+=v*(run.char.xpMul||1);
   while(P.xp>=xpNeed(P.level)){
-    P.xp-=xpNeed(P.level); P.level++; run.pendingLv++; B.maxHp+=1; recalc(); P.hp+=1;
+    P.xp-=xpNeed(P.level); P.level++; PROF.maxLevel=Math.max(PROF.maxLevel||0,P.level); run.pendingLv++; B.maxHp+=1; recalc(); P.hp+=1;
     texts.push({x:P.x,y:P.y-58,vy:-50,t:0,life:1.2,s:26,txt:'LEVEL UP!',c:'#ffcc4d'});
     fx.push({k:'ring',x:P.x,y:P.y,r0:10,r1:130,t:0,life:.5,c:'#ffcc4d',w:6});
     parts.push({x:P.x,y:P.y,vx:0,vy:0,t:0,life:.6,img:'fx_magic',col:'#ffd24d',s0:40,s1:150,add:1,rot:0,vr:2});
@@ -886,7 +900,8 @@ function drawVeg(c,ch,x,y,r,o){
   c.drawImage(im,-Ws/2,-Hs,Ws,Hs);
   if(o.hit){c.globalAlpha=.85;c.drawImage(tinted('veg_'+ch.id,'#ffffff'),-Ws/2,-Hs,Ws,Hs);c.globalAlpha=1}
   // face
-  const fy=-Hs*(1-ch.fy), es=Hs*ch.es, er=Hs*ch.ez;
+  const fy=-Hs*(1-ch.fy), es=Hs*ch.es, er=Hs*ch.ez, fxo=Hs*(ch.fx||0);
+  c.translate(fxo,0);
   const lx=(o.lx||0)*er*.35*(o.lx<-.2?-1:1), ly=(o.ly||0)*er*.3;
   const blink=o.blink!=null&&o.blink<0;
   for(const s of [-1,1]){
@@ -1136,7 +1151,7 @@ function buildMenu(){
     drawVeg(c,ch,120,190-r*1.4,r,{t:1,lx:.3,ly:.2});
     const fm=PROF.fmedals[ch.id], md=fm??PROF.medals[ch.id]; if(md!=null)b.insertAdjacentHTML('beforeend',`<span class="medal" style="--dc:${DANGERS[md].col}" title="Won ${fm!=null?'a Full 20-wave run':'a run'} on Danger ${md} (${DANGERS[md].name})">${fm!=null?'★★':'★'} D${md}</span>`);
     c.save();c.translate(170,150);c.rotate(-.35);drawWeaponSprite(c,ch.weapon,0,WEAPONS[ch.weapon].len*1.6);c.restore();
-    const lines=modLines(ch.mods).concat(ch.lines).concat([['Starts with '+WEAPONS[ch.weapon].name+' ('+WEAPONS[ch.weapon].sets.map(k=>SETS[k].name).join(', ')+')','neu']]);
+    const lines=modLines(ch.mods).concat(ch.lines).concat(ch.startW?[]:[['Starts with '+WEAPONS[ch.weapon].name+' ('+WEAPONS[ch.weapon].sets.map(k=>SETS[k].name).join(', ')+')','neu']]);
     b.appendChild(cv);
     b.insertAdjacentHTML('beforeend',`<span class="role">${ch.role}</span><b>${ch.name}</b><p>${ch.desc}</p><ul>${fmtLines(lines)}</ul>`);
     b.onclick=()=>{audioInit();sfx('click');startRun(ch)};
@@ -1192,7 +1207,8 @@ function showLevelUp(){
   $('lvlSub').textContent=run.pendingLv>1?`Pick one (${run.pendingLv} upgrades waiting)`:'Pick one';
   const box=$('lvlCards'); box.innerHTML=''; $('lvlBtns').innerHTML=''; box.style.gridTemplateColumns='';
   const used=new Set();
-  for(let i=0;i<4;i++){
+  const nC=run.char.choices||4; box.classList.toggle('five',nC>4);
+  for(let i=0;i<nC;i++){
     let u; do{u=pick(UPG)}while(used.has(u[0])); used.add(u[0]);
     const r=rollRarity(); const v=u[1][r];
     const card=document.createElement('button'); card.className='card pickable r'+r;
@@ -1226,7 +1242,7 @@ function weaponCard(id,tier){
   const def=WEAPONS[id]; const card=document.createElement('div'); card.className='card r'+tier;
   const ic=document.createElement('div'); ic.className='ic'; ic.appendChild(weaponIcon(id,tier)); card.appendChild(ic);
   const owned=run.weapons.some(w=>w.id===id&&w.tier===tier);
-  card.insertAdjacentHTML('beforeend',`<div class="ct">Tier ${TIERN[tier]} ${def.melee?'melee':'ranged'} weapon${owned&&tier<3?' · merges':''}</div><div class="cn">${def.name}</div>${setPills(id,!(run.weapons.length>=6&&owned))}<ul><li>${def.desc}</li><li class="neu">${wStatLine(def,tier)}</li></ul>`);
+  card.insertAdjacentHTML('beforeend',`<div class="ct">Tier ${TIERN[tier]} ${def.melee?'melee':'ranged'} weapon${owned&&tier<3?' · merges':''}</div><div class="cn">${def.name}</div>${setPills(id,!(run.weapons.length>=maxW()&&owned))}<ul><li>${def.desc}</li><li class="neu">${wStatLine(def,tier)}</li></ul>`);
   return card;
 }
 function rollShop(fresh){
@@ -1262,7 +1278,7 @@ function renderShop(){
     buy.onclick=()=>{
       if(run.mats<price||!ok){sfx('deny');return}
       run.mats-=price; s.sold=true;
-      if(s.kind==='w'){const merged=run.weapons.length>=6;addWeapon(s.id,s.tier);if(merged)toast(`Merged into ${WEAPONS[s.id].name} ${TIERN[s.tier+1]}`)}
+      if(s.kind==='w'){const merged=run.weapons.length>=maxW();addWeapon(s.id,s.tier);if(merged)toast(`Merged into ${WEAPONS[s.id].name} ${TIERN[s.tier+1]}`)}
       else applyItem(ITEM_BY[s.id]);
       sfx('buy'); renderShop();
     };
@@ -1270,9 +1286,10 @@ function renderShop(){
     lock.onclick=()=>{s.locked=!s.locked;sfx('click');renderShop()};
     foot.append(buy,lock); card.appendChild(foot); box.appendChild(card);
   });
-  $('wcount').textContent=`${run.weapons.length}/6`;
+  $('wcount').textContent=`${run.weapons.length}/${maxW()}`;
   const ws=$('wslots'); ws.innerHTML='';
-  for(let i=0;i<6;i++){
+  ws.style.setProperty('--wn',maxW());
+  for(let i=0;i<maxW();i++){
     const w=run.weapons[i]; const b=document.createElement('button'); b.className='ws';
     if(!w){b.classList.add('empty');b.disabled=true;ws.appendChild(b);continue}
     b.classList.add('t'+w.tier); if(i===selW)b.classList.add('sel');
