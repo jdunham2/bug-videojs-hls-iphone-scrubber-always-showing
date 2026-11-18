@@ -215,6 +215,27 @@ compose('e_hive', 'body_yellowA.png', [
     ('eye_red.png', 0, -40, .8, 0, False), ('eye_red.png', -45, -5, .6, 0, False), ('eye_red.png', 45, -5, .6, 0, True), ('eye_red.png', -20, 22, .45, 0, False), ('eye_red.png', 22, 22, .45, 0, True),
     ('mouthE.png', 0, 55, 1.0, 0, False)], maxpx=200)
 
+compose('e_bulwark', 'body_darkA.png', [
+    ('detail_dark_horn_small.png', -45, -90, 1.2, 15, False, L), ('detail_dark_horn_small.png', 45, -90, 1.2, -15, True, L),
+    ('leg_darkC.png', -42, 92, .55, 0, False, L), ('leg_darkC.png', 42, 92, .55, 0, True, L),
+    ('eye_angry_blue.png', -34, -24, .9, 0, False), ('eye_angry_blue.png', 34, -24, .9, 0, True), ('mouth_closed_teeth.png', 0, 40, 1.1, 0, False)], maxpx=170)
+compose('e_spotter', 'body_redE.png', [
+    ('detail_red_antenna_large.png', 0, -150, 1.3, 0, False, L),
+    ('eye_red.png', 0, -60, 1.2, 0, False), ('mouth_closed_sad.png', 0, 10, .9, 0, False)], bscale=.85, maxpx=150)
+compose('e_blinker', 'body_whiteB.png', [
+    ('detail_white_ear.png', -60, -90, 1.1, 20, False, L), ('detail_white_ear.png', 60, -90, 1.1, -20, True, L),
+    ('eye_psycho_dark.png', -34, -22, .8, 0, False), ('eye_psycho_dark.png', 34, -22, .8, 0, False), ('mouthF.png', 0, 45, .9, 0, False)], bscale=.85, maxpx=140)
+compose('e_phantom', 'body_whiteF.png', [
+    ('eye_closed_feminine.png', -32, -50, 1.1, 0, False), ('eye_closed_feminine.png', 32, -50, 1.1, 0, True), ('mouthG.png', 0, 20, .9, 0, False)], bscale=.8, maxpx=150)
+compose('e_pulser', 'body_yellowC.png', [
+    ('detail_yellow_antenna_large.png', -30, -118, 1.2, 18, False, L), ('detail_yellow_antenna_large.png', 30, -118, 1.2, -18, True, L),
+    ('eye_yellow.png', -28, -34, .75, 0, False), ('eye_yellow.png', 28, -34, .75, 0, True), ('mouthG.png', 0, 38, 1.1, 0, False)], maxpx=150)
+compose('e_rhino', 'body_darkC.png', [
+    ('leg_darkD.png', -40, 100, .6, 0, False, L), ('leg_darkD.png', 40, 100, .6, 0, True, L),
+    ('detail_white_horn_large.png', 0, -112, 1.8, 0, False, L),
+    ('eye_human_red.png', -30, -40, .7, 0, False), ('eye_human_red.png', 30, -40, .7, 0, False),
+    ('nose_brown.png', 0, 4, .7, 0, False), ('mouthI.png', 0, 52, 1.0, 0, False)], maxpx=170)
+
 # bosses
 compose('e_bking', 'body_darkB.png', [
     ('detail_dark_ear_round.png', -78, -80, 1.2, 0, False, L), ('detail_dark_ear_round.png', 78, -80, 1.2, 0, True, L),
