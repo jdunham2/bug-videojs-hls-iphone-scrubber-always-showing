@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 16, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 17, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -559,6 +559,27 @@ const VAULT_D = makeDungeon('vault', 'The Prism Vault', 15, VAULT, { tint: 'rgb(
   for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
   RAILS.push({ pts: [[(D.x0 + 23) * T + 16, 22 * T + 16], [(D.x0 + 23) * T + 16, 14 * T + 8]] });
 }
+// ---------- the Verdant Wilds: a jungle island reached on the back of an old sea turtle ----------
+const JUNGLE_D = makeDungeon('jungle', 'The Verdant Wilds', 16, null, { outdoor: true, theme: 'jungle',
+  objective: g => 'Canopy Camp sits by the turtle\'s landing. Ranger Tavi knows these woods. Cut through the tall grass, cross the river on the rope bridges, and watch out for thieving monkeys.' });
+{
+  const D = JUNGLE_D, X = D.x0;
+  for (let y = 0; y < H; y++) for (let lx = 0; lx < DW; lx++) {
+    const x = X + lx, dx = (lx - 19.5) / 18.5, dy = (y - 23) / 21;
+    const d = Math.hypot(dx, dy) + (vnoise(x / 5 + 300, y / 5) - 0.5) * 0.32;
+    tiles[y * W + x] = y < 44 && d < 0.93 ? LAND : DEEP; region[y * W + x] = 14;
+  }
+  for (let y = 0; y < 8; y++) for (const lx of [19, 20]) if (!isLand(tiles[y * W + X + lx]) || y < 3) tiles[y * W + X + lx] = PLANK;
+  // the river
+  const pts = [[2, 17], [10, 19], [18, 23], [26, 21], [33, 25], [38, 27]];
+  for (let i = 0; i < pts.length - 1; i++) { const [ax, ay] = pts[i], [bx, by] = pts[i + 1], n = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) * 2; for (let k = 0; k <= n; k++) { const x = Math.round(ax + (bx - ax) * k / n), y = Math.round(ay + (by - ay) * k / n); for (let oy = -1; oy <= 1; oy++) for (let ox = 0; ox <= 1; ox++) tiles[(y + oy) * W + X + x + ox] = DEEP; } }
+  const road = (x0, y0, x1, y1) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (let i = 0; i <= n; i++) { const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n); for (const [xx, yy] of [[x, y], [x - 1, y], [x, y + 1], [x - 1, y + 1]]) { const k = yy * W + X + xx; if (tiles[k] === DEEP && yy > 8 && yy < 40) tiles[k] = PLANK; else if (isLand(tiles[k]) && tiles[k] !== PLANK) tiles[k] = PATH; } } };
+  road(20, 4, 20, 14); road(20, 14, 11, 31); road(20, 14, 30, 30);
+  D.camp = { x: (X + 20) * T, y: 11 * T }; D.temple = { x: (X + 30) * T, y: 33 * T };
+  for (let y = 30; y <= 36; y++) for (let lx = 26; lx <= 34; lx++) tiles[y * W + X + lx] = PATH;
+  D.start = { x: (X + 20) * T, y: 4 * T };
+}
+const nearJungleSite = (tx, ty, d) => [JUNGLE_D.camp, JUNGLE_D.temple].some(A => Math.hypot(tx - A.x / T, ty - A.y / T) < d) || Math.hypot(tx - JUNGLE_D.x0 - 20, ty - 4) < 3;
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -705,10 +726,16 @@ function drawOutdoorTile(c, x, y, px, py, t) {
     spr(c, 'w_c', px, py); c.fillStyle = 'rgba(232,246,255,.78)'; c.fillRect(px, py, T, T);
     c.strokeStyle = 'rgba(150,200,230,.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + h * 20, py + 4); c.lineTo(px + 10 + h * 10, py + 18); c.lineTo(px + 26, py + 22 + h * 6); c.stroke();
   } else if (!isLand(t)) {
-    spr(c, edgeKey('w_', (xx, yy) => isLand(tileAt(xx, yy)), x, y), px, py); c.fillStyle = { sand: 'rgba(40,200,190,.18)', swamp: 'rgba(25,55,30,.5)', ash: 'rgba(30,20,24,.55)', dusk: 'rgba(8,12,36,.62)' }[dungeonAt(px).theme] || 'rgba(40,90,140,.28)'; c.fillRect(px, py, T, T);
+    spr(c, edgeKey('w_', (xx, yy) => isLand(tileAt(xx, yy)), x, y), px, py); c.fillStyle = { sand: 'rgba(40,200,190,.18)', swamp: 'rgba(25,55,30,.5)', ash: 'rgba(30,20,24,.55)', dusk: 'rgba(8,12,36,.62)', jungle: 'rgba(20,120,90,.32)' }[dungeonAt(px).theme] || 'rgba(40,90,140,.28)'; c.fillRect(px, py, T, T);
   } else if (t === PLANK) {
     c.fillStyle = '#6a4a30'; c.fillRect(px, py, T, T); c.fillStyle = '#8a6440'; for (let i = 0; i < 4; i++) c.fillRect(px, py + i * 8 + 1, T, 6);
     if (!dungeonAt(px).theme) { c.fillStyle = 'rgba(240,247,255,.45)'; c.fillRect(px, py, T, T); }
+  } else if (dungeonAt(px).theme === 'jungle') {
+    spr(c, h < 0.4 ? 'grass1' : 'grass0', px, py);
+    if (t === PATH) spr(c, edgeKey('p_', notPath, x, y), px, py);
+    c.fillStyle = t === PATH ? 'rgba(90,70,30,.18)' : 'rgba(20,90,30,.32)'; c.fillRect(px, py, T, T);
+    if (t !== PATH && h > 0.8) { c.fillStyle = 'rgba(30,70,20,.5)'; c.beginPath(); c.ellipse(px + h * 22, py + 8 + h * 14, 6, 3, h * 3, 0, Math.PI * 2); c.fill(); }
+    if (t === PATH && h < 0.15) { c.fillStyle = 'rgba(80,90,70,.35)'; c.fillRect(px + 4, py + 4, 10, 8); c.fillRect(px + 16, py + 16, 10, 8); }
   } else if (dungeonAt(px).theme === 'dusk') {
     spr(c, h < 0.3 ? 'grass1' : 'grass0', px, py);
     if (t === PATH) spr(c, edgeKey('p_', notPath, x, y), px, py);
@@ -844,6 +871,7 @@ const ITEMS = {
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
   glimmer: { name: 'Glimmerstone', price: 12 },
+  jade: { name: 'Jade', price: 11 },
   sunstone: { name: 'Sunstone', price: 450 },
 };
 // Weapons and armor: craft them at the workbench, then equip one of each.
@@ -856,6 +884,7 @@ const WEAPONS = {
   arcane:  { name: 'Arcane Edge', dmg: 3, col: '#d6b8ff', cost: { gem: 1, crystal: 5 }, beam: true, desc: 'Cut from the Hollow Gem. Triple damage, and fires a sword beam while your hearts are full.' },
   frost:   { name: 'Frostbite Blade', dmg: 3, col: '#9fe8ff', cost: { frostheart: 1, crystal: 6 }, freeze: true, desc: 'Forged from the Frost Heart. Triple damage, and freezes foes so they move at a crawl.' },
   sun:     { name: 'Sunblade', dmg: 4, col: '#ffd65a', cost: { sunstone: 1, crystal: 8 }, beam: true, beamAlways: true, desc: 'Forged from the Sunstone. Quadruple damage, and every swing fires a beam of sunlight.' },
+  jadefang: { name: 'Jade Fang', dmg: 3, col: '#5ab87a', cost: { jade: 6, goo: 4 }, poison: true, desc: 'Carved from jungle jade. Triple damage, and poisons whatever it cuts.' },
   prism:   { name: 'Prism Blade', dmg: 3, col: '#c8bcff', cost: { glimmer: 6, crystal: 4 }, crit: true, desc: 'Cut from glimmerstone. Triple damage, and one swing in four strikes twice as hard.' },
   soul:    { name: 'Soulreaver', dmg: 5, col: '#7fe07a', cost: { soulgem: 1, ectoplasm: 8 }, lifesteal: true, desc: 'Bound to the Soul Gem. Five times damage, the strongest blade there is, and each foe you defeat restores a heart.' },
   storm:   { name: 'Stormbrand', dmg: 4, col: '#fff6a8', cost: { stormcore: 1, feather: 6 }, beam: true, reach: 8, desc: 'Forged around the Storm Core. Quadruple damage, long reach, and fires a lightning beam while your hearts are full.' },
@@ -875,6 +904,7 @@ const ARMORS = {
   dragonscale: { name: 'Dragonscale Mail', hearts: 6, tint: ['#3a0e0a', '#8a2a1a', '#ffb347'], cost: { dragonscale: 1, obsidian: 6 }, sturdy: true, fireproof: true, desc: 'Scales of the Magma Drake. +6 hearts, barely knocked back, and fire only deals 1 damage.' },
   barkskin: { name: 'Barkskin Mail', hearts: 5, tint: ['#2a1c10', '#5a3e26', '#7fb85a'], cost: { heartwood: 1, herb: 10 }, regen: true, desc: 'Grown from the Rotroot\'s heart. +5 hearts, and slowly heals you anywhere.' },
   prismplate: { name: 'Prismatic Plate', hearts: 6, tint: ['#2a2050', '#a593ff', '#9fe8ff'], cost: { prismheart: 1, glimmer: 6 }, speed: 1.15, sturdy: true, desc: 'Grown from the Hydra\'s heart. +6 hearts, 15% faster, and hits barely knock you back.' },
+  ranger:  { name: 'Ranger\'s Garb', hearts: 4, tint: ['#2a3a1a', '#5a7a3a', '#c9d68a'], cost: { jade: 8, herb: 6 }, speed: 1.2, desc: 'Light jungle leathers. +4 hearts and 20% faster movement.' },
   glimmermail: { name: 'Glimmer Mail', hearts: 4, tint: ['#2a3a6a', '#5a7ab0', '#9fe8ff'], cost: { glimmer: 8, crystal: 4 }, speed: 1.1, desc: 'Light crystal scales. +4 hearts and 10% faster movement.' },
   gravecoat: { name: 'Gravewarden Coat', hearts: 4, tint: ['#14121a', '#3a3650', '#b8a8ff'], cost: { ectoplasm: 8, stone: 4 }, sturdy: true, desc: '+4 hearts, and hits barely knock you back.' },
   windweave: { name: 'Windweave Cloak', hearts: 3, tint: ['#3a5a7a', '#9fd4f5', '#ffffff'], cost: { feather: 8, goo: 4 }, speed: 1.25, desc: 'Woven from gale feathers. +3 hearts and 25% faster movement.' },
@@ -924,6 +954,15 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'snaps', giver: 'tavi', name: 'Hungry Plants', goal: { kill: [['snapjaw', 4], ['dartfrog', 3]] }, reward: { gold: 150, items: { jade: 4 } },
+    offer: ['Welcome to the Wilds! I\'m Tavi, the ranger here. The snapjaws have spread onto the paths, and the dart frogs spit poison.', 'Four snapjaws and three dart frogs. Snapjaws can\'t move, so stay out of biting range and strike after they snap.'],
+    done: ['The paths are safe again. Take this jade: the smiths love it.'] },
+  { id: 'jadeidol', giver: 'tavi', name: 'The Jade Idol', req: 'snaps', hint: 'Search the Verdant Wilds for a small jade idol', foundText: 'Found it! Bring it to Tavi.', goal: { find: 'jadeidol' }, reward: { gold: 170, items: { potion: 3 } },
+    offer: ['A monkey ran off with the jade idol from the temple shrine! It must have dropped it somewhere in the jungle.', 'Search the tall grass and the riverbanks. Cut the grass with your sword to look underneath.'],
+    done: ['The idol is home! The old temple feels a little less angry already.'] },
+  { id: 'wilds', giver: 'tavi', name: 'Wild Things', req: 'jadeidol', goal: { kill: [['raptor', 4], ['monkey', 3]] }, reward: { gold: 250, items: { crystal: 6, jade: 4 } },
+    offer: ['Raptors hunt in pairs on the jungle floor, and the thief monkeys keep raiding my camp.', 'Four raptors and three monkeys. If a monkey grabs your gold, chase it down to get it back!'],
+    done: ['Ha! You\'re a true ranger now. The Wilds are lucky to have you.'] },
   { id: 'vault', giver: 'quill', name: 'The Prism Vault', req: 'deep', goal: { boss: ['mole', 'hydra'] }, reward: { gold: 520, items: { crystal: 14 } },
     offer: ['In the south cavern there\'s a sealed vault of pure crystal. The old miners called it the Prism Vault.', 'The Mole King guards its door, and something with three heads sleeps at the bottom. Bring me back a story, friend.'],
     done: ['A three-headed crystal hydra! I\'ll be telling this one for years. That Prism Heart will make armor fit for a king.'] },
@@ -1048,7 +1087,7 @@ function spawnFind(item, rg, x0, w) {
   if (S.found[item] || pickups.some(p => p.item === item)) return;
   for (let i = 0; i < 4000; i++) {
     const x = x0 + 2 + Math.floor(hash(i, 131) * (w - 4)), y = 2 + Math.floor(hash(131, i) * 40);
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
   }
 }
 function spawnRing() {
@@ -1064,6 +1103,7 @@ function acceptQuest(q) {
   if (q.goal.find === 'idol') spawnFind('idol', 8, SUN_D.x0, DW);
   if (q.goal.find === 'bloom') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (q.goal.find === 'chime') spawnFind('chime', 11, SKY_D.x0, DW);
+  if (q.goal.find === 'jadeidol') spawnFind('jadeidol', 14, JUNGLE_D.x0, DW);
   if (q.goal.find === 'goldpick') spawnFind('goldpick', 13, CAVE_D.x0, DW);
   banner(`New quest: ${q.name}`, '#ffe08a'); SFX.play('collect'); questTick(); save();
 }
@@ -1091,7 +1131,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1105,9 +1145,9 @@ const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- objects ----------
 const resources = [], enemies = [], pickups = [], particles = [], floats = [], decor = [], animals = [], ambient = [];
-const SOLID = { tree: 11, rock: 12, crystal: 11, pot: 8, crate: 11, vine: 15, obsidian: 12 };
-const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5, pot: 1, crate: 2, vine: 2, obsidian: 5 };
-const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead']];
+const SOLID = { tree: 11, rock: 12, crystal: 11, pot: 8, crate: 11, vine: 15, obsidian: 12, tallgrass: 0 };
+const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5, pot: 1, crate: 2, vine: 2, obsidian: 5, tallgrass: 1 };
+const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round']];
 function addRes(type, tx, ty) {
   const r = { type, x: tx * T + 16 + (rng() - 0.5) * 10, y: ty * T + 20 + (rng() - 0.5) * 6, hp: RES_HP[type], max: RES_HP[type], alive: true, respawn: 0, shake: 0, seed: rng() };
   if (type === 'tree') { const k = TREE_KINDS[region[ty * W + tx]] || TREE_KINDS[4]; r.key = k[Math.floor(r.seed * k.length)]; }
@@ -1180,10 +1220,21 @@ for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
   for (let i = 0; i < 6; i++) { const x = Math.round(C.x / T) - 2 + (i % 3) * 2, y = Math.round(C.y / T) + (i < 3 ? -1 : 1); if (tiles[y * W + x] === LAND) decor.push({ grave: true, v: v++, x: x * T + 16, y: y * T + 20, solid: 10 }); }
 }
 for (let i = decor.length - 1; i >= 0; i--) if (decor[i].grave && Math.hypot(decor[i].x - OSS.x, decor[i].y - OSS.y) < 3.2 * T) decor.splice(i, 1);
+for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
+  const x = JUNGLE_D.x0 + lx, t = tiles[y * W + x];
+  if (t !== LAND || nearJungleSite(x, y, 5) || !isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1))) continue;
+  const r = rng();
+  if (r < 0.15) addRes('tree', x, y); else if (r < 0.18) addRes('herb', x, y); else if (r < 0.34) addRes('tallgrass', x, y); else if (r < 0.35) addRes('rock', x, y); else if (r < 0.38) decor.push({ key: r < 0.365 ? 'bush' : 'bush2', x: x * T + 16, y: y * T + 22, s: 2 });
+}
+{
+  const TP = JUNGLE_D.temple;
+  decor.push({ templeIdol: true, x: TP.x + 16, y: TP.y + 8, solid: 22 });
+  for (const [ox, oy] of [[-4, -3], [4, -3], [-4, 3], [4, 3], [-2, -3], [2, -3]]) decor.push({ key: 'pillar', x: TP.x + 16 + ox * T, y: TP.y + oy * T, s: 2.5, solid: 13 });
+}
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
-    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
+    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
   }
   return [cx * T + 300, cy * T];
 }
@@ -1229,6 +1280,10 @@ const ENEMY = {
   glimbat: { name: 'Glimmerbat', proc: 'glimbat', ai: 'glimbat', hp: 1, sp: 130, dmg: 1, aggro: 210, drops: [['gold', 1]], col: '#9fe8ff', flyer: true },
   burrower: { name: 'Burrower', proc: 'burrower', ai: 'burrower', hp: 3, sp: 70, dmg: 1, aggro: 200, drops: [['stone', 2], ['gold', 2]], col: '#7a5a40' },
   geode:   { name: 'Geode Golem', proc: 'geode', ai: 'geode', hp: 7, sp: 28, dmg: 1, aggro: 200, drops: [['glimmer', 2], ['crystal', 2]], col: '#a593ff', heavy: true },
+  snapjaw: { name: 'Snapjaw', proc: 'snapjaw', ai: 'snapjaw', hp: 4, sp: 0, dmg: 1, aggro: 220, drops: [['jade', 1], ['herb', 1]], col: '#3d8448', rooted: true },
+  raptor:  { name: 'Raptor', proc: 'raptor', ai: 'raptor', hp: 3, sp: 110, dmg: 1, aggro: 230, drops: [['jade', 1], ['gold', 2]], col: '#5a8a3a' },
+  dartfrog: { name: 'Dart Frog', proc: 'dartfrog', ai: 'dartfrog', hp: 2, sp: 60, dmg: 1, aggro: 190, drops: [['goo', 1], ['gold', 1]], col: '#3a8ae0' },
+  monkey:  { name: 'Thief Monkey', proc: 'monkey', ai: 'monkey', hp: 3, sp: 120, dmg: 1, aggro: 220, drops: [['gold', 3]], col: '#6a4424' },
   icemage: { name: 'Ice Mage', sprite: 'mage_ice', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 2], ['gold', 3]], col: '#9fe8ff' },
   mage:    { name: 'Cultist', sprite: 'mage', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 1], ['gold', 3]], col: '#e08a3c' },
 };
@@ -1241,8 +1296,10 @@ for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['bandit', 4, 2], [
   ['magmite', 10, 7], ['imp', 10, 4], ['boulderback', 10, 3], ['salamander', 10, 4], ['mage', 10, 2], ['bat', 10, 2], ['salamander', 8, 3], ['boulderback', 2, 2], ['imp', 2, 2],
   ['hawk', 11, 5], ['puff', 11, 4], ['windling', 11, 4], ['sentinel', 11, 3], ['hawk', 6, 2], ['hawk', 2, 2], ['windling', 8, 2],
   ['skeleton', 12, 6], ['shade', 12, 4], ['banshee', 12, 3], ['hound', 12, 4], ['bat', 12, 2], ['skeleton', 2, 2], ['hound', 4, 3], ['banshee', 6, 1],
-  ['shardback', 13, 4], ['geode', 13, 3], ['burrower', 13, 4], ['shardback', 1, 2], ['burrower', 3, 2]])
+  ['shardback', 13, 4], ['geode', 13, 3], ['burrower', 13, 4], ['shardback', 1, 2], ['burrower', 3, 2],
+  ['snapjaw', 14, 5], ['dartfrog', 14, 5], ['monkey', 14, 3], ['snapjaw', 4, 2], ['dartfrog', 9, 3]])
   for (let i = 0; i < n; i++) addEnemy(kind, rg);
+for (const rg of [14, 14, 14, 3]) { const [x, y] = randomTileIn(rg, 9); for (let i = 0; i < 2; i++) enemies.push(makeEnemy('raptor', x + i * 30, y)); }
 for (let g = 0; g < 4; g++) { const [x, y] = randomTileIn(13, 9); for (let i = 0; i < 3; i++) enemies.push(makeEnemy('glimbat', x + (i - 1) * 24, y + (i % 2) * 18)); }
 // dungeon creatures never respawn; clearing a room opens its gate
 function dSpawn(D, list) {
@@ -1412,6 +1469,7 @@ const NPCS = [
   { id: 'zahir', name: 'Zahir', x: SUN_D.mirra.x - 70, y: SUN_D.mirra.y + 36, sheet: 'zahir_idle', walk: 'zahir_walk', verb: 'Trade with', path: [[SUN_D.mirra.x - 70, SUN_D.mirra.y + 36], [SUN_D.mirra.x - 110, SUN_D.mirra.y + 40]] },
   { id: 'amara', name: 'Amara', x: SUN_D.mirra.x + 80, y: SUN_D.mirra.y + 40, sheet: 'amara_idle', walk: 'amara_walk', verb: 'Talk to', path: [[SUN_D.mirra.x + 80, SUN_D.mirra.y + 40], [SUN_D.mirra.x + 120, SUN_D.mirra.y + 50]] },
   { id: 'rosa', name: 'Captain Rosa', x: SUN_D.cove.x - 40, y: SUN_D.cove.y - 10, sheet: 'rosa_idle', walk: 'rosa_walk', verb: 'Talk to', path: [[SUN_D.cove.x - 40, SUN_D.cove.y - 10], [SUN_D.cove.x + 10, SUN_D.cove.y + 20]] },
+  { id: 'tavi', name: 'Ranger Tavi', x: JUNGLE_D.camp.x + 60, y: JUNGLE_D.camp.y + 30, sheet: 'tavi_idle', walk: 'tavi_walk', verb: 'Talk to', path: [[JUNGLE_D.camp.x + 60, JUNGLE_D.camp.y + 30], [JUNGLE_D.camp.x + 100, JUNGLE_D.camp.y + 50]] },
   { id: 'quill', name: 'Prospector Quill', x: CAVE_D.camp.x + 60, y: CAVE_D.camp.y + 30, sheet: 'quill_idle', walk: 'quill_walk', verb: 'Talk to', path: [[CAVE_D.camp.x + 60, CAVE_D.camp.y + 30], [CAVE_D.camp.x + 100, CAVE_D.camp.y + 50]] },
   { id: 'morrow', name: 'Old Morrow', x: DUSK_D.camp.x + 60, y: DUSK_D.camp.y + 30, sheet: 'morrow_idle', walk: 'morrow_walk', verb: 'Talk to', path: [[DUSK_D.camp.x + 60, DUSK_D.camp.y + 30], [DUSK_D.camp.x + 90, DUSK_D.camp.y + 50]] },
   { id: 'aeris', name: 'Aeris the Windkeeper', x: SKY_D.roost.x + 60, y: SKY_D.roost.y + 30, sheet: 'aeris_idle', walk: 'aeris_walk', verb: 'Talk to', path: [[SKY_D.roost.x + 60, SKY_D.roost.y + 30], [SKY_D.roost.x + 100, SKY_D.roost.y + 50]] },
@@ -1535,6 +1593,16 @@ if (HAMLET) {
   for (const [ox, oy, k] of [[-80, 10, 'crate'], [-96, 26, 'barrel'], [110, 10, 'crate']]) decor.push({ key: k, x: CAVE_D.camp.x + ox, y: CAVE_D.camp.y + oy, s: 2, solid: 10 });
   addSign('Glimmer Camp', 'Glimmer Camp. Carts cross the chasms. Crystals light the way. Stay out of the dark corners.', CAVE_D.camp.x - 60, CAVE_D.camp.y + 80);
 }
+// Old Shelly the sea turtle: the Sunward Isles' south shore to the Verdant Wilds
+{
+  let ty = 43; while (ty > 20 && !isLand(tileAt(SUN_D.x0 + 20, ty))) ty--;
+  addFerry('turtle_out', 'Old Shelly the Sea Turtle', (SUN_D.x0 + 20) * T + 16, (ty + 1) * T + 4); NPCS[NPCS.length - 1].verb = 'Ride';
+  addFerry('turtle_home', 'Shelly to the Sunward Isles', (JUNGLE_D.x0 + 21) * T + 6, 3 * T + 16); NPCS[NPCS.length - 1].verb = 'Ride';
+  addSign('Shell sign', 'Old Shelly swims to the Verdant Wilds, a jungle island to the south. Be polite: she bites.', (SUN_D.x0 + 18) * T, (ty - 1) * T);
+  decor.push({ fire: true, x: JUNGLE_D.camp.x + 10, y: JUNGLE_D.camp.y + 60, solid: 12 });
+  for (const [ox, oy, k] of [[-80, 10, 'crate'], [-96, 26, 'barrel'], [110, 10, 'crate']]) decor.push({ key: k, x: JUNGLE_D.camp.x + ox, y: JUNGLE_D.camp.y + oy, s: 2, solid: 10 });
+  addSign('Canopy Camp', 'Canopy Camp. Tall grass hides all sorts of things. Hold on to your coin purse.', JUNGLE_D.camp.x - 60, JUNGLE_D.camp.y + 80);
+}
 addFerry('ferry_home', 'Boat to Saltmarsh', (SUN_D.x0 + 21) * T + 6, 3 * T + 16);
 addSign('Mirra Oasis', 'Mirra Oasis. Shade, cool water and Zahir\'s bazaar. Corsair\'s Cove lies down the east path, the Sunken Ruins to the southwest.', SUN_D.mirra.x + 40, SUN_D.mirra.y - 20);
 addSign('Corsair\'s Cove', 'Corsair\'s Cove. No questions asked, no gold returned.', SUN_D.cove.x - 90, SUN_D.cove.y - 40);
@@ -1595,6 +1663,8 @@ const ICON_DRAW = {
   sunstone: c => { c.fillStyle = '#b8862a'; diamond(c, 16, 18, 11, 14); c.fillStyle = '#f4b740'; diamond(c, 16, 18, 9, 11); c.fillStyle = '#ffe9a8'; diamond(c, 14, 15, 3, 5); c.strokeStyle = 'rgba(255,214,90,.8)'; c.lineWidth = 2; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; c.beginPath(); c.moveTo(16 + Math.cos(a) * 12, 16 + Math.sin(a) * 12); c.lineTo(16 + Math.cos(a) * 15, 16 + Math.sin(a) * 15); c.stroke(); } },
   idol: c => { c.fillStyle = '#7a5a14'; c.fillRect(9, 6, 14, 22); c.fillStyle = '#f4b740'; c.fillRect(10, 7, 12, 20); c.fillStyle = '#7a5a14'; c.fillRect(12, 11, 3, 3); c.fillRect(17, 11, 3, 3); c.fillRect(13, 18, 6, 2); c.fillStyle = '#ec5257'; c.fillRect(15, 3, 2, 4); c.fillStyle = '#ffe9a8'; c.fillRect(11, 8, 2, 6); },
   obsidian: c => { c.fillStyle = '#16121c'; c.beginPath(); c.moveTo(6, 28); c.lineTo(10, 10); c.lineTo(16, 3); c.lineTo(21, 12); c.lineTo(26, 28); c.closePath(); c.fill(); c.fillStyle = '#4a3a62'; c.beginPath(); c.moveTo(11, 26); c.lineTo(13, 12); c.lineTo(16, 7); c.lineTo(17, 22); c.closePath(); c.fill(); c.fillStyle = '#c8b8ff'; c.fillRect(14, 9, 2, 6); },
+  jade: c => { c.fillStyle = 'rgba(90,200,120,.3)'; circle(c, 16, 16, 12); c.fillStyle = '#2f6b3a'; c.beginPath(); c.ellipse(16, 17, 10, 8, 0.4, 0, Math.PI * 2); c.fill(); c.fillStyle = '#5ab87a'; c.beginPath(); c.ellipse(15, 16, 7, 5, 0.4, 0, Math.PI * 2); c.fill(); c.fillStyle = '#d6ffe0'; c.fillRect(11, 13, 3, 2); },
+  jadeidol: c => { c.fillStyle = '#2f6b3a'; c.fillRect(9, 6, 14, 22); c.fillStyle = '#5ab87a'; c.fillRect(10, 7, 12, 20); c.fillStyle = '#2f6b3a'; c.fillRect(12, 11, 3, 3); c.fillRect(17, 11, 3, 3); c.fillRect(13, 18, 6, 2); c.fillStyle = '#d6ffe0'; c.fillRect(11, 8, 2, 6); c.fillStyle = '#ffd65a'; c.fillRect(14, 3, 4, 3); },
   glimmer: c => { c.fillStyle = 'rgba(159,232,255,.3)'; circle(c, 16, 16, 12); c.fillStyle = '#5a7ab0'; c.beginPath(); c.moveTo(16, 4); c.lineTo(26, 14); c.lineTo(20, 28); c.lineTo(12, 28); c.lineTo(6, 14); c.closePath(); c.fill(); c.fillStyle = '#9fe8ff'; c.beginPath(); c.moveTo(16, 6); c.lineTo(23, 14); c.lineTo(16, 26); c.lineTo(9, 14); c.closePath(); c.fill(); c.fillStyle = '#ffffff'; c.fillRect(13, 10, 2, 6); },
   goldpick: c => { c.save(); c.translate(16, 16); c.rotate(-0.7); c.fillStyle = '#6a4a2a'; c.fillRect(-1.5, -4, 3, 18); c.fillStyle = '#d9a23c'; c.beginPath(); c.moveTo(-12, -6); c.quadraticCurveTo(0, -12, 12, -6); c.lineTo(10, -3); c.quadraticCurveTo(0, -8, -10, -3); c.closePath(); c.fill(); c.fillStyle = '#ffe9a8'; c.fillRect(-4, -9, 6, 2); c.restore(); },
   ectoplasm: c => { c.fillStyle = 'rgba(184,168,255,.35)'; circle(c, 16, 18, 12); c.fillStyle = '#9a88e0'; c.beginPath(); c.moveTo(8, 26); c.quadraticCurveTo(6, 10, 16, 6); c.quadraticCurveTo(26, 10, 24, 26); c.lineTo(20, 22); c.lineTo(16, 27); c.lineTo(12, 22); c.closePath(); c.fill(); c.fillStyle = '#e6deff'; c.fillRect(12, 13, 3, 3); c.fillRect(18, 13, 3, 3); },
@@ -1628,7 +1698,7 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart'];
 const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
@@ -1749,6 +1819,13 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">The Verdant Wilds</div>
+      <dl class="controls">
+      <dt>Getting there</dt><dd>Ride Old Shelly the sea turtle from the south shore of the Sunward Isles. She swims you back, too.</dd>
+      <dt>The jungle</dt><dd>Cut tall grass with your sword: herbs and coins hide underneath. Cross the river on the rope bridges. Ancient temple ruins stand to the southeast.</dd>
+      <dt>Creatures</dt><dd>Snapjaws are rooted plants that bite up close and spit seeds from afar. Raptors hunt in pairs and dash at you. Dart frogs spit poison that ticks away your hearts. Thief monkeys steal your gold: catch them to get it back.</dd>
+      <dt>Jade</dt><dd>Snapjaws and raptors drop jade. It crafts the poisonous Jade Fang and the speedy Ranger's Garb.</dd>
+      <dt>Elsewhere</dt><dd>Snapjaws grow in the forest, raptors hunt the meadow, and dart frogs hop through the Mirewood.</dd></dl>
       <div class="label">The Prism Vault</div>
       <dl class="controls">
       <dt>Getting in</dt><dd>A crystal-crusted door in Glimmerdeep's south cavern.</dd>
@@ -2061,7 +2138,7 @@ function onAction() {
     face(res);
     if (res.type === 'tree') doAct('axe', a => hitResource(res, a));
     else if (res.type === 'herb') doAct('gather', a => hitResource(res, a));
-    else if (res.type === 'pot' || res.type === 'crate' || res.type === 'vine') doAct('sword', a => hitResource(res, a));
+    else if (res.type === 'pot' || res.type === 'crate' || res.type === 'vine' || res.type === 'tallgrass') doAct('sword', a => hitResource(res, a));
     else doAct(S.tools.pickaxe ? 'pick' : 'sword', a => hitResource(res, a));
     return true;
   }
@@ -2078,6 +2155,9 @@ function interact(n) {
   }
   if (n.sign) { say(n.name, [n.text]); return; }
   if (n.id === 'ysolde') { shopName = 'Ysolde\'s Trading Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
+  if (n.boat && n.id === 'turtle_out') { const first = !S.found.jungle; S.found.jungle = true; travel(JUNGLE_D.start.x, JUNGLE_D.start.y, 0, 1, 'The Verdant Wilds'); if (first) setTimeout(() => toast('Steamy jungle as far as the eye can see. Canopy Camp is just south of the landing.', 4500), 1200); return; }
+  if (n.boat && n.id === 'turtle_home') { const TT = NPCS.find(m => m.id === 'turtle_out'); travel(TT.x, TT.y - 50, 0, -1, 'The Sunward Isles'); return; }
+  if (n.id === 'tavi') { shopName = 'Tavi\'s Ranger Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
   if (n.boat && n.id.startsWith('cart_')) { const [, ri, end] = n.id.split('_'); startRide(RAILS[+ri], end === 'a'); return; }
   if (n.boat && n.id === 'lift_out') { const first = !S.found.cave; S.found.cave = true; travel(CAVE_D.start.x, CAVE_D.start.y, 0, 1, 'Glimmerdeep'); if (first) setTimeout(() => toast('Far below the island, crystals glow in the dark. Glimmer Camp is just south of the lift.', 4500), 1200); return; }
   if (n.boat && n.id === 'lift_home') { const L = NPCS.find(m => m.id === 'lift_out'); travel(L.x, L.y + 50, 0, 1, 'Brindle Isle'); return; }
@@ -2150,7 +2230,7 @@ function damageEnemy(e, dmg, kx, ky) {
   if (e.kind === 'boulderback' && (e.state === 'roll' || e.state === 'windup')) { floatText(e.x, e.y - 40, 'Clang', '#c8d0ff'); SFX.play('mine'); return false; }
   if (e.kind === 'boulderback' && e.state === 'flipped') { dmg *= 2; e.hp -= dmg; e.hurt = 0.2; burst(e.x, e.y - 14, D.col, 8); floatText(e.x, e.y - 46, dmg + '!', '#ffe08a'); if (e.hp <= 0) killEnemy(e); return true; }
   if (e.kind === 'snail' && e.shell > 0) { floatText(e.x, e.y - 40, 'Clink', '#e0c08a'); SFX.play('mine'); return false; }
-  e.hp -= dmg; e.hurt = 0.2; e.kx = kx * (D.heavy ? 0.4 : 1); e.ky = ky * (D.heavy ? 0.4 : 1);
+  e.hp -= dmg; e.hurt = 0.2; e.kx = kx * (D.heavy ? 0.4 : 1); e.ky = ky * (D.heavy ? 0.4 : 1); if (D.rooted) e.kx = e.ky = 0;
   if (gearW().poison) { e.poison = 3; e.poisonT = 1; }
   if (gearW().freeze) e.frozen = 2.5;
   if (e.kind === 'snail' && e.hp > 0 && rng() < 0.45) e.shell = 1.6;
@@ -2214,7 +2294,7 @@ function hitResource(r, a) {
   const power = (r.type === 'rock' || r.type === 'crystal' || r.type === 'obsidian') ? (S.tools.pickaxe ? 2 : 1) : (weaponDmg() >= 2 && r.type === 'tree' ? 2 : 1);
   r.hp -= power * (sp && sp !== 'Whirlwind' ? 2 : 1);
   if (sp && sp !== 'Whirlwind') { impact(6); burst(r.x, r.y - 18, '#ffe08a', 12); }
-  const col = { tree: '#7a4b27', rock: '#9a978f', herb: '#5bbf55', crystal: '#a593ff', pot: '#b5652f', crate: '#a8713f', vine: '#4f8a3a', obsidian: '#3a2e4a' }[r.type];
+  const col = { tree: '#7a4b27', rock: '#9a978f', herb: '#5bbf55', crystal: '#a593ff', pot: '#b5652f', crate: '#a8713f', vine: '#4f8a3a', obsidian: '#3a2e4a', tallgrass: '#5aa65c' }[r.type];
   if (r.hp > 0) SFX.play(r.type === 'tree' ? 'chop' : r.type === 'herb' || r.type === 'crate' ? 'pick' : 'mine');
   if (r.type === 'tree') for (let i = 0; i < 4; i++) particles.push({ x: r.x + (rng() - 0.5) * 30, y: r.y - 40 - rng() * 20, vx: (rng() - 0.5) * 40, vy: -20, life: 0.9, color: i % 2 ? '#5aa65c' : '#3d8448', leaf: true });
   burst(r.x, r.y - 16, col, 6);
@@ -2222,6 +2302,7 @@ function hitResource(r, a) {
   r.alive = false; r.respawn = 35 + rng() * 20; r.fall = 0; r.fallDir = P.x <= r.x ? 1 : -1;
   SFX.play(r.type === 'tree' ? 'fall' : r.type === 'herb' ? 'pick' : 'crumble');
   if (r.type === 'pot' || r.type === 'crate') r.fall = 9;
+  if (r.type === 'tallgrass') { r.respawn = 40; r.fall = 9; const roll = rng(); if (roll < 0.2) drop(r.x, r.y - 6, 'herb', 1); else if (roll < 0.34) drop(r.x, r.y - 6, 'gold', 1 + Math.floor(rng() * 2)); else if (roll < 0.4) drop(r.x, r.y - 6, 'goo', 1); for (let i = 0; i < 6; i++) particles.push({ x: r.x + (rng() - 0.5) * 20, y: r.y - 10, vx: (rng() - 0.5) * 80, vy: -60 - rng() * 40, life: 0.5, color: i % 2 ? '#5aa65c' : '#3d8448', leaf: true }); }
   if (r.type === 'vine') { r.respawn = 1e9; r.fall = 9; floatText(r.x, r.y - 50, 'Cut through!', '#c8e8b0'); }
   if (r.type === 'rock' || r.type === 'crystal') for (let i = 0; i < 10; i++) { const a = rng() * Math.PI * 2, v = 60 + rng() * 120; particles.push({ x: r.x, y: r.y - 10, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 90, life: 0.7, color: r.type === 'rock' ? (i % 2 ? '#9c9690' : '#6c6764') : (i % 2 ? '#a593ff' : '#e6e0ff'), size: 5 }); }
   // Lucky hit: a random bonus drop with a gold sparkle
@@ -2363,7 +2444,7 @@ function update(dt) {
   P.inv = Math.max(0, P.inv - dt); P.slow = Math.max(0, (P.slow || 0) - dt); P.hex = Math.max(0, (P.hex || 0) - dt);
   if (!P.dash && dungeonAt(P.x) === TOMB_D) for (const tr of TRAPS) if (trapState(tr) === 2 && P.x > tr.x + 2 && P.x < tr.x + 30 && P.y > tr.y + 4 && P.y < tr.y + 34) { damagePlayer(1, { x: tr.x + 16, y: tr.y + 40 }); break; }
   if (gearA().regen && S.hp > 0 && S.hp < maxHp()) { P.regenT = (P.regenT || 0) + dt; if (P.regenT > 8) { P.regenT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#7fe0f0'); } }
-  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
+  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
   if (S.bridge && !edgeToast && P.y > (H - 6) * T && !inDungeon(P.x)) { edgeToast = true; toast('The mainland lies at the end of the bridge. Keep walking south.', 3500); }
   for (const r of resources) {
     r.shake = Math.max(0, r.shake - dt);
@@ -2386,6 +2467,7 @@ function update(dt) {
       pickups.splice(i, 1);
       if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
       else if (p.item === 'idol') { S.found.idol = true; banner('Found the golden idol!', '#ffe08a'); SFX.play('lucky'); questTick(); }
+      else if (p.item === 'jadeidol') { S.found.jadeidol = true; banner('Found the jade idol!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'goldpick') { S.found.goldpick = true; banner('Found the golden pickaxe!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'chime') { S.found.chime = true; banner('Found the wind chime!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'bloom') { S.found.bloom = true; banner('Found the Ember Bloom!', '#ffe08a'); SFX.play('lucky'); questTick(); }
@@ -2732,6 +2814,7 @@ function updateProjectiles(dt, fainted) {
       }
       if (!fainted && Math.hypot(P.x - p.x, P.y - 14 - p.y) < (p.kind === 'bubble' ? 16 : 14)) {
         damagePlayer(p.kind === 'fire' ? fireDmg(p.weak ? 1 : 2) : 1, p); p.dead = true; burst(p.x, p.y, p.kind === 'web' ? '#ffffff' : p.kind === 'bubble' ? '#bfe8ff' : p.kind === 'fire' ? '#ffb347' : '#c9b8ff', 6);
+        if (p.kind === 'venom') { P.poison = 3.2; P.poisonT = 1; floatText(P.x, P.y - 60, 'Poisoned!', '#7fd17a'); }
         if (p.kind === 'hex') { P.hex = 1.6; floatText(P.x, P.y - 60, 'Hexed! Controls reversed', '#d6b8ff'); }
         if ((p.kind === 'web' || p.kind === 'ice') && !gearA().warm) { P.slow = 2.2; floatText(P.x, P.y - 60, p.kind === 'ice' ? 'Chilled!' : 'Webbed!', '#ffffff'); }
       }
@@ -3589,6 +3672,7 @@ function drawPyramid(c) {
 // ---------- Mirewood creatures: spore clouds, toads, wisps ----------
 const HAZARDS = [];
 function updateHazards(dt, fainted) {
+  if (!fainted) tickPoison(P, dt, () => { if (S.hp > 1) { S.hp--; updateHUD(); floatText(P.x, P.y - 56, '-1', '#7fd17a'); } });
   for (let i = HAZARDS.length - 1; i >= 0; i--) {
     const h = HAZARDS[i]; h.t += dt; h.tick -= dt;
     if (!fainted && Math.hypot(P.x - h.x, (P.y - h.y) / 0.7) < h.r) {
@@ -4733,7 +4817,7 @@ function updateCaveFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
     if (chase) { if (d > 44) moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); if (d < 80 && e.cd <= 0) { e.state = 'windup'; e.st = 0.8; } } else wander(D.sp);
     touch(D.dmg, 24); return true;
   }
-  return false;
+  return updateJungleFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander);
 }
 function shardBurst(e) {
   for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + rng() * 0.3; projectiles.push({ kind: 'shard', x: e.x, y: e.y - 14, vx: Math.cos(a) * 180, vy: Math.sin(a) * 180, ang: a, t: 0, life: 0.9 }); }
@@ -4970,6 +5054,105 @@ function drawVaultGate(c) {
   c.fillStyle = '#0a0812'; c.beginPath(); c.moveTo(x - 16, y); c.lineTo(x - 16, y - 34); c.quadraticCurveTo(x, y - 50, x + 16, y - 34); c.lineTo(x + 16, y); c.closePath(); c.fill();
   const g = 0.35 + Math.sin(time * 2.5) * 0.15; c.fillStyle = `rgba(165,147,255,${g})`; c.fillRect(x - 12, y - 12, 24, 12);
 }
+// ---------- Verdant Wilds creatures: snapjaws, raptors, dart frogs, thief monkeys ----------
+function updateJungleFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
+  const ai = AI(e.kind);
+  if (ai === 'snapjaw') {
+    if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { e.state = 'bite'; e.st = 0.25; e.ba = Math.atan2(dy, dx); SFX.play('swing'); if (!fainted && !P.dash && d < 78) damagePlayer(D.dmg, e); } return true; }
+    if (e.state === 'bite') { e.st -= dt; if (e.st <= 0) { e.state = 'move'; e.cd = 1.5; } return true; }
+    if (e.state === 'spit') { e.st -= dt; if (e.st <= 0) { projectiles.push({ kind: 'rock', seed: true, sx: e.x, sy: e.y - 30, x: e.x, y: e.y - 30, tx: P.x, ty: P.y, t: 0, dur: 0.75, z: 0 }); SFX.play('swing'); e.state = 'move'; e.cd = 2.4; } return true; }
+    if (chase && e.cd <= 0) { if (d < 72) { e.state = 'windup'; e.st = 0.35; } else if (d < 220) { e.state = 'spit'; e.st = 0.4; } }
+    return true;
+  }
+  if (ai === 'raptor') {
+    if (e.state === 'dash') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); if (!e.hit && d < 24 && !fainted) { e.hit = true; damagePlayer(D.dmg, e); } if (e.st <= 0) { e.state = 'move'; e.cd = 1.3 + rng() * 0.6; } return true; }
+    if (chase) {
+      const side = (e.hx % 2 ? 1 : -1), a = Math.atan2(dy, dx) + side * (d < 110 ? 1.4 : 0.4); moveEnemy(e, Math.cos(a) * D.sp * dt, Math.sin(a) * D.sp * dt);
+      if (e.cd <= 0 && d < 150) { e.state = 'dash'; e.st = 0.3; e.lx = dx / d * 420; e.ly = dy / d * 420; e.hit = false; SFX.play('dash'); }
+    } else wander(D.sp * 0.5);
+    return true;
+  }
+  if (ai === 'dartfrog') {
+    if (e.state === 'leap') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); e.lift = Math.sin(Math.PI * Math.max(0, 1 - e.st / 0.35)) * 14; if (e.st <= 0) { e.state = 'move'; e.lift = 0; e.wt = 0.6 + rng() * 0.6; } return true; }
+    if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { const a = Math.atan2(P.y - 14 - (e.y - 10), P.x - e.x); projectiles.push({ kind: 'venom', x: e.x, y: e.y - 10, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, ang: a, t: 0, life: 1.6 }); SFX.play('swing'); e.state = 'move'; e.cd = 2.2 + rng(); } return true; }
+    e.wt = (e.wt || 0) - dt;
+    if (chase && d < 180 && e.cd <= 0) { e.state = 'windup'; e.st = 0.4; return true; }
+    if (e.wt <= 0) { const a = chase ? Math.atan2(dy, dx) + (rng() - 0.5) * 2 : rng() * Math.PI * 2; e.state = 'leap'; e.st = 0.35; e.lx = Math.cos(a) * 160; e.ly = Math.sin(a) * 160; }
+    touch(D.dmg); return true;
+  }
+  if (ai === 'monkey') {
+    if (e.loot) { moveEnemy(e, -dx / d * D.sp * 1.3 * dt, -dy / d * D.sp * 1.3 * dt); return true; }
+    if (chase) { const j = Math.sin(e.anim * 6) * 0.5; moveEnemy(e, (dx / d + j * dy / d) * D.sp * dt, (dy / d - j * dx / d) * D.sp * dt); } else wander(D.sp * 0.5);
+    if (d < 22 && !fainted && P.inv <= 0) {
+      const amt = Math.min(S.gold, 5 + Math.floor(rng() * 11));
+      if (amt > 0) { S.gold -= amt; e.loot = amt; floatText(P.x, P.y - 60, `-${amt}g`, '#f4b740'); SFX.play('coin'); if (!monkeyHint) { monkeyHint = true; toast('A monkey snatched your gold! Catch it to get it back.', 3500); } updateHUD(); }
+      else { damagePlayer(1, e); e.cd = 1; }
+    }
+    return true;
+  }
+  return false;
+}
+let monkeyHint = false;
+Object.assign(PROC_DRAW, {
+  snapjaw(c, e, k) {
+    const open = e.state === 'windup' ? (1 - e.st / 0.35) * 0.6 : e.state === 'bite' ? 0.1 : 0.25 + Math.sin(e.anim * 2) * 0.08, a = e.state === 'bite' ? e.ba : Math.atan2(P.y - e.y, P.x - e.x), reach = e.state === 'bite' ? 46 : 16;
+    shadow(c, e.x, e.y + 2, 14 * k, 4 * k);
+    c.fillStyle = '#2f6b3a'; for (const s of [-1, 1]) { c.beginPath(); c.ellipse(e.x + s * 10, e.y - 3, 10 * k, 4 * k, s * 0.4, 0, Math.PI * 2); c.fill(); }
+    const hx = e.x + Math.cos(a) * reach, hy = e.y - 24 + Math.sin(a) * reach * 0.6;
+    c.strokeStyle = '#3d8448'; c.lineWidth = 5; c.beginPath(); c.moveTo(e.x, e.y - 4); c.quadraticCurveTo(e.x, e.y - 22, hx, hy); c.stroke();
+    c.save(); c.translate(hx, hy); c.rotate(a);
+    c.fillStyle = '#c8402a'; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 13 * k, -open - 0.9, -open); c.closePath(); c.fill(); c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 13 * k, open, open + 0.9); c.closePath(); c.fill();
+    c.fillStyle = '#ffe9a8'; for (let i = 0; i < 4; i++) { c.fillRect(4 + i * 2.5, -open * 8 - 2, 1.5, 3); c.fillRect(4 + i * 2.5, open * 8 - 1, 1.5, 3); }
+    c.fillStyle = '#f2e6d6'; circle(c, -4, -6, 2); circle(c, -2, 6, 2);
+    c.restore();
+  },
+  raptor(c, e, k) {
+    const f = (e.state === 'dash' ? e.lx : P.x - e.x) < 0 ? -1 : 1, run = Math.sin(e.anim * (e.state === 'dash' ? 26 : 14)) * 3;
+    shadow(c, e.x, e.y + 2, 14 * k, 4 * k);
+    c.fillStyle = '#3d6a24'; c.fillRect(e.x - 4, e.y - 10 + run, 3, 10); c.fillRect(e.x + 2, e.y - 10 - run, 3, 10);
+    c.strokeStyle = '#5a8a3a'; c.lineWidth = 5; c.beginPath(); c.moveTo(e.x - f * 4, e.y - 16); c.quadraticCurveTo(e.x - f * 16, e.y - 18, e.x - f * 24, e.y - 12); c.stroke();
+    c.fillStyle = '#5a8a3a'; ellipse(c, e.x, e.y - 16, 11 * k, 7 * k); c.fillStyle = '#e8d070'; ellipse(c, e.x + f * 2, e.y - 13, 7 * k, 4 * k);
+    c.fillStyle = '#5a8a3a'; ellipse(c, e.x + f * 12, e.y - 26, 7 * k, 5 * k); c.fillRect(e.x + f * 6 - 2, e.y - 26, 5, 10);
+    c.fillStyle = '#ffe08a'; c.fillRect(e.x + f * 14 - 1, e.y - 29, 2, 2); c.fillStyle = '#c8402a'; for (let i = 0; i < 3; i++) c.fillRect(e.x - 6 + i * 4, e.y - 24, 2, 3);
+  },
+  dartfrog(c, e, k) {
+    const lift = e.lift || 0, col = ['#3a8ae0', '#e8b030', '#e0503a'][Math.floor(e.hx) % 3];
+    shadow(c, e.x, e.y + 2, 9 * k, 3 * k);
+    c.fillStyle = col; ellipse(c, e.x, e.y - 6 - lift, 9 * k, 6 * k); c.fillStyle = '#1a1a2a'; for (const [ox, oy] of [[-3, -8], [3, -5], [0, -3]]) circle(c, e.x + ox, e.y + oy - lift, 1.6);
+    for (const ox of [-4, 4]) { c.fillStyle = col; circle(c, e.x + ox, e.y - 11 - lift, 2.6); c.fillStyle = '#1a1210'; c.fillRect(e.x + ox - 1, e.y - 12 - lift, 2, 2); }
+    if (e.state === 'windup') { c.fillStyle = 'rgba(127,209,122,.6)'; circle(c, e.x, e.y - 8 - lift, 4 + (1 - e.st / 0.4) * 3); }
+  },
+  monkey(c, e, k) {
+    const f = (e.loot ? e.x - P.x : P.x - e.x) < 0 ? -1 : 1, bob = Math.abs(Math.sin(e.anim * 10)) * 4;
+    shadow(c, e.x, e.y + 2, 10 * k, 3 * k);
+    c.strokeStyle = '#6a4424'; c.lineWidth = 3; c.beginPath(); c.moveTo(e.x - f * 6, e.y - 10 - bob); c.quadraticCurveTo(e.x - f * 18, e.y - 20, e.x - f * 14, e.y - 30); c.stroke();
+    c.fillStyle = '#6a4424'; ellipse(c, e.x, e.y - 12 - bob, 8 * k, 9 * k); circle(c, e.x + f * 2, e.y - 24 - bob, 7 * k);
+    c.fillStyle = '#d8b088'; ellipse(c, e.x + f * 4, e.y - 23 - bob, 4.5 * k, 4 * k); ellipse(c, e.x, e.y - 10 - bob, 4.5 * k, 5 * k);
+    c.fillStyle = '#1a1210'; c.fillRect(e.x + f * 3 - 2, e.y - 26 - bob, 1.5, 1.5); c.fillRect(e.x + f * 6 - 1, e.y - 26 - bob, 1.5, 1.5);
+    if (e.loot) { c.fillStyle = '#8a6a34'; circle(c, e.x - f * 8, e.y - 16 - bob, 6); c.fillStyle = '#f4b740'; c.fillRect(e.x - f * 8 - 2, e.y - 22 - bob, 4, 3); }
+  },
+});
+function drawTallGrass(c, r) {
+  const s = r.shake ? Math.sin(time * 70) * 2 : 0;
+  for (let i = 0; i < 6; i++) { const ox = -12 + i * 5 + (r.seed * 7 % 3), h = 16 + ((i * 7 + r.seed * 13) % 9), sway = Math.sin(time * 2 + r.x * 0.05 + i) * 2 + s; c.strokeStyle = i % 2 ? '#3d8448' : '#5aa65c'; c.lineWidth = 3; c.beginPath(); c.moveTo(ox, 0); c.quadraticCurveTo(ox + sway * 0.5, -h * 0.6, ox + sway, -h); c.stroke(); }
+}
+function drawTempleIdol(c, o) {
+  const x = o.x, y = o.y;
+  shadow(c, x, y + 2, 26, 8);
+  c.fillStyle = '#6a7a5a'; c.fillRect(x - 24, y - 12, 48, 14); c.fillStyle = '#7a8a6a'; c.fillRect(x - 20, y - 70, 40, 60); c.fillStyle = '#5a6a4a'; c.fillRect(x - 20, y - 70, 8, 60);
+  c.fillStyle = '#4a5a3a'; c.fillRect(x - 12, y - 58, 8, 6); c.fillRect(x + 4, y - 58, 8, 6); c.fillRect(x - 10, y - 40, 20, 5);
+  c.fillStyle = '#3d8448'; for (const [ox, oy] of [[-18, -66], [14, -30], [-16, -22], [16, -62]]) { c.beginPath(); c.ellipse(x + ox, y + oy, 5, 3, 0.6, 0, Math.PI * 2); c.fill(); }
+  const g = 0.5 + Math.sin(time * 2) * 0.3; c.fillStyle = `rgba(127,224,122,${g})`; c.fillRect(x - 11, y - 57, 6, 4); c.fillRect(x + 5, y - 57, 6, 4);
+}
+function drawTurtle(c, x, y, home) {
+  const bob = Math.sin(time * 1.5) * 2;
+  c.fillStyle = 'rgba(160,220,240,.35)'; ellipse(c, x, y + 4, 40, 10);
+  c.fillStyle = '#5a8a5a'; for (const [ox, oy] of [[-26, 2], [26, 2], [-22, -12], [22, -12]]) ellipse(c, x + ox, y + oy + bob, 9, 5);
+  c.fillStyle = '#7aa86a'; ellipse(c, x, y - 32 + bob, 10, 9); c.fillStyle = '#1a1210'; c.fillRect(x - 5, y - 35 + bob, 2, 2); c.fillRect(x + 3, y - 35 + bob, 2, 2);
+  c.fillStyle = '#5a4028'; ellipse(c, x, y - 6 + bob, 30, 18); c.fillStyle = '#7a5a3a'; ellipse(c, x, y - 9 + bob, 26, 14);
+  c.strokeStyle = '#4a3020'; c.lineWidth = 2; for (const [ox, oy] of [[-10, -12], [10, -12], [0, -4], [-14, -2], [14, -2]]) { c.beginPath(); c.arc(x + ox, y + oy + bob, 5, 0, Math.PI * 2); c.stroke(); }
+  c.fillStyle = '#c8402a'; c.fillRect(x - 6, y - 26 + bob, 12, 4);
+}
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -4978,6 +5161,7 @@ function updateAmbient(dt) {
     const tx = Math.floor(x / T), ty = Math.floor(y / T), rg = region[ty * W + tx];
     if (isLand(tileAt(tx, ty))) {
       if (rg === 4) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: Math.random() < 0.5 ? '#5aa65c' : '#d9a23c' });
+      else if (rg === 14) ambient.push({ kind: 'fly', x, y, life: 6, ph: Math.random() * 6, col: ['#3a8ae0', '#ffd65a', '#e0503a', '#ffffff'][Math.floor(Math.random() * 4)], vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 20 });
       else if (rg === 3) ambient.push({ kind: 'fly', x, y, life: 6, ph: Math.random() * 6, col: ['#ffffff', '#ffd65a', '#f28fb4'][Math.floor(Math.random() * 3)], vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 20 });
       else if (rg === 13) ambient.push({ kind: 'mote', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 6, vy: -3 - Math.random() * 4 });
       else if (rg === 12) ambient.push({ kind: 'glow', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12 });
@@ -5078,6 +5262,7 @@ function drawRes(c, r) {
     else if (r.type === 'crate') { shadow(c, 0, -4, 12, 4); sprB(c, 'crate', 0, 0, 2); }
     else if (r.type === 'vine') drawVine(c, r);
     else if (r.type === 'obsidian') drawObsidian(c, r);
+    else if (r.type === 'tallgrass') drawTallGrass(c, r);
     else if (r.type === 'crystal') {
       const gl = 0.22 + Math.sin(time * 3 + r.seed * 10) * 0.08;
       c.fillStyle = `rgba(165,147,255,${gl})`; circle(c, 0, -19, 22);
@@ -5147,7 +5332,8 @@ function drawProjectiles(c) {
       const pulse = 0.5 + Math.sin(time * 16) * 0.3;
       c.strokeStyle = `rgba(236,82,87,${pulse})`; c.lineWidth = 2; c.beginPath(); c.ellipse(p.tx, p.ty, 22, 10, 0, 0, Math.PI * 2); c.stroke();
       shadow(c, p.x, p.fall ? p.ty : p.y + 30 * (1 - Math.max(0, p.t) / p.dur), 7, 3);
-      if (p.bone) { const fy = p.y - p.z; c.save(); c.translate(p.x, fy); c.rotate(p.t * 14); c.fillStyle = '#efe6d8'; c.fillRect(-9, -2, 18, 4); circle(c, -9, -2, 3); circle(c, -9, 2, 3); circle(c, 9, -2, 3); circle(c, 9, 2, 3); c.restore(); }
+      if (p.seed) { const fy = p.y - p.z; c.fillStyle = '#3d6a24'; circle(c, p.x, fy, 6); c.fillStyle = '#7ab84a'; circle(c, p.x - 1, fy - 1, 4); }
+      else if (p.bone) { const fy = p.y - p.z; c.save(); c.translate(p.x, fy); c.rotate(p.t * 14); c.fillStyle = '#efe6d8'; c.fillRect(-9, -2, 18, 4); circle(c, -9, -2, 3); circle(c, -9, 2, 3); circle(c, 9, -2, 3); circle(c, 9, 2, 3); c.restore(); }
       else if (p.flask) { const fy = p.y - p.z; c.save(); c.translate(p.x, fy); c.rotate(p.t * 9); c.fillStyle = '#3d6a44'; circle(c, 0, 2, 7); c.fillStyle = '#7fd17a'; circle(c, 0, 3, 5); c.fillStyle = '#c9b18a'; c.fillRect(-2, -9, 4, 6); c.restore(); }
       else sprB(c, p.ice ? 'crystal_ice' : 'rock_g', p.x, p.y - p.z + 8, 1.25);
     } else if (p.kind === 'wisp') {
@@ -5156,6 +5342,8 @@ function drawProjectiles(c) {
       c.save(); c.translate(p.x, p.y); c.rotate(p.t * 10); c.fillStyle = 'rgba(181,140,255,.35)'; circle(c, 0, 0, 11); c.fillStyle = '#b58cff'; for (let i = 0; i < 3; i++) { c.rotate(Math.PI * 2 / 3); c.fillRect(-2, -9, 4, 7); } c.restore(); c.fillStyle = '#f0e6ff'; circle(c, p.x, p.y, 3);
     } else if (p.kind === 'sand') {
       c.fillStyle = 'rgba(232,200,138,.45)'; circle(c, p.x, p.y, 10); c.fillStyle = '#c99a5a'; circle(c, p.x, p.y, 6); c.fillStyle = '#f2dcae'; circle(c, p.x - 2, p.y - 2, 2);
+    } else if (p.kind === 'venom') {
+      c.fillStyle = 'rgba(127,209,122,.35)'; circle(c, p.x, p.y, 8); c.fillStyle = '#5ab85a'; circle(c, p.x, p.y, 4); c.fillStyle = '#d6ffd0'; c.fillRect(p.x - 2, p.y - 2, 2, 2);
     } else if (p.kind === 'shard') {
       c.save(); c.translate(p.x, p.y); c.rotate((p.ang || 0) + Math.PI / 2); c.fillStyle = 'rgba(165,147,255,.4)'; circle(c, 0, 0, 7); c.fillStyle = '#c8bcff'; diamond(c, 0, 0, 3, 8); c.fillStyle = '#ffffff'; diamond(c, -1, -1, 1, 4); c.restore();
     } else if (p.kind === 'ice') {
@@ -5639,7 +5827,7 @@ function drawProp(c, o) {
 
 function drawNPC(c, n) {
   const near = Math.hypot(n.x - P.x, n.y - P.y) < 50;
-  if (n.boat) { if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
+  if (n.boat) { if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bed) { drawBed(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText('Bed').width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText('Bed', n.x, n.y + 17); } return; }
   if (n.sign) { drawSign(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bench) {
@@ -5711,7 +5899,7 @@ function render() {
   }
   const list = [];
   for (const d of decor) if (inView(d.x, d.y)) { if (d.prop === 'rug' || d.prop === 'flowers' || d.wall) { if (d.prop === 'rug' || d.prop === 'flowers') drawProp(ctx, d); else list.push([d.y - 200, 5, d]); } else list.push([d.y, 5, d]); }
-  for (const r of resources) if ((r.alive || (r.type !== 'herb' && r.type !== 'pot' && r.type !== 'crate' && r.type !== 'vine')) && inView(r.x, r.y)) list.push([r.y, 0, r]);
+  for (const r of resources) if ((r.alive || (r.type !== 'herb' && r.type !== 'pot' && r.type !== 'crate' && r.type !== 'vine' && r.type !== 'tallgrass')) && inView(r.x, r.y)) list.push([r.y, 0, r]);
   for (const e of enemies) if ((e.alive || e.dieT > 0) && inView(e.x, e.y)) list.push([e.y, 1, e]);
   for (const n of NPCS) if (inView(n.x, n.y)) list.push([n.y, 2, n]);
   for (const a of animals) if (inView(a.x, a.y)) list.push([a.y, 6, a]);
@@ -5739,6 +5927,7 @@ function render() {
     else if (kind === 5 && o.forge) drawForge(ctx, o);
     else if (kind === 5 && o.windmill) drawWindmill(ctx, o);
     else if (kind === 5 && o.lantern) drawLantern(ctx, o.lantern);
+    else if (kind === 5 && o.templeIdol) drawTempleIdol(ctx, o);
     else if (kind === 5 && o.glowcap) drawGlowcap(ctx, o);
     else if (kind === 5 && o.grave) drawGrave(ctx, o);
     else if (kind === 5 && o.fire) drawCampfire(ctx, o);
@@ -5841,6 +6030,7 @@ async function start(hot) {
   if (qState('idol') && qState('idol').state === 'active') spawnFind('idol', 8, SUN_D.x0, DW);
   if (qState('bloom') && qState('bloom').state === 'active') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (qState('chime') && qState('chime').state === 'active') spawnFind('chime', 11, SKY_D.x0, DW);
+  if (qState('jadeidol') && qState('jadeidol').state === 'active') spawnFind('jadeidol', 14, JUNGLE_D.x0, DW);
   if (qState('goldpick') && qState('goldpick').state === 'active') spawnFind('goldpick', 13, CAVE_D.x0, DW);
   for (const q of QUESTS) if (questReady(q)) questReadyNotified[q.id] = true;
   P.x = S.px; P.y = S.py;
