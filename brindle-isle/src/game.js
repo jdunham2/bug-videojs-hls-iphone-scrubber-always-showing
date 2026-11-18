@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 21, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 22, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -685,7 +685,34 @@ const AIR_VENTS = [];
     AIR_VENTS.push({ tx: x, ty: y, x: x * T + 16, y: y * T + 20 });
   }
 }
-const nearReefSite = (tx, ty, d) => Math.hypot(tx - REEF_D.camp.x / T, ty - REEF_D.camp.y / T) < d || Math.hypot(tx - REEF_D.x0 - 20, ty - 4) < 3 || AIR_VENTS.some(v => Math.hypot(v.tx - tx, v.ty - ty) < 2);
+const nearReefSite = (tx, ty, d) => Math.hypot(tx - REEF_D.camp.x / T, ty - REEF_D.camp.y / T) < d || Math.hypot(tx - REEF_D.x0 - 20, ty - 4) < 3 || AIR_VENTS.some(v => Math.hypot(v.tx - tx, v.ty - ty) < 2) || Math.hypot(tx - REEF_D.x0 - 20, ty - 39) < 4;
+// ---------- the Drowned Palace: sunken ruins at the south of the reef ----------
+const PALACE = { x: (REEF_D.x0 + 20) * T, y: 39 * T + 4, tx: REEF_D.x0 + 20, ty: 39 };
+for (let y = 36; y <= 42; y++) for (let lx = 16; lx <= 24; lx++) tiles[y * W + REEF_D.x0 + lx] = LAND;
+ENTRANCES.push(PALACE);
+const PALACE_D = makeDungeon('palace', 'The Drowned Palace', 21, PALACE, { tint: 'rgb(175,210,238)',
+  gateMsg: 'The palace gate is sealed. Strike the three giant clams in the gallery.', bossDoorMsg: 'A great door carved with tentacles. The Siren keeps its key.',
+  objective: g => !g.open.sw ? 'Strike the three giant clams in the flooded gallery. Mind your air!'
+    : !g.open.lock ? (g.keys ? 'Use the small key on the door in the west wall of the eel hall.' : 'Find a small key in the alcove east of the eel hall.')
+    : !S.defeated.siren ? 'Defeat the Siren. Her song drags you in and shields her: back away, then strike when she stops singing.'
+    : !g.open.boss ? 'Open the tentacle door north of the eel hall with the Boss Key.'
+    : !S.defeated.kraken ? 'Defeat the Kraken. Sever its tentacles while they rest on the floor, and its head will surface.' : 'The palace is quiet. Take the stairs back up.' });
+{
+  const D = PALACE_D;
+  carve(D, 6, 1, 33, 10);                          // the Kraken's throne room
+  carve(D, 19, 11, 20, 12);
+  carve(D, 12, 13, 27, 24);                        // the eel hall
+  carve(D, 28, 20, 30, 22);                        // key alcove
+  carve(D, 1, 13, 10, 24);                         // the Siren's grotto
+  carve(D, 3, 26, 36, 33);                         // the flooded gallery
+  carve(D, 19, 34, 20, 34); entryHall(D);
+  addDoor(D, 'sw', 'switch', [[19, 25], [20, 25]], GATE);
+  addDoor(D, 'lock', 'lock', [[11, 14], [11, 15]], LOCK, [10, 14]);
+  addDoor(D, 'boss', 'boss', [[19, 11], [20, 11]], BDOOR);
+  for (const [i, x, y] of [[1, 5, 27], [2, 34, 27], [3, 20, 32]]) D.switches.push({ id: 'c' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
+  for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
+  for (const [x, y] of [[23, 38], [10, 30], [29, 30], [20, 19], [8, 18], [9, 3], [30, 3]]) AIR_VENTS.push({ tx: D.x0 + x, ty: y, x: (D.x0 + x) * T + 16, y: y * T + 20 });
+}
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -978,6 +1005,7 @@ const ITEMS = {
   prismheart: { name: 'Prism Heart', price: 700 },
   serpenteye: { name: 'Serpent\'s Eye', price: 750 },
   dragonpearl: { name: 'Dragon Pearl', price: 800 },
+  krakenbeak: { name: 'Kraken Beak', price: 850 },
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
@@ -1019,6 +1047,7 @@ const ARMORS = {
   fur:     { name: 'Jarl\'s Fur Mantle', hearts: 4, tint: ['#4a3524', '#a07b56', '#efe6d8'], cost: { horn: 1, goo: 8 }, warm: true, desc: '+4 hearts, and too warm to be slowed by ice, webs or chills.' },
   dragonscale: { name: 'Dragonscale Mail', hearts: 6, tint: ['#3a0e0a', '#8a2a1a', '#ffb347'], cost: { dragonscale: 1, obsidian: 6 }, sturdy: true, fireproof: true, desc: 'Scales of the Magma Drake. +6 hearts, barely knocked back, and fire only deals 1 damage.' },
   barkskin: { name: 'Barkskin Mail', hearts: 5, tint: ['#2a1c10', '#5a3e26', '#7fb85a'], cost: { heartwood: 1, herb: 10 }, regen: true, desc: 'Grown from the Rotroot\'s heart. +5 hearts, and slowly heals you anywhere.' },
+  abyssal: { name: 'Abyssal Plate', hearts: 8, tint: ['#1a1030', '#6a3a8a', '#9fe8ff'], cost: { krakenbeak: 1, coral: 8 }, sturdy: true, breath: 3, desc: 'Forged from the Kraken\'s beak. +8 hearts, the most of any armor, barely knocked back, and triple air underwater.' },
   serpentscale: { name: 'Serpent Scale Armor', hearts: 7, tint: ['#1a3a1a', '#4a8a3a', '#ffd65a'], cost: { serpenteye: 1, jade: 8 }, sturdy: true, regen: true, desc: 'Scales of the Serpent Queen. +7 hearts, the most of any armor, barely knocked back, and slowly heals you.' },
   prismplate: { name: 'Prismatic Plate', hearts: 6, tint: ['#2a2050', '#a593ff', '#9fe8ff'], cost: { prismheart: 1, glimmer: 6 }, speed: 1.15, sturdy: true, desc: 'Grown from the Hydra\'s heart. +6 hearts, 15% faster, and hits barely knock you back.' },
   coralmail: { name: 'Diver\'s Coral Mail', hearts: 4, tint: ['#2a3a5a', '#e8703a', '#9fd4f5'], cost: { coral: 8, goo: 6 }, breath: 2, desc: '+4 hearts, and you can hold your breath twice as long underwater.' },
@@ -1073,6 +1102,9 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'palace', giver: 'marlo', name: 'The Drowned Palace', req: 'deepreef', goal: { boss: ['siren', 'kraken'] }, reward: { gold: 580, items: { crystal: 16 } },
+    offer: ['At the south edge of the reef lie the ruins of a sunken palace. Sailors say a Siren sings there, luring divers in.', 'And below her throne waits the Kraken. Bring plenty of air, friend, and cover your ears.'],
+    done: ['The Kraken, beaten! Every diver on the reef owes you a drink. That beak will make armor fit for the deep.'] },
   { id: 'jellies', giver: 'marlo', name: 'Stinging Waters', goal: { kill: [['jellyfish', 5]] }, reward: { gold: 150, items: { coral: 4 } },
     offer: ['Ahoy, diver! Marlo\'s the name. The jellyfish are swarming over the reef, stinging anyone who passes.', 'Pop five of them. When one glows yellow, back off: it\'s about to zap everything around it.'],
     done: ['Much better! Take some coral. The smiths up top will know what to do with it.'] },
@@ -1277,7 +1309,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1501,6 +1533,11 @@ dSpawn(TOMB_D, [['scarab', 15, 37], ['scarab', 24, 37], ['scarab', 21, 40], ['mu
 dChest(TOMB_D, 'key', 'key', 37, 26); dChest(TOMB_D, 'hall', 'gold', 32, 13);
 dPillars(TOMB_D, [[15, 14], [29, 14], [15, 19], [29, 19]]);
 for (const [x, y] of [[14, 41], [25, 41], [5, 23], [34, 23]]) addRes('pot', TOMB_D.x0 + x, y);
+dSpawn(PALACE_D, [['jellyfish', 15, 38], ['jellyfish', 25, 37], ['puffer', 8, 29], ['puffer', 31, 31], ['shark', 20, 29], ['jellyfish', 14, 32], ['puffer', 26, 28],
+  ['eel', 13, 14], ['eel', 26, 14], ['eel', 13, 23], ['eel', 26, 23], ['shark', 20, 16]]);
+dChest(PALACE_D, 'key', 'key', 30, 21); dChest(PALACE_D, 'hall', 'gold', 24, 14);
+dPillars(PALACE_D, [[12, 29], [27, 29], [16, 17], [23, 17], [16, 21], [23, 21]]);
+for (const [x, y] of [[14, 41], [25, 41], [36, 33], [3, 26], [27, 24]]) addRes('pot', PALACE_D.x0 + x, y);
 dSpawn(SHRINE_D, [['moth', 15, 38], ['tanuki', 24, 39], ['fox', 8, 29], ['moth', 30, 28], ['tanuki', 14, 31], ['tanuki', 27, 30], ['moth', 22, 27], ['fox', 33, 32],
   ['koi', 14, 18], ['koi', 25, 18], ['fox', 24, 14], ['moth', 15, 22]]);
 dChest(SHRINE_D, 'key', 'key', 30, 21); dChest(SHRINE_D, 'hall', 'gold', 13, 14);
@@ -1565,6 +1602,12 @@ const BOSS_INFO = {
   scarab: { name: 'The Golden Scarab', hp: 80, contact: 40, wake: 5 * T, col: '#ffd65a',
     seq: { 1: ['scuttle', 'roll', 'scuttle', 'beam'], 2: ['roll', 'dive', 'beam', 'scuttle', 'roll'], 3: ['beam', 'roll', 'dive', 'roll', 'beam', 'scuttle'] },
     lines: { 2: 'The Golden Scarab takes flight!', 3: 'The Golden Scarab blazes like the sun!' } },
+  siren:  { name: 'The Siren', hp: 62, contact: 26, wake: 4 * T, col: '#4ac8b8',
+    seq: { 1: ['swim', 'sing', 'bubbles', 'swim'], 2: ['sing', 'bubbles', 'dive', 'sing'], 3: ['sing', 'jellies', 'bubbles', 'dive', 'sing'] },
+    lines: { 2: 'The Siren\'s song grows stronger!', 3: 'The Siren calls the jellyfish!' } },
+  kraken: { name: 'The Kraken', hp: 100, contact: 0, wake: 7 * T, col: '#9a5ab8',
+    seq: { 1: ['fight'], 2: ['fight'], 3: ['fight'] },
+    lines: { 2: 'The Kraken clouds the water with ink!', 3: 'The Kraken thrashes in fury!' } },
   elderfox: { name: 'The Elder Fox', hp: 64, contact: 28, wake: 4 * T, col: '#e8a040',
     seq: { 1: ['prowl', 'fire', 'illusion', 'prowl', 'dash'], 2: ['illusion', 'fire', 'dash', 'prowl', 'fire'], 3: ['illusion', 'fire', 'dash', 'illusion', 'fire', 'dash'] },
     lines: { 2: 'The Elder Fox\'s tails blaze with foxfire!', 3: 'The Elder Fox weaves a dozen illusions!' } },
@@ -1637,6 +1680,8 @@ const BOSSES = [
   makeBoss('jarl', FROST_D.camp.x, FROST_D.camp.y, { cx: FROST_D.camp.x, cy: FROST_D.camp.y, r: 5.6 * T }),
   makeBoss('mummy', (TOMB_D.x0 + 5) * T + 16, 16 * T, roomArena(TOMB_D, 1, 12, 10, 20)),
   makeBoss('scarab', (TOMB_D.x0 + 20) * T, 5 * T, roomArena(TOMB_D, 8, 1, 31, 10)),
+  makeBoss('siren', (PALACE_D.x0 + 5) * T + 16, 18 * T, roomArena(PALACE_D, 1, 13, 10, 24)),
+  makeBoss('kraken', (PALACE_D.x0 + 20) * T, 4 * T, roomArena(PALACE_D, 6, 1, 33, 10)),
   makeBoss('elderfox', (SHRINE_D.x0 + 5) * T + 16, 17 * T, roomArena(SHRINE_D, 1, 13, 10, 24)),
   makeBoss('koidragon', (SHRINE_D.x0 + 24) * T, 9 * T + 8, roomArena(SHRINE_D, 6, 1, 33, 10)),
   makeBoss('chameleon', (SERP_D.x0 + 5) * T + 16, 18 * T + 16, roomArena(SERP_D, 1, 13, 10, 24)),
@@ -1896,6 +1941,7 @@ const ICON_DRAW = {
   feather: c => { c.save(); c.translate(16, 16); c.rotate(-0.6); c.fillStyle = '#c8b89a'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#efe6d8'; c.beginPath(); c.ellipse(-1, -3, 3, 10, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-0.5, -12, 1.5, 26); c.restore(); },
   chime: c => { c.fillStyle = '#8a6a44'; c.fillRect(6, 4, 20, 3); c.strokeStyle = '#c8c0b0'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(9 + i * 5, 7); c.lineTo(9 + i * 5, 12); c.stroke(); } for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#7fe0f0' : '#bfefff'; c.fillRect(8 + i * 5, 12, 3, 10 + (i % 2) * 6); } c.fillStyle = '#ffffff'; c.fillRect(8, 13, 1, 6); },
   bloom: c => { c.fillStyle = '#3d6a44'; c.fillRect(15, 18, 2, 12); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.fillStyle = i % 2 ? '#ff7a2a' : '#ffb347'; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 13 + Math.sin(a) * 6, 5, 3, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe08a'; circle(c, 16, 13, 3.5); },
+  krakenbeak: c => { c.fillStyle = 'rgba(154,90,184,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#2a1a1a'; c.beginPath(); c.moveTo(8, 10); c.quadraticCurveTo(26, 6, 26, 16); c.quadraticCurveTo(20, 14, 12, 18); c.closePath(); c.fill(); c.beginPath(); c.moveTo(8, 20); c.quadraticCurveTo(22, 26, 24, 18); c.quadraticCurveTo(18, 20, 12, 18); c.closePath(); c.fill(); c.fillStyle = '#8a7aa8'; c.fillRect(12, 11, 6, 2); },
   dragonpearl: c => { c.fillStyle = 'rgba(255,233,242,.4)'; circle(c, 16, 16, 13); c.fillStyle = '#e8d6e6'; circle(c, 16, 16, 9); c.fillStyle = '#ffffff'; circle(c, 13, 13, 4); c.strokeStyle = '#e8703a'; c.lineWidth = 2; c.beginPath(); c.arc(16, 16, 11, 0.5, 2.6); c.stroke(); },
   serpenteye: c => { c.fillStyle = 'rgba(255,214,90,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#2f6b3a'; c.beginPath(); c.ellipse(16, 16, 12, 8, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffd65a'; c.beginPath(); c.ellipse(16, 16, 9, 6, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#1a1210'; c.fillRect(15, 10, 2, 12); c.fillStyle = '#ffffff'; c.fillRect(11, 13, 2, 2); },
   prismheart: c => { c.fillStyle = 'rgba(165,147,255,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#4a3a7a'; c.beginPath(); c.moveTo(16, 27); c.bezierCurveTo(2, 18, 6, 4, 16, 11); c.bezierCurveTo(26, 4, 30, 18, 16, 27); c.fill(); c.fillStyle = '#a593ff'; c.beginPath(); c.moveTo(16, 24); c.bezierCurveTo(6, 17, 9, 7, 16, 13); c.bezierCurveTo(23, 7, 26, 17, 16, 24); c.fill(); c.fillStyle = '#9fe8ff'; c.fillRect(11, 12, 3, 4); },
@@ -1925,8 +1971,8 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl'];
-const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak'];
+const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
   if (DH) return DH.objective(dgs(DH));
@@ -2046,6 +2092,12 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">The Drowned Palace</div>
+      <dl class="controls">
+      <dt>Getting in</dt><dd>Sunken ruins with broken columns at the south end of the reef. It is flooded: your air keeps running out, so use the bubble vents inside.</dd>
+      <dt>Inside</dt><dd>Strike the three giant clams in the gallery. Moray eels lurk in the hall beyond.</dd>
+      <dt>Siren</dt><dd>Her song drags you toward her and shields her. Walk against the pull, then strike once the song ends. Dodge her bubbles.</dd>
+      <dt>Kraken</dt><dd>Tentacles burst up from the edges and slam down: dodge the red rings, then hack at a tentacle while it rests on the floor. Sever three and the Kraken's head surfaces. Ink clouds slow you.</dd></dl>
       <div class="label">The Sunken Reef</div>
       <dl class="controls">
       <dt>Getting there</dt><dd>Climb into the Diving Bell at the Saltmarsh dock. The bell on the seabed takes you back up.</dd>
@@ -2390,6 +2442,7 @@ function onAction() {
   if (hh) { face({ x: hh.x, y: hh.y }); doAct('sword', hitEnemies); return true; }
   if (AB && AB.type === 'serpent' && AB.active && AB.trail && AB.trail.length) { const tl = AB.trail[AB.trail.length - 1]; if (Math.hypot(tl.x - P.x, tl.y - P.y) < 100) { face({ x: tl.x, y: tl.y }); doAct('sword', hitEnemies); return true; } }
   if (AB && AB.type === 'chameleon' && AB.state === 'stalk') { doAct('sword', hitEnemies); return true; }
+  if (AB && AB.type === 'kraken' && AB.tents) { const tt = AB.state === 'dazed' && Math.hypot(AB.x - P.x, AB.y - P.y) < 120 ? AB : AB.tents.find(t => t.state === 'down' && Math.hypot(t.tx - P.x, t.ty - P.y) < 110); if (tt) { face(tt === AB ? AB : { x: tt.tx, y: tt.ty }); doAct('sword', hitEnemies); return true; } }
   if (AB && bossHittable(AB) && Math.hypot(AB.x - P.x, AB.y - P.y) < 110) { face(AB); doAct('sword', hitEnemies); return true; }
   if (res) {
     face(res);
@@ -2534,6 +2587,7 @@ function hitEnemies(a) {
   for (const e of enemies) if (e.alive && e.decoys && e.decoys.length) for (let i = e.decoys.length - 1; i >= 0; i--) { const q = e.decoys[i]; if (Math.hypot(q.x - hx, q.y - 10 - hy) < rad + 6) { e.decoys.splice(i, 1); burst(q.x, q.y - 16, '#ffb347', 12); floatText(q.x, q.y - 40, 'Just an illusion!', '#ffd6a0'); hit = true; } }
   if (AB && AB.type === 'hydra' && hitHydra(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && AB.type === 'serpent' && hitSerpent(AB, hx, hy, rad, dmg)) hit = true;
+  if (AB && AB.type === 'kraken' && hitKraken(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && bossHittable(AB) && Math.hypot(AB.x - hx, AB.y - (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 50 : 26) - AB.z - hy) < rad + (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 40 : 30)) { if (AB.decoys && AB.decoys.some(dc => !dc.popped)) { AB.decoys = []; wizardDazeQuiet(AB, 'Found her! Strike now!'); } damageBoss(AB, dmg); hit = true; }
   deflect(hx, hy, rad + 6);
   hitSwitches(hx, hy, rad);
@@ -3099,7 +3153,7 @@ function updateProjectiles(dt, fainted) {
 
 // ---------- bosses ----------
 const activeBoss = () => BOSSES.find(B => B.active);
-const bossHittable = B => B && B.active && B.type !== 'hydra' && B.type !== 'serpent' && B.z < 30 && !['dying', 'wake', 'vanish', 'appear', 'dead', 'sink', 'lurk', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'swim', 'sink', 'slide'].includes(B.state);
+const bossHittable = B => B && B.active && B.type !== 'hydra' && B.type !== 'serpent' && B.type !== 'kraken' && B.z < 30 && !['dying', 'wake', 'vanish', 'appear', 'dead', 'sink', 'lurk', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'swim', 'sink', 'slide'].includes(B.state);
 let blizzard = 0;
 function bossBar() {
   const B = activeBoss(), el = $('bossbar'); el.hidden = !B; if (!B) return;
@@ -3129,6 +3183,7 @@ function damageBoss(B, n) {
   }
   const dazed = B.state === 'dazed';
   let dmg = n * (dazed ? 2 : 1);
+  if (B.type === 'siren' && B.state === 'sing') { B.shield = 0.3; floatText(B.x, B.y - 80, 'Her song shields her!', '#ffd6ea'); SFX.play('mine'); return; }
   if (B.type === 'chameleon' && B.state === 'stalk') { B.state = 'dazed'; B.st = 1.8; floatText(B.x, B.y - 80, 'Found it!', '#ffe08a'); SFX.play('hit'); return; }
   if (B.type === 'shadow' && B.state !== 'dazed' && !shadowInLight(B)) { B.shield = 0.3; floatText(B.x, B.y - 80, 'It passes through!', '#b8a8ff'); if (!shadowHint) { shadowHint = true; toast('Your Shadow mirrors your moves. Meet it inside the lit circle, where it turns solid!', 4500); } return; }
   if (B.type === 'lich' && B.state !== 'dazed' && B.jars && B.jars.some(j => j.hp > 0)) { B.shield = 0.35; floatText(B.x, B.y - 110, 'Shielded!', '#bfffb0'); SFX.play('mine'); if (!lichHint) { lichHint = true; toast('His soul jars shield him. Smash all three jars to break the shield!', 4500); } return; }
@@ -3214,6 +3269,14 @@ function bossStart(B, action) {
     else if (action === 'lash') { B.state = 'lashWind'; B.st = B.phase === 3 ? 0.45 : 0.6; }
     else if (action === 'curse') { B.state = 'curse'; B.st = 0.8; }
     else if (action === 'sarcophagus') { B.state = 'sink'; B.st = 0.5; SFX.play('wisp'); }
+  } else if (B.type === 'siren') {
+    if (action === 'swim') B.state = 'swim';
+    else if (action === 'sing') { B.state = 'sing'; B.st = B.phase === 3 ? 3 : 2.4; SFX.play('wisp'); }
+    else if (action === 'bubbles') { B.state = 'bubbles'; B.st = 0.6; }
+    else if (action === 'dive') { B.state = 'dive'; B.st = 0.4; }
+    else if (action === 'jellies') { B.state = 'jellies'; B.st = 0.7; }
+  } else if (B.type === 'kraken') {
+    B.state = 'fight';
   } else if (B.type === 'elderfox') {
     if (action === 'prowl') B.state = 'prowl';
     else if (action === 'fire') { B.state = 'fire'; B.st = 0.6; }
@@ -3323,6 +3386,8 @@ function finishBoss(B) {
   if (B.type === 'jarl') { drop(B.x, B.y - 10, 'gold', 20, 10); drop(B.x, B.y - 10, 'horn', 1); banner('Jarl Frostbeard defeated!', '#ffe08a'); }
   if (B.type === 'mummy') { drop(B.x, B.y - 10, 'gold', 16, 5); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mummy King crumbles!', '#ffe08a'); }
   if (B.type === 'scarab') { drop(B.x, B.y - 10, 'gold', 30, 10); drop(B.x, B.y - 10, 'sunstone', 1); banner('The Golden Scarab falls!', '#ffe08a'); }
+  if (B.type === 'siren') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'coral', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Siren\'s song falls silent!', '#ffe08a'); }
+  if (B.type === 'kraken') { B.tents = null; drop(B.x, B.y + 20, 'gold', 45, 10); drop(B.x, B.y + 20, 'krakenbeak', 1); banner('The Kraken sinks into the deep!', '#ffe08a'); }
   if (B.type === 'elderfox') { B.decoys = []; drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'petal', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Elder Fox bows and vanishes!', '#ffe08a'); }
   if (B.type === 'koidragon') { B.beached = false; drop(B.x, B.y - 10, 'gold', 45, 10); drop(B.x, B.y - 10, 'dragonpearl', 1); banner('The Koi Dragon is calmed! The shrine is at peace.', '#ffe08a'); }
   if (B.type === 'chameleon') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'jade', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Giant Chameleon is defeated!', '#ffe08a'); }
@@ -3360,7 +3425,7 @@ function updateBosses(dt, fainted) {
       Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: B.hx, y: B.hy, z: 0, ring: null, alpha: 1 });
       for (const e of enemies) if (e.minion) e.remove = true;
       projectiles.length = 0; bossBar();
-      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; B.tailHits = 0; B.dir = undefined; B.beached = false; B.tgt = null; B.gong = null; if (B.type === 'wraith') blizzard = 0;
+      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; B.tailHits = 0; B.dir = undefined; B.beached = false; B.tgt = null; B.gong = null; B.tents = null; B.cut = 0; if (B.type === 'wraith') blizzard = 0;
     if (!fainted) toast(`${B.name} waits for your return.`);
       continue;
     }
@@ -3377,7 +3442,7 @@ function updateBosses(dt, fainted) {
       continue;
     }
     if (B.state === 'wake' || B.state === 'rest') { B.st -= dt; if (B.type === 'wraith') B.z += (20 + Math.sin(B.anim * 2) * 6 - B.z) * Math.min(1, dt * 4); if (B.type === 'wizard') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * 0.1; if (B.type === 'bat') B.z += (46 - B.z) * Math.min(1, dt * 4); if (B.st <= 0) bossNext(B); }
-    else ({ elderfox: updateElderFox, koidragon: updateKoiDragon, chameleon: updateChameleon, serpent: updateSerpent, mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
+    else ({ siren: updateSiren, kraken: updateKraken, elderfox: updateElderFox, koidragon: updateKoiDragon, chameleon: updateChameleon, serpent: updateSerpent, mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
     const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'fight', 'stalk', 'swim', 'sink', 'slide', 'rise'].includes(B.state);
     if (B.active && !harmless && B.z < 14 && d < I.contact && !fainted) damagePlayer(2, B);
   }
@@ -3988,6 +4053,7 @@ function drawHazards(c) {
       for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2, fx = h.x + Math.cos(a) * h.r * 0.5, fy = h.y + Math.sin(a) * h.r * 0.25, fh = (8 + Math.sin(time * 18 + i * 2) * 4) * k; c.fillStyle = `rgba(255,140,40,${0.7 * k})`; ellipse(c, fx, fy - fh * 0.6, 4, fh); c.fillStyle = `rgba(255,230,140,${0.7 * k})`; ellipse(c, fx, fy - fh * 0.4, 2, fh * 0.5); }
       continue;
     }
+    if (h.ink) { for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2 + h.t * 0.5, rr = h.r * 0.5; c.fillStyle = `rgba(20,14,30,${0.45 * k})`; circle(c, h.x + Math.cos(a) * rr, h.y - 10 + Math.sin(a) * rr * 0.6, h.r * 0.55); } continue; }
     if (h.pollen) { for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + h.t * 0.8, rr = h.r * 0.55; c.fillStyle = `rgba(255,190,220,${0.25 * k})`; circle(c, h.x + Math.cos(a) * rr, h.y - 10 + Math.sin(a) * rr * 0.6, h.r * 0.45); } continue; }
     for (let i = 0; i < 6; i++) {
       const a = i / 6 * Math.PI * 2 + h.t * 0.6, rr = h.r * 0.55;
@@ -5828,7 +5894,7 @@ function drawBell(c, sw, lit) {
 // ---------- air ----------
 const MAX_AIR = () => 12 * (gearA().breath || 1);
 let airTick = 0;
-const inReef = () => P.x >= REEF_D.x0 * T && P.x < (REEF_D.x0 + DW) * T;
+const inReef = () => (P.x >= REEF_D.x0 * T && P.x < (REEF_D.x0 + DW) * T) || (P.x >= PALACE_D.x0 * T && P.x < (PALACE_D.x0 + DW) * T);
 function updateAir(dt, fainted) {
   if (!inReef()) { P.air = MAX_AIR(); return; }
   if (P.air === undefined) P.air = MAX_AIR();
@@ -5955,6 +6021,124 @@ function drawDivingBell(c, x, y, home) {
   c.fillStyle = '#9fd4f5'; circle(c, x, y - 26, 8); c.strokeStyle = '#5a3a22'; c.lineWidth = 2; c.beginPath(); c.arc(x, y - 26, 8, 0, Math.PI * 2); c.stroke();
   c.fillStyle = '#5a3a22'; for (let i = 0; i < 5; i++) circle(c, x - 18 + i * 9, y - 3, 1.6);
   if (home && Math.random() < 0.2) particles.push({ x: x + (Math.random() - 0.5) * 20, y: y - 50, vx: 0, vy: -40, life: 0.8, color: '#dff6ff', size: 2 });
+}
+// ---------- the Siren: her song pulls you in and shields her ----------
+let sirenHint = false;
+function updateSiren(B, dt, fainted, d) {
+  const A = B.arena;
+  switch (B.state) {
+    case 'swim': { B.st += dt; const a = B.anim * 1.2, tx = A.cx + Math.sin(a) * 90, ty = A.cy + Math.sin(a * 2) * 70, dx = tx - B.x, dy = ty - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * Math.min(dd, 120 * dt); B.y += dy / dd * Math.min(dd, 120 * dt); if (B.st > 1.6) bossRest(B, 0.1); break; }
+    case 'sing': {
+      B.st -= dt;
+      if (!fainted && !P.dash) { const dx = B.x - P.x, dy = B.y - P.y, dd = Math.hypot(dx, dy) || 1; moveBody(P, dx / dd * (B.phase === 3 ? 115 : 95) * dt, dy / dd * (B.phase === 3 ? 115 : 95) * dt, 9); if (dd < 44) { damagePlayer(2, B); P.kx = -dx / dd * 420; P.ky = -dy / dd * 420; } }
+      if (Math.random() < dt * 8) particles.push({ x: B.x + (rng() - 0.5) * 30, y: B.y - 50, vx: (rng() - 0.5) * 40, vy: -40, life: 0.8, color: '#ffe9f2', size: 3 });
+      if (!sirenHint) { sirenHint = true; toast('Her song drags you toward her and shields her. Walk away, then strike when the song ends!', 4500); }
+      if (B.st <= 0) bossRest(B, 0.7);
+      break;
+    }
+    case 'bubbles': B.st -= dt; if (B.st <= 0) { const a = Math.atan2(P.y - 14 - (B.y - 40), P.x - B.x), n = B.phase === 1 ? 5 : 7; for (let i = 0; i < n; i++) { const o = (i - (n - 1) / 2) * 0.22; projectiles.push({ kind: 'bubble', x: B.x, y: B.y - 40, vx: Math.cos(a + o) * 140, vy: Math.sin(a + o) * 140, ph: rng() * 6, t: 0, life: 2.6 }); } SFX.play('wisp'); bossRest(B, 0.8); } break;
+    case 'dive': B.st -= dt; B.alpha = Math.max(0, B.st / 0.4); if (B.st <= 0) { B.x = A.x0 + 60 + rng() * (A.x1 - A.x0 - 120); B.y = A.y0 + 80 + rng() * (A.y1 - A.y0 - 100); B.alpha = 1; burst(B.x, B.y - 30, '#bfe8ff', 14); bossRest(B, 0.6); } break;
+    case 'jellies': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['jellyfish', 'jellyfish'], 4); bossRest(B, 0.5); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+  }
+}
+function drawSiren(c, B) {
+  const x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y - 20 + Math.sin(B.anim * 2) * 4, sing = B.state === 'sing';
+  if (sing) { for (let i = 0; i < 3; i++) { const ph = (time * 1.2 + i / 3) % 1; c.strokeStyle = `rgba(255,214,234,${0.6 * (1 - ph)})`; c.lineWidth = 3; c.beginPath(); c.ellipse(x, B.y - 10, 40 + ph * 160, (40 + ph * 160) * 0.6, 0, 0, Math.PI * 2); c.stroke(); } c.strokeStyle = 'rgba(200,240,255,.6)'; c.lineWidth = 3; c.beginPath(); c.arc(x, y - 30, 42, 0, Math.PI * 2); c.stroke(); }
+  c.fillStyle = 'rgba(0,0,0,.25)'; ellipse(c, B.x, B.y + 4, 24, 7);
+  c.save(); c.globalAlpha = B.alpha === undefined ? 1 : B.alpha; bossFlash(c, B);
+  const sw = Math.sin(time * 3) * 8;
+  c.fillStyle = '#2a8a8a'; c.beginPath(); c.moveTo(x - 10, y - 20); c.quadraticCurveTo(x - 14 + sw * 0.3, y + 10, x + sw, y + 20); c.quadraticCurveTo(x + 14 + sw * 0.3, y + 10, x + 10, y - 20); c.closePath(); c.fill();
+  c.fillStyle = '#4ac8b8'; c.beginPath(); c.moveTo(x + sw, y + 18); c.lineTo(x + sw - 16, y + 30); c.lineTo(x + sw + 16, y + 30); c.closePath(); c.fill();
+  c.fillStyle = '#f2d0b0'; c.fillRect(x - 8, y - 46, 16, 26); circle(c, x, y - 54, 9);
+  c.fillStyle = '#e888b4'; c.fillRect(x - 8, y - 38, 16, 5);
+  c.fillStyle = '#c8402a'; c.beginPath(); c.moveTo(x - 10, y - 60); c.quadraticCurveTo(x - 20, y - 40, x - 14 + sw * 0.4, y - 18); c.lineTo(x - 8, y - 46); c.closePath(); c.fill(); c.beginPath(); c.moveTo(x + 10, y - 60); c.quadraticCurveTo(x + 20, y - 40, x + 14 + sw * 0.4, y - 18); c.lineTo(x + 8, y - 46); c.closePath(); c.fill(); ellipse(c, x, y - 60, 11, 6);
+  c.fillStyle = '#1a3a4a'; c.fillRect(x - 5, y - 56, 2, 2); c.fillRect(x + 3, y - 56, 2, 2); c.fillStyle = '#c8402a'; c.beginPath(); c.ellipse(x, y - 50, 2.5, sing ? 3 : 1, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#ffd65a'; c.beginPath(); c.moveTo(x - 8, y - 63); c.lineTo(x - 4, y - 70); c.lineTo(x, y - 64); c.lineTo(x + 4, y - 70); c.lineTo(x + 8, y - 63); c.fill();
+  c.restore();
+  if (B.state === 'bubbles' || B.state === 'sing') bossWarn(c, { x }, y - 90);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 40, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 80, 18);
+}
+// ---------- the Kraken: tentacles slam from the edges; sever them to bring up the head ----------
+function krakenTents(B) {
+  if (!B.tents) B.tents = [[8, 2], [31, 2], [7, 6], [32, 6], [12, 9.5], [27, 9.5]].map(([x, y]) => ({ bx: (PALACE_D.x0 + x) * T + 16, by: y * T + 16, state: 'hidden', st: 0, hp: 6, tx: 0, ty: 0, k: 0 }));
+  return B.tents;
+}
+function tentPts(t) { const pts = []; for (let i = 0; i <= 6; i++) { const k = i / 6 * t.k; pts.push({ x: t.bx + (t.tx - t.bx) * k + Math.sin(i + time * 3) * 6 * (1 - i / 6), y: t.by + (t.ty - t.by) * k }); } return pts; }
+function hitKraken(B, hx, hy, rad, dmg) {
+  if (!B.active || B.state === 'dying' || B.state === 'wake') return false;
+  if (B.state === 'dazed' && Math.hypot(B.x - hx, B.y - 40 - hy) < rad + 50) { damageBoss(B, dmg); return true; }
+  for (const t of krakenTents(B)) {
+    if (t.state !== 'down') continue;
+    if (!tentPts(t).some(p => Math.hypot(p.x - hx, p.y - 10 - hy) < rad + 14)) continue;
+    t.hp -= dmg; damageBoss(B, Math.ceil(dmg / 2)); burst(t.tx, t.ty - 10, '#9a5ab8', 10);
+    if (t.hp <= 0) { t.state = 'severed'; t.st = 8; t.hp = 6; B.cut = (B.cut || 0) + 1; SFX.play('crumble'); floatText(t.tx, t.ty - 50, 'Tentacle severed!', '#ffe08a');
+      if (B.cut >= 3 && B.state !== 'dazed') { B.cut = 0; B.state = 'dazed'; B.st = 3.2; impact(10); floatText(B.x, B.y - 120, 'The Kraken surfaces! Strike its head!', '#ffe08a'); } }
+    return true;
+  }
+  return false;
+}
+function updateKraken(B, dt, fainted, d) {
+  const tents = krakenTents(B);
+  if (B.state === 'fight') {
+    B.tcd = (B.tcd || 1) - dt;
+    if (B.tcd <= 0) { B.tcd = B.phase === 3 ? 0.9 : B.phase === 2 ? 1.2 : 1.6; const idle = tents.filter(t => t.state === 'hidden'); if (idle.length) { const t = idle[Math.floor(rng() * idle.length)]; t.state = 'rise'; t.st = 0.8; } }
+    B.icd = (B.icd || 6) - dt;
+    if (B.icd <= 0 && B.phase >= 2) { B.icd = 7; for (let i = 0; i < 3; i++) HAZARDS.push({ x: P.x + (rng() - 0.5) * 200, y: P.y + (rng() - 0.5) * 120, r: 50, t: 0, life: 4, tick: 99, ink: true }); SFX.play('slime'); if (B.phase === 3) summonMinions(B, ['jellyfish'], 3); }
+  }
+  if (B.state === 'dazed') { B.st -= dt; if (B.st <= 0) { B.state = 'fight'; } }
+  for (const t of tents) {
+    switch (t.state) {
+      case 'rise': t.st -= dt; if (Math.random() < dt * 20) particles.push({ x: t.bx + (rng() - 0.5) * 20, y: t.by, vx: 0, vy: -40, life: 0.4, color: '#bfe8ff', size: 3 }); if (t.st <= 0) { t.state = 'slam'; t.st = 0.3; const dx = P.x - t.bx, dy = P.y - t.by, dd = Math.hypot(dx, dy) || 1, len = Math.min(280, dd + 30); t.tx = t.bx + dx / dd * len; t.ty = t.by + dy / dd * len; t.k = 0; t.hit = false; SFX.play('swing'); } break;
+      case 'slam': t.st -= dt; t.k = Math.min(1, 1 - t.st / 0.3); if (t.st <= 0) { t.k = 1; impact(5); SFX.play('slam'); if (!t.hit && !fainted && !P.dash && tentPts(t).some(p => Math.hypot(P.x - p.x, P.y - p.y) < 20)) { t.hit = true; damagePlayer(2, { x: t.bx, y: t.by }); } t.state = 'down'; t.st = 1.7; } break;
+      case 'down': t.st -= dt; if (t.st <= 0) { t.state = 'retract'; t.st = 0.3; } break;
+      case 'retract': t.st -= dt; t.k = Math.max(0, t.st / 0.3); if (t.st <= 0) { t.state = 'hidden'; } break;
+      case 'severed': t.st -= dt; t.k = 0; if (t.st <= 0) t.state = 'hidden'; break;
+    }
+  }
+}
+function drawKraken(c, B) {
+  const x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y, up = B.state === 'dazed' ? 1 : B.state === 'sleep' ? 0.2 : 0.45, g = 0.6 + Math.sin(time * 3) * 0.3;
+  c.fillStyle = 'rgba(20,30,60,.45)'; ellipse(c, x, y + 6, 90, 26);
+  for (let i = 0; i < 3; i++) { const ph = (time * 0.8 + i / 3) % 1; c.strokeStyle = `rgba(200,240,255,${0.4 * (1 - ph)})`; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y + 6, 70 + ph * 50, 20 + ph * 14, 0, 0, Math.PI * 2); c.stroke(); }
+  c.save(); c.beginPath(); c.rect(x - 140, y - 220, 280, 226); c.clip();
+  c.globalAlpha = 1; bossFlash(c, B);
+  const hy = y + (1 - up) * 110;
+  c.fillStyle = '#6a3a8a'; c.beginPath(); c.ellipse(x, hy - 70, 66, 80, 0, Math.PI, 0); c.lineTo(x + 66, hy + 10); c.lineTo(x - 66, hy + 10); c.closePath(); c.fill();
+  c.fillStyle = '#8a5ab0'; c.beginPath(); c.ellipse(x - 14, hy - 96, 36, 40, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#c8a8e8'; for (const [ox, oy, r] of [[-30, -60, 6], [24, -84, 5], [36, -50, 4], [-10, -116, 4]]) circle(c, x + ox, hy + oy, r);
+  for (const s of [-1, 1]) { c.fillStyle = '#f2e6d6'; ellipse(c, x + s * 26, hy - 40, 14, 12); c.fillStyle = B.state === 'dazed' ? '#ffe08a' : `rgba(255,214,90,${g})`; ellipse(c, x + s * 26, hy - 40, 9, 9); c.fillStyle = '#1a1210'; c.fillRect(x + s * 26 - 6, hy - 41, 12, 3); }
+  c.restore(); c.globalAlpha = 1;
+  for (const t of krakenTents(B)) {
+    c.fillStyle = 'rgba(20,30,60,.4)'; ellipse(c, t.bx, t.by + 4, 18, 6);
+    if (t.state === 'rise') { const pr = 1 - t.st / 0.8; c.strokeStyle = `rgba(236,82,87,${0.4 + pr * 0.5})`; c.lineWidth = 2; c.beginPath(); c.ellipse(t.bx, t.by, 20 + pr * 8, 8 + pr * 3, 0, 0, Math.PI * 2); c.stroke(); }
+    if (t.state === 'severed') { c.fillStyle = '#4a2a5a'; ellipse(c, t.bx, t.by - 4, 10, 6); continue; }
+    if (t.k <= 0) continue;
+    const pts = tentPts(t);
+    c.lineCap = 'round'; for (let i = 0; i < pts.length - 1; i++) { const w = 26 - i * 3.2; c.strokeStyle = '#6a3a8a'; c.lineWidth = w; c.beginPath(); c.moveTo(pts[i].x, pts[i].y - 10); c.lineTo(pts[i + 1].x, pts[i + 1].y - 10); c.stroke(); }
+    c.lineCap = 'butt'; c.fillStyle = '#e6c8f2'; for (let i = 1; i < pts.length - 1; i++) { circle(c, pts[i].x - 4, pts[i].y - 6, 3.5); circle(c, pts[i].x + 4, pts[i].y - 6, 3.5); }
+    if (t.state === 'down') healthBar(c, t.tx, t.ty - 34, t.hp / 6);
+  }
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 40, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 130, 30);
+}
+function drawPalaceGate(c) {
+  const x = PALACE.x, y = PALACE.y;
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, x, y - 2, 70, 12);
+  c.fillStyle = '#8a9aa8'; c.fillRect(x - 60, y - 8, 120, 10);
+  for (const ox of [-52, -30, 30, 52]) { c.fillStyle = '#a8b8c4'; c.fillRect(x + ox - 6, y - 70 + (Math.abs(ox) > 40 ? 18 : 0), 12, 70 - (Math.abs(ox) > 40 ? 18 : 0)); c.fillStyle = '#7a8a98'; c.fillRect(x + ox + 2, y - 70 + (Math.abs(ox) > 40 ? 18 : 0), 4, 70 - (Math.abs(ox) > 40 ? 18 : 0)); }
+  c.fillStyle = '#8a9aa8'; c.beginPath(); c.moveTo(x - 44, y - 70); c.lineTo(x, y - 96); c.lineTo(x + 44, y - 70); c.closePath(); c.fill();
+  c.fillStyle = '#0a1a2a'; c.beginPath(); c.moveTo(x - 16, y); c.lineTo(x - 16, y - 34); c.quadraticCurveTo(x, y - 50, x + 16, y - 34); c.lineTo(x + 16, y); c.closePath(); c.fill();
+  c.fillStyle = '#4aa85a'; for (const [ox, oy] of [[-56, -40], [48, -20], [-30, -76]]) { c.fillRect(x + ox, y + oy, 3, 22); }
+  c.fillStyle = '#e8703a'; c.fillRect(x + 26, y - 18, 4, 14); c.fillRect(x + 22, y - 14, 4, 3);
+}
+function drawClam(c, sw, lit) {
+  shadow(c, sw.x, sw.y + 3, 16, 5);
+  const open = lit ? 0.5 + Math.sin(time * 2) * 0.1 : 0;
+  c.fillStyle = '#8a7aa8'; c.beginPath(); c.ellipse(sw.x, sw.y - 6, 16, 9, 0, 0, Math.PI); c.fill();
+  c.save(); c.translate(sw.x, sw.y - 6); c.rotate(-open); c.fillStyle = '#a89ac8'; c.beginPath(); c.ellipse(0, 0, 16, 10, 0, Math.PI, Math.PI * 2); c.fill(); c.strokeStyle = '#6a5a8a'; c.lineWidth = 1; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(0, 0); c.lineTo(i * 6, -9); c.stroke(); } c.restore();
+  if (lit) { c.fillStyle = '#ffffff'; circle(c, sw.x, sw.y - 8, 4); c.fillStyle = `rgba(255,255,255,${0.25 + Math.sin(time * 4) * 0.1})`; circle(c, sw.x, sw.y - 10, 16); }
 }
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
@@ -6218,7 +6402,7 @@ function drawTent(c, o) {
   c.fillStyle = 'rgba(242,248,255,.85)'; c.beginPath(); c.moveTo(o.x - 10, o.y - 40); c.lineTo(o.x, o.y - 52); c.lineTo(o.x + 10, o.y - 40); c.closePath(); c.fill();
   c.fillStyle = '#c0392b'; c.fillRect(o.x - 1, o.y - 66, 2, 16); c.fillRect(o.x + 1, o.y - 66, 10, 6);
 }
-function drawBossAny(c, B) { ({ elderfox: drawElderFox, koidragon: drawKoiDragon, chameleon: drawChameleon, serpent: drawSerpent, mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
+function drawBossAny(c, B) { ({ siren: drawSiren, kraken: drawKraken, elderfox: drawElderFox, koidragon: drawKoiDragon, chameleon: drawChameleon, serpent: drawSerpent, mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
 function drawJarl(c, B) {
   let sx = 1, sy = 1, ox = 0;
   if (B.state === 'stride') { const k = Math.abs(Math.sin(B.anim * 7)); sy = 1 - k * 0.05; sx = 1 + k * 0.03; }
@@ -6702,7 +6886,7 @@ function render() {
   if (CD === CAVE_D || CD === VAULT_D) drawRails(ctx, inViewT);
   if (CD === SERP_D) drawDartTraps(ctx);
   if (CD === VALE_D || CD === SHRINE_D) drawLilyWobble(ctx);
-  if (CD === REEF_D) drawAirVents(ctx, inViewT);
+  if (CD === REEF_D || CD === PALACE_D) drawAirVents(ctx, inViewT);
   if (CD === SKY_D || CD === SPIRE_D) drawSkyOverlay(ctx, camX, camY, viewW, viewH, CD === SKY_D);
   const inView = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   for (const p of pickups) {
@@ -6731,8 +6915,8 @@ function render() {
     else if (kind === 1) drawEnemy(ctx, o);
     else if (kind === 7) drawBossAny(ctx, o);
     else if (kind === 8) drawChest(ctx, o);
-    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : o.id === 'shrine' ? drawShrineGate : drawCryptDoor)(ctx);
-    else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : dungeonAt(o.x) === SHRINE_D ? drawBell : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
+    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : o.id === 'shrine' ? drawShrineGate : o.id === 'palace' ? drawPalaceGate : drawCryptDoor)(ctx);
+    else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : dungeonAt(o.x) === SHRINE_D ? drawBell : dungeonAt(o.x) === PALACE_D ? drawClam : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) { if (P.ride) drawCart(ctx, P.x, P.y + 6); drawPlayer(ctx); if (P.ride) drawCartFront(ctx, P.x, P.y + 6); }
     else if (kind === 4) drawHouse(ctx, o);
@@ -6756,7 +6940,7 @@ function render() {
   drawProjectiles(ctx);
   drawHazards(ctx);
   if (CD === CINDER_D || CD === FORGE_D) drawVentFlames(ctx, inView);
-  if (CD === REEF_D) drawAirBar(ctx);
+  if (CD === REEF_D || CD === PALACE_D) drawAirBar(ctx);
   drawAmbient(ctx);
   if (inD && !CD.outdoor) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -6784,7 +6968,7 @@ function render() {
   }
   if (inD || fade > 0 || blizzard > 0) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (CD === REEF_D) drawReefOverlay(ctx, k);
+    if (CD === REEF_D || CD === PALACE_D) drawReefOverlay(ctx, k);
     if (CD === CINDER_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(255,90,30,0)'); g.addColorStop(1, `rgba(140,40,20,${0.36 + Math.sin(time * 0.8) * 0.05})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === MIRE_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.25, cvs.width / 2, cvs.height / 2, cvs.height * 0.8); g.addColorStop(0, 'rgba(150,190,140,0)'); g.addColorStop(1, `rgba(150,190,140,${0.42 + Math.sin(time * 0.5) * 0.06})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (blizzard > 0) { ctx.fillStyle = `rgba(235,245,255,${Math.min(0.6, blizzard * 0.6)})`; ctx.fillRect(0, 0, cvs.width, cvs.height); }
