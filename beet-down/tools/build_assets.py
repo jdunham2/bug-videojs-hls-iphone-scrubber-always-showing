@@ -57,10 +57,10 @@ def put(name, im, q=82, **meta):
 
 
 # ---------- 3D renders ----------
-HUE = {'i_core': -92, 'i_crown': 92, 'i_chrono': -50}
+HUE = {'w_rail': 62, 'i_core': -92, 'i_crown': 92, 'i_chrono': -50}
 TINT = {'i_urn': ((90, 50, 0), (240, 170, 30), (255, 236, 150)), 'i_fshield': ((10, 40, 80), (70, 190, 255), (220, 248, 255))}  # colourise grey models  # hue shift (0-255 scale): purple crystal -> alien green, blue jewel -> ruby red
 ROT = {'veg_banana': 58, 'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90}
-FLIP = {'w_knife', 'w_pistol', 'w_smg', 'w_shotgun', 'w_rocket', 'w_zapper', 'w_sniper', 'w_minigun', 'w_bouncer', 'w_lobber', 'w_flamer'}
+FLIP = {'w_tender', 'w_laser', 'w_rail', 'w_mines', 'w_guzi', 'w_knife', 'w_pistol', 'w_smg', 'w_shotgun', 'w_rocket', 'w_zapper', 'w_sniper', 'w_minigun', 'w_bouncer', 'w_lobber', 'w_flamer'}
 for f in sorted(os.listdir(RAW)):
     n = f[:-4]
     im = load(os.path.join(RAW, f))
@@ -89,6 +89,9 @@ for f in sorted(os.listdir(RAW)):
             im = Image.merge('HSV', (h, sat, v)).convert('RGB'); im.putalpha(al)
         im = outline(im, 6); im, _ = fit(im, 96, 96)
     elif n.startswith('w_'):
+        if n in HUE:
+            r, g, b, al = im.split(); h, sat, v = Image.merge('RGB', (r, g, b)).convert('HSV').split()
+            h = h.point(lambda x: (x + HUE[n]) % 256); im = Image.merge('HSV', (h, sat, v)).convert('RGB'); im.putalpha(al)
         im = outline(im, 6); im, _ = fit(im, 160, 110)
     elif n.startswith('d_'):
         im = outline(im, 4); im, _ = fit(im, 90, 90)
