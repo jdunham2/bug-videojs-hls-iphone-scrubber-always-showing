@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 19, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 20, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -631,6 +631,37 @@ const KOI_SPOTS = [];
   D.start = { x: (X + 20) * T, y: 4 * T + 8 };
 }
 const nearValeSite = (tx, ty, d) => Math.hypot(tx - VALE_D.camp.x / T, ty - VALE_D.camp.y / T) < d || Math.hypot(tx - VALE_D.x0 - 20, ty - 4) < 3 || Math.hypot(tx - VALE_D.x0 - 20, ty - 34) < 2;
+// ---------- the Shrine of Falling Petals: a sacred shrine in Petalfall Vale ----------
+const SHRINE = findSpot(range(VALE_D.x0 + 28, VALE_D.x0 + 35), range(26, 38)) || findSpot(range(VALE_D.x0 + 4, VALE_D.x0 + 12), range(30, 40)) || { x: (VALE_D.x0 + 32) * T, y: 30 * T + 4, tx: VALE_D.x0 + 32, ty: 30 };
+ENTRANCES.push(SHRINE); pathLine(VALE_D.x0 + 30, 25, SHRINE.tx, SHRINE.ty + 1);
+const SHRINE_D = makeDungeon('shrine', 'The Shrine of Falling Petals', 19, SHRINE, { tint: 'rgb(240,218,232)',
+  gateMsg: 'The shrine gate is sealed. Ring the three bells in the gallery.', bossDoorMsg: 'A sacred door painted with a dragon. The Elder Fox keeps its key.',
+  objective: g => !g.open.sw ? 'Ring the three bells in the gallery to open the shrine gate.'
+    : !g.open.lock ? (g.keys ? 'Use the small key on the door in the west wall, north of the lily pond.' : 'Find a small key in the alcove east of the lily pond. Keep moving on the lily pads!')
+    : !S.defeated.elderfox ? 'Defeat the Elder Fox. Strike the great bell to shatter her illusions.'
+    : !g.open.boss ? 'Open the dragon door north of the lily pond with the Boss Key.'
+    : !S.defeated.koidragon ? 'Defeat the Koi Dragon. Step off the island when it lunges, then strike it while it is stranded.' : 'Peace returns to the shrine. Take the stairs back up.' });
+{
+  const D = SHRINE_D;
+  carve(D, 6, 1, 33, 10);                          // the Koi Dragon's sacred pool
+  for (let y = 2; y <= 9; y++) for (let x = 8; x <= 31; x++) dset(D, x, y, DEEP);
+  for (let y = 4; y <= 7; y++) for (let x = 17; x <= 22; x++) dset(D, x, y, FLOOR);   // the islet
+  for (let y = 8; y <= 9; y++) for (const x of [19, 20]) dset(D, x, y, FLOOR);          // stone bridge
+  for (const [x, y] of [[13, 3], [14, 3], [12, 5], [12, 6], [13, 8], [14, 8], [25, 3], [26, 3], [27, 5], [27, 6], [25, 8], [26, 8], [16, 2], [23, 2], [10, 7], [29, 7]]) dset(D, x, y, LILY);
+  carve(D, 19, 11, 20, 12);
+  carve(D, 12, 13, 27, 24);                        // the lily pond hall
+  for (let y = 16; y <= 20; y++) for (let x = 12; x <= 27; x++) dset(D, x, y, DEEP);
+  for (let y = 16; y <= 20; y++) { const o = (y % 2) ? 0 : 1; for (const x of [18 + o, 19 + o, 20 + o]) dset(D, x, y, LILY); }
+  carve(D, 28, 20, 30, 22);                        // key alcove (south bank)
+  carve(D, 1, 13, 10, 24);                         // the Elder Fox's courtyard
+  carve(D, 3, 26, 36, 33);                         // the gallery
+  carve(D, 19, 34, 20, 34); entryHall(D);
+  addDoor(D, 'sw', 'switch', [[19, 25], [20, 25]], GATE);
+  addDoor(D, 'lock', 'lock', [[11, 14], [11, 15]], LOCK, [10, 14]);
+  addDoor(D, 'boss', 'boss', [[19, 11], [20, 11]], BDOOR);
+  for (const [i, x, y] of [[1, 5, 27], [2, 34, 27], [3, 20, 32]]) D.switches.push({ id: 'k' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
+  for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
+}
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -824,6 +855,7 @@ function drawDungeonTile(c, x, y) {
   if (!D) return;
   if (D.outdoor) { drawOutdoorTile(c, x, y, px, py, t); return; }
   const lx = x - D.x0;
+  if (D.id === 'shrine' && (t === DEEP || t === LILY)) { drawBlossomTile(c, x, y, px, py, t); return; }
   if (t === LAVA) {
     const h = hash(x, y); c.fillStyle = '#c8401a'; c.fillRect(px, py, T, T); c.fillStyle = '#ff7a2a'; c.fillRect(px + 3, py + 3, T - 6, T - 6);
     c.fillStyle = '#ffb347'; ellipse(c, px + 8 + h * 14, py + 10 + h * 8, 5, 2.5); ellipse(c, px + 22 - h * 8, py + 22, 4, 2);
@@ -920,6 +952,7 @@ const ITEMS = {
   soulgem: { name: 'Soul Gem', price: 700 },
   prismheart: { name: 'Prism Heart', price: 700 },
   serpenteye: { name: 'Serpent\'s Eye', price: 750 },
+  dragonpearl: { name: 'Dragon Pearl', price: 800 },
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
@@ -941,6 +974,7 @@ const WEAPONS = {
   bloom:   { name: 'Blossom Blade', dmg: 3, col: '#f2a0c8', cost: { petal: 6, crystal: 4 }, bloom: true, desc: 'Petals bloom along the edge. Triple damage, and some hits restore a heart.' },
   jadefang: { name: 'Jade Fang', dmg: 3, col: '#5ab87a', cost: { jade: 6, goo: 4 }, poison: true, desc: 'Carved from jungle jade. Triple damage, and poisons whatever it cuts.' },
   prism:   { name: 'Prism Blade', dmg: 3, col: '#c8bcff', cost: { glimmer: 6, crystal: 4 }, crit: true, desc: 'Cut from glimmerstone. Triple damage, and one swing in four strikes twice as hard.' },
+  pearl:   { name: 'Moonpearl Blade', dmg: 5, col: '#ffe9f2', cost: { dragonpearl: 1, petal: 8 }, beam: true, beamAlways: true, desc: 'Set with the Dragon Pearl. Five times damage, and every swing fires a beam of moonlight.' },
   soul:    { name: 'Soulreaver', dmg: 5, col: '#7fe07a', cost: { soulgem: 1, ectoplasm: 8 }, lifesteal: true, desc: 'Bound to the Soul Gem. Five times damage, the strongest blade there is, and each foe you defeat restores a heart.' },
   storm:   { name: 'Stormbrand', dmg: 4, col: '#fff6a8', cost: { stormcore: 1, feather: 6 }, beam: true, reach: 8, desc: 'Forged around the Storm Core. Quadruple damage, long reach, and fires a lightning beam while your hearts are full.' },
   moon:    { name: 'Moonblade', dmg: 3, col: '#d6e2ff', cost: { ectoplasm: 6, crystal: 4 }, glow: true, desc: 'Silvered with ectoplasm. Triple damage, lights up the dark, and strikes shades anywhere.' },
@@ -1011,6 +1045,9 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'shrine', giver: 'wren', name: 'The Shrine of Falling Petals', req: 'tricks', goal: { boss: ['elderfox', 'koidragon'] }, reward: { gold: 560, items: { crystal: 15 } },
+    offer: ['The old shrine to the east has been closed for years. The Elder Fox guards its gate with tricks and illusions.', 'Within lies the sacred pool, and the great koi there has grown into a dragon. Ring the great bell to see through the fox\'s tricks, dear.'],
+    done: ['The shrine bells are ringing again! Keep the Dragon Pearl. It glows like the moon on the pond.'] },
   { id: 'moths', giver: 'wren', name: 'Sleepy Wings', goal: { kill: [['moth', 5]] }, reward: { gold: 150, items: { petal: 4 } },
     offer: ['Oh, a traveler! How lovely. Would you help an old woman? The blossom moths have grown far too many.', 'Their pollen makes everyone so drowsy, the whole village naps past noon. Five of them, if you please. Hold your breath near the pink clouds.'],
     done: ['Wonderful! Here, take some spirit petals. They shimmer so prettily.'] },
@@ -1202,7 +1239,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1414,6 +1451,11 @@ dSpawn(TOMB_D, [['scarab', 15, 37], ['scarab', 24, 37], ['scarab', 21, 40], ['mu
 dChest(TOMB_D, 'key', 'key', 37, 26); dChest(TOMB_D, 'hall', 'gold', 32, 13);
 dPillars(TOMB_D, [[15, 14], [29, 14], [15, 19], [29, 19]]);
 for (const [x, y] of [[14, 41], [25, 41], [5, 23], [34, 23]]) addRes('pot', TOMB_D.x0 + x, y);
+dSpawn(SHRINE_D, [['moth', 15, 38], ['tanuki', 24, 39], ['fox', 8, 29], ['moth', 30, 28], ['tanuki', 14, 31], ['tanuki', 27, 30], ['moth', 22, 27], ['fox', 33, 32],
+  ['koi', 14, 18], ['koi', 25, 18], ['fox', 24, 14], ['moth', 15, 22]]);
+dChest(SHRINE_D, 'key', 'key', 30, 21); dChest(SHRINE_D, 'hall', 'gold', 13, 14);
+dPillars(SHRINE_D, [[12, 29], [27, 29], [6, 32], [33, 27]]);
+for (const [x, y] of [[14, 41], [25, 41], [36, 33], [3, 26], [27, 23]]) addRes('pot', SHRINE_D.x0 + x, y);
 dSpawn(SERP_D, [['dartfrog', 15, 38], ['raptor', 24, 37], ['raptor', 25, 39], ['snapjaw', 6, 28], ['snapjaw', 33, 31], ['raptor', 14, 30], ['raptor', 16, 31], ['dartfrog', 26, 28], ['monkey', 22, 32],
   ['snapjaw', 24, 14], ['dartfrog', 15, 22], ['raptor', 20, 15]]);
 dChest(SERP_D, 'key', 'key', 30, 21); dChest(SERP_D, 'hall', 'gold', 26, 13);
@@ -1473,6 +1515,12 @@ const BOSS_INFO = {
   scarab: { name: 'The Golden Scarab', hp: 80, contact: 40, wake: 5 * T, col: '#ffd65a',
     seq: { 1: ['scuttle', 'roll', 'scuttle', 'beam'], 2: ['roll', 'dive', 'beam', 'scuttle', 'roll'], 3: ['beam', 'roll', 'dive', 'roll', 'beam', 'scuttle'] },
     lines: { 2: 'The Golden Scarab takes flight!', 3: 'The Golden Scarab blazes like the sun!' } },
+  elderfox: { name: 'The Elder Fox', hp: 64, contact: 28, wake: 4 * T, col: '#e8a040',
+    seq: { 1: ['prowl', 'fire', 'illusion', 'prowl', 'dash'], 2: ['illusion', 'fire', 'dash', 'prowl', 'fire'], 3: ['illusion', 'fire', 'dash', 'illusion', 'fire', 'dash'] },
+    lines: { 2: 'The Elder Fox\'s tails blaze with foxfire!', 3: 'The Elder Fox weaves a dozen illusions!' } },
+  koidragon: { name: 'The Koi Dragon', hp: 92, contact: 34, wake: 5 * T, col: '#e8703a',
+    seq: { 1: ['swim', 'spit', 'swim', 'wave', 'swim', 'lunge'], 2: ['swim', 'spit', 'lunge', 'swim', 'wave', 'lunge'], 3: ['swim', 'lunge', 'spit', 'lunge', 'wave', 'lunge'] },
+    lines: { 2: 'The Koi Dragon churns the sacred pool!', 3: 'The Koi Dragon rages!' } },
   chameleon: { name: 'The Giant Chameleon', hp: 60, contact: 28, wake: 4 * T, col: '#4aa85a',
     seq: { 1: ['stalk', 'stalk'], 2: ['stalk', 'spit', 'stalk'], 3: ['stalk', 'spit', 'frogs', 'stalk'] },
     lines: { 2: 'The Giant Chameleon spits venom!', 3: 'The Giant Chameleon calls its frogs!' } },
@@ -1539,6 +1587,8 @@ const BOSSES = [
   makeBoss('jarl', FROST_D.camp.x, FROST_D.camp.y, { cx: FROST_D.camp.x, cy: FROST_D.camp.y, r: 5.6 * T }),
   makeBoss('mummy', (TOMB_D.x0 + 5) * T + 16, 16 * T, roomArena(TOMB_D, 1, 12, 10, 20)),
   makeBoss('scarab', (TOMB_D.x0 + 20) * T, 5 * T, roomArena(TOMB_D, 8, 1, 31, 10)),
+  makeBoss('elderfox', (SHRINE_D.x0 + 5) * T + 16, 17 * T, roomArena(SHRINE_D, 1, 13, 10, 24)),
+  makeBoss('koidragon', (SHRINE_D.x0 + 24) * T, 9 * T + 8, roomArena(SHRINE_D, 6, 1, 33, 10)),
   makeBoss('chameleon', (SERP_D.x0 + 5) * T + 16, 18 * T + 16, roomArena(SERP_D, 1, 13, 10, 24)),
   makeBoss('serpent', (SERP_D.x0 + 20) * T, 6 * T, roomArena(SERP_D, 6, 1, 33, 10)),
   makeBoss('mole', (VAULT_D.x0 + 5) * T + 16, 18 * T + 16, roomArena(VAULT_D, 1, 13, 10, 24)),
@@ -1784,6 +1834,7 @@ const ICON_DRAW = {
   feather: c => { c.save(); c.translate(16, 16); c.rotate(-0.6); c.fillStyle = '#c8b89a'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#efe6d8'; c.beginPath(); c.ellipse(-1, -3, 3, 10, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-0.5, -12, 1.5, 26); c.restore(); },
   chime: c => { c.fillStyle = '#8a6a44'; c.fillRect(6, 4, 20, 3); c.strokeStyle = '#c8c0b0'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(9 + i * 5, 7); c.lineTo(9 + i * 5, 12); c.stroke(); } for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#7fe0f0' : '#bfefff'; c.fillRect(8 + i * 5, 12, 3, 10 + (i % 2) * 6); } c.fillStyle = '#ffffff'; c.fillRect(8, 13, 1, 6); },
   bloom: c => { c.fillStyle = '#3d6a44'; c.fillRect(15, 18, 2, 12); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.fillStyle = i % 2 ? '#ff7a2a' : '#ffb347'; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 13 + Math.sin(a) * 6, 5, 3, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe08a'; circle(c, 16, 13, 3.5); },
+  dragonpearl: c => { c.fillStyle = 'rgba(255,233,242,.4)'; circle(c, 16, 16, 13); c.fillStyle = '#e8d6e6'; circle(c, 16, 16, 9); c.fillStyle = '#ffffff'; circle(c, 13, 13, 4); c.strokeStyle = '#e8703a'; c.lineWidth = 2; c.beginPath(); c.arc(16, 16, 11, 0.5, 2.6); c.stroke(); },
   serpenteye: c => { c.fillStyle = 'rgba(255,214,90,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#2f6b3a'; c.beginPath(); c.ellipse(16, 16, 12, 8, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffd65a'; c.beginPath(); c.ellipse(16, 16, 9, 6, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#1a1210'; c.fillRect(15, 10, 2, 12); c.fillStyle = '#ffffff'; c.fillRect(11, 13, 2, 2); },
   prismheart: c => { c.fillStyle = 'rgba(165,147,255,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#4a3a7a'; c.beginPath(); c.moveTo(16, 27); c.bezierCurveTo(2, 18, 6, 4, 16, 11); c.bezierCurveTo(26, 4, 30, 18, 16, 27); c.fill(); c.fillStyle = '#a593ff'; c.beginPath(); c.moveTo(16, 24); c.bezierCurveTo(6, 17, 9, 7, 16, 13); c.bezierCurveTo(23, 7, 26, 17, 16, 24); c.fill(); c.fillStyle = '#9fe8ff'; c.fillRect(11, 12, 3, 4); },
   soulgem: c => { c.fillStyle = 'rgba(127,224,122,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#2a4a2a'; diamond(c, 16, 16, 9, 12); c.fillStyle = '#7fe07a'; diamond(c, 16, 16, 7, 9); c.fillStyle = '#e6ffe0'; c.fillRect(12, 13, 3, 3); c.fillRect(17, 13, 3, 3); c.fillStyle = '#2a4a2a'; c.fillRect(14, 19, 4, 1); },
@@ -1812,8 +1863,8 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye'];
-const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl'];
+const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
   if (DH) return DH.objective(dgs(DH));
@@ -1933,6 +1984,12 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">The Shrine of Falling Petals</div>
+      <dl class="controls">
+      <dt>Getting in</dt><dd>A small shrine with a curved roof on the east side of Petalfall Vale.</dd>
+      <dt>Inside</dt><dd>Ring the three bells in the gallery. Cross the lily pond on sinking pads to reach the key.</dd>
+      <dt>Elder Fox</dt><dd>She conjures copies of herself. Pop them one by one, guess the real fox, or strike the great bell in her courtyard to shatter every illusion at once.</dd>
+      <dt>Koi Dragon</dt><dd>It swims under the sacred pool, surfacing to spit bubbles or send out waves. When it aims at the island, get off: it leaps out and strands itself. Strike it then.</dd></dl>
       <div class="label">Petalfall Vale</div>
       <dl class="controls">
       <dt>Getting there</dt><dd>Go through the Mountain Pass in the northeast of the Frostmoor. The pass at Petalfall brings you back.</dd>
@@ -2258,6 +2315,8 @@ function onAction() {
   if (brl) { face({ x: brl.x, y: brl.y }); doAct('sword', hitEnemies); return true; }
   const jar = AB && AB.type === 'lich' && AB.jars && AB.state !== 'dazed' && AB.jars.find(j => j.hp > 0 && Math.hypot(j.x - P.x, j.y - P.y) < 70);
   if (jar) { face({ x: jar.x, y: jar.y }); doAct('sword', hitEnemies); return true; }
+  const gong = AB && AB.type === 'elderfox' && AB.gong && AB.gong.cd <= 0 && Math.hypot(AB.gong.x - P.x, AB.gong.y - P.y) < 60 && AB.decoys && AB.decoys.some(q => !q.popped) ? AB.gong : null;
+  if (gong) { face({ x: gong.x, y: gong.y }); doAct('sword', hitEnemies); return true; }
   const hh = AB && AB.type === 'hydra' && AB.heads && AB.heads.find(h => !h.dead && h.state === 'stuck' && Math.hypot(h.x - P.x, h.y - P.y) < 110);
   if (hh) { face({ x: hh.x, y: hh.y }); doAct('sword', hitEnemies); return true; }
   if (AB && AB.type === 'serpent' && AB.active && AB.trail && AB.trail.length) { const tl = AB.trail[AB.trail.length - 1]; if (Math.hypot(tl.x - P.x, tl.y - P.y) < 100) { face({ x: tl.x, y: tl.y }); doAct('sword', hitEnemies); return true; } }
@@ -2397,7 +2456,7 @@ function hitEnemies(a) {
   }
   const AB = activeBoss();
   if (AB && AB.decoys) for (const dc of AB.decoys) if (!dc.popped && Math.hypot(dc.x - hx, dc.y - 26 - AB.z - hy) < rad + 26) { dc.popped = true; burst(dc.x, dc.y - 40, '#dff6ff', 16); floatText(dc.x, dc.y - 80, 'Just a reflection!', '#c8e8ff'); SFX.play('mine'); hit = true; }
-  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitLanterns(hx, hy, rad);
+  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitGong(AB || {}, hx, hy, rad); hitLanterns(hx, hy, rad);
   for (const e of enemies) if (e.alive && e.decoys && e.decoys.length) for (let i = e.decoys.length - 1; i >= 0; i--) { const q = e.decoys[i]; if (Math.hypot(q.x - hx, q.y - 10 - hy) < rad + 6) { e.decoys.splice(i, 1); burst(q.x, q.y - 16, '#ffb347', 12); floatText(q.x, q.y - 40, 'Just an illusion!', '#ffd6a0'); hit = true; } }
   if (AB && AB.type === 'hydra' && hitHydra(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && AB.type === 'serpent' && hitSerpent(AB, hx, hy, rad, dmg)) hit = true;
@@ -2965,7 +3024,7 @@ function updateProjectiles(dt, fainted) {
 
 // ---------- bosses ----------
 const activeBoss = () => BOSSES.find(B => B.active);
-const bossHittable = B => B && B.active && B.type !== 'hydra' && B.type !== 'serpent' && B.z < 30 && !['dying', 'wake', 'vanish', 'appear', 'dead', 'sink', 'lurk', 'burrow', 'under', 'hidden', 'diving', 'rumble'].includes(B.state);
+const bossHittable = B => B && B.active && B.type !== 'hydra' && B.type !== 'serpent' && B.z < 30 && !['dying', 'wake', 'vanish', 'appear', 'dead', 'sink', 'lurk', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'swim', 'sink', 'slide'].includes(B.state);
 let blizzard = 0;
 function bossBar() {
   const B = activeBoss(), el = $('bossbar'); el.hidden = !B; if (!B) return;
@@ -3080,6 +3139,16 @@ function bossStart(B, action) {
     else if (action === 'lash') { B.state = 'lashWind'; B.st = B.phase === 3 ? 0.45 : 0.6; }
     else if (action === 'curse') { B.state = 'curse'; B.st = 0.8; }
     else if (action === 'sarcophagus') { B.state = 'sink'; B.st = 0.5; SFX.play('wisp'); }
+  } else if (B.type === 'elderfox') {
+    if (action === 'prowl') B.state = 'prowl';
+    else if (action === 'fire') { B.state = 'fire'; B.st = 0.6; }
+    else if (action === 'illusion') { B.state = 'illusion'; B.st = 0.5; }
+    else if (action === 'dash') { B.state = 'dashWind'; B.st = 0.45; }
+  } else if (B.type === 'koidragon') {
+    if (action === 'swim') { B.state = 'swim'; B.st = 1.2; B.tgt = null; }
+    else if (action === 'spit') { B.state = 'rise'; B.st = 0.7; B.atk = 'spit'; SFX.play('slime'); }
+    else if (action === 'wave') { B.state = 'rise'; B.st = 0.7; B.atk = 'wave'; SFX.play('slime'); }
+    else if (action === 'lunge') { B.state = 'lungeWind'; B.st = 0.7; SFX.play('boss'); }
   } else if (B.type === 'chameleon') {
     if (action === 'stalk') { B.state = 'stalk'; B.st = 0; }
     else if (action === 'spit') { B.state = 'spit'; B.st = 0.5; }
@@ -3179,6 +3248,8 @@ function finishBoss(B) {
   if (B.type === 'jarl') { drop(B.x, B.y - 10, 'gold', 20, 10); drop(B.x, B.y - 10, 'horn', 1); banner('Jarl Frostbeard defeated!', '#ffe08a'); }
   if (B.type === 'mummy') { drop(B.x, B.y - 10, 'gold', 16, 5); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mummy King crumbles!', '#ffe08a'); }
   if (B.type === 'scarab') { drop(B.x, B.y - 10, 'gold', 30, 10); drop(B.x, B.y - 10, 'sunstone', 1); banner('The Golden Scarab falls!', '#ffe08a'); }
+  if (B.type === 'elderfox') { B.decoys = []; drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'petal', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Elder Fox bows and vanishes!', '#ffe08a'); }
+  if (B.type === 'koidragon') { B.beached = false; drop(B.x, B.y - 10, 'gold', 45, 10); drop(B.x, B.y - 10, 'dragonpearl', 1); banner('The Koi Dragon is calmed! The shrine is at peace.', '#ffe08a'); }
   if (B.type === 'chameleon') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'jade', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Giant Chameleon is defeated!', '#ffe08a'); }
   if (B.type === 'serpent') { B.trail = []; drop(B.x, B.y - 10, 'gold', 45, 10); drop(B.x, B.y - 10, 'serpenteye', 1); banner('The Serpent Queen falls! The temple is free.', '#ffe08a'); }
   if (B.type === 'mole') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'glimmer', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mole King is dethroned!', '#ffe08a'); }
@@ -3214,7 +3285,7 @@ function updateBosses(dt, fainted) {
       Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: B.hx, y: B.hy, z: 0, ring: null, alpha: 1 });
       for (const e of enemies) if (e.minion) e.remove = true;
       projectiles.length = 0; bossBar();
-      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; B.tailHits = 0; B.dir = undefined; if (B.type === 'wraith') blizzard = 0;
+      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; B.tailHits = 0; B.dir = undefined; B.beached = false; B.tgt = null; B.gong = null; if (B.type === 'wraith') blizzard = 0;
     if (!fainted) toast(`${B.name} waits for your return.`);
       continue;
     }
@@ -3231,8 +3302,8 @@ function updateBosses(dt, fainted) {
       continue;
     }
     if (B.state === 'wake' || B.state === 'rest') { B.st -= dt; if (B.type === 'wraith') B.z += (20 + Math.sin(B.anim * 2) * 6 - B.z) * Math.min(1, dt * 4); if (B.type === 'wizard') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * 0.1; if (B.type === 'bat') B.z += (46 - B.z) * Math.min(1, dt * 4); if (B.st <= 0) bossNext(B); }
-    else ({ chameleon: updateChameleon, serpent: updateSerpent, mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
-    const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'fight', 'stalk'].includes(B.state);
+    else ({ elderfox: updateElderFox, koidragon: updateKoiDragon, chameleon: updateChameleon, serpent: updateSerpent, mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
+    const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'fight', 'stalk', 'swim', 'sink', 'slide', 'rise'].includes(B.state);
     if (B.active && !harmless && B.z < 14 && d < I.contact && !fainted) damagePlayer(2, B);
   }
 }
@@ -5419,9 +5490,9 @@ const LILY_STATE = new Map();
 let lilyStand = 0, lilyKey = -1;
 function updateLilies(dt, fainted) {
   for (const [k, st] of LILY_STATE) { st.down -= dt; if (st.down <= 0) { tiles[k] = LILY; LILY_STATE.delete(k); const x = k % W, y = Math.floor(k / W); redrawArea(x, y, x, y); } }
-  if (dungeonAt(P.x) !== VALE_D || P.ride) return;
+  if ((dungeonAt(P.x) !== VALE_D && dungeonAt(P.x) !== SHRINE_D) || P.ride) return;
   const tx = Math.floor(P.x / T), ty = Math.floor(P.y / T), k = ty * W + tx, t = tiles[k];
-  if (t === LAND || t === PATH) { P.safe = { x: P.x, y: P.y }; lilyStand = 0; lilyKey = -1; return; }
+  if (t === LAND || t === PATH || t === FLOOR) { P.safe = { x: P.x, y: P.y }; lilyStand = 0; lilyKey = -1; return; }
   if (t === LILY) {
     if (k !== lilyKey) { lilyKey = k; lilyStand = 0; }
     lilyStand += dt;
@@ -5568,6 +5639,117 @@ Object.assign(PROC_DRAW, {
     c.fillStyle = '#6a4a2a'; circle(c, e.x - 4, e.y - 31 - bob, 3); circle(c, e.x + 6, e.y - 31 - bob, 3);
   },
 });
+// ---------- the Elder Fox: illusions shield her until the great bell rings ----------
+function foxGong(B) { return B.gong || (B.gong = { x: (SHRINE_D.x0 + 5) * T + 16, y: 22 * T + 16, cd: 0 }); }
+let elderHint = false;
+function hitGong(B, hx, hy, rad) {
+  if (B.type !== 'elderfox' || !B.active) return;
+  const g = foxGong(B);
+  if (g.cd > 0 || Math.hypot(g.x - hx, g.y - 30 - hy) > rad + 20) return;
+  g.cd = 6; g.ring = 1; SFX.play('lucky'); impact(6);
+  if (B.decoys && B.decoys.some(q => !q.popped)) { for (const q of B.decoys) if (!q.popped) burst(q.x, q.y - 20, '#ffb347', 12); B.decoys = []; B.state = 'dazed'; B.st = 2.6; floatText(B.x, B.y - 90, 'The bell shatters her illusions!', '#ffe08a'); }
+  else floatText(g.x, g.y - 70, 'Bong!', '#ffe9a8');
+}
+function updateElderFox(B, dt, fainted, d) {
+  const g = foxGong(B); g.cd = Math.max(0, g.cd - dt); g.ring = Math.max(0, (g.ring || 0) - dt);
+  B.decoys = B.decoys || [];
+  switch (B.state) {
+    case 'prowl': { B.st += dt; const want = d > 150 ? 1 : d < 100 ? -1 : 0, a = B.anim * 1.3; const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; B.x += (dx / dd * want + Math.cos(a) * 0.6) * 110 * dt; B.y += (dy / dd * want + Math.sin(a) * 0.6) * 110 * dt; clampBoss(B); if (B.st > 1.6) bossRest(B, 0.1); break; }
+    case 'fire': B.st -= dt; if (B.st <= 0) { const n = B.phase === 3 ? 12 : 8, off = rng(); for (const src of [B, ...B.decoys.filter(q => !q.popped)]) for (let i = 0; i < (src === B ? n : 3); i++) { const a = (i + off) / (src === B ? n : 3) * Math.PI * 2; projectiles.push({ kind: 'fire', weak: true, x: src.x, y: src.y - 30, vx: Math.cos(a) * 150, vy: Math.sin(a) * 150, ang: a, t: 0, life: 2 }); } SFX.play('wisp'); bossRest(B, 0.6); } break;
+    case 'illusion': B.st -= dt; if (B.st <= 0) { const A = B.arena, n = B.phase === 3 ? 5 : 3, spots = []; for (let i = 0; i <= n; i++) spots.push({ x: A.x0 + 50 + rng() * (A.x1 - A.x0 - 100), y: A.y0 + 70 + rng() * (A.y1 - A.y0 - 90) }); burst(B.x, B.y - 20, '#ffb347', 16); const me = spots.pop(); B.x = me.x; B.y = me.y; B.decoys = spots; SFX.play('wisp'); if (!elderHint) { elderHint = true; toast('Which one is real? Strike the great bell in the courtyard to shatter her illusions!', 4500); } bossRest(B, 0.6); } break;
+    case 'dashWind': B.st -= dt; if (B.st <= 0) { const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; B.vx = dx / dd * 380; B.vy = dy / dd * 380; B.state = 'dash'; B.st = 0.35; SFX.play('dash'); } break;
+    case 'dash': B.st -= dt; B.x += B.vx * dt; B.y += B.vy * dt; clampBoss(B); if (!B.dhit && !fainted && !P.dash && d < 30) { B.dhit = true; damagePlayer(2, B); } if (B.st <= 0) { B.dhit = false; bossRest(B, 0.5); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+  }
+}
+function drawElderFox(c, B) {
+  const g = foxGong(B);
+  shadow(c, g.x, g.y + 2, 20, 6);
+  c.fillStyle = '#5a3a22'; c.fillRect(g.x - 24, g.y - 70, 6, 72); c.fillRect(g.x + 18, g.y - 70, 6, 72); c.fillStyle = '#c8402a'; c.fillRect(g.x - 28, g.y - 76, 56, 8);
+  const sw = g.ring > 0 ? Math.sin(time * 30) * g.ring * 0.3 : 0; c.save(); c.translate(g.x, g.y - 68); c.rotate(sw);
+  c.fillStyle = g.cd > 0 ? '#8a6a34' : '#d9a23c'; c.beginPath(); c.moveTo(-14, 10); c.quadraticCurveTo(-16, 40, -18, 44); c.lineTo(18, 44); c.quadraticCurveTo(16, 40, 14, 10); c.quadraticCurveTo(0, 2, -14, 10); c.fill(); c.fillStyle = '#ffe9a8'; c.fillRect(-10, 16, 3, 20); c.restore();
+  if (g.ring > 0) { c.strokeStyle = `rgba(255,233,168,${g.ring})`; c.lineWidth = 3; c.beginPath(); c.ellipse(g.x, g.y - 40, 60 * (1.5 - g.ring), 30 * (1.5 - g.ring), 0, 0, Math.PI * 2); c.stroke(); }
+  const one = (x, y, alpha) => {
+    const f = P.x < x ? -1 : 1, bob = Math.sin(B.anim * 4) * 3, sc = 1.8;
+    c.save(); c.globalAlpha = alpha;
+    c.fillStyle = 'rgba(0,0,0,.28)'; ellipse(c, x, y + 4, 26, 8);
+    for (let i = 0; i < 5; i++) { c.fillStyle = i % 2 ? '#f2e6d6' : '#e8a040'; c.beginPath(); c.ellipse(x - f * (18 + i * 2), y - 20 - i * 9 + bob, 16, 6, -f * (0.4 + i * 0.25), 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = '#e8a040'; ellipse(c, x, y - 20 + bob, 10 * sc, 8 * sc); ellipse(c, x + f * 16, y - 36 + bob, 7 * sc, 6 * sc);
+    c.beginPath(); c.moveTo(x + f * 8, y - 46 + bob); c.lineTo(x + f * 10, y - 60 + bob); c.lineTo(x + f * 16, y - 46 + bob); c.fill(); c.beginPath(); c.moveTo(x + f * 18, y - 46 + bob); c.lineTo(x + f * 24, y - 58 + bob); c.lineTo(x + f * 26, y - 42 + bob); c.fill();
+    c.fillStyle = '#f2e6d6'; ellipse(c, x + f * 22, y - 32 + bob, 5, 4); ellipse(c, x, y - 14 + bob, 8, 6);
+    c.fillStyle = B.state === 'dazed' ? '#ffe08a' : '#7fe0f0'; c.fillRect(x + f * 18 - 1, y - 40 + bob, 3, 3);
+    c.fillStyle = '#c8402a'; c.fillRect(x + f * 14 - 6, y - 52 + bob, 12, 3);
+    c.restore();
+  };
+  for (const q of B.decoys || []) if (!q.popped) one(q.x, q.y, 1);
+  c.globalAlpha = 1; bossFlash(c, B); one(B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), B.y, c.globalAlpha); c.globalAlpha = 1;
+  if (B.state === 'fire' || B.state === 'dashWind' || B.state === 'illusion') bossWarn(c, B, B.y - 90);
+  if (B.state === 'sleep') bossZ(c, { x: B.x, y: B.y - 40, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, B.x, B.y - 80, 22);
+}
+// ---------- the Koi Dragon: swims under the sacred pool, strands itself on the islet ----------
+const isPool = (x, y) => { const t = tileAt(Math.floor(x / T), Math.floor(y / T)); return t === DEEP || t === LILY; };
+function poolSpotNear(B, x, y) { const A = B.arena; for (let i = 0; i < 60; i++) { const a = rng() * Math.PI * 2, r = 70 + rng() * 120, nx = Math.max(A.x0 + 70, Math.min(A.x1 - 70, x + Math.cos(a) * r)), ny = Math.max(A.y0 + 50, Math.min(A.y1 - 50, y + Math.sin(a) * r * 0.6)); if (tileAt(Math.floor(nx / T), Math.floor(ny / T)) === DEEP) return { x: nx, y: ny }; } return { x: (SHRINE_D.x0 + 10) * T, y: 3 * T }; }
+const isletCenter = () => ({ x: (SHRINE_D.x0 + 20) * T, y: 6 * T });
+function updateKoiDragon(B, dt, fainted, d) {
+  switch (B.state) {
+    case 'swim': { B.st -= dt; if (!B.tgt) B.tgt = poolSpotNear(B, P.x, P.y); const dx = B.tgt.x - B.x, dy = B.tgt.y - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * Math.min(dd, 220 * dt); B.y += dy / dd * Math.min(dd, 220 * dt); if (Math.random() < dt * 10) particles.push({ x: B.x + (rng() - 0.5) * 40, y: B.y, vx: 0, vy: -20, life: 0.4, color: '#bfe8ff', size: 3 }); if (B.st <= 0 && dd < 10) { B.tgt = null; bossRest(B, 0.1); } else if (B.st <= -2) { B.tgt = null; bossRest(B, 0.1); } break; }
+    case 'rise': B.st -= dt; if (B.st <= 0) {
+      if (B.atk === 'spit') { const a = Math.atan2(P.y - 14 - (B.y - 50), P.x - B.x), n = B.phase === 1 ? 5 : 7; for (let i = 0; i < n; i++) { const o = (i - (n - 1) / 2) * 0.22; projectiles.push({ kind: 'bubble', x: B.x, y: B.y - 50, vx: Math.cos(a + o) * 150, vy: Math.sin(a + o) * 150, ph: rng() * 6, t: 0, life: 2.6 }); } SFX.play('wisp'); }
+      else { B.ring = { x: B.x, y: B.y, r: 30, max: 260, hit: false }; impact(6); SFX.play('slam'); }
+      B.state = 'sink'; B.st = 0.9;
+    } break;
+    case 'sink': B.st -= dt; if (B.st <= 0) bossRest(B, 0.1); break;
+    case 'lungeWind': B.st -= dt; if (B.st <= 0) { const ic = isletCenter(); B.sx = B.x; B.sy = B.y; B.tx = ic.x + (rng() - 0.5) * 60; B.ty = ic.y + (rng() - 0.5) * 30; B.state = 'lunge'; B.st = 0.55; SFX.play('leap'); } break;
+    case 'lunge': { B.st -= dt; const k = 1 - Math.max(0, B.st) / 0.55; B.x = B.sx + (B.tx - B.sx) * k; B.y = B.sy + (B.ty - B.sy) * k; B.z = Math.sin(Math.PI * k) * 70;
+      if (B.st <= 0) { B.z = 0; impact(12); hitStop = 0.08; SFX.play('slam'); burst(B.x, B.y, '#bfe8ff', 20); if (!fainted && !P.dash && d < 60) damagePlayer(2, B); B.state = 'dazed'; B.st = 2.8; B.beached = true; floatText(B.x, B.y - 100, 'It\'s stranded! Strike now!', '#ffe08a'); }
+      break; }
+    case 'slide': { B.st -= dt; const dx = B.tgt.x - B.x, dy = B.tgt.y - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * Math.min(dd, 300 * dt); B.y += dy / dd * Math.min(dd, 300 * dt); if (B.st <= 0 || dd < 8) { B.tgt = null; B.beached = false; bossRest(B, 0.2); } break; }
+    case 'dazed': B.st -= dt; if (B.st <= 0) { if (B.beached) { B.state = 'slide'; B.st = 0.8; B.tgt = poolSpotNear(B, B.x, B.y); SFX.play('slime'); } else bossRest(B, 0.3); } break;
+  }
+}
+function drawKoiDragon(c, B) {
+  const x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y, z = B.z || 0, f = P.x < B.x ? -1 : 1;
+  const under = B.state === 'swim' || B.state === 'sleep' || B.state === 'slide' && !B.beached;
+  if (B.state === 'swim' || B.state === 'rest' && !B.beached) { c.fillStyle = 'rgba(20,40,80,.35)'; c.beginPath(); c.ellipse(x, y, 54, 16, Math.sin(time) * 0.2, 0, Math.PI * 2); c.fill(); for (let i = 0; i < 2; i++) { const ph = (time * 1.5 + i * 0.5) % 1; c.strokeStyle = `rgba(255,255,255,${0.5 * (1 - ph)})`; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y, 30 + ph * 40, 10 + ph * 12, 0, 0, Math.PI * 2); c.stroke(); } return; }
+  if (B.state === 'sleep') { c.fillStyle = 'rgba(20,40,80,.3)'; ellipse(c, x, y, 54, 16); bossZ(c, { x, y: y - 20, z: 0, anim: B.anim }); return; }
+  const rise = B.state === 'rise' ? 1 - Math.max(0, B.st) / 0.7 : B.state === 'sink' ? Math.max(0, B.st) / 0.9 : 1, out = B.beached || B.state === 'lunge';
+  if (!out) { c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 3; c.beginPath(); c.ellipse(x, y, 40, 12, 0, 0, Math.PI * 2); c.stroke(); }
+  else { c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, x, y + 4, 60, 14); }
+  c.save(); if (!out) { c.beginPath(); c.rect(x - 120, y - 200, 240, 200); c.clip(); }
+  c.globalAlpha = 1; bossFlash(c, B);
+  const by = y - z + (1 - rise) * 80, len = out ? 1 : 0.6;
+  // body coil
+  for (let i = 8; i >= 0; i--) { const sx = x - f * i * 12 * len, sy = by - 20 - Math.sin(i * 0.7 + time * 3) * 8 - (out ? 0 : i * 6), r = 16 - i * 0.9; c.fillStyle = i % 2 ? '#e8703a' : '#ffffff'; circle(c, sx, sy, r); c.fillStyle = 'rgba(255,214,90,.5)'; circle(c, sx - 2, sy - 3, r * 0.4); }
+  c.fillStyle = '#e8703a'; c.beginPath(); c.moveTo(x - f * 100 * len, by - 24); c.lineTo(x - f * 124 * len, by - 44); c.lineTo(x - f * 124 * len, by - 8); c.closePath(); c.fill();
+  // head
+  const hx = x + f * 14, hy = by - 44;
+  c.fillStyle = '#e8703a'; ellipse(c, hx, hy, 22, 16); c.fillStyle = '#ffffff'; ellipse(c, hx + f * 10, hy + 4, 12, 8);
+  c.fillStyle = '#d9a23c'; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(hx - 6 + s * 6, hy - 12); c.lineTo(hx - 12 + s * 10, hy - 34); c.lineTo(hx - 2 + s * 6, hy - 14); c.fill(); }
+  c.strokeStyle = '#ffe9a8'; c.lineWidth = 2; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(hx + f * 18, hy + 2 + s * 3); c.quadraticCurveTo(hx + f * 34, hy + s * 14, hx + f * 40, hy + 10 + s * 16); c.stroke(); }
+  c.fillStyle = B.state === 'dazed' ? '#ffe08a' : '#1a1210'; circle(c, hx + f * 8, hy - 4, 4); c.fillStyle = '#ffffff'; c.fillRect(hx + f * 8 - 1, hy - 6, 2, 2);
+  c.restore(); c.globalAlpha = 1;
+  if (B.state === 'lungeWind') { const ic = isletCenter(); c.strokeStyle = `rgba(236,82,87,${0.5 + Math.sin(time * 16) * 0.3})`; c.lineWidth = 3; c.beginPath(); c.ellipse(ic.x, ic.y, 90, 50, 0, 0, Math.PI * 2); c.stroke(); bossWarn(c, { x }, by - 110); }
+  if (B.state === 'rise') bossWarn(c, { x }, by - 110);
+  if (B.state === 'dazed') drawStars(c, hx, hy - 40, 24);
+}
+function drawShrineGate(c) {
+  const x = SHRINE.x, y = SHRINE.y;
+  c.fillStyle = 'rgba(0,0,0,.25)'; ellipse(c, x, y - 2, 64, 12);
+  c.fillStyle = '#8a8478'; c.fillRect(x - 50, y - 8, 100, 10);
+  c.fillStyle = '#e6dcc8'; c.fillRect(x - 40, y - 60, 80, 52); c.fillStyle = '#c8402a'; c.fillRect(x - 40, y - 60, 8, 52); c.fillRect(x + 32, y - 60, 8, 52);
+  c.fillStyle = '#3a2a3a'; c.beginPath(); c.moveTo(x - 62, y - 56); c.quadraticCurveTo(x - 40, y - 64, x - 30, y - 86); c.lineTo(x + 30, y - 86); c.quadraticCurveTo(x + 40, y - 64, x + 62, y - 56); c.closePath(); c.fill();
+  c.fillStyle = '#5a4a5a'; c.fillRect(x - 32, y - 92, 64, 8);
+  c.fillStyle = '#1a1210'; c.fillRect(x - 14, y - 40, 28, 40); c.fillStyle = 'rgba(255,200,220,.35)'; c.fillRect(x - 12, y - 14, 24, 14);
+  c.fillStyle = '#e888b4'; for (const [ox, oy] of [[-58, -60], [56, -64], [-44, -86], [40, -90]]) circle(c, x + ox, y + oy, 8);
+}
+function drawBell(c, sw, lit) {
+  shadow(c, sw.x, sw.y + 3, 12, 4);
+  c.fillStyle = '#5a3a22'; c.fillRect(sw.x - 14, sw.y - 40, 4, 42); c.fillRect(sw.x + 10, sw.y - 40, 4, 42); c.fillStyle = '#c8402a'; c.fillRect(sw.x - 17, sw.y - 44, 34, 5);
+  const sw2 = lit ? Math.sin(time * 6) * 0.15 : 0; c.save(); c.translate(sw.x, sw.y - 39); c.rotate(sw2);
+  c.fillStyle = lit ? '#ffd65a' : '#8a6a34'; c.beginPath(); c.moveTo(-8, 4); c.quadraticCurveTo(-9, 18, -11, 22); c.lineTo(11, 22); c.quadraticCurveTo(9, 18, 8, 4); c.quadraticCurveTo(0, -2, -8, 4); c.fill(); c.fillStyle = '#ffe9a8'; c.fillRect(-5, 8, 2, 10); c.restore();
+  if (lit) { c.fillStyle = `rgba(255,214,90,${0.2 + Math.sin(time * 4) * 0.08})`; circle(c, sw.x, sw.y - 28, 22); }
+}
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -5827,7 +6009,7 @@ function drawTent(c, o) {
   c.fillStyle = 'rgba(242,248,255,.85)'; c.beginPath(); c.moveTo(o.x - 10, o.y - 40); c.lineTo(o.x, o.y - 52); c.lineTo(o.x + 10, o.y - 40); c.closePath(); c.fill();
   c.fillStyle = '#c0392b'; c.fillRect(o.x - 1, o.y - 66, 2, 16); c.fillRect(o.x + 1, o.y - 66, 10, 6);
 }
-function drawBossAny(c, B) { ({ chameleon: drawChameleon, serpent: drawSerpent, mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
+function drawBossAny(c, B) { ({ elderfox: drawElderFox, koidragon: drawKoiDragon, chameleon: drawChameleon, serpent: drawSerpent, mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
 function drawJarl(c, B) {
   let sx = 1, sy = 1, ox = 0;
   if (B.state === 'stride') { const k = Math.abs(Math.sin(B.anim * 7)); sy = 1 - k * 0.05; sx = 1 + k * 0.03; }
@@ -6310,7 +6492,7 @@ function render() {
   if (CD === CINDER_D || CD === FORGE_D) drawCinderGround(ctx, camX, camY, viewW, viewH, inViewT);
   if (CD === CAVE_D || CD === VAULT_D) drawRails(ctx, inViewT);
   if (CD === SERP_D) drawDartTraps(ctx);
-  if (CD === VALE_D) drawLilyWobble(ctx);
+  if (CD === VALE_D || CD === SHRINE_D) drawLilyWobble(ctx);
   if (CD === SKY_D || CD === SPIRE_D) drawSkyOverlay(ctx, camX, camY, viewW, viewH, CD === SKY_D);
   const inView = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   for (const p of pickups) {
@@ -6339,8 +6521,8 @@ function render() {
     else if (kind === 1) drawEnemy(ctx, o);
     else if (kind === 7) drawBossAny(ctx, o);
     else if (kind === 8) drawChest(ctx, o);
-    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : drawCryptDoor)(ctx);
-    else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
+    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : o.id === 'shrine' ? drawShrineGate : drawCryptDoor)(ctx);
+    else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : dungeonAt(o.x) === SHRINE_D ? drawBell : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) { if (P.ride) drawCart(ctx, P.x, P.y + 6); drawPlayer(ctx); if (P.ride) drawCartFront(ctx, P.x, P.y + 6); }
     else if (kind === 4) drawHouse(ctx, o);
