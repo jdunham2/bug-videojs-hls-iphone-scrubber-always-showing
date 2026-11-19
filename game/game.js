@@ -8,8 +8,9 @@
   // Config
   // ---------------------------------------------------------------------------
   const TILE = 32;
-  const MW = 72;            // map width in tiles
-  const MH = 52;            // map height in tiles
+  const MW = 96;            // map width in tiles
+  const MH = 68;            // map height in tiles
+  const AREA_K = (MW * MH) / (72 * 52); // how much bigger than the original 72×52 village (scales scenery)
   const WORLD_W = MW * TILE;
   const WORLD_H = MH * TILE;
   const IH = 12;            // extra rows below the village that hold house interiors
@@ -79,8 +80,8 @@
     const kind = opts.kind || pick(KIND_NAMES);
     const season = opts.season || pick(SEASON_NAMES);
     const weatherName = opts.weather || pickWeather(season);
-    const roadY = kind === 'seaside' ? 18 + Math.floor(rand() * 6) : 22 + Math.floor(rand() * 7);  // top row of the 2-wide east–west road
-    const roadX = 28 + Math.floor(rand() * 15); // left column of the 2-wide north–south road
+    const roadY = kind === 'seaside' ? 24 + Math.floor(rand() * 8) : 29 + Math.floor(rand() * 10);  // top row of the 2-wide east–west road
+    const roadX = 37 + Math.floor(rand() * 21); // left column of the 2-wide north–south road
     const quads = {
       NW: { x0: 4, y0: 4, x1: roadX - 1, y1: roadY - 1, north: true },
       NE: { x0: roadX + 3, y0: 4, x1: MW - 4, y1: roadY - 1, north: true },
@@ -257,11 +258,11 @@
     };
     for (const q of L.homeQs) {
       let placed = 0;
-      for (let row = 0; row < 3 && placed < 3; row++) {
+      for (let row = 0; row < 4 && placed < 4; row++) {
         const hh = 4;
         const hy0 = q.north ? q.y1 - hh - 2 - row * 8 : q.y0 + 2 + row * 8;
         if (hy0 < q.y0 + 1 || hy0 + hh > q.y1 - 1) continue;
-        for (let x = q.x0 + Math.floor(rand() * 3); x < q.x1 - 5 && placed < 3; ) {
+        for (let x = q.x0 + Math.floor(rand() * 3); x < q.x1 - 5 && placed < 4; ) {
           const hw = rand() < 0.5 ? 5 : 6;
           if (tryHouse(x, hy0, hw, hh)) { placed++; x += hw + 2 + Math.floor(rand() * 3); } else x += 1;
         }
@@ -284,6 +285,7 @@
     }
     if (L.jetty) carvePath(L.jetty.baseX - L.jetty.sx, L.jetty.baseY - L.jetty.sy, solid);
     if (L.castle) carvePath(L.castle.out[0], L.castle.out[1], solid);
+    if (L.maze) carvePath(L.maze.entrance.x, L.maze.entrance.y, solid);
     if (L.museum) carvePath(L.museum.x + Math.floor(L.museum.w / 2) - 1, L.museum.y + L.museum.h, solid);
 
     // Who lives where: Bertram nearest his garden, everyone else at random
@@ -399,9 +401,9 @@
       }
       return null;
     };
-    for (let n = 0; n < (L.kind === 'forest' ? 180 : 75); n++) { const s = openSpot(1); if (s) objects.push(makeTree((s[0] + rr(0.3, 0.7)) * TILE, (s[1] + rr(0.5, 0.9)) * TILE)); }
-    for (let n = 0; n < 45; n++) { const s = openSpot(0); if (s) objects.push(makeBush((s[0] + 0.5) * TILE, (s[1] + 0.75) * TILE)); }
-    for (let n = 0; n < 25; n++) { const s = openSpot(0); if (s) objects.push(makeRock((s[0] + 0.5) * TILE, (s[1] + 0.7) * TILE)); }
+    for (let n = 0; n < (L.kind === 'forest' ? 180 : 75) * AREA_K; n++) { const s = openSpot(1); if (s) objects.push(makeTree((s[0] + rr(0.3, 0.7)) * TILE, (s[1] + rr(0.5, 0.9)) * TILE)); }
+    for (let n = 0; n < 45 * AREA_K; n++) { const s = openSpot(0); if (s) objects.push(makeBush((s[0] + 0.5) * TILE, (s[1] + 0.75) * TILE)); }
+    for (let n = 0; n < 25 * AREA_K; n++) { const s = openSpot(0); if (s) objects.push(makeRock((s[0] + 0.5) * TILE, (s[1] + 0.7) * TILE)); }
     // Reeds along the water's sandy edge
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       if (getT(x, y) === SAND && rand() < 0.16) objects.push(makeReeds((x + rr(0.2, 0.8)) * TILE, (y + rr(0.5, 0.9)) * TILE));
@@ -426,7 +428,7 @@
     const floors = shuffled(['#b07d48', '#a0703f', '#c08a52', '#9a6a3c']);
     const rugs = shuffled(['#b5523b', '#3f7f6a', '#4f6fa8', '#7a4f8f', '#c08a2e', '#2f6b5a']);
     L.houses.forEach((h, k) => {
-      if (k >= 6) return; // six rooms fit in the strip; any extra house stays locked
+      if (k >= Math.floor(MW / ROOM_STRIDE)) return; // as many rooms as fit in the strip; any extra house stays locked
       const x0 = 1 + k * ROOM_STRIDE, y0 = MH + 2;
       rectT(x0 + 1, y0 + 2, 9, 5, FLOOR);
       setT(x0 + 5, y0 + 7, FLOOR); // door mat
@@ -1235,7 +1237,7 @@
     }
     // Grass blades
     g.lineCap = 'round';
-    for (let i = 0; i < LK.blades; i++) {
+    for (let i = 0; i < LK.blades * AREA_K; i++) {
       const x = gr(0, WORLD_W), y = gr(0, WORLD_H);
       g.strokeStyle = grng() < 0.6 ? LK.blade[0] : LK.blade[1];
       g.lineWidth = 1.2;
@@ -1352,7 +1354,7 @@
       }
     }
     if (LK.leaves) { // fallen leaves everywhere
-      for (let i = 0; i < LK.leaves; i++) {
+      for (let i = 0; i < LK.leaves * AREA_K; i++) {
         const x = gr(0, WORLD_W), y = gr(0, WORLD_H), t0 = map[idx(Math.floor(x / TILE), Math.floor(y / TILE))];
         if (t0 !== GRASS && t0 !== PATH && t0 !== STONE) continue;
         g.fillStyle = ['#c0392b', '#e07b2a', '#f0a040', '#d9a43a', '#8a5a2e'][Math.floor(grng() * 5)];
@@ -1361,7 +1363,7 @@
     }
     // Flowers & clover on open grass
     const petals = LK.petals || [];
-    for (let i = 0; i < (petals.length ? LK.flowers : 0); i++) {
+    for (let i = 0; i < (petals.length ? LK.flowers * AREA_K : 0); i++) {
       const x = gr(0, WORLD_W), y = gr(0, WORLD_H);
       const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
       if (map[idx(tx, ty)] !== GRASS) continue;
@@ -1541,6 +1543,7 @@
     critterScare(player.x, player.y, chitterRadius() * 1.1);
     fairyCheck();
     puddleJump();
+    if (duskK >= 0.4 && critters.some((c) => c.type === 'bat' && Math.hypot(c.x - player.x, c.y - player.y) < 180)) { for (const c of critters) if (c.type === 'bat') c.scatter = 3; sfx('squeak'); completeTask('bats'); }
     caveEcho();
     for (const v of villagers) {
       if (Math.hypot(v.x - player.x, v.y - player.y) < chitterRadius() && startleV(v, rpick(['Eek!', 'Gah!', 'Yikes!']))) completeTask('jump');
@@ -2391,6 +2394,7 @@
     if (roofAction()) return;
     if (leverAction()) return;
     if (rideAction()) return;
+    if (rummageAction()) return;
     if (player.held && !(petChoice() === 'wardrobe')) { dropHeld(false); return; }
     const pc = petChoice();
     if (pc === 'dog') { petDog(); return; }
@@ -2424,6 +2428,9 @@
     if (L.eclipseOn) completeTask('eclipse');
     if (it.blown) completeTask('umbrella');
     if (it.kind === 'ring') completeTask('lockring');
+    if (it.woodnuts) completeTask('woodpecker');
+    if (it.scarehat) completeTask('scarehat');
+    if (areaOf(it.x, it.y) > 0) budgieTattle(it);
     if (it.shop) {
       const keeper = VILLAGER[it.owner];
       if (keeper && areaOf(keeper.x, keeper.y) === areaOf(it.x, it.y)) completeTask('counter');
@@ -3588,6 +3595,15 @@
     { id: 'bigwheel', tier: 'Easy', text: 'Ride to the top of the big wheel', req: ['bigwheel'] },
     { id: 'candyfloss', tier: 'Easy', text: 'Eat some candyfloss', req: ['candy'] },
     { id: 'mirrors', tier: 'Easy', text: 'Get lost in the hall of mirrors', req: ['tent'] },
+    { id: 'boar', tier: 'Easy', text: 'Get charged by the wild boar', hint: 'go near her piglets', req: ['boar'] },
+    { id: 'moose', tier: 'Easy', text: 'Shoo the moose off the road', hint: 'chitter at it', req: ['moose'] },
+    { id: 'bats', tier: 'Easy', text: 'Scatter the bats', hint: 'after dusk, round the lamps' },
+    { id: 'kitten', tier: 'Easy', text: 'Make friends with the kitten', hint: 'sit still beside it', req: ['kitten'] },
+    { id: 'hamster', tier: 'Easy', text: 'Let the hamster out', hint: 'in Toby’s room', req: ['hamster'] },
+    { id: 'tent', tier: 'Easy', text: 'Hide in a tent at the campsite', req: ['camp'] },
+    { id: 'marshmallow', tier: 'Easy', text: 'Toast a marshmallow', hint: 'hold it by the campfire', req: ['camp'] },
+    { id: 'rummage', tier: 'Easy', text: 'Rummage through the scrapyard', hint: 'E by a junk pile', req: ['scrap'] },
+    { id: 'crowfield', tier: 'Easy', text: 'Scatter the crows from the field', req: ['fieldcrows'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3676,6 +3692,14 @@
     { id: 'cider', tier: 'Medium', text: 'Make cider', hint: 'put 3 apples in the press', req: ['press'] },
     { id: 'maze', tier: 'Medium', text: 'Reach the middle of the hedge maze', req: ['maze'] },
     { id: 'coconut', tier: 'Medium', text: 'Knock down all three coconuts', hint: 'throw things at them', req: ['shy'] },
+    { id: 'woodpecker', tier: 'Medium', text: 'Follow the woodpecker to its hidden nuts', hint: 'walk up to it, again and again', req: ['woodpecker'] },
+    { id: 'goldfish', tier: 'Medium', text: 'Tip over a goldfish bowl', req: ['fishbowl'] },
+    { id: 'budgie', tier: 'Medium', text: 'Get told on by a budgie', hint: 'pick something up in its room', req: ['budgie'] },
+    { id: 'junk3', tier: 'Medium', text: 'Stash 3 bits of scrapyard junk in your hideout', goal: 3, req: ['scrap'] },
+    { id: 'scarehat', tier: 'Medium', text: 'Steal a scarecrow’s hat', req: ['field'] },
+    { id: 'crowquest', tier: 'Medium', text: 'Bring the crow something shiny', hint: 'drop it by the crow with the “!”', req: ['qcrow'] },
+    { id: 'foxquest', tier: 'Medium', text: 'Bring the hungry fox an egg', hint: 'its den is at the forest edge', req: ['qfox'] },
+    { id: 'molequest', tier: 'Medium', text: 'Dig up 3 worms for the mole', hint: 'B on grass with empty paws', req: ['qmole'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3769,7 +3793,7 @@
   function setupRun(day) {
     Object.assign(run, { day, eaten: 0, tobyHits: 0, prints: 0, crows: 0, fireflies: 0, puddles: 0, eggs: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
     run.maxStrikes = 3 + lvl('fur');
-    run.timeTotal = Math.min(540, 360 + 30 * (day - 1)) + 60 * lvl('day');
+    run.timeTotal = Math.min(600, 420 + 30 * (day - 1)) + 60 * lvl('day'); // the bigger village takes a little longer to ransack
     run.timeLeft = run.timeTotal;
     run.villagerSpeed = Math.min(1.4, 1 + 0.06 * (day - 1));
     run.vision = 170 * Math.min(1.35, 1 + 0.06 * (day - 1)) * (1 - 0.15 * lvl('step'));
@@ -3853,6 +3877,13 @@
       if (r === 'shy' && !L.shy) return false;
       if (r === 'candy' && !(L.fair && L.fair.candy)) return false;
       if (r === 'tent' && !(L.fair && L.fair.tent)) return false;
+      if (r === 'camp' && !L.camp) return false;
+      if (r === 'scrap' && !L.scrap) return false;
+      if (r === 'field' && !(L.fieldCrows && L.fieldCrows.length)) return false;
+      if (r === 'fishbowl' && !L.fishHouse) return false;
+      if (r === 'hamster' && !L.hamster) return false;
+      if (r === 'budgie' && !L.budgie) return false;
+      for (const [rq, ty] of [['boar', 'boar'], ['moose', 'moose'], ['woodpecker', 'woodpecker'], ['kitten', 'kitten'], ['fieldcrows', 'fcrow'], ['qcrow', 'qcrow'], ['qfox', 'qfox'], ['qmole', 'qmole']]) if (r === rq && !critters.some((c) => c.type === ty)) return false;
       for (const [rq, ty] of [['snails', 'snail'], ['dragonflies', 'dragonfly'], ['ladybirds', 'ladybird'], ['seal', 'seal'], ['otters', 'otter'], ['heron', 'heron']]) if (r === rq && !critters.some((c) => c.type === ty)) return false;
       if (r === 'farm' && !L.paddock) return false;
       if (r === 'rainbow' && !rainbowPossible()) return false;
@@ -3935,6 +3966,7 @@
     setProgress('presents3', stashed.filter((it) => it.kind === 'present').length);
     if (stashed.some((it) => it.kind === 'tortoise')) completeTask('tortoisestash');
     if (stashed.some((it) => it.kind === 'chest')) completeTask('treasure');
+    setProgress('junk3', stashed.filter((it) => it.junk).length);
   }
 
   // Getting caught ---------------------------------------------------------------
@@ -4266,7 +4298,7 @@
       return false;
     };
     for (const s of shuffled(spots)) { if (placed >= 12) break; if (rand() < 0.8) tryAt(...s); }
-    for (let n = 0; n < 60 && placed < 18; n++) tryAt(rr(5, MW - 5), rr(5, MH - 5));
+    for (let n = 0; n < 90 && placed < Math.round(18 * AREA_K); n++) tryAt(rr(5, MW - 5), rr(5, MH - 5));
   }
 
   function updateHiding(dt) {
@@ -4305,6 +4337,7 @@
       if (bush.kind === 'igloo') completeTask('igloo');
       if (bush.kind === 'armour') completeTask('armour');
       if (bush.kind === 'hollowtree') completeTask('hollow');
+      if (bush.kind === 'tent') completeTask('tent');
       // Chasers who weren't right on top of you lose track in the leaves
       for (const v of villagers) {
         if (v.state === 'chase' && Math.hypot(v.x - player.x, v.y - player.y) > 60) {
@@ -4650,6 +4683,13 @@
 
   // Fragile things smash when they hit the floor hard
   function shatter(it) {
+    if (it.kind === 'fishbowl') { // SPLOSH: the goldfish flops about until someone scoops it into a glass
+      splash(it.x, it.y, false); sfx('crash'); sfx('splash');
+      critters.push({ type: 'goldfish', x: it.x, y: it.y, z: 0, dir: 'left', walk: 0, ph: 0, life: 6 });
+      lookTowards(it.x, it.y, 260, (v) => (it.owner === v.id ? 'My GOLDFISH!' : 'Oh no, the goldfish!'));
+      completeTask('goldfish');
+      return;
+    }
     if (it.kind === 'flour') { burstFlour(it); return; }
     if (it.kind === 'snowball') { // a soft white splat, not a crash
       for (let k = 0; k < 8; k++) particles.push({ kind: 'shard', col: '#f4f8fb', x: it.x, y: it.y, z: Math.max(2, it.z), vx: rr(-40, 40), vy: rr(-20, 20), vz: rr(30, 80), life: 0.5, max: 0.5 });
@@ -5829,6 +5869,7 @@
     placeWebs();
     spawnRainCritters();
     spawnMoreCritters();
+    spawnOutskirtsCritters();
   }
 
   // Something scary happened near (x, y): birds and frogs bolt (see also farmNightScare)
@@ -5837,6 +5878,7 @@
       if (Math.hypot(c.x - x, c.y - y) > r) continue;
       if (FN_TYPES.has(c.type)) { farmNightScare(c, x, y, r); continue; }
       if (c.type === 'mgoat') { c.wait = 0; continue; }
+      if (OK_TYPES.has(c.type)) { okScare(c, x, y, r); continue; }
       if (WD_TYPES.has(c.type)) { wildScare(c, x, y, r); continue; }
       if (SN_TYPES.has(c.type)) { snowScare(c, x, y, r); continue; }
       if (RN_TYPES.has(c.type)) { rainScare(c, x, y, r); continue; }
@@ -5883,6 +5925,7 @@
       if (SN_TYPES.has(c.type)) { updateSnowAnimals(c, dt, near); continue; }
       if (RN_TYPES.has(c.type)) { updateRainCritter(c, dt, near); continue; }
       if (c.type === 'mgoat') { updateMGoat(c, dt); continue; }
+      if (OK_TYPES.has(c.type)) { updateOutskirtsCritter(c, dt, near); continue; }
 
       if (c.type === 'duck') {
         c.panic = Math.max(0, c.panic - dt);
@@ -6031,6 +6074,7 @@
     if (SN_TYPES.has(c.type)) { drawSnowAnimal(ctx, c, t); return; }
     if (RN_TYPES.has(c.type)) { drawRainCritter(ctx, c, t); return; }
     if (c.type === 'mgoat') { drawMGoat(ctx, c); return; }
+    if (OK_TYPES.has(c.type)) { drawOutskirtsCritter(ctx, c, t); return; }
     if (c.type === 'frog' && c.gone > 0) return;
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -7504,13 +7548,14 @@
     if (L.kind === 'castle') buildCastle(markSolid, place);
     if (L.kind === 'forest') buildForest(markSolid, place);
     buildMoreEarly(markSolid, place);
+    buildOutskirts(markSolid, place);
     if (L.kind === 'castle' || (L.kind !== 'market' && rand() < 0.3)) buildMuseum(markSolid, place);
   }
   // Called from buildMap after the plaza props
   function buildKindLate() {
     const T = TILE, P = L.plaza, px = P.x, py = P.y;
     L.stalls = null; L.cart = null; L.festCrows = []; L.bonfire = null; L.fireworks = [];
-    placeCastleObjects(); placeForestObjects(); placeMuseumObjects(); placeRace(); placeMoreObjects();
+    placeCastleObjects(); placeForestObjects(); placeMuseumObjects(); placeRace(); placeMoreObjects(); placeOutskirtsObjects();
     if (L.museum) L.homes.guard = L.homes.percy;
     L.homes.pest = L.homes.percy; L.homes.watch = L.homes.percy;
     L.lights = objects.filter((o) => o.kind === 'lamp');
@@ -7567,6 +7612,7 @@
       placeFree('flour', L.mill.x + 40, L.mill.y + 4);
     }
     placeMoreItems();
+    placeOutskirtsItems();
     if (L.castleChest) addItem('chest', L.castleChest.x, L.castleChest.y);
     if (L.plinths) ['crown', 'gem', 'goldvase'].forEach((k, i) => { const p = L.plinths[i]; addItem(k, p.x, p.y - 2, { z: 18, owner: 'guard' }).museum = true; });
     if (L.rings) for (const R of L.rings) for (let k = 0; k < 2; k++) placeFree('mushroom', R.x + rr(-40, 40), R.y + rr(18, 30));
@@ -8675,7 +8721,7 @@
   function shopOf(h) {
     if (!L.shopHouses) {
       L.shopHouses = new Map();
-      for (const id of ['rosa', 'mabel', 'percy']) { const hh = L.houses[L.homes[id]]; if (hh && L.houses.indexOf(hh) < 6 && !L.shopHouses.has(hh)) L.shopHouses.set(hh, { ...SHOPS[id], owner: id }); }
+      for (const id of ['rosa', 'mabel', 'percy']) { const hh = L.houses[L.homes[id]]; if (hh && L.houses.indexOf(hh) < Math.floor(MW / ROOM_STRIDE) && !L.shopHouses.has(hh)) L.shopHouses.set(hh, { ...SHOPS[id], owner: id }); }
     }
     return L.shopHouses.get(h) || null;
   }
@@ -8982,7 +9028,7 @@
     const mound = L.buried.find((b) => Math.hypot(b.x - player.x, b.y - player.y) < 20);
     if (!player.held && mound) { player.digging = { t: 0.8, up: mound }; player.stun = 0.8; sfx('rustle'); return; }
     const it = player.held;
-    if (!it) { player.bubble = { text: 'nothing to bury', t: 1 }; return; }
+    if (!it) { if (diggable(player.x, player.y)) { player.digging = { t: 0.8, worms: true }; player.stun = 0.8; sfx('rustle'); } else player.bubble = { text: 'can’t dig here', t: 1 }; return; } // dig for worms
     if (it.type.heavy) { player.bubble = { text: 'too big to bury!', t: 1 }; return; }
     if (!diggable(player.x, player.y)) { player.bubble = { text: 'can’t dig here', t: 1 }; return; }
     player.digging = { t: 1, it }; player.stun = 1; sfx('rustle');
@@ -8994,6 +9040,7 @@
     if (Math.random() < dt * 14) puff(player.x + rr(-6, 6), player.y + 2, 1, 'soil');
     if (D.t > 0) return;
     player.digging = null;
+    if (D.worms) { if (Math.random() < 0.45) { player.worms = (player.worms || 0) + 1; player.bubble = { text: `a worm! (${player.worms})`, t: 1.2 }; sfx('pick'); } else player.bubble = { text: 'just dirt...', t: 1 }; return; }
     if (D.up) { // dig it back up
       const b = D.up; L.buried.splice(L.buried.indexOf(b), 1);
       Object.assign(b.it, { x: b.x, y: b.y, z: 0, held: false, heldBy: null, air: true, vz: 120, vx: 0, vy: 10 });
@@ -9423,7 +9470,7 @@
       case 'worm': {
         c.life -= dt;
         if (c.life <= 0) { c.dead = true; break; }
-        if (outside && pd < 11) { c.dead = true; sparkle(c.x, c.y, 4); sfx('pick'); player.bubble = { text: 'wriggly!', t: 1 }; completeTask('worm'); }
+        if (outside && pd < 11) { c.dead = true; sparkle(c.x, c.y, 4); sfx('pick'); player.worms = (player.worms || 0) + 1; player.bubble = { text: 'wriggly!', t: 1 }; completeTask('worm'); }
         break;
       }
       case 'blackbird': {
@@ -10304,6 +10351,389 @@
     return true;
   }
   // ---------------------------------------------------------------------------
+  // Woodland animals (wild boar, a moose, bats, a woodpecker), pets in the
+  // houses (a goldfish bowl, a hamster, a kitten, a budgie), the outskirts
+  // (a campsite, a scrapyard, a crow field) and quests from animals.
+  // ---------------------------------------------------------------------------
+  const OK_TYPES = new Set(['boar', 'boarlet', 'moose', 'bat', 'woodpecker', 'goldfish', 'hamster', 'kitten', 'fcrow', 'qcrow', 'qfox', 'qmole']);
+  Object.assign(ITEM, {
+    fishbowl: { name: 'goldfish bowl', h: 12, r: 6, fragile: true, draw(c) { c.fillStyle = 'rgba(160,210,240,0.7)'; circle(c, 0, -6, 6); c.fillStyle = '#f2913a'; ellipse(c, 1, -5, 2.2, 1.4); poly(c, [[-1, -5], [-3, -6.5], [-3, -3.5]]); c.fill(); c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 0.8; c.beginPath(); c.arc(-2, -8, 2, Math.PI, Math.PI * 1.5); c.stroke(); } },
+    marshmallow: { name: 'marshmallow', h: 12, r: 4, draw(c, it) { c.strokeStyle = '#a0703f'; c.lineWidth = 1; c.beginPath(); c.moveTo(-4, 0); c.lineTo(3, -9); c.stroke(); c.fillStyle = it && it.toasted ? '#d9a04a' : '#fbf6ee'; roundRect(c, 1, -13, 5, 5, 2, true); } },
+    nuts: { name: 'stash of nuts', h: 6, r: 5, draw(c) { c.fillStyle = '#8a5a2a'; for (const [x, y] of [[-3, -2], [0, -3], [3, -2], [-1.5, -5], [1.5, -5]]) ellipse(c, x, y, 2, 1.7); c.fillStyle = '#5a3a20'; for (const [x, y] of [[-3, -3], [0, -4], [3, -3]]) c.fillRect(x - 1.5, y - 0.8, 3, 1); } },
+    gear: { name: 'rusty cog', h: 10, r: 6, draw(c) { c.fillStyle = '#9a6a3a'; circle(c, 0, -5, 5); for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; c.fillRect(Math.cos(a) * 5 - 1.2, -5 + Math.sin(a) * 5 - 1.2, 2.4, 2.4); } c.fillStyle = '#5a3a20'; circle(c, 0, -5, 1.8); } },
+    kettle: { name: 'old kettle', h: 12, r: 6, draw(c) { c.fillStyle = '#8a8e96'; roundRect(c, -6, -10, 12, 10, 4, true); c.fillRect(5, -8, 4, 2); c.strokeStyle = '#5a5e66'; c.lineWidth = 1.4; c.beginPath(); c.arc(0, -10, 4, Math.PI, 0); c.stroke(); } },
+    hubcap: { name: 'hubcap', h: 4, r: 7, draw(c) { c.fillStyle = '#c4c8d0'; ellipse(c, 0, -2, 7, 3); c.fillStyle = '#9aa0aa'; ellipse(c, 0, -2.5, 3, 1.4); } },
+  });
+  FOOD.marshmallow = { bites: 1, fill: 6, sweet: true }; FOOD.nuts = { bites: 2, fill: 14 };
+  const JUNK = ['gear', 'kettle', 'hubcap', 'boot', 'can', 'bucket'];
+  const SHINY = new Set(['ring', 'crown', 'gem', 'trophy', 'clock', 'goldvase', 'goldpot', 'hubcap', 'frame', 'teapot']);
+
+  // --- Objects --------------------------------------------------------------------------------
+  function makeTent(x, y, col) {
+    const o = {
+      kind: 'tent', x, y, r: 20, hitbox: null, rustle: 0, bounds: { l: x - 30, r: x + 30, t: y - 40, b: y + 6 },
+      contains(px, py) { const dx = (px - x) / 18, dy = (py - (y - 6)) / 10; return dx * dx + dy * dy < 1; },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 6, y, 28, 7); },
+      draw(ctx, t) {
+        const sh = o.rustle > 0 ? Math.sin(t * 40) : 0;
+        ctx.fillStyle = col; poly(ctx, [[x - 26 + sh, y], [x + 26 + sh, y], [x + sh, y - 34]]); ctx.fill();
+        ctx.fillStyle = shade(col, -0.25); poly(ctx, [[x - 8 + sh, y], [x + 8 + sh, y], [x + sh, y - 22]]); ctx.fill();
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; poly(ctx, [[x - 8 + sh, y - 25], [x + 8 + sh, y - 25], [x + sh, y - 34]]); ctx.fill(); }
+        if (player.hidden && player.hidingIn === o) { ctx.fillStyle = '#ffffff'; circle(ctx, x - 2.5, y - 8, 1.4); circle(ctx, x + 2.5, y - 8, 1.4); }
+      },
+    };
+    return o;
+  }
+  function makeCampfire(x, y) {
+    return {
+      kind: 'campfire', x, y, hitbox: box(x - 10, y - 5, 20, 6), bounds: { l: x - 60, r: x + 60, t: y - 40, b: y + 30 },
+      shadow(ctx) { const g = ctx.createRadialGradient(x, y - 4, 2, x, y - 4, 50); g.addColorStop(0, `rgba(255,170,60,${0.2 + duskK * 0.3})`); g.addColorStop(1, 'rgba(255,170,60,0)'); ctx.fillStyle = g; ctx.fillRect(x - 50, y - 54, 100, 100); },
+      draw(ctx, t) {
+        ctx.fillStyle = '#8a8578'; for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; circle(ctx, x + Math.cos(a) * 10, y - 2 + Math.sin(a) * 4, 2.6); }
+        ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 7, y - 5, 14, 3);
+        if (!wet()) for (let k = 0; k < 4; k++) { const fx = x + (k - 1.5) * 3 + Math.sin(t * 6 + k) * 1.5, h = 9 + Math.sin(t * 9 + k) * 3; ctx.fillStyle = k % 2 ? '#f2913a' : '#ffd166'; poly(ctx, [[fx - 3, y - 4], [fx + 3, y - 4], [fx, y - 4 - h]]); ctx.fill(); }
+        else if (Math.random() < 0.1 && !paused) particles.push({ x: x + rr(-4, 4), y: y - 6, r: 3, life: 1, max: 1, vy: -14 });
+      },
+    };
+  }
+  function makeJunkPile(x, y) {
+    const J = { x, y, found: false };
+    (L.junk = L.junk || []).push(J);
+    const bits = Array.from({ length: 9 }, () => [rr(-16, 16), rr(-14, 0), pick(['#8a8e96', '#9a6a3a', '#5a5e66', '#c0392b', '#4f6fa8']), rr(4, 8)]);
+    return {
+      kind: 'junkpile', x, y, hitbox: box(x - 16, y - 8, 32, 9), bounds: { l: x - 24, r: x + 24, t: y - 30, b: y + 4 },
+      draw(ctx) { ctx.fillStyle = '#6a5a4a'; ellipse(ctx, x, y - 4, 20, 9); for (const [bx, by, col, r] of bits) { ctx.fillStyle = col; roundRect(ctx, x + bx - r / 2, y + by - r / 2 - 4, r, r * 0.7, 1.5, true); } ctx.fillStyle = '#2b2d33'; circle(ctx, x + 10, y - 14, 4); ctx.fillStyle = '#5a5e66'; circle(ctx, x + 10, y - 14, 1.6); },
+    };
+  }
+  function makeHamsterCage(x, y) {
+    return {
+      kind: 'hamstercage', x, y, hitbox: box(x - 10, y - 6, 20, 7), bounds: { l: x - 14, r: x + 14, t: y - 26, b: y + 3 },
+      draw(ctx, t) {
+        ctx.fillStyle = '#e6c56a'; ctx.fillRect(x - 11, y - 4, 22, 4);
+        ctx.strokeStyle = '#8a8e96'; ctx.lineWidth = 0.8; ctx.strokeRect(x - 10, y - 20, 20, 16); for (let k = -7; k <= 7; k += 3.5) { ctx.beginPath(); ctx.moveTo(x + k, y - 20); ctx.lineTo(x + k, y - 4); ctx.stroke(); }
+        if (!L.hamsterOut) { ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 3, y - 11, 5, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = '#e8a050'; circle(ctx, x + 3 + Math.cos(t * 12) * 1.5, y - 7, 2.2); }
+      },
+    };
+  }
+  function makeBudgieCage(x, y) {
+    return {
+      kind: 'budgiecage', x, y, bounds: { l: x - 12, r: x + 12, t: y - 50, b: y + 3 },
+      draw(ctx, t) {
+        ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 1, y - 40, 2, 40); ctx.fillRect(x - 6, y - 1, 12, 2);
+        ctx.strokeStyle = '#c9a33a'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.ellipse(x, y - 34, 7, 9, 0, Math.PI, 0); ctx.lineTo(x + 7, y - 26); ctx.lineTo(x - 7, y - 26); ctx.closePath(); ctx.stroke();
+        ctx.fillStyle = '#5ac85a'; ellipse(ctx, x, y - 30 + Math.sin(t * 5) * 0.6, 2.2, 3); ctx.fillStyle = '#f2d06a'; circle(ctx, x, y - 33, 1.6);
+      },
+    };
+  }
+  function makeMolehill(x, y) { return { kind: 'molehill', x, y: y - 6, bounds: { l: x - 10, r: x + 10, t: y - 10, b: y + 4 }, draw(ctx) { ctx.fillStyle = isWinter() ? '#dfe9f2' : '#6b4a2e'; ellipse(ctx, x, y, 8, 4); ctx.fillStyle = isWinter() ? '#f4f8fb' : '#7a5a3a'; ellipse(ctx, x - 1, y - 2, 5, 2.5); } }; }
+  function makeFoxDen(x, y) { return { kind: 'foxden', x, y, bounds: { l: x - 26, r: x + 26, t: y - 26, b: y + 4 }, draw(ctx) { ctx.fillStyle = '#7a756a'; ellipse(ctx, x, y - 8, 24, 14); ctx.fillStyle = '#2a1e14'; ctx.beginPath(); ctx.ellipse(x, y, 9, 10, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#5a8a3a'; circle(ctx, x - 14, y - 18, 5); circle(ctx, x + 16, y - 16, 4); } }; }
+
+  // --- Building: the outskirts (needs room) ------------------------------------------------------
+  function buildOutskirts(markSolid, place) {
+    const T = TILE;
+    L.camp = null; L.scrap = null; L.field = null;
+    const c = place(8, 6);
+    if (c) L.camp = { x: (c.x + 4) * T, y: (c.y + 3.2) * T, tents: [{ x: (c.x + 1.8) * T, y: (c.y + 2) * T }, { x: (c.x + 6.2) * T, y: (c.y + 2.2) * T }] };
+    const s = place(9, 7);
+    if (s) { L.scrap = { x: s.x + 1, y: s.y + 1, w: 7, h: 5 }; markSolid(s.x + 1, s.y + 1, 7, 5); }
+    const f = place(11, 8);
+    if (f) L.field = { x: f.x + 1, y: f.y + 1, w: 9, h: 6 };
+  }
+  function placeOutskirtsObjects() {
+    const T = TILE;
+    if (L.camp) {
+      objects.push(makeCampfire(L.camp.x, L.camp.y));
+      const cols = ['#e8732a', '#3f7f6a'];
+      L.camp.tents.forEach((p, i) => { const o = makeTent(p.x, p.y, cols[i]); objects.push(o); });
+    }
+    if (L.scrap) {
+      const S = L.scrap, gx = S.x + Math.floor(S.w / 2);
+      for (let x = S.x; x < S.x + S.w; x++) { if (x !== gx) objects.push(makeFence(x, S.y + S.h - 1, 'h')); objects.push(makeFence(x, S.y, 'h')); }
+      for (let y = S.y + 1; y < S.y + S.h - 1; y++) { objects.push(makeFence(S.x, y, 'v')); objects.push(makeFence(S.x + S.w - 1, y, 'v')); }
+      for (const [u, v] of [[0.25, 0.4], [0.72, 0.4], [0.3, 0.75], [0.72, 0.78]]) objects.push(makeJunkPile((S.x + S.w * u) * T, (S.y + S.h * v) * T));
+      objects.push(makeSign((gx + 1.6) * T, (S.y + S.h + 0.4) * T, 'SCRAP', 'YARD'));
+    }
+    if (L.field) {
+      const F = L.field;
+      for (let r = 0; r < F.h; r += 2) objects.push(makeWheatRow(F.x * T, (F.x + F.w) * T, (F.y + r + 0.95) * T));
+      L.fieldCrows = [];
+      for (const u of [0.25, 0.75]) { const o = makeScarecrow((F.x + F.w * u) * T, (F.y + F.h * 0.55) * T); objects.push(o); L.fieldCrows.push(o); }
+    }
+    // pets in the houses
+    const rooms = (L.rooms || []).filter(Boolean);
+    const shopless = rooms.filter((h) => !shopOf(h));
+    const tobyH = L.houses[L.homes.toby];
+    if (tobyH && tobyH.room) { const R = tobyH.room; L.hamster = { x: (R.bedLeft ? R.x0 + 3.7 : R.x0 + 7.3) * T, y: (R.y0 + 6.6) * T, area: tobyH.area, room: R }; objects.push(makeHamsterCage(L.hamster.x, L.hamster.y)); }
+    const bh = pick(shopless.filter((h) => h !== tobyH)) || null;
+    if (bh) { const R = bh.room; L.budgie = { x: (R.x0 + 5.5) * T, y: (R.y0 + 3.4) * T, area: bh.area, house: bh }; objects.push(makeBudgieCage(L.budgie.x, L.budgie.y)); }
+    L.fishHouse = pick(shopless.filter((h) => h !== bh)) || null;
+    // quest givers' homes
+    const mh = randomFreeSpot(3, 2);
+    if (mh) { L.moleHome = { x: (mh[0] + 1.5) * T, y: (mh[1] + 1.2) * T }; for (const [dx, dy] of [[-28, -6], [0, 4], [26, -8], [-12, 16], [16, 18]]) objects.push(makeMolehill(L.moleHome.x + dx, L.moleHome.y + dy)); }
+  }
+  function placeOutskirtsItems() {
+    if (L.camp) for (let k = 0; k < 3; k++) placeFree('marshmallow', L.camp.x - 24 + k * 14, L.camp.y + 24);
+    if (L.fishHouse) { const R = L.fishHouse.room; addItem('fishbowl', (R.x0 + 5.5) * TILE, (R.y0 + 5) * TILE + 1, { z: 22, owner: residentsOf(L.fishHouse)[0] || null }); }
+    if (L.fieldCrows) for (const o of L.fieldCrows) addItem('hat', o.x, o.y - 2, { z: 54, owner: 'bertram' }).scarehat = true;
+  }
+
+  // --- Animals ------------------------------------------------------------------------------------
+  function spawnOutskirtsCritters() {
+    const T = TILE;
+    const mk = (type, x, y, extra) => { const c = Object.assign({ type, x, y, z: 0, dir: 'left', walk: 0, ph: rand() * 6, tx: null, wait: rr(0, 3), cd: 0 }, extra); critters.push(c); return c; };
+    // a wild boar sow and her stripy piglets, along the forest edge
+    { const e = edgeSpot(rr(0, WORLD_W), rr(0, WORLD_H)); if (e) { const sow = mk('boar', e.x, e.y, { hx: e.x, hy: e.y, charge: 0 }); for (let k = 0; k < 3; k++) mk('boarlet', e.x + rr(-20, 20), e.y + rr(-10, 10), { mum: sow, off: k }); } }
+    // a moose standing in the road, somewhere along it
+    for (let n = 0; n < 40; n++) { const tx = Math.floor(rr(6, MW - 6)); if (getT(tx, L.roadY) === PATH && Math.abs(tx - L.roadX) > 8 && (tx < L.plaza.x - 2 || tx > L.plaza.x + 14)) { mk('moose', (tx + 0.5) * T, (L.roadY + 1.2) * T, { hx: (tx + 0.5) * T, hy: (L.roadY + 1.2) * T, shoo: 0 }); break; } }
+    // bats roosting (they come out at dusk)
+    for (let k = 0; k < 6; k++) mk('bat', (L.plaza.x + 6) * T + rr(-200, 200), (L.plaza.y + 6) * T + rr(-150, 150), { flying: true, z: 40, hx: 0, hy: 0, scatter: 0 });
+    // a woodpecker drumming on a tree
+    { const trees = objects.filter((o) => o.kind === 'tree' && o.y < WORLD_H && o.x > 6 * T && o.x < WORLD_W - 6 * T && o.y > 6 * T && o.y < WORLD_H - 6 * T); if (trees.length) { const tr = pick(trees); mk('woodpecker', tr.x + 6, tr.y, { flying: true, z: 24, tree: tr, hops: 0, flyT: 0 }); } }
+    // a kitten near one of the houses
+    { const h = pick(L.houses); if (h) mk('kitten', (h.doorX + 2) * T, (h.y + h.h + 1.5) * T, { friend: false, idleNear: 0, mewT: rr(3, 8) }); }
+    // crows in the field
+    if (L.field && !isWinter()) { const F = L.field; for (let k = 0; k < 6; k++) mk('fcrow', (F.x + rr(1, F.w - 1)) * T, (F.y + rr(1, F.h - 1)) * T, { hx: 0, hy: 0, flyT: 0, flying: false }); for (const c of critters) if (c.type === 'fcrow') { c.hx = c.x; c.hy = c.y; } }
+    // quest givers
+    { const tr = objects.filter((o) => o.kind === 'tree' && o.y < WORLD_H && Math.hypot(o.x - (L.plaza.x + 6) * T, o.y - (L.plaza.y + 6) * T) < 14 * T); const t0 = tr.length ? pick(tr) : null; if (t0) mk('qcrow', t0.x + 4, t0.y + 1, { flying: true, z: 40, quest: 'crow', askT: 0, done: false }); }
+    { const den = edgeSpot((L.plaza.x + 6) * T, (L.plaza.y - 10) * T); L.foxDen = den ? { x: den.x, y: den.y } : null; if (den) objects.push(makeFoxDen(den.x, den.y - 10)); }
+    if (L.foxDen) mk('qfox', L.foxDen.x + 18, L.foxDen.y, { quest: 'fox', askT: 0, done: false });
+    if (L.moleHome) mk('qmole', L.moleHome.x, L.moleHome.y, { quest: 'mole', askT: 0, done: false, pop: 0 });
+  }
+  const QUEST_ASK = { crow: 'Caw! Bring me something SHINY, would you?', fox: 'Psst... I’m starving. Fetch me an egg?', mole: 'Squeak! Dig me up 3 worms? (press B on grass)' };
+  function questReward(c, text) {
+    c.done = true; c.bubble = { text, t: 2 }; sfx('happy'); sparkle(c.x, c.y, 14);
+    for (let k = 0; k < 3; k++) particles.push({ kind: 'heart', x: c.x + rr(-6, 6), y: c.y, z: 14 + k * 4, life: 1.2, max: 1.2 });
+    run.earned += 2; updateRunBar(); toast('+2 ✦ for helping out', 'Favour done!', true);
+    completeTask(c.quest + 'quest');
+  }
+  function updateOutskirtsCritter(c, dt, near) {
+    const pd = Math.hypot(player.x - c.x, player.y - c.y), outside = areaOf(player.x, player.y) === 0;
+    const running = player.speed > WALK_SPEED * 1.15;
+    c.cd = Math.max(0, (c.cd || 0) - dt);
+    switch (c.type) {
+      case 'boar': {
+        if (c.charge > 0) {
+          c.charge -= dt; if (!outside) { c.charge = 0; break; }
+          critterMove(c, player.x, player.y, 160, dt);
+          if (pd < 15) { knockPlayer(c.x, c.y, 250); c.bubble = { text: 'SNORT!', t: 1 }; sfx('oink'); sfx('bonk'); c.charge = 0; c.cd = 8; completeTask('boar'); }
+          break;
+        }
+        const kids = critters.filter((k) => k.type === 'boarlet' && k.mum === c);
+        const nearKids = kids.some((k) => Math.hypot(player.x - k.x, player.y - k.y) < 50);
+        if (outside && c.cd <= 0 && !player.hidden && (nearKids || pd < 40)) { c.charge = 2; c.bubble = { text: 'GRUNT!', t: 0.8 }; sfx('growl'); break; }
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.hx + rr(-90, 90); c.ty = c.hy + rr(-60, 60); c.wait = rr(2, 5); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 22, dt)) c.tx = null;
+        if (Math.random() < dt * 0.3) c.bubble = { text: '*snuffle*', t: 0.8 };
+        break;
+      }
+      case 'boarlet': {
+        const m = c.mum, tx = m.x + Math.cos(c.off * 2.1 + c.ph * 0.3) * 18, ty = m.y + 8 + Math.sin(c.off * 2.1) * 8;
+        if (Math.hypot(tx - c.x, ty - c.y) > 4) critterMove(c, tx, ty, m.charge > 0 ? 120 : 40, dt);
+        break;
+      }
+      case 'moose': {
+        if (outside && pd < 28) { // it doesn't budge: a great big wall of moose
+          const dx = player.x - c.x, dy = player.y - c.y, d = Math.hypot(dx, dy) || 1, push = 28 - d;
+          if (!collides(player.x + dx / d * push, player.y)) player.x += dx / d * push;
+          if (!collides(player.x, player.y + dy / d * push)) player.y += dy / d * push;
+          if (c.cd <= 0) { c.cd = 4; c.bubble = { text: rpick(['...', '*chews*', 'Mmmrrph.']), t: 1.2 }; }
+        }
+        if (c.shoo > 0) { c.shoo -= dt; critterMove(c, c.x + c.sdx * 40, c.y + c.sdy * 40, 30, dt); if (c.shoo <= 0) { c.hx = c.x; c.hy = c.y; } }
+        break;
+      }
+      case 'bat': {
+        if (duskK < 0.4) break;
+        c.scatter = Math.max(0, c.scatter - dt);
+        const lamps = L.lights || [];
+        if (c.lamp === undefined) { let best = 0, bd = 1e9; lamps.forEach((lp, i) => { const d = Math.hypot(lp.x - c.x, lp.y - c.y) + Math.random() * 200; if (d < bd) { bd = d; best = i; } }); c.lamp = best; }
+        const l = lamps[c.lamp] || { x: (L.plaza.x + 6) * TILE, y: (L.plaza.y + 6) * TILE };
+        const sp = c.scatter > 0 ? 3 : 1, a = c.ph * 2.3 * sp;
+        c.x += (l.x + Math.cos(a) * 40 * sp - c.x) * Math.min(1, dt * 2); c.y += (l.y - 20 + Math.sin(a * 1.3) * 26 * sp - c.y) * Math.min(1, dt * 2);
+        c.z = 40 + Math.sin(a * 2) * 10; c.walk += dt * 30; c.dir = Math.cos(a) > 0 ? 'right' : 'left';
+        break;
+      }
+      case 'woodpecker': {
+        if (c.flyT > 0) { c.flyT -= dt; critterMove(c, c.tree.x + 6, c.tree.y, 140, dt); c.z = 24 + Math.sin(c.flyT * 4) * 10; c.walk += dt * 25; if (c.flyT <= 0) c.z = 24; break; }
+        if (Math.random() < dt * 1.2) { c.peck = 0.25; if (pd < 300) tone(900, 700, 0.03, 'square', 0.03); }
+        c.peck = Math.max(0, (c.peck || 0) - dt);
+        if (outside && pd < 60 && c.hops < 3) { // off to the next tree; follow it
+          const next = objects.filter((o) => o.kind === 'tree' && o !== c.tree && o.y < WORLD_H && Math.hypot(o.x - c.x, o.y - c.y) > 100 && Math.hypot(o.x - c.x, o.y - c.y) < 300 && o.x > 4 * TILE && o.x < WORLD_W - 4 * TILE && o.y > 4 * TILE && o.y < WORLD_H - 4 * TILE);
+          if (next.length) { c.tree = pick(next); c.flyT = 1.6; c.hops++; c.bubble = { text: 'tik-tik!', t: 0.8 }; sfx('flutter'); }
+          if (c.hops === 3) setTimeout(() => { const it = addItem('nuts', c.tree.x + 4, c.tree.y + 10); it.woodnuts = true; c.bubble = { text: '*tap tap tap*', t: 1.4 }; }, 1700);
+        }
+        break;
+      }
+      case 'goldfish': {
+        c.life -= dt; c.z = Math.abs(Math.sin(c.ph * 9)) * 6; c.dir = Math.sin(c.ph * 4) > 0 ? 'left' : 'right';
+        if (c.life <= 0) { c.dead = true; sparkle(c.x, c.y, 4); } // scooped back into a glass of water, safe and sound
+        break;
+      }
+      case 'hamster': {
+        const R = c.room, minX = (R.x0 + 1.4) * TILE, maxX = (R.x0 + 9.6) * TILE, minY = (R.y0 + 3) * TILE, maxY = (R.y0 + 6.8) * TILE;
+        c.wait -= dt;
+        if (c.wait <= 0 || c.tx === null) { c.tx = rr(minX, maxX); c.ty = rr(minY, maxY); c.wait = rr(0.6, 1.6); }
+        const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy);
+        if (d > 1) { c.x += dx / d * Math.min(d, 90 * dt); c.y += dy / d * Math.min(d, 90 * dt); c.dir = dx > 0 ? 'right' : 'left'; c.moving = true; c.walk += dt * 22; }
+        for (const v of villagers) if (areaOf(v.x, v.y) === areaOf(c.x, c.y) && Math.hypot(v.x - c.x, v.y - c.y) < 40 && (v.hamCD || 0) < time) { v.hamCD = time + 6; startleV(v, rpick(['The hamster’s loose!', 'Nibbles! Come back!', 'Eek! Under the bed!'])); }
+        break;
+      }
+      case 'kitten': {
+        c.mewT -= dt;
+        if (c.mewT <= 0) { c.mewT = rr(5, 10); c.bubble = { text: rpick(['mew!', 'mew mew', 'mrrp?']), t: 0.9 }; if (pd < 220) sfx('purr'); }
+        if (c.friend) {
+          if (!outside || pd > 500) { c.x = player.x - 20; c.y = player.y + 6; break; }
+          if (pd > 30) critterMove(c, player.x - 16, player.y + 6, pd > 90 ? 190 : 100, dt);
+          for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - c.x, v.y - c.y) < 50 && (v.awwCD || 0) < time && v.state !== 'chase') { v.awwCD = time + 20; say(v, rpick(['Aww, a kitten!', 'Hello, little one!']), 1.6); }
+          break;
+        }
+        if (outside && pd < 40 && player.speed < 5) { c.idleNear += dt; if (c.idleNear > 1.5) { c.friend = true; c.bubble = { text: 'purrrr ♥', t: 1.4 }; sfx('purr'); completeTask('kitten'); } } else c.idleNear = 0;
+        c.wait -= dt;
+        if (c.wait <= 0) { c.tx = c.x + rr(-40, 40); c.ty = c.y + rr(-30, 30); c.wait = rr(1, 3); }
+        if (c.tx && critterMove(c, c.tx, c.ty, 30, dt)) c.tx = null;
+        break;
+      }
+      case 'fcrow': {
+        if (c.flyT > 0) { c.flyT -= dt; c.z = Math.min(60, c.z + 60 * dt); c.x += Math.cos(c.fa) * 80 * dt; c.y += Math.sin(c.fa) * 50 * dt; c.walk += dt * 25; if (c.flyT <= 0) { c.x = c.hx + rr(-20, 20); c.y = c.hy + rr(-10, 10); c.z = 0; } break; }
+        if (outside && pd < 80 && running) { for (const k of critters) if (k.type === 'fcrow' && !(k.flyT > 0)) { k.flyT = rr(3, 5); k.fa = Math.atan2(k.y - player.y, k.x - player.x) + rr(-0.5, 0.5); } sfx('flutter'); sfx('squawk'); completeTask('crowfield'); break; }
+        if (Math.random() < dt * 0.5) c.peck = 0.3; c.peck = Math.max(0, (c.peck || 0) - dt);
+        break;
+      }
+      case 'qcrow': case 'qfox': case 'qmole': {
+        if (c.type === 'qmole') { c.pop = Math.max(0, c.pop - dt); if (outside && pd < 80) c.pop = 1; }
+        if (c.done) break;
+        c.askT -= dt;
+        if (outside && pd < 70 && c.askT <= 0) { c.askT = 8; c.bubble = { text: QUEST_ASK[c.quest], t: 3 }; if (c.type === 'qcrow') sfx('squawk'); }
+        if (c.quest === 'mole') { if (outside && pd < 40 && (player.worms || 0) >= 3) { player.worms -= 3; questReward(c, 'Squeak! Delicious! Thank you!'); } break; }
+        for (let i = items.length - 1; i >= 0; i--) {
+          const it = items[i];
+          if (it.held || it.air || !it.touched || Math.hypot(it.x - c.x, it.y - c.y) > 34) continue;
+          if ((c.quest === 'crow' && SHINY.has(it.kind)) || (c.quest === 'fox' && (it.kind === 'egg' || it.kind === 'paintegg'))) {
+            items.splice(i, 1); sfx('chomp');
+            questReward(c, c.quest === 'crow' ? 'CAW! Ooh, sparkly! Mine!' : 'Mmm, an egg! You’re a pal.');
+            break;
+          }
+        }
+        break;
+      }
+    }
+  }
+  function okScare(c, x, y, r) {
+    const real = r < 9999;
+    if (c.type === 'moose' && real && !(c.shoo > 0)) { const a = Math.atan2(c.y - y, c.x - x); c.sdx = Math.cos(a); c.sdy = Math.sin(a); c.shoo = 3; c.bubble = { text: 'HRRMMPH.', t: 1.2 }; sfx('moo'); completeTask('moose'); }
+    if (c.type === 'bat' && duskK >= 0.4 && real) { c.scatter = 3; if (c.type === 'bat' && !L.batsDone) { L.batsDone = true; sfx('squeak'); completeTask('bats'); } }
+    if (c.type === 'fcrow' && !(c.flyT > 0)) { c.flyT = rr(3, 5); c.fa = Math.atan2(c.y - y, c.x - x); if (real) completeTask('crowfield'); }
+    if (c.type === 'boar' && real && c.cd <= 0) { c.charge = 2; c.bubble = { text: 'GRUNT!', t: 0.8 }; sfx('growl'); }
+  }
+  function drawOutskirtsCritter(ctx, c, t) {
+    if (c.dead) return;
+    if (c.type === 'bat' && duskK < 0.4) return;
+    if (c.type === 'qmole' && c.pop <= 0 && c.done) return;
+    ctx.save(); ctx.translate(c.x, c.y);
+    if (c.type !== 'bat' && c.type !== 'qcrow' && c.type !== 'woodpecker') { ctx.fillStyle = 'rgba(20,30,10,0.2)'; ellipse(ctx, 0, 0, c.type === 'moose' ? 18 : c.type === 'boar' ? 10 : 5, c.type === 'moose' ? 5 : 2.4); }
+    ctx.translate(0, -(c.z || 0)); if (c.dir === 'left') ctx.scale(-1, 1);
+    const step = c.moving ? Math.sin(c.walk * 2) * 2 : 0;
+    switch (c.type) {
+      case 'boar': case 'boarlet': {
+        const s = c.type === 'boarlet' ? 0.5 : 1; ctx.scale(s, s);
+        ctx.fillStyle = '#4a3a2a'; for (const lx of [-6, 5]) ctx.fillRect(lx + step * 0.4, -5, 2.4, 5);
+        ctx.fillStyle = c.type === 'boarlet' ? '#a0703f' : '#5a4532'; ellipse(ctx, 0, -9, 10, 6); ellipse(ctx, 9, -9, 5, 4.5);
+        if (c.type === 'boarlet') { ctx.fillStyle = '#e6c56a'; for (let k = -2; k <= 2; k++) ctx.fillRect(-8 + (k + 2) * 3.5, -13, 1.4, 8); }
+        else { ctx.fillStyle = '#3a2a1a'; for (let k = 0; k < 6; k++) ctx.fillRect(-7 + k * 2.5, -16, 1.2, 3); }
+        ctx.fillStyle = '#8a6a5a'; ellipse(ctx, 13.5, -8, 2, 1.8); ctx.fillStyle = '#f4f2ee'; poly(ctx, [[12, -6], [14, -3], [11, -5.5]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 10, -11, 0.8);
+        break;
+      }
+      case 'moose': {
+        ctx.fillStyle = '#4a3a2a'; for (const lx of [-12, -8, 8, 12]) ctx.fillRect(lx, -22, 3, 22);
+        ctx.fillStyle = '#6b4a2e'; roundRect(ctx, -16, -36, 34, 16, 7, true); poly(ctx, [[12, -34], [18, -34], [24, -44], [18, -46]]); ctx.fill();
+        roundRect(ctx, 20, -50, 14, 9, 4, true); ctx.fillStyle = '#5a3a20'; ellipse(ctx, 32, -44, 3.5, 3);
+        ctx.fillStyle = '#c9a26a'; for (const s of [-1, 1]) { poly(ctx, [[24, -50], [16 + s * 2, -62], [12, -58], [18, -54], [14, -66], [22, -52]]); ctx.fill(); }
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 25, -47, 1);
+        break;
+      }
+      case 'bat': { const f = Math.sin(c.walk) * 4; ctx.fillStyle = '#2b2d33'; ellipse(ctx, 0, 0, 2.5, 2); poly(ctx, [[-1, 0], [-9, -3 - f], [-6, 1], [-4, 0]]); ctx.fill(); poly(ctx, [[1, 0], [9, -3 - f], [6, 1], [4, 0]]); ctx.fill(); break; }
+      case 'woodpecker': { const pk = c.peck > 0 ? 1.5 : 0; ctx.fillStyle = '#2b2d33'; ellipse(ctx, 0, -4, 3, 4.5); ctx.fillStyle = '#f4f2ee'; ellipse(ctx, 0.5, -3, 1.5, 3); ctx.fillStyle = '#e8453c'; circle(ctx, 0.5 + pk, -9, 1.8); ctx.fillStyle = '#2b2d33'; poly(ctx, [[2 + pk, -9], [5 + pk, -8.5], [2 + pk, -8]]); ctx.fill(); break; }
+      case 'goldfish': ctx.fillStyle = '#f2913a'; ellipse(ctx, 0, -2, 3.5, 2); poly(ctx, [[-3, -2], [-6, -4], [-6, 0]]); ctx.fill(); ctx.fillStyle = 'rgba(160,210,240,0.6)'; ellipse(ctx, 0, 1, 8, 2.5); break;
+      case 'hamster': ctx.fillStyle = '#e8a050'; ellipse(ctx, 0, -2.5, 4, 3); ctx.fillStyle = '#f8e4c4'; ellipse(ctx, 1.5, -2, 2, 1.8); ctx.fillStyle = '#1d1d22'; circle(ctx, 3, -3.5, 0.6); break;
+      case 'kitten': {
+        ctx.fillStyle = '#2b2d33'; ctx.fillRect(-4 + step * 0.4, -4, 1.4, 4); ctx.fillRect(3 - step * 0.4, -4, 1.4, 4);
+        ctx.fillStyle = '#e8923a'; ellipse(ctx, 0, -6, 5.5, 3.6); ctx.fillStyle = '#2b2d33'; ellipse(ctx, -2, -7, 2.4, 1.8); ctx.fillStyle = '#f4f2ee'; ellipse(ctx, 2, -5, 2, 1.4);
+        ctx.fillStyle = '#e8923a'; circle(ctx, 5, -9.5, 3.2); poly(ctx, [[3, -12], [3.5, -15], [5, -12.5]]); ctx.fill(); ctx.fillStyle = '#2b2d33'; poly(ctx, [[5.5, -12.5], [7, -15], [7.5, -11.5]]); ctx.fill();
+        ctx.strokeStyle = '#e8923a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-5, -7); ctx.quadraticCurveTo(-9, -12 + Math.sin(c.ph * 5), -7, -14); ctx.stroke();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 6.2, -10, 0.6);
+        break;
+      }
+      case 'fcrow': case 'qcrow': {
+        const f = c.flyT > 0 ? Math.sin(c.walk) * 3 : 0, pk = c.peck > 0 ? 2 : 0;
+        ctx.fillStyle = '#1d1d22'; ellipse(ctx, 0, -4, 4.5, 3.2); circle(ctx, 3.5, -7 + pk, 2.5); poly(ctx, [[-4, -4], [-9, -6], [-8, -2]]); ctx.fill();
+        if (f) { poly(ctx, [[-1, -5], [-6, -11 - f], [2, -5]]); ctx.fill(); }
+        ctx.fillStyle = '#3a3a40'; poly(ctx, [[5.5, -7.5 + pk], [9, -6.8 + pk], [5.5, -6 + pk]]); ctx.fill();
+        if (c.type === 'qcrow' && !c.done) { ctx.scale(c.dir === 'left' ? -1 : 1, 1); ctx.fillStyle = '#f2c14e'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('!', 0, -14); }
+        break;
+      }
+      case 'qfox': {
+        ctx.fillStyle = '#d9682a'; roundRect(ctx, -7, -9, 14, 7, 3.5, true); poly(ctx, [[4, -8], [11, -9], [12, -6], [6, -4]]); ctx.fill();
+        poly(ctx, [[5, -10], [6, -15], [8, -10]]); ctx.fill(); ctx.beginPath(); ctx.moveTo(-6, -7); ctx.quadraticCurveTo(-15, -4, -12, 0); ctx.quadraticCurveTo(-9, -2, -6, -4); ctx.fill();
+        ctx.fillStyle = '#f4f2ee'; circle(ctx, -12, -0.5, 1.6); ctx.fillStyle = '#1d1d22'; circle(ctx, 8.5, -8, 0.8); circle(ctx, 12, -7.5, 0.8);
+        if (!c.done) { ctx.scale(c.dir === 'left' ? -1 : 1, 1); ctx.fillStyle = '#f2c14e'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('!', 0, -18); }
+        break;
+      }
+      case 'qmole': {
+        const up = c.pop > 0 || !c.done ? 1 : 0;
+        ctx.fillStyle = '#6b4a2e'; ellipse(ctx, 0, 0, 7, 3.5);
+        if (up) { ctx.fillStyle = '#3a3036'; ellipse(ctx, 0, -5, 4.5, 4); ctx.fillStyle = '#f2b8c6'; circle(ctx, 3.5, -5, 1.4); ctx.fillStyle = '#f2d0c0'; ellipse(ctx, -4, -2, 2, 1); ellipse(ctx, 4, -2, 2, 1); }
+        if (!c.done) { ctx.fillStyle = '#f2c14e'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('!', 0, -12); }
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
+  // --- Per frame ------------------------------------------------------------------------------------
+  function updateOutskirts(dt) {
+    if (!L || !started || paused) return;
+    // toasting a marshmallow: hold it by the campfire
+    const it = player.held;
+    if (it && it.kind === 'marshmallow' && !it.toasted && L.camp && !wet() && Math.hypot(player.x - L.camp.x, player.y - L.camp.y) < 40) {
+      it.toastT = (it.toastT || 0) + dt;
+      if (Math.random() < dt * 6) particles.push({ kind: 'spark', x: it.x, y: it.y, z: it.z + 8, vx: 0, vy: 0, vz: 30, life: 0.4, max: 0.4 });
+      if (it.toastT > 2) { it.toasted = true; player.bubble = { text: 'perfectly golden!', t: 1.3 }; sfx('happy'); completeTask('marshmallow'); }
+    }
+    // the hamster cage: walk into it and the door swings open
+    const H = L.hamster;
+    if (H && !L.hamsterOut && areaOf(player.x, player.y) === H.area && Math.hypot(player.x - H.x, player.y - (H.y + 8)) < 18) {
+      L.hamsterOut = true; critters.push({ type: 'hamster', x: H.x, y: H.y + 10, z: 0, dir: 'left', walk: 0, ph: 0, tx: null, wait: 0, room: H.room });
+      sfx('squeak'); player.bubble = { text: 'oops! the hamster!', t: 1.4 }; completeTask('hamster');
+    }
+  }
+  // The budgie tells on you: pick something up in its room and it squawks for the owner
+  function budgieTattle(it) {
+    const B = L.budgie;
+    if (!B || areaOf(it.x, it.y) !== B.area || (L.budgieCD || 0) > time) return;
+    L.budgieCD = time + 12;
+    toast('“BURGLAR! BURGLAR!” squawks the budgie', 'Tattle-tale!', true); sfx('squawk'); sfx('squawk');
+    for (const id of residentsOf(B.house)) {
+      const v = VILLAGER[id]; if (!v || v.state === 'chase') continue;
+      const hi = v.stops.findIndex((s) => s.act === 'home');
+      if (hi >= 0) { v.stopIdx = hi; toRoute(v); say(v, 'What’s that bird squawking about?!', 1.8); }
+    }
+    completeTask('budgie');
+  }
+  // Rummage through a scrapyard junk pile (E with empty paws next to one)
+  function rummageAction() {
+    if (!L.junk || player.held) return false;
+    const J = L.junk.find((j) => !j.found && Math.hypot(player.x - j.x, player.y - (j.y + 10)) < 26);
+    if (!J) return false;
+    J.found = true; sfx('rustle'); sfx('bonk');
+    const it = addItem(pick(JUNK), J.x + rr(-8, 8), J.y + 14); it.junk = true; Object.assign(it, { air: true, vz: 100 });
+    player.bubble = { text: rpick(['ooh, treasure!', 'what’s this?', 'junk! lovely junk!']), t: 1.2 };
+    completeTask('rummage');
+    return true;
+  }
+  const junkNear = () => !player.held && L && L.junk && L.junk.some((j) => !j.found && Math.hypot(player.x - j.x, player.y - (j.y + 10)) < 26);
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -10665,6 +11095,7 @@
     else if (player.roof && started && player.x > roofRect(player.roof).r - 26 && player.y > roofRect(player.roof).b - 24) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'climb down' } }, t);
     else if (player.ride && (player.ride.kind === 'boat' || player.ride.kind === 'carousel') && started) drawPrompt(ctx, { x: player.x, y: player.y - (player.rideZ || 0), z: 0, owner: null, type: { h: 30, name: 'hop off' } }, t);
     else if (leverNear() && started) drawPrompt(ctx, { x: L.canal.lock.lever.x, y: L.canal.lock.lever.y, z: 0, owner: null, type: { h: 20, name: L.canal.lock.target ? 'drain the lock' : 'fill the lock' } }, t);
+    else if (junkNear() && started && !target) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'rummage' } }, t);
     else if (rideNear() && started && !target) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: rideNear() } }, t);
     else if (pipeNear() && started && !target) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'climb the drainpipe' } }, t);
     else if (player.tree && started && (player.tree.t < 0.15 || player.tree.t > 0.85)) drawPrompt(ctx, { x: player.x, y: player.y - 52, z: 0, owner: null, type: { h: 30, name: 'climb down' } }, t);
@@ -10784,6 +11215,7 @@
       updateTricks(dt);
       updateRainy(dt);
       updateMore(dt);
+      updateOutskirts(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
@@ -10830,9 +11262,9 @@
     placePuddles();
     spawnCritters();
     spawnWeather();
-    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack' || o.kind === 'drift' || o.kind === 'igloo' || o.kind === 'armour' || o.kind === 'hollowtree' || o.kind === 'cave' || o.kind === 'mirrortent'); // places to hide
+    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack' || o.kind === 'drift' || o.kind === 'igloo' || o.kind === 'armour' || o.kind === 'hollowtree' || o.kind === 'cave' || o.kind === 'mirrortent' || o.kind === 'tent'); // places to hide
     spawnAmbient();
-    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0, sled: false, tongueDone: false, tree: null, disguise: null, digging: null, roof: null, caged: 0, swim: false, ride: null, rideZ: 0 });
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0, sled: false, tongueDone: false, tree: null, disguise: null, digging: null, roof: null, caged: 0, swim: false, ride: null, rideZ: 0, worms: 0 });
     target = null;
     cam.x = player.x; cam.y = player.y;
   }

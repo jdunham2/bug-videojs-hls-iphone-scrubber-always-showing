@@ -14,7 +14,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Throw (from a roof or treehouse: drop) | F | "throw" button |
 | Eat what you're carrying | Q | "eat" button |
 | Wear / take off a disguise (hat, bucket, pot, shirt, sock, crown) | G | "wear" button |
-| Bury what you're carrying / dig it back up | B | "bury" / "dig up" button |
+| Bury what you're carrying / dig it back up / dig for worms (empty paws) | B | "bury" / "dig up" button |
 | Chitter (hop, scare butterflies, drop what's in your mouth) | Space | "chitter" button |
 | Toggle minimap | M | — |
 | Show / hide to-do list | T | "To-do" tab |
@@ -125,6 +125,21 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   sparrow flocks that scatter when you run at them (they shelter from bad weather), squirrels that dash up
   trees (and Biscuit barks up the tree, drawing villagers' eyes), frogs by the water in rain and spring, and
   seaside seagulls that swoop down and steal food out of your mouth (chitter to scare them off).
+- **A bigger map**: every village is now 96×68 tiles (up from 72×52), with up to eight houses you can go
+  into, more woods, bushes and hiding spots, and an extra minute on the clock to make up for the walking.
+- **Woodland animals**: a wild boar sow with stripy piglets (she charges if you go near them), a moose that
+  stands in the road like a wall until you chitter at it, bats that flit round the lamps after dusk, and a
+  woodpecker that flies off tree to tree when you get close (follow it and it leads you to a stash of nuts).
+- **Pets in the houses**: a goldfish bowl on someone's table (throw it and the goldfish flops about until it's
+  rescued), Toby's hamster (walk up to the cage and out it pops, sending villagers shrieking), a kitten
+  outside that follows you about once you've sat still beside it, and a budgie that squawks "BURGLAR!" if you
+  pick something up in its room, sending its owner hurrying home.
+- **The outskirts**: a campsite with two tents to hide in and a campfire (hold a marshmallow by it to toast
+  it), a fenced scrapyard with junk piles to rummage through (E), and a field with scarecrows (their hats
+  can be pinched) and crows to scatter.
+- **Animal favours**: three animals with a "!" over their heads want something. The crow wants something shiny,
+  the fox at its den by the forest edge wants an egg, and the mole wants three worms (press B on grass with
+  empty paws to dig for them). Drop off what they want for 2 bonus shinies.
 - **Rainy-day critters**: snails come out in the rain (or in spring) leaving shiny trails and hide in their
   shells if you get close; worms pop up in wet grass and a blackbird swoops for them (grab one first); spider
   webs on the fences sparkle with dew in the rain, fog, frost and early morning; dragonflies dart over the
@@ -162,7 +177,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 212 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 229 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -244,6 +259,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   mountain, canal, orchard and funfair: `buildMoreEarly()` / `placeMoreObjects()` / `placeMoreItems()`,
   `buildCanal()`, `buildMaze()`, `rideAction()` / `updateRide()` (cable car, narrowboats, carousel, big wheel),
   `leverAction()`, `shakeTree()`, `caveEcho()`, `updateMGoat()`, `updateMore()`;
+  woodland, pets, outskirts and favours: `buildOutskirts()` / `placeOutskirtsObjects()` / `placeOutskirtsItems()`,
+  `spawnOutskirtsCritters()` / `updateOutskirtsCritter()` / `okScare()` / `drawOutskirtsCritter()`, `questReward()`,
+  `budgieTattle()`, `rummageAction()`, `updateOutskirts()`; map size: `MW` / `MH` / `AREA_K` at the top;
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
