@@ -68,6 +68,13 @@ export class Falcon {
 
   update(dt, enemies, fighting) {
     if (!this.active) return;
+    // Only ever the realistic Meshy falcon: if its model is still loading (a slow
+    // connection), keep checking and stay out of sight until it's ready.
+    if (!this.realistic && models.falcon) {
+      this.realistic = this.useModel();
+      this.applyPlumage();
+    }
+    this.group.visible = this.realistic;
     this.t += dt;
     const P = this.game.player.pos;
     let target;
