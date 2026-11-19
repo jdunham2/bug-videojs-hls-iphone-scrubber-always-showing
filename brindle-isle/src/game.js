@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 31, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 32, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -954,6 +954,36 @@ const TIDE = { high: false, t: 0, warned: false, cells: [] };
   D.shell = { x: (X + 11) * T + 16, y: 39 * T + 16 };
 }
 const nearMangSite = (tx, ty, d) => Math.hypot(tx - MANG_D.camp.x / T, ty - MANG_D.camp.y / T) < d || Math.hypot(tx - MANG_D.x0 - 20, ty - 4) < 3 || Math.hypot(tx - MANG_D.x0 - 11, ty - 39) < 2.5;
+// ---------- the Brine Grotto: a sea cave under the shoals, flooded by the same tide ----------
+for (let y = 22; y <= 27; y++) for (let lx = 25; lx <= 31; lx++) { const k = y * W + MANG_D.x0 + lx; if (Math.hypot(lx - 28, (y - 24.5) * 1.2) <= 3.6) { tiles[k] = LAND; const i = TIDE.cells.indexOf(k); if (i >= 0) TIDE.cells.splice(i, 1); } }
+const GROTTO = { x: (MANG_D.x0 + 28) * T, y: 25 * T + 4, tx: MANG_D.x0 + 28, ty: 25 };
+ENTRANCES.push(GROTTO);
+const GROTTO_D = makeDungeon('grotto', 'The Brine Grotto', 31, GROTTO, { tint: 'rgb(185,220,210)',
+  gateMsg: 'A rusted grate blocks the way. Strike the three tide crystals in the cave.', bossDoorMsg: 'A door crusted with barnacles. The Swarm Mother keeps its key.',
+  objective: g => !g.open.sw ? 'Strike the three tide crystals. One sits on a ledge you can only reach across the sandbar at low tide.'
+    : !g.open.lock ? (g.keys ? 'Use the small key on the door in the west wall of the tide hall.' : 'The small key waits in an alcove across the tide pool. Cross the sandbar at low tide.')
+    : !S.defeated.swarmmother ? 'Defeat the Swarm Mother. She flies too high to reach: strike a smudge pot, then lure her dive through the smoke.'
+    : !g.open.boss ? 'Open the barnacled door north of the tide hall with the Boss Key.'
+    : !S.defeated.brinetooth ? 'Defeat Old Brinetooth. At high tide it hides in the water: wait for low tide, when it is stranded on the sand.' : 'The grotto is quiet. Take the stairs back up.' });
+{
+  const D = GROTTO_D;
+  carve(D, 6, 1, 33, 10);                          // Brinetooth's basin
+  carve(D, 9, 3, 30, 8, SANDBAR);
+  carve(D, 19, 11, 20, 12);
+  carve(D, 12, 13, 27, 24);                        // the tide hall
+  carve(D, 22, 13, 27, 24, DEEP); carve(D, 22, 14, 27, 15, SANDBAR);
+  carve(D, 28, 13, 30, 15);                        // key alcove across the pool
+  carve(D, 1, 13, 10, 24);                         // the Swarm Mother's nest
+  carve(D, 3, 26, 36, 33);                         // the crystal cave
+  carve(D, 30, 28, 36, 33, DEEP); carve(D, 32, 30, 34, 32); carve(D, 30, 31, 31, 31, SANDBAR);
+  carve(D, 19, 34, 20, 34); entryHall(D);
+  addDoor(D, 'sw', 'switch', [[19, 25], [20, 25]], GATE);
+  addDoor(D, 'lock', 'lock', [[11, 14], [11, 15]], LOCK, [10, 14]);
+  addDoor(D, 'boss', 'boss', [[19, 11], [20, 11]], BDOOR);
+  for (const [i, x, y] of [[1, 5, 27], [2, 14, 31], [3, 33, 31]]) D.switches.push({ id: 'g' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
+  for (const [x, y] of [[15, 34], [24, 34], [8, 25], [26, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
+  for (let y = 0; y < 35; y++) for (let lx = 0; lx < DW; lx++) if (tiles[y * W + D.x0 + lx] === SANDBAR) TIDE.cells.push(y * W + D.x0 + lx);
+}
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -1079,7 +1109,7 @@ function edgeKey(prefix, other, x, y) {
 }
 const landForShore = (x, y) => isLand(tileAt(x, y)) && !isBridge(x, y);
 const notPath = (x, y) => tileAt(x, y) !== PATH;
-const floorLike = t => t === FLOOR || t === 26 || t === 27 || t === STAIRS || t === BOG || t === WIND || t === GATE || t === LOCK || t === BDOOR;
+const floorLike = t => t === FLOOR || t === 26 || t === 27 || t === 28 || t === 29 || t === STAIRS || t === BOG || t === WIND || t === GATE || t === LOCK || t === BDOOR;
 function drawOutdoorTile(c, x, y, px, py, t) {
   if (dungeonAt(px).theme === 'sky') { drawSkyTile(c, x, y, px, py, t); return; }
   if (dungeonAt(px).theme === 'cave') { drawCaveTile(c, x, y, px, py, t); return; }
@@ -1154,6 +1184,7 @@ function drawDungeonTile(c, x, y) {
   if (D.outdoor) { drawOutdoorTile(c, x, y, px, py, t); return; }
   const lx = x - D.x0;
   if (D.id === 'shrine' && (t === DEEP || t === LILY)) { drawBlossomTile(c, x, y, px, py, t); return; }
+  if (D.id === 'grotto' && (t === SANDBAR || t === FLOODBAR || t === DEEP)) { drawMangroveTile(c, x, y, px, py, t); return; }
   if (D.id === 'citadel' && (t === SLIDE || t === ICEBLOCK)) { drawGlacierTile(c, x, y, px, py, t); return; }
   if (t === LAVA) {
     const h = hash(x, y); c.fillStyle = '#c8401a'; c.fillRect(px, py, T, T); c.fillStyle = '#ff7a2a'; c.fillRect(px + 3, py + 3, T - 6, T - 6);
@@ -1259,6 +1290,7 @@ const ITEMS = {
   cosmicheart: { name: 'Heart of the Cosmos', price: 950 },
   harvestcrown: { name: 'Harvest Crown', price: 950 },
   aurorastone: { name: 'Aurora Stone', price: 1000 },
+  abyssaltooth: { name: 'Abyssal Tooth', price: 1050 },
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
@@ -1283,6 +1315,7 @@ const WEAPONS = {
   arcane:  { name: 'Arcane Edge', dmg: 3, col: '#d6b8ff', cost: { gem: 1, crystal: 5 }, beam: true, desc: 'Cut from the Hollow Gem. Triple damage, and fires a sword beam while your hearts are full.' },
   frost:   { name: 'Frostbite Blade', dmg: 3, col: '#9fe8ff', cost: { frostheart: 1, crystal: 6 }, freeze: true, desc: 'Forged from the Frost Heart. Triple damage, and freezes foes so they move at a crawl.' },
   sun:     { name: 'Sunblade', dmg: 4, col: '#ffd65a', cost: { sunstone: 1, crystal: 8 }, beam: true, beamAlways: true, desc: 'Forged from the Sunstone. Quadruple damage, and every swing fires a beam of sunlight.' },
+  trident: { name: 'Tidecaller Trident', dmg: 5, col: '#5ab0a0', cost: { abyssaltooth: 1, driftwood: 8 }, reach: 12, desc: 'Tipped with the Abyssal Tooth. Five times damage and long reach: the sea itself answers its call.' },
   aurorablade: { name: 'Aurora Blade', dmg: 5, col: '#8cf0d0', cost: { aurorastone: 1, glacial: 8 }, reach: 8, freeze: true, desc: 'Set with the Aurora Stone, it shimmers green and violet. Five times damage, long reach, and it freezes foes.' },
   gourdbane: { name: 'Gourdbane', dmg: 5, col: '#e8803a', cost: { harvestcrown: 1, corn: 8 }, heavy: true, poison: true, desc: 'Topped with the Harvest Crown. Five times damage in a wide sweep, and it poisons what it cuts.' },
   heronspear: { name: 'Heron Spear', dmg: 4, col: '#c8d0d8', cost: { driftwood: 8, crystal: 4 }, reach: 14, desc: 'A long driftwood spear tipped like a heron\'s beak. Quadruple damage and the longest reach of any blade.' },
@@ -1374,6 +1407,9 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'grotto', giver: 'odo', name: 'The Brine Grotto', req: 'shoalfoes', goal: { boss: ['swarmmother', 'brinetooth'] }, reward: { gold: 700, items: { crystal: 18, driftwood: 6 } },
+    offer: ['There\'s a sea cave under the islet east of here. The Brine Grotto. The tide floods it twice a minute.', 'A great swarm nests inside, and old Brinetooth, the biggest eel I ever saw, took my best net. Wait for low tide to strike it, friend.'],
+    done: ['You beat old Brinetooth? Keep that tooth. A trident tipped with it would make the sea itself obey.'] },
   { id: 'citadel', giver: 'sena', name: 'The Frozen Citadel', req: 'icefoes', goal: { boss: ['matriarch', 'rimequeen'] }, reward: { gold: 680, items: { crystal: 18, glacial: 6 } },
     offer: ['South of the frozen lake stands an ice palace that wasn\'t there last winter. The Rime Queen has made it her home.', 'Her frost barrier turns swords. They say only a great slide across the ice can break it. Will you go?'],
     done: ['The auroras are dancing again! Keep that stone: set in a blade, it shines like the northern lights.'] },
@@ -1646,7 +1682,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0, harvestcrown: 0, glacial: 0, aurorastone: 0, driftwood: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0, harvestcrown: 0, glacial: 0, aurorastone: 0, driftwood: 0, abyssaltooth: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1791,7 +1827,7 @@ for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
 }
 for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
   const x = MANG_D.x0 + lx, t = tiles[y * W + x];
-  if (t !== LAND || nearMangSite(x, y, 5) || !isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1)) || tileAt(x, y + 1) === SANDBAR || tileAt(x, y - 1) === SANDBAR || tileAt(x - 1, y) === SANDBAR || tileAt(x + 1, y) === SANDBAR) continue;
+  if (t !== LAND || nearMangSite(x, y, 5) || Math.hypot(x - GROTTO.tx, y - GROTTO.ty) < 4 || !isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1)) || tileAt(x, y + 1) === SANDBAR || tileAt(x, y - 1) === SANDBAR || tileAt(x - 1, y) === SANDBAR || tileAt(x + 1, y) === SANDBAR) continue;
   const r = rng();
   if (r < 0.13) addRes('tree', x, y); else if (r < 0.17) addRes('tallgrass', x, y); else if (r < 0.185) addRes('herb', x, y); else if (r < 0.195) addRes('rock', x, y);
 }
@@ -1932,6 +1968,11 @@ dSpawn(TOMB_D, [['scarab', 15, 37], ['scarab', 24, 37], ['scarab', 21, 40], ['mu
 dChest(TOMB_D, 'key', 'key', 37, 26); dChest(TOMB_D, 'hall', 'gold', 32, 13);
 dPillars(TOMB_D, [[15, 14], [29, 14], [15, 19], [29, 19]]);
 for (const [x, y] of [[14, 41], [25, 41], [5, 23], [34, 23]]) addRes('pot', TOMB_D.x0 + x, y);
+dSpawn(GROTTO_D, [['mudskipper', 15, 38], ['mudskipper', 24, 38], ['clam', 8, 29], ['heron', 24, 29], ['mosquito', 20, 28], ['mosquito', 21, 29], ['mudskipper', 12, 32], ['clam', 26, 32], ['heron', 6, 32],
+  ['mosquito', 14, 20], ['mudskipper', 16, 17]]);
+dChest(GROTTO_D, 'key', 'key', 29, 14); dChest(GROTTO_D, 'hall', 'gold', 4, 32);
+dPillars(GROTTO_D, [[12, 28], [27, 28], [9, 31]]);
+for (const [x, y] of [[36, 26], [14, 41], [25, 41]]) addRes('crystal', GROTTO_D.x0 + x, y);
 dSpawn(CITADEL_D, [['penguin', 15, 38], ['penguin', 24, 38], ['snowball', 8, 29], ['yeti', 30, 30], ['frostbat', 20, 28], ['penguin', 12, 32], ['snowball', 27, 32], ['frostbat', 33, 31], ['yeti', 6, 32],
   ['frostbat', 14, 28]]);
 dChest(CITADEL_D, 'key', 'key', 27, 13); dChest(CITADEL_D, 'hall', 'gold', 35, 32);
@@ -2021,6 +2062,12 @@ const BOSS_INFO = {
   scarab: { name: 'The Golden Scarab', hp: 80, contact: 40, wake: 5 * T, col: '#ffd65a',
     seq: { 1: ['scuttle', 'roll', 'scuttle', 'beam'], 2: ['roll', 'dive', 'beam', 'scuttle', 'roll'], 3: ['beam', 'roll', 'dive', 'roll', 'beam', 'scuttle'] },
     lines: { 2: 'The Golden Scarab takes flight!', 3: 'The Golden Scarab blazes like the sun!' } },
+  swarmmother: { name: 'The Swarm Mother', hp: 70, contact: 0, wake: 4 * T, col: '#c84a3a',
+    seq: { 1: ['circle', 'aim', 'circle', 'aim'], 2: ['circle', 'aim', 'spray', 'circle', 'aim', 'brood'], 3: ['aim', 'spray', 'circle', 'aim', 'brood', 'aim'] },
+    lines: { 2: 'The Swarm Mother calls her brood!', 3: 'The Swarm Mother buzzes in a frenzy!' } },
+  brinetooth: { name: 'Old Brinetooth', hp: 110, contact: 0, wake: 6 * T, col: '#5a7a52',
+    seq: { 1: ['a', 'b', 'a', 'c'], 2: ['a', 'c', 'b', 'a'], 3: ['a', 'b', 'c', 'a', 'b'] },
+    lines: { 2: 'Old Brinetooth thrashes in fury!', 3: 'Old Brinetooth churns the whole grotto!' } },
   matriarch: { name: 'The Snow Matriarch', hp: 72, contact: 34, wake: 4 * T, col: '#e6eef5',
     seq: { 1: ['curl', 'throw', 'curl'], 2: ['curl', 'cubs', 'curl', 'throw'], 3: ['curl', 'stomp', 'curl', 'cubs', 'throw'] },
     lines: { 2: 'The Snow Matriarch calls her brood!', 3: 'The Snow Matriarch stamps in fury!' } },
@@ -2123,6 +2170,8 @@ const BOSSES = [
   makeBoss('jarl', FROST_D.camp.x, FROST_D.camp.y, { cx: FROST_D.camp.x, cy: FROST_D.camp.y, r: 5.6 * T }),
   makeBoss('mummy', (TOMB_D.x0 + 5) * T + 16, 16 * T, roomArena(TOMB_D, 1, 12, 10, 20)),
   makeBoss('scarab', (TOMB_D.x0 + 20) * T, 5 * T, roomArena(TOMB_D, 8, 1, 31, 10)),
+  makeBoss('swarmmother', (GROTTO_D.x0 + 5) * T + 16, 18 * T, roomArena(GROTTO_D, 1, 13, 10, 24)),
+  makeBoss('brinetooth', (GROTTO_D.x0 + 20) * T, 6 * T, roomArena(GROTTO_D, 6, 1, 33, 10)),
   makeBoss('matriarch', (CITADEL_D.x0 + 5) * T + 16, 18 * T, roomArena(CITADEL_D, 1, 13, 10, 24)),
   makeBoss('rimequeen', (CITADEL_D.x0 + 20) * T, 5 * T, roomArena(CITADEL_D, 6, 1, 33, 10)),
   makeBoss('scareking', (MILL_D.x0 + 5) * T + 16, 16 * T, roomArena(MILL_D, 1, 13, 10, 24)),
@@ -2459,6 +2508,7 @@ const ICON_DRAW = {
   feather: c => { c.save(); c.translate(16, 16); c.rotate(-0.6); c.fillStyle = '#c8b89a'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#efe6d8'; c.beginPath(); c.ellipse(-1, -3, 3, 10, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-0.5, -12, 1.5, 26); c.restore(); },
   chime: c => { c.fillStyle = '#8a6a44'; c.fillRect(6, 4, 20, 3); c.strokeStyle = '#c8c0b0'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(9 + i * 5, 7); c.lineTo(9 + i * 5, 12); c.stroke(); } for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#7fe0f0' : '#bfefff'; c.fillRect(8 + i * 5, 12, 3, 10 + (i % 2) * 6); } c.fillStyle = '#ffffff'; c.fillRect(8, 13, 1, 6); },
   bloom: c => { c.fillStyle = '#3d6a44'; c.fillRect(15, 18, 2, 12); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.fillStyle = i % 2 ? '#ff7a2a' : '#ffb347'; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 13 + Math.sin(a) * 6, 5, 3, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe08a'; circle(c, 16, 13, 3.5); },
+  abyssaltooth: c => { c.fillStyle = 'rgba(90,160,140,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#f2ecd8'; c.beginPath(); c.moveTo(10, 6); c.quadraticCurveTo(24, 8, 22, 28); c.quadraticCurveTo(16, 18, 9, 10); c.closePath(); c.fill(); c.fillStyle = '#c8c0a0'; c.beginPath(); c.moveTo(12, 9); c.quadraticCurveTo(20, 12, 21, 24); c.lineTo(18, 14); c.closePath(); c.fill(); c.fillStyle = '#5ab0a0'; c.fillRect(8, 5, 6, 3); },
   aurorastone: c => { const g = c.createLinearGradient(6, 6, 26, 26); g.addColorStop(0, '#5affaa'); g.addColorStop(0.5, '#8c78ff'); g.addColorStop(1, '#5adcff'); c.fillStyle = 'rgba(140,120,255,.3)'; circle(c, 16, 16, 13); c.fillStyle = g; c.beginPath(); c.moveTo(16, 4); c.lineTo(26, 14); c.lineTo(21, 28); c.lineTo(11, 28); c.lineTo(6, 14); c.closePath(); c.fill(); c.fillStyle = 'rgba(255,255,255,.75)'; c.fillRect(12, 9, 2, 9); c.fillRect(17, 12, 2, 4); },
   harvestcrown: c => { c.fillStyle = 'rgba(232,128,58,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#c8602a'; c.fillRect(7, 18, 18, 7); c.fillStyle = '#e8803a'; for (const [x, h] of [[8, 9], [13, 12], [19, 12], [24, 9]]) { c.beginPath(); c.moveTo(x - 3, 18); c.lineTo(x, 18 - h); c.lineTo(x + 3, 18); c.fill(); } c.fillStyle = '#4a6a2a'; c.fillRect(15, 5, 2, 4); c.fillStyle = '#ffd65a'; c.fillRect(10, 20, 2, 2); c.fillRect(20, 20, 2, 2); },
   cosmicheart: c => { c.fillStyle = 'rgba(159,212,255,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#1a1840'; c.beginPath(); c.moveTo(16, 27); c.bezierCurveTo(2, 18, 6, 4, 16, 11); c.bezierCurveTo(26, 4, 30, 18, 16, 27); c.fill(); c.fillStyle = '#ffe9a8'; for (const [ox, oy] of [[12, 13], [19, 12], [16, 19], [21, 17], [11, 18]]) c.fillRect(ox, oy, 1.6, 1.6); },
@@ -2493,8 +2543,8 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'glacial', 'driftwood', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone'];
-const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'glacial', 'driftwood', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone', 'abyssaltooth'];
+const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone', 'abyssaltooth'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
   if (DH) return DH.objective(dgs(DH));
@@ -2614,6 +2664,12 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">The Brine Grotto</div>
+      <dl class="controls">
+      <dt>Getting in</dt><dd>A sea cave on the islet east of Odo's Landing. Cross the sandbar at low tide to reach it.</dd>
+      <dt>Inside</dt><dd>The same tide floods the grotto: sandbars inside are dry only at low tide. Strike the three tide crystals, then cross the tide pool for the small key.</dd>
+      <dt>Swarm Mother</dt><dd>She flies too high to reach. Strike a smudge pot to light it, then stand near the smoke so her dive carries her through it. Choking, she falls: strike her then.</dd>
+      <dt>Old Brinetooth</dt><dd>At high tide the giant eel hides in the flooded basin and lunges at the shore: step out of the red ring. At low tide it's stranded on the sand and can be struck, but it still thrashes and snaps. Get off the sand before the tide comes back!</dd></dl>
       <div class="label">Mangrove Shoals</div>
       <dl class="controls">
       <dt>Getting there</dt><dd>Board Fisher's Punt near the Mirewood camp. The punt at Odo's Landing brings you back.</dd>
@@ -3026,6 +3082,8 @@ function onAction() {
   if (ls) { face({ x: ls.x, y: ls.y }); doAct('sword', hitEnemies); return true; }
   const py = AB && AB.type === 'weaver' && AB.state !== 'dazed' && AB.pylons && AB.pylons.find(q => q.hp > 0 && Math.hypot(q.x - P.x, q.y - P.y) < 70);
   if (py) { face({ x: py.x, y: py.y }); doAct('sword', hitEnemies); return true; }
+  const sp2 = AB && AB.type === 'swarmmother' && AB.active && swarmPots(AB).find(q => q.smoke <= 1 && Math.hypot(q.x - P.x, q.y - P.y) < 56);
+  if (sp2) { face({ x: sp2.x, y: sp2.y }); doAct('sword', hitEnemies); return true; }
   const bm = projectiles.find(q => q.kind === 'bomb' && !q.dead && !q.arc && !q.ret && Math.hypot(q.x - P.x, q.y - P.y) < 60);
   if (bm) { face({ x: bm.x, y: bm.y }); doAct('sword', hitEnemies); return true; }
   const hh = AB && AB.type === 'hydra' && AB.heads && AB.heads.find(h => !h.dead && h.state === 'stuck' && Math.hypot(h.x - P.x, h.y - P.y) < 110);
@@ -3193,7 +3251,7 @@ function hitEnemies(a) {
   }
   const AB = activeBoss();
   if (AB && AB.decoys) for (const dc of AB.decoys) if (!dc.popped && Math.hypot(dc.x - hx, dc.y - 26 - AB.z - hy) < rad + 26) { dc.popped = true; burst(dc.x, dc.y - 40, '#dff6ff', 16); floatText(dc.x, dc.y - 80, 'Just a reflection!', '#c8e8ff'); SFX.play('mine'); hit = true; }
-  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitGong(AB || {}, hx, hy, rad); hitClockGears(AB || {}, hx, hy, rad); hitLionStars(AB || {}, hx, hy, rad); hitPylons(AB || {}, hx, hy, rad); if (returnBombs(hx, hy, rad)) hit = true; hitLanterns(hx, hy, rad);
+  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitGong(AB || {}, hx, hy, rad); hitClockGears(AB || {}, hx, hy, rad); hitLionStars(AB || {}, hx, hy, rad); hitPylons(AB || {}, hx, hy, rad); if (returnBombs(hx, hy, rad)) hit = true; if (hitSmudge(AB || {}, hx, hy, rad)) hit = true; hitLanterns(hx, hy, rad);
   for (const e of enemies) if (e.alive && e.decoys && e.decoys.length) for (let i = e.decoys.length - 1; i >= 0; i--) { const q = e.decoys[i]; if (Math.hypot(q.x - hx, q.y - 10 - hy) < rad + 6) { e.decoys.splice(i, 1); burst(q.x, q.y - 16, '#ffb347', 12); floatText(q.x, q.y - 40, 'Just an illusion!', '#ffd6a0'); hit = true; } }
   if (AB && AB.type === 'hydra' && hitHydra(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && AB.type === 'serpent' && hitSerpent(AB, hx, hy, rad, dmg)) hit = true;
@@ -3805,6 +3863,8 @@ function damageBoss(B, n) {
   const dazed = B.state === 'dazed';
   let dmg = n * (dazed ? 2 : 1);
   if (B.type === 'scareking' && B.state === 'blink') return;
+  if (B.type === 'swarmmother' && B.state !== 'dazed') { B.shield = 0.35; floatText(B.x, B.y - 90, 'She darts away!', '#ff9a9a'); return; }
+  if (B.type === 'brinetooth' && B.swim && B.state !== 'dazed') { B.shield = 0.35; floatText(B.x, B.y - 70, 'It\'s under the water!', '#9fd8f0'); SFX.play('mine'); return; }
   if (B.type === 'matriarch' && B.state !== 'dazed') { B.shield = 0.35; floatText(B.x, B.y - 120, B.state === 'roll' ? 'It bounces off!' : 'Her snowy coat absorbs it!', '#e6eef5'); SFX.play('mine'); return; }
   if (B.type === 'rimequeen' && B.state !== 'dazed') { B.shield = 0.35; floatText(B.x, B.y - 120, 'Her frost barrier holds!', '#9fe8ff'); SFX.play('mine'); return; }
   if (B.type === 'pumpking' && B.state !== 'dazed' && !B.retHit) { B.shield = 0.35; floatText(B.x, B.y - 110, 'Its rind is too thick!', '#e8c060'); SFX.play('mine'); return; }
@@ -3896,6 +3956,15 @@ function bossStart(B, action) {
     else if (action === 'lash') { B.state = 'lashWind'; B.st = B.phase === 3 ? 0.45 : 0.6; }
     else if (action === 'curse') { B.state = 'curse'; B.st = 0.8; }
     else if (action === 'sarcophagus') { B.state = 'sink'; B.st = 0.5; SFX.play('wisp'); }
+  } else if (B.type === 'swarmmother') {
+    if (action === 'circle') { B.state = 'circle'; B.st = 1.8; }
+    else if (action === 'aim') { B.state = 'aim'; B.st = 0.6; B.tx = P.x; B.ty = P.y; }
+    else if (action === 'brood') { B.state = 'brood'; B.st = 0.6; }
+    else if (action === 'spray') { B.state = 'spray'; B.st = 0.6; }
+  } else if (B.type === 'brinetooth') {
+    B.swim = TIDE.high;
+    if (B.swim) { if (action === 'b') { B.state = 'jet'; B.st = 0.6; } else { B.state = 'aim'; B.st = 0.7; B.tx = P.x; B.ty = P.y; } }
+    else { if (action === 'b') { B.state = 'thrash'; B.st = 0.7; } else if (action === 'c') { B.state = 'snap'; B.st = 0.55; } else { B.state = 'flop'; B.st = 2; } }
   } else if (B.type === 'matriarch') {
     if (action === 'curl') { B.state = 'curl'; B.st = 0.6; B.sz = 1; }
     else if (action === 'throw') { B.state = 'throw'; B.st = 0.6; }
@@ -4052,6 +4121,8 @@ function finishBoss(B) {
   if (B.type === 'jarl') { drop(B.x, B.y - 10, 'gold', 20, 10); drop(B.x, B.y - 10, 'horn', 1); banner('Jarl Frostbeard defeated!', '#ffe08a'); }
   if (B.type === 'mummy') { drop(B.x, B.y - 10, 'gold', 16, 5); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mummy King crumbles!', '#ffe08a'); }
   if (B.type === 'scarab') { drop(B.x, B.y - 10, 'gold', 30, 10); drop(B.x, B.y - 10, 'sunstone', 1); banner('The Golden Scarab falls!', '#ffe08a'); }
+  if (B.type === 'swarmmother') { B.pots = null; drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'driftwood', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Swarm Mother falls! The air is still.', '#ffe08a'); }
+  if (B.type === 'brinetooth') { drop(B.x, B.y + 20, 'gold', 45, 10); drop(B.x, B.y + 20, 'abyssaltooth', 1); banner('Old Brinetooth sinks for good! The grotto is calm.', '#ffe08a'); }
   if (B.type === 'matriarch') { B.sz = 1; drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'glacial', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Snow Matriarch melts into slush!', '#ffe08a'); }
   if (B.type === 'rimequeen') { drop(B.x, B.y + 20, 'gold', 45, 10); drop(B.x, B.y + 20, 'aurorastone', 1); banner('The Rime Queen shatters! Spring stirs in the Rift.', '#ffe08a'); }
   if (B.type === 'scareking') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'corn', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Scarecrow King crumbles into straw!', '#ffe08a'); }
@@ -4099,7 +4170,7 @@ function updateBosses(dt, fainted) {
       Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: B.hx, y: B.hy, z: 0, ring: null, alpha: 1 });
       for (const e of enemies) if (e.minion) e.remove = true;
       projectiles.length = 0; bossBar();
-      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; B.tailHits = 0; B.dir = undefined; B.beached = false; B.tgt = null; B.gong = null; B.tents = null; B.cut = 0; B.gears = null; B.glow = -1; B.stars = null; B.pylons = null; B.lattice = 0; if (B.type === 'wraith') blizzard = 0; B.sz = 1; B.tgt = null;
+      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; B.tailHits = 0; B.dir = undefined; B.beached = false; B.tgt = null; B.gong = null; B.tents = null; B.cut = 0; B.gears = null; B.glow = -1; B.stars = null; B.pylons = null; B.lattice = 0; if (B.type === 'wraith') blizzard = 0; B.sz = 1; B.tgt = null; B.pots = null; B.segs = null;
     if (!fainted) toast(`${B.name} waits for your return.`);
       continue;
     }
@@ -4116,7 +4187,7 @@ function updateBosses(dt, fainted) {
       continue;
     }
     if (B.state === 'wake' || B.state === 'rest') { B.st -= dt; if (B.type === 'wraith') B.z += (20 + Math.sin(B.anim * 2) * 6 - B.z) * Math.min(1, dt * 4); if (B.type === 'wizard') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * 0.1; if (B.type === 'bat') B.z += (46 - B.z) * Math.min(1, dt * 4); if (B.st <= 0) bossNext(B); }
-    else ({ matriarch: updateMatriarch, rimequeen: updateRimeQueen, scareking: updateScareKing, pumpking: updatePumpKing, lion: updateLion, weaver: updateWeaver, knight2: updateKnight2, clock: updateClock, siren: updateSiren, kraken: updateKraken, elderfox: updateElderFox, koidragon: updateKoiDragon, chameleon: updateChameleon, serpent: updateSerpent, mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
+    else ({ swarmmother: updateSwarmMother, brinetooth: updateBrinetooth, matriarch: updateMatriarch, rimequeen: updateRimeQueen, scareking: updateScareKing, pumpking: updatePumpKing, lion: updateLion, weaver: updateWeaver, knight2: updateKnight2, clock: updateClock, siren: updateSiren, kraken: updateKraken, elderfox: updateElderFox, koidragon: updateKoiDragon, chameleon: updateChameleon, serpent: updateSerpent, mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
     const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'fight', 'stalk', 'swim', 'sink', 'slide', 'rise', 'dim'].includes(B.state);
     if (B.active && !harmless && B.z < 14 && d < I.contact && !fainted) damagePlayer(2, B);
   }
@@ -7806,28 +7877,29 @@ let tideSweepHint = false;
 function setTide(high) {
   TIDE.high = high;
   for (const k of TIDE.cells) tiles[k] = high ? FLOODBAR : SANDBAR;
-  redrawArea(MANG_D.x0, 12, MANG_D.x0 + DW - 1, 43);
-  const here = dungeonAt(P.x) === MANG_D;
+  redrawArea(MANG_D.x0, 12, MANG_D.x0 + DW - 1, 43); redrawArea(GROTTO_D.x0, 0, GROTTO_D.x0 + DW - 1, 34);
+  const here = dungeonAt(P.x) === MANG_D || dungeonAt(P.x) === GROTTO_D;
   if (high) {
     for (let i = pickups.length - 1; i >= 0; i--) { const q = pickups[i]; if (q.item === 'driftwood' && tileAt(Math.floor(q.x / T), Math.floor(q.y / T)) === FLOODBAR) pickups.splice(i, 1); }
-    for (const e of enemies) if (e.alive && !ENEMY[e.kind].flyer && dungeonAt(e.x) === MANG_D && tileAt(Math.floor(e.x / T), Math.floor(e.y / T)) === FLOODBAR) { e.x = e.hx; e.y = e.hy; }
+    for (const e of enemies) if (e.alive && !ENEMY[e.kind].flyer && (dungeonAt(e.x) === MANG_D || dungeonAt(e.x) === GROTTO_D) && tileAt(Math.floor(e.x / T), Math.floor(e.y / T)) === FLOODBAR) { e.x = e.hx; e.y = e.hy; }
     if (here) { toast('High tide! The sandbars are under water.', 3000); SFX.play('slime'); }
   } else {
     const n = pickups.filter(q => q.item === 'driftwood').length;
-    for (let i = n; i < 6; i++) { const k = TIDE.cells[Math.floor(rng() * TIDE.cells.length)]; pickups.push({ x: (k % W) * T + 16, y: Math.floor(k / W) * T + 16, vx: 0, vy: 0, item: 'driftwood', t: 0.4, keep: true }); }
+    const outCells = TIDE.cells.filter(k => (k % W) < MANG_D.x0 + DW);
+    for (let i = n; i < 6; i++) { const k = outCells[Math.floor(rng() * outCells.length)]; pickups.push({ x: (k % W) * T + 16, y: Math.floor(k / W) * T + 16, vx: 0, vy: 0, item: 'driftwood', t: 0.4, keep: true }); }
     if (here) toast('Low tide. The sandbars are bare: driftwood has washed up!', 3000);
   }
 }
 function updateTide(dt, fainted) {
   TIDE.t += dt;
-  const dur = TIDE.high ? TIDE_HIGH : TIDE_LOW, here = dungeonAt(P.x) === MANG_D;
+  const dur = TIDE.high ? TIDE_HIGH : TIDE_LOW, here = dungeonAt(P.x) === MANG_D || dungeonAt(P.x) === GROTTO_D;
   if (!TIDE.high && !TIDE.warned && TIDE.t > dur - 5) { TIDE.warned = true; if (here) { toast('The tide is coming in! Get to an islet or the shore.', 3500); SFX.play('wisp'); } }
   if (TIDE.t >= dur) { TIDE.t = 0; TIDE.warned = false; setTide(!TIDE.high); }
   if (!here || fainted || P.ride) return;
   const tx = Math.floor(P.x / T), ty = Math.floor(P.y / T);
   if (tileAt(tx, ty) !== FLOODBAR) return;
   let best = null, bd = 1e9;
-  for (let yy = ty - 14; yy <= ty + 14; yy++) for (let xx = tx - 14; xx <= tx + 14; xx++) { const t = tileAt(xx, yy); if (!isLand(t) || t === FLOODBAR || dungeonAt(xx * T + 16) !== MANG_D) continue; const dd = Math.hypot(xx - tx, yy - ty); if (dd < bd) { bd = dd; best = [xx, yy]; } }
+  for (let yy = ty - 14; yy <= ty + 14; yy++) for (let xx = tx - 14; xx <= tx + 14; xx++) { const t = tileAt(xx, yy); if (!isLand(t) || t === FLOODBAR || t === STAIRS || dungeonAt(xx * T + 16) !== dungeonAt(P.x)) continue; const dd = Math.hypot(xx - tx, yy - ty); if (dd < bd) { bd = dd; best = [xx, yy]; } }
   burst(P.x, P.y - 10, '#bfe8ff', 16); SFX.play('slime');
   if (best) { P.x = best[0] * T + 16; P.y = best[1] * T + 16; } else { P.x = MANG_D.start.x; P.y = MANG_D.start.y; }
   P.slideV = null; P.kx = P.ky = 0; damagePlayer(1, { x: P.x, y: P.y - 20 }); floatText(P.x, P.y - 60, 'Swept away!', '#bfe8ff');
@@ -7965,6 +8037,118 @@ Object.assign(PROC_DRAW, {
     c.strokeStyle = '#5a7a8a'; c.lineWidth = 1; for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(e.x, y - gape); c.lineTo(e.x + i * 5 * k, y - gape - 9 * k + Math.abs(i) * 1.5); c.stroke(); }
   },
 });
+// ---------- the Swarm Mother: too high to reach, until she flies through smudge-pot smoke ----------
+let swHint = false;
+function swarmPots(B) {
+  if (!B.pots) { const A = B.arena; B.pots = [[0.18, 0.2], [0.82, 0.2], [0.18, 0.86], [0.82, 0.86]].map(([fx, fy]) => ({ x: A.x0 + (A.x1 - A.x0) * fx, y: A.y0 + (A.y1 - A.y0) * fy, smoke: 0 })); }
+  return B.pots;
+}
+function hitSmudge(B, hx, hy, rad) {
+  if (B.type !== 'swarmmother' || !B.active || B.state === 'dying') return false;
+  let any = false;
+  for (const p of swarmPots(B)) {
+    if (Math.hypot(p.x - hx, p.y - 12 - hy) > rad + 18 || p.smoke > 1) continue;
+    p.smoke = 5; any = true; SFX.play('wisp'); burst(p.x, p.y - 20, '#c8c8c0', 14); floatText(p.x, p.y - 50, 'Smoke!', '#e6e6e0');
+  }
+  return any;
+}
+function updateSwarmMother(B, dt, fainted, d) {
+  const A = B.arena, pots = swarmPots(B);
+  if (!swHint && B.active) { swHint = true; toast('She flies too high to reach! Strike a smudge pot to make smoke, then lure her dive through it.', 5000); }
+  for (const p of pots) { p.smoke = Math.max(0, p.smoke - dt); if (p.smoke > 0 && Math.random() < dt * 14) particles.push({ x: p.x + (rng() - 0.5) * 30, y: p.y - 20, vx: (rng() - 0.5) * 20, vy: -30 - rng() * 20, life: 1.2, color: 'rgba(200,200,190,.7)', size: 8 }); }
+  if (B.state !== 'dazed') {
+    const want = B.state === 'dive' ? 20 : 46; B.z += (want - B.z) * Math.min(1, dt * 5);
+    const p = B.state === 'dive' && pots.find(q => q.smoke > 0 && Math.hypot(q.x - B.x, q.y - B.y) < 70);
+    if (p) { B.state = 'dazed'; B.st = 3.4; impact(6); SFX.play('slam'); floatText(B.x, B.y - 90, 'She chokes on the smoke!', '#ffe08a'); burst(B.x, B.y - 30, '#c8c8c0', 16); return; }
+  }
+  switch (B.state) {
+    case 'circle': { B.st -= dt; const a = B.anim * 1.6, tx = A.cx + Math.cos(a) * 100, ty = A.cy + Math.sin(a) * 120; B.x += (tx - B.x) * Math.min(1, dt * 3); B.y += (ty - B.y) * Math.min(1, dt * 3); if (B.st <= 0) bossRest(B, 0.1); break; }
+    case 'aim': B.st -= dt; if (B.st <= 0) { const dx = B.tx - B.x, dy = B.ty - B.y, dd = Math.hypot(dx, dy) || 1; B.vx = dx / dd * 340; B.vy = dy / dd * 340; B.state = 'dive'; B.st = Math.min(1.1, (dd + 60) / 340); B.hitP = false; SFX.play('dash'); } break;
+    case 'dive': B.st -= dt; B.x += B.vx * dt; B.y += B.vy * dt; clampBoss(B); if (!B.hitP && !fainted && !P.dash && Math.hypot(P.x - B.x, P.y - B.y) < 34) { B.hitP = true; damagePlayer(2, B); } if (Math.random() < dt * 30) particles.push({ x: B.x, y: B.y - B.z, vx: -B.vx * 0.1, vy: -B.vy * 0.1, life: 0.3, color: '#e0503a', size: 3 }); if (B.st <= 0) bossRest(B, 0.5); break;
+    case 'brood': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['mosquito', 'mosquito', 'mosquito'], 5); SFX.play('wisp'); bossRest(B, 0.4); } break;
+    case 'spray': B.st -= dt; if (B.st <= 0) { const a0 = Math.atan2(P.y - 14 - (B.y - B.z), P.x - B.x), n = B.phase === 3 ? 7 : 5; for (let i = 0; i < n; i++) { const a = a0 + (i - (n - 1) / 2) * 0.28; projectiles.push({ kind: 'venom', x: B.x, y: B.y - B.z, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, t: 0, life: 2.2 }); } SFX.play('swing'); bossRest(B, 0.6); } break;
+    case 'dazed': B.st -= dt; B.z = Math.max(0, B.z - 120 * dt); if (B.st <= 0) bossRest(B, 0.4); break;
+  }
+}
+function drawSwarmMother(c, B) {
+  for (const p of swarmPots(B)) {
+    shadow(c, p.x, p.y + 2, 14, 5);
+    c.fillStyle = '#8a5a3a'; c.beginPath(); c.moveTo(p.x - 12, p.y - 22); c.quadraticCurveTo(p.x - 16, p.y - 6, p.x - 9, p.y); c.lineTo(p.x + 9, p.y); c.quadraticCurveTo(p.x + 16, p.y - 6, p.x + 12, p.y - 22); c.closePath(); c.fill();
+    c.fillStyle = '#6a4228'; c.fillRect(p.x - 13, p.y - 24, 26, 4); c.fillStyle = p.smoke > 0 ? '#ffb347' : '#5a3a28'; ellipse(c, p.x, p.y - 22, 10, 3);
+    if (p.smoke > 0) { c.fillStyle = `rgba(200,200,190,${0.25 + Math.min(1, p.smoke) * 0.25})`; for (let i = 0; i < 4; i++) circle(c, p.x + Math.sin(time * 2 + i * 1.7) * 22, p.y - 40 - i * 14, 26 - i * 3); }
+    else { c.fillStyle = 'rgba(255,255,255,.6)'; c.font = '700 10px sans-serif'; c.textAlign = 'center'; if (B.active && Math.hypot(P.x - p.x, P.y - p.y) < 70) c.fillText('Strike!', p.x, p.y - 34); }
+  }
+  const x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y - (B.z || 0), f = (B.state === 'dive' ? B.vx : P.x - B.x) < 0 ? -1 : 1, flap = Math.sin(time * 50) * 6;
+  if (B.state === 'aim') { const pulse = 0.5 + Math.sin(time * 18) * 0.3; c.strokeStyle = `rgba(236,82,87,${pulse})`; c.lineWidth = 2; c.beginPath(); c.moveTo(B.x, B.y); c.lineTo(B.tx, B.ty); c.stroke(); c.beginPath(); c.ellipse(B.tx, B.ty, 26, 11, 0, 0, Math.PI * 2); c.stroke(); }
+  c.fillStyle = 'rgba(0,0,0,.25)'; ellipse(c, B.x, B.y + 4, 30, 8);
+  c.save(); bossFlash(c, B);
+  c.fillStyle = 'rgba(220,235,240,.5)'; for (const s of [-1, 1]) { c.beginPath(); c.ellipse(x + s * 26, y - 40 + flap * s * 0.3, 30, 10, s * (0.4 + flap * 0.02), 0, Math.PI * 2); c.fill(); }
+  c.fillStyle = '#4a3a2a'; c.beginPath(); c.ellipse(x - f * 22, y - 22, 24, 13, -f * 0.3, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#c84a3a'; for (let i = 0; i < 3; i++) { c.beginPath(); c.ellipse(x - f * (12 + i * 10), y - 24 + i * 2, 3, 10, -f * 0.3, 0, Math.PI * 2); c.fill(); }
+  c.fillStyle = '#3a3a2a'; ellipse(c, x, y - 34, 16, 14); c.fillStyle = '#2a2a1a'; circle(c, x + f * 16, y - 40, 10);
+  c.fillStyle = '#c83a3a'; circle(c, x + f * 20, y - 44, 4); circle(c, x + f * 13, y - 45, 3);
+  c.strokeStyle = '#1a1a10'; c.lineWidth = 2; c.beginPath(); c.moveTo(x + f * 24, y - 38); c.lineTo(x + f * (B.state === 'dive' ? 50 : 40), y - 26); c.stroke();
+  c.strokeStyle = '#2a2a1a'; c.lineWidth = 2; for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(x + i * 6, y - 24); c.lineTo(x + i * 10, y - 4 + Math.sin(time * 8 + i) * 2); c.stroke(); }
+  c.restore();
+  if (B.state === 'spray' || B.state === 'aim') bossWarn(c, { x }, y - 80);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 60, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 70, 22);
+}
+// ---------- Old Brinetooth: hides in the water at high tide, stranded on the sand at low tide ----------
+let btHint = false;
+const brineBasin = B => { const A = B.arena; return { x0: A.x0 + 3 * T + 20, x1: A.x1 - 3 * T - 20, y0: A.y0 + 2 * T + 16, y1: A.y1 - 2 * T - 8 }; };
+function updateBrinetooth(B, dt, fainted, d) {
+  const R = brineBasin(B), wasSwim = B.swim;
+  B.swim = TIDE.high;
+  if (!btHint && B.active) { btHint = true; toast(TIDE.high ? 'Old Brinetooth lurks in the flooded basin. Wait for low tide, when it\'s stranded on the sand!' : 'Old Brinetooth is stranded on the sand! Strike before the tide comes back in.', 5000); }
+  if (wasSwim && !B.swim && B.state !== 'dying') { floatText(B.x, B.y - 80, 'Stranded! Strike now!', '#ffe08a'); B.state = 'flop'; B.st = 1.5; }
+  if (!wasSwim && B.swim && B.state !== 'dying') { floatText(B.x, B.y - 80, 'It slips back into the water!', '#9fd8f0'); B.state = 'lurk2'; B.st = 1; }
+  const clampR = () => { B.x = Math.max(R.x0, Math.min(R.x1, B.x)); B.y = Math.max(R.y0, Math.min(R.y1, B.y)); };
+  if (B.swim && B.state !== 'lunge' && B.state !== 'dying') { B.x += (Math.max(R.x0, Math.min(R.x1, B.x)) - B.x) * Math.min(1, dt * 4); B.y += (Math.max(R.y0, Math.min(R.y1, B.y)) - B.y) * Math.min(1, dt * 4); }
+  // body segments trail the head
+  if (!B.segs) B.segs = Array.from({ length: 9 }, () => ({ x: B.x, y: B.y }));
+  let px2 = B.x, py2 = B.y; for (const s of B.segs) { const dx = s.x - px2, dy = s.y - py2, dd = Math.hypot(dx, dy) || 1; if (dd > 16) { s.x = px2 + dx / dd * 16; s.y = py2 + dy / dd * 16; } px2 = s.x; py2 = s.y; }
+  switch (B.state) {
+    case 'lurk2': B.st -= dt; B.x += Math.cos(B.anim) * 60 * dt; B.y += Math.sin(B.anim * 1.3) * 40 * dt; clampR(); if (B.st <= 0) bossRest(B, 0.1); break;
+    case 'aim': B.st -= dt; if (B.st <= 0) { B.state = 'lunge'; B.st = 0.35; SFX.play('dash'); } break;
+    case 'lunge': { B.st -= dt; const ex = B.tx - B.x, ey = B.ty - B.y, el = Math.hypot(ex, ey) || 1; B.x += ex / el * Math.min(el, 520 * dt); B.y += ey / el * Math.min(el, 520 * dt); if (B.st <= 0) { if (!fainted && !P.dash && Math.hypot(P.x - B.tx, P.y - B.ty) < 46) damagePlayer(2, B); burst(B.tx, B.ty, '#bfe8ff', 14); SFX.play('slime'); bossRest(B, 0.6); } break; }
+    case 'jet': B.st -= dt; if (B.st <= 0) { const ring = B.phase === 3, n = ring ? 10 : 4, a0 = Math.atan2(P.y - B.y, P.x - B.x); for (let i = 0; i < n; i++) { const a = ring ? i / n * Math.PI * 2 : a0 + (i - 1.5) * 0.3; projectiles.push({ kind: 'bubble', x: B.x, y: B.y - 20, vx: Math.cos(a) * 100, vy: Math.sin(a) * 100, t: 0, life: 3.5, ph: rng() * 6 }); } SFX.play('wisp'); bossRest(B, 0.6); } break;
+    case 'flop': { B.st -= dt; const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * 45 * dt + Math.sin(B.anim * 9) * 30 * dt; B.y += dy / dd * 45 * dt; clampR(); if (!fainted && d < 40) damagePlayer(1, B); if (B.st <= 0) bossRest(B, 0.2); break; }
+    case 'thrash': B.st -= dt; if (B.st <= 0) { B.ring = { x: B.x, y: B.y, r: 20, max: 190, hit: false }; impact(5); SFX.play('slam'); bossRest(B, 0.8); } break;
+    case 'snap': B.st -= dt; if (B.st <= 0) { const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * Math.min(dd, 70); B.y += dy / dd * Math.min(dd, 70); clampR(); if (!fainted && !P.dash && Math.hypot(P.x - B.x, P.y - B.y) < 44) damagePlayer(2, B); SFX.play('hit'); bossRest(B, 0.9); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+  }
+}
+function drawBrinetooth(c, B) {
+  const sw = B.swim && B.state !== 'dying', x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y;
+  if (B.state === 'aim') { const pulse = 0.5 + Math.sin(time * 18) * 0.3; c.strokeStyle = `rgba(236,82,87,${pulse})`; c.lineWidth = 3; c.beginPath(); c.ellipse(B.tx, B.ty, 46, 20, 0, 0, Math.PI * 2); c.stroke(); }
+  const segs = B.segs || [];
+  c.save(); if (sw) c.globalAlpha = 0.45; bossFlash(c, B);
+  for (let i = segs.length - 1; i >= 0; i--) { const s = segs[i], r = 15 - i * 1.1, wob = sw ? 0 : Math.sin(time * 8 + i) * 2; if (!sw) { c.fillStyle = 'rgba(0,0,0,.2)'; ellipse(c, s.x, s.y + 4, r, r * 0.4); } c.fillStyle = i % 2 ? '#4a6a4a' : '#5a7a52'; ellipse(c, s.x, s.y - 12 + wob, r, r * 0.8); c.fillStyle = '#c8c890'; ellipse(c, s.x, s.y - 8 + wob, r * 0.6, r * 0.3); }
+  const f = P.x < x ? -1 : 1, open = B.state === 'aim' || B.state === 'lunge' || B.state === 'snap' ? 1 : 0.3 + Math.sin(time * 3) * 0.2;
+  c.fillStyle = '#5a7a52'; ellipse(c, x, y - 16, 22, 16);
+  c.fillStyle = '#3a1a1a'; c.beginPath(); c.moveTo(x + f * 8, y - 18); c.lineTo(x + f * 34, y - 22 - open * 12); c.lineTo(x + f * 34, y - 14 + open * 10); c.closePath(); c.fill();
+  c.fillStyle = '#f2ecd8'; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(x + f * (14 + i * 5), y - 20 - open * (4 + i * 2)); c.lineTo(x + f * (16 + i * 5), y - 14 - open * (4 + i * 2)); c.lineTo(x + f * (18 + i * 5), y - 20 - open * (4 + i * 2)); c.fill(); }
+  c.fillStyle = '#e8d060'; circle(c, x + f * 6, y - 26, 5); c.fillStyle = '#1a1a10'; c.fillRect(x + f * 6 - 1, y - 30, 2, 8);
+  c.restore();
+  if (sw) { c.strokeStyle = 'rgba(220,245,240,.6)'; c.lineWidth = 2; for (let i = 0; i < 3; i++) { const r = ((time * 30 + i * 20) % 60); c.globalAlpha = 1 - r / 60; c.beginPath(); c.ellipse(x, y - 4, 20 + r, 8 + r * 0.4, 0, 0, Math.PI * 2); c.stroke(); } c.globalAlpha = 1; }
+  else if (B.state !== 'sleep' && B.state !== 'dying') { c.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 3; i++) c.fillRect(x - 10 + i * 9, y - 28 + Math.sin(time * 6 + i) * 2, 3, 2); }
+  if (B.state === 'thrash' || B.state === 'jet' || B.state === 'snap') bossWarn(c, { x }, y - 70);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 40, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 60, 22);
+}
+function drawGrottoGate(c) {
+  const x = GROTTO.x, y = GROTTO.y;
+  c.fillStyle = 'rgba(0,0,0,.28)'; ellipse(c, x, y - 2, 56, 12);
+  c.fillStyle = '#5a5a50'; c.beginPath(); c.moveTo(x - 52, y); c.quadraticCurveTo(x - 58, y - 60, x - 20, y - 78); c.quadraticCurveTo(x + 10, y - 92, x + 40, y - 70); c.quadraticCurveTo(x + 60, y - 40, x + 52, y); c.closePath(); c.fill();
+  c.fillStyle = '#6e6e62'; c.beginPath(); c.moveTo(x - 46, y - 10); c.quadraticCurveTo(x - 50, y - 56, x - 18, y - 72); c.lineTo(x - 10, y - 60); c.quadraticCurveTo(x - 34, y - 46, x - 30, y - 6); c.closePath(); c.fill();
+  c.fillStyle = '#0e1a1a'; c.beginPath(); c.moveTo(x - 20, y); c.quadraticCurveTo(x - 24, y - 44, x, y - 48); c.quadraticCurveTo(x + 24, y - 44, x + 20, y); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(60,140,120,.35)'; ellipse(c, x, y - 4, 18, 5);
+  c.strokeStyle = '#4a3220'; c.lineWidth = 4; c.lineCap = 'round'; for (const [ax, bx] of [[-44, -30], [36, 50], [-10, 8]]) { c.beginPath(); c.moveTo(x + ax, y - 70); c.quadraticCurveTo(x + (ax + bx) / 2, y - 30, x + bx, y + 2); c.stroke(); } c.lineCap = 'butt';
+  c.fillStyle = '#e8e0d0'; for (const [ox, oy] of [[-36, -30], [-30, -26], [34, -40], [40, -34], [28, -18]]) circle(c, x + ox, y + oy, 2.5);
+  c.fillStyle = '#5a8a3a'; for (const ox of [-30, -6, 22]) { c.beginPath(); c.ellipse(x + ox, y - 76 + Math.abs(ox) * 0.2, 14, 6, 0, 0, Math.PI * 2); c.fill(); }
+  const dr = (time * 0.8) % 1; c.fillStyle = `rgba(160,220,210,${1 - dr})`; circle(c, x - 4, y - 48 + dr * 40, 2);
+}
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -8244,7 +8428,7 @@ function drawTent(c, o) {
   c.fillStyle = 'rgba(242,248,255,.85)'; c.beginPath(); c.moveTo(o.x - 10, o.y - 40); c.lineTo(o.x, o.y - 52); c.lineTo(o.x + 10, o.y - 40); c.closePath(); c.fill();
   c.fillStyle = '#c0392b'; c.fillRect(o.x - 1, o.y - 66, 2, 16); c.fillRect(o.x + 1, o.y - 66, 10, 6);
 }
-function drawBossAny(c, B) { ({ matriarch: drawMatriarch, rimequeen: drawRimeQueen, scareking: drawScareKing, pumpking: drawPumpKing, lion: drawLion, weaver: drawWeaver, knight2: drawKnight2, clock: drawClock, siren: drawSiren, kraken: drawKraken, elderfox: drawElderFox, koidragon: drawKoiDragon, chameleon: drawChameleon, serpent: drawSerpent, mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
+function drawBossAny(c, B) { ({ swarmmother: drawSwarmMother, brinetooth: drawBrinetooth, matriarch: drawMatriarch, rimequeen: drawRimeQueen, scareking: drawScareKing, pumpking: drawPumpKing, lion: drawLion, weaver: drawWeaver, knight2: drawKnight2, clock: drawClock, siren: drawSiren, kraken: drawKraken, elderfox: drawElderFox, koidragon: drawKoiDragon, chameleon: drawChameleon, serpent: drawSerpent, mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
 function drawJarl(c, B) {
   let sx = 1, sy = 1, ox = 0;
   if (B.state === 'stride') { const k = Math.abs(Math.sin(B.anim * 7)); sy = 1 - k * 0.05; sx = 1 + k * 0.03; }
@@ -8759,7 +8943,7 @@ function render() {
     else if (kind === 1) drawEnemy(ctx, o);
     else if (kind === 7) drawBossAny(ctx, o);
     else if (kind === 8) drawChest(ctx, o);
-    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : o.id === 'shrine' ? drawShrineGate : o.id === 'palace' ? drawPalaceGate : o.id === 'tower' ? drawClockTower : o.id === 'sanctum' ? drawSanctumGate : o.id === 'mill' ? drawMillGate : o.id === 'citadel' ? drawCitadelGate : drawCryptDoor)(ctx);
+    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : o.id === 'shrine' ? drawShrineGate : o.id === 'palace' ? drawPalaceGate : o.id === 'tower' ? drawClockTower : o.id === 'sanctum' ? drawSanctumGate : o.id === 'mill' ? drawMillGate : o.id === 'citadel' ? drawCitadelGate : o.id === 'grotto' ? drawGrottoGate : drawCryptDoor)(ctx);
     else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : dungeonAt(o.x) === SHRINE_D ? drawBell : dungeonAt(o.x) === PALACE_D ? drawClam : (dungeonAt(o.x) === TOWER_D || dungeonAt(o.x) === MILL_D) ? drawLever : dungeonAt(o.x) === SANCT_D ? drawStarStone : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) { if (P.ride) drawCart(ctx, P.x, P.y + 6); if (P.bounce) { shadow(ctx, P.x, P.y + 1, 12, 4); ctx.save(); ctx.translate(0, -P.bounce.lift); } drawPlayer(ctx); if (P.bounce) ctx.restore(); if (P.ride) drawCartFront(ctx, P.x, P.y + 6); }
@@ -8821,7 +9005,7 @@ function render() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (CD === REEF_D || CD === PALACE_D) drawReefOverlay(ctx, k);
     if (CD === GLAC_D) drawAurora(ctx);
-    if (CD === MANG_D) drawMangroveHUD(ctx);
+    if (CD === MANG_D || CD === GROTTO_D) drawMangroveHUD(ctx);
     if (CD === STAR_D) { ctx.fillStyle = 'rgba(10,12,44,.22)'; ctx.fillRect(0, 0, cvs.width, cvs.height); const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(10,10,40,0)'); g.addColorStop(1, 'rgba(8,8,30,.45)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === COG_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(140,90,30,0)'); g.addColorStop(1, 'rgba(90,60,20,.3)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === CINDER_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(255,90,30,0)'); g.addColorStop(1, `rgba(140,40,20,${0.36 + Math.sin(time * 0.8) * 0.05})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
