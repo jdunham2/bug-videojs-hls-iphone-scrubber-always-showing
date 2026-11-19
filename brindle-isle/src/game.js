@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 26, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 27, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -82,7 +82,7 @@ const REGION_TINT = [null, 'rgba(96,44,160,.34)', 'rgba(128,110,84,.38)', 'rgba(
 const tiles = new Uint8Array(W * H), region = new Uint8Array(W * H);
 const cx = OW / 2, cy = H / 2;
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? DEEP : tiles[y * W + x];
-const isLand = t => t >= LAND && t !== 20 && t !== WALL && t !== GATE && t !== LOCK && t !== BDOOR && t !== POOL;
+const isLand = t => t >= LAND && t !== 20 && t !== 24 && t !== 25 && t !== WALL && t !== GATE && t !== LOCK && t !== BDOOR && t !== POOL;
 const inDungeon = x => x >= (OW + 2) * T;
 function regionOf(x, y) {
   const dx = x - cx, dy = y - cy;
@@ -809,6 +809,41 @@ const SANCT_D = makeDungeon('sanctum', 'The Astral Sanctum', 25, SANCT, { tint: 
   for (const [i, x, y] of [[1, 13, 22], [2, 26, 22], [3, 15, 23]]) D.switches.push({ id: 's' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
   for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
 }
+// ---------- Harvest Hollow: an autumn valley of farms and a corn maze ----------
+const HEDGE = 24, CORN = 25;
+const HARV_D = makeDungeon('harvest', 'Harvest Hollow', 26, null, { outdoor: true, theme: 'autumn',
+  objective: g => 'Harvest Farm sits by the hay wagon. Farmer Bram needs help. Bounce across the river on the springy hay bales, and beware the scarecrows: they only move when you look away.' });
+const BOUNCERS = [];
+{
+  const D = HARV_D, X = D.x0;
+  for (let y = 0; y < H; y++) for (let lx = 0; lx < DW; lx++) {
+    const x = X + lx, dx = (lx - 19.5) / 18.5, dy = (y - 22) / 21;
+    const d = Math.hypot(dx, dy) + (vnoise(x / 6 + 1000, y / 6) - 0.5) * 0.28;
+    tiles[y * W + x] = y < 44 && d < 0.93 ? LAND : DEEP; region[y * W + x] = 19;
+  }
+  for (let y = 2; y < 9; y++) for (let lx = 16; lx <= 24; lx++) tiles[y * W + X + lx] = LAND;
+  // the river across the middle
+  for (let lx = 0; lx < DW; lx++) { const c0 = 21 + Math.round(Math.sin(lx * 0.35) * 1.2); for (let y = c0 - 1; y <= c0 + 2; y++) tiles[y * W + X + lx] = DEEP; }
+  // hedgerows
+  for (const [x0, y0, x1, y1] of [[5, 12, 14, 12], [26, 13, 34, 13], [8, 15, 8, 18], [31, 15, 31, 18]]) for (let y = y0; y <= y1; y++) for (let lx = x0; lx <= x1; lx++) if (tiles[y * W + X + lx] === LAND) tiles[y * W + X + lx] = HEDGE;
+  // the corn maze
+  const MX0 = 7, MY0 = 28, CW = 13, CH = 6;
+  for (let y = MY0; y <= MY0 + CH * 2; y++) for (let lx = MX0; lx <= MX0 + CW * 2; lx++) if (tiles[y * W + X + lx] === LAND) tiles[y * W + X + lx] = CORN;
+  const seen = new Set(), stack = [[6, 0]]; seen.add('6,0');
+  const open = (cxm, cym) => { const k = (MY0 + 1 + cym * 2) * W + X + MX0 + 1 + cxm * 2; if (tiles[k] === CORN) tiles[k] = LAND; };
+  open(6, 0); let r = 7;
+  while (stack.length) { const [cxm, cym] = stack[stack.length - 1]; const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b2]) => [cxm + a, cym + b2]).filter(([a, b2]) => a >= 0 && b2 >= 0 && a < CW && b2 < CH && !seen.has(a + ',' + b2)); if (!nb.length) { stack.pop(); continue; } r = (r * 9301 + 49297) % 233280; const [nx, ny] = nb[Math.floor(r / 233280 * nb.length)]; seen.add(nx + ',' + ny); const wx = MX0 + 1 + cxm * 2 + (nx - cxm), wy = MY0 + 1 + cym * 2 + (ny - cym); if (tiles[wy * W + X + wx] === CORN) tiles[wy * W + X + wx] = LAND; open(nx, ny); stack.push([nx, ny]); }
+  for (let y = MY0; y <= MY0 + CH * 2 + 3; y++) for (let lx = 0; lx < DW; lx++) if ((lx < MX0 || lx > MX0 + CW * 2 || y > MY0 + CH * 2) && tiles[y * W + X + lx] === LAND) tiles[y * W + X + lx] = HEDGE;
+  tiles[MY0 * W + X + MX0 + 13] = LAND; tiles[(MY0 - 1) * W + X + MX0 + 13] = LAND;
+  D.mazeCenter = { x: (X + MX0 + 1 + 6 * 2) * T + 16, y: (MY0 + 1 + 3 * 2) * T + 16 };
+  pathLine(X + 20, 4, X + 20, 17); pathLine(X + 20, 17, X + 12, 18); pathLine(X + 20, 17, X + 28, 18);
+  const bounce = (ax, ay, bx, by) => { for (const [x, y] of [[ax, ay], [bx, by]]) for (let yy = y - 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + 1; xx++) if (!isLand(tiles[yy * W + X + xx]) || tiles[yy * W + X + xx] === HEDGE) tiles[yy * W + X + xx] = LAND; BOUNCERS.push({ a: { x: (X + ax) * T + 16, y: ay * T + 16 }, b: { x: (X + bx) * T + 16, y: by * T + 16 } }); };
+  bounce(12, 18, 12, 25); bounce(28, 18, 28, 25);
+  pathLine(X + 12, 26, X + 20, 27); pathLine(X + 28, 26, X + 20, 27);
+  D.camp = { x: (X + 20) * T, y: 9 * T };
+  D.start = { x: (X + 20) * T, y: 4 * T + 8 };
+}
+const nearHarvSite = (tx, ty, d) => Math.hypot(tx - HARV_D.camp.x / T, ty - HARV_D.camp.y / T) < d || Math.hypot(tx - HARV_D.x0 - 20, ty - 4) < 3 || BOUNCERS.some(b => [b.a, b.b].some(q => Math.hypot(tx - q.x / T, ty - q.y / T) < 2.5));
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -942,6 +977,7 @@ function drawOutdoorTile(c, x, y, px, py, t) {
   if (dungeonAt(px).theme === 'reef') { drawReefTile(c, x, y, px, py, t); return; }
   if (dungeonAt(px).theme === 'cog') { drawCogTile(c, x, y, px, py, t); return; }
   if (dungeonAt(px).theme === 'star') { drawStarTile(c, x, y, px, py, t); return; }
+  if (dungeonAt(px).theme === 'autumn') { drawAutumnTile(c, x, y, px, py, t); return; }
   if (t === BOG) {
     const hb = hash(x, y); c.fillStyle = '#2e3a1e'; c.fillRect(px, py, T, T); c.fillStyle = '#3d4a26'; c.fillRect(px + 2, py + 2, T - 4, T - 4);
     c.fillStyle = 'rgba(120,140,60,.35)'; ellipse(c, px + 8 + hb * 16, py + 10 + hb * 10, 4, 2); ellipse(c, px + 22 - hb * 10, py + 22, 3, 1.5);
@@ -1117,6 +1153,7 @@ const ITEMS = {
   coral: { name: 'Sea Coral', price: 11 },
   gear: { name: 'Brass Gear', price: 12 },
   starshard: { name: 'Star Shard', price: 14 },
+  corn: { name: 'Golden Corn', price: 9 },
   sunstone: { name: 'Sunstone', price: 450 },
 };
 // Weapons and armor: craft them at the workbench, then equip one of each.
@@ -1129,6 +1166,7 @@ const WEAPONS = {
   arcane:  { name: 'Arcane Edge', dmg: 3, col: '#d6b8ff', cost: { gem: 1, crystal: 5 }, beam: true, desc: 'Cut from the Hollow Gem. Triple damage, and fires a sword beam while your hearts are full.' },
   frost:   { name: 'Frostbite Blade', dmg: 3, col: '#9fe8ff', cost: { frostheart: 1, crystal: 6 }, freeze: true, desc: 'Forged from the Frost Heart. Triple damage, and freezes foes so they move at a crawl.' },
   sun:     { name: 'Sunblade', dmg: 4, col: '#ffd65a', cost: { sunstone: 1, crystal: 8 }, beam: true, beamAlways: true, desc: 'Forged from the Sunstone. Quadruple damage, and every swing fires a beam of sunlight.' },
+  scythe:  { name: 'Harvest Scythe', dmg: 4, col: '#c8c0b0', cost: { corn: 8, stone: 6 }, heavy: true, desc: 'A great farm scythe. Quadruple damage in a wide sweep, but slower swings.' },
   comet:   { name: 'Comet Edge', dmg: 4, col: '#9fd4ff', cost: { starshard: 8, crystal: 6 }, beam: true, desc: 'Forged from star shards. Quadruple damage, and fires a beam of starlight while your hearts are full.' },
   chrono:  { name: 'Chronoblade', dmg: 5, col: '#f2dca0', cost: { clockheart: 1, gear: 8 }, chain: true, reach: 6, desc: 'Ticking with the Clockwork Heart. Five times damage, long reach, and its sparks leap to nearby foes.' },
   clockblade: { name: 'Clockwork Blade', dmg: 3, col: '#d0aa5c', cost: { gear: 6, crystal: 4 }, chain: true, desc: 'A humming brass blade. Triple damage, and its sparks often leap to a nearby foe.' },
@@ -1158,6 +1196,7 @@ const ARMORS = {
   abyssal: { name: 'Abyssal Plate', hearts: 8, tint: ['#1a1030', '#6a3a8a', '#9fe8ff'], cost: { krakenbeak: 1, coral: 8 }, sturdy: true, breath: 3, desc: 'Forged from the Kraken\'s beak. +8 hearts, the most of any armor, barely knocked back, and triple air underwater.' },
   serpentscale: { name: 'Serpent Scale Armor', hearts: 7, tint: ['#1a3a1a', '#4a8a3a', '#ffd65a'], cost: { serpenteye: 1, jade: 8 }, sturdy: true, regen: true, desc: 'Scales of the Serpent Queen. +7 hearts, the most of any armor, barely knocked back, and slowly heals you.' },
   prismplate: { name: 'Prismatic Plate', hearts: 6, tint: ['#2a2050', '#a593ff', '#9fe8ff'], cost: { prismheart: 1, glimmer: 6 }, speed: 1.15, sturdy: true, desc: 'Grown from the Hydra\'s heart. +6 hearts, 15% faster, and hits barely knock you back.' },
+  harvestcoat: { name: 'Harvest Coat', hearts: 5, tint: ['#5a3a1a', '#c8602a', '#e8c060'], cost: { corn: 8, herb: 6 }, speed: 1.1, desc: 'A warm autumn coat. +5 hearts and 10% faster movement.' },
   stargazer: { name: 'Stargazer Robe', hearts: 5, tint: ['#1a1840', '#5a4a9a', '#ffe9a8'], cost: { starshard: 8, goo: 6 }, regen: true, desc: 'Embroidered with star shards. +5 hearts, and slowly heals you anywhere.' },
   brassplate: { name: 'Brass Plate', hearts: 5, tint: ['#5a4020', '#b08a44', '#f2dca0'], cost: { gear: 8, stone: 6 }, sturdy: true, desc: 'Riveted brass armor. +5 hearts, and hits barely knock you back.' },
   coralmail: { name: 'Diver\'s Coral Mail', hearts: 4, tint: ['#2a3a5a', '#e8703a', '#9fd4f5'], cost: { coral: 8, goo: 6 }, breath: 2, desc: '+4 hearts, and you can hold your breath twice as long underwater.' },
@@ -1212,6 +1251,15 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'crows', giver: 'bram', name: 'Crow Trouble', goal: { kill: [['crow', 6]] }, reward: { gold: 160, items: { corn: 4 } },
+    offer: ['Howdy! Bram\'s the name. The crows are eating my corn faster than I can grow it.', 'Shoo off six of them. They circle, then dive: step aside and swat them.'],
+    done: ['That\'ll learn \'em. Here, have some golden corn. Fresh off the stalk.'] },
+  { id: 'seed', giver: 'bram', name: 'The Golden Seed', req: 'crows', hint: 'Find the golden seed at the heart of the corn maze', foundText: 'Found it! Bring it to Bram.', goal: { find: 'goldenseed' }, reward: { gold: 180, items: { potion: 3 } },
+    offer: ['My prize golden seed rolled into the corn maze, south past the river. It\'s right in the middle somewhere.', 'Bounce across on the hay bales. And mind the corn wraiths: they drift right through the stalks.'],
+    done: ['My golden seed! Next year\'s pumpkins will be the size of houses.'] },
+  { id: 'scare', giver: 'bram', name: 'Things in the Fields', req: 'seed', goal: { kill: [['stalker', 3], ['jack', 3], ['cornwraith', 3]] }, reward: { gold: 280, items: { crystal: 6, corn: 4 } },
+    offer: ['My scarecrows have come to life, the pumpkins grew faces, and something haunts the corn.', 'Three of each. Keep your eyes on a scarecrow: it can only move when you look away!'],
+    done: ['The fields are quiet. You\'ve saved the whole harvest, friend.'] },
   { id: 'sanctum', giver: 'lio', name: 'The Astral Sanctum', req: 'starfoes', goal: { boss: ['lion', 'weaver'] }, reward: { gold: 620, items: { crystal: 18 } },
     offer: ['South of here stands the Astral Sanctum, a temple open to the sky. The old stargazers built it.', 'A lion made of stars guards it, and the Starweaver spins her web beneath the dome. Cut her threads, friend, and bring the stars back to order.'],
     done: ['The constellations are back where they belong! Take the Heart of the Cosmos. Wear it, and the heavens will protect you.'] },
@@ -1396,9 +1444,10 @@ function spawnFind(item, rg, x0, w) {
   if (S.found[item] || pickups.some(p => p.item === item)) return;
   for (let i = 0; i < 4000; i++) {
     const x = x0 + 2 + Math.floor(hash(i, 131) * (w - 4)), y = 2 + Math.floor(hash(131, i) * 40);
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
   }
 }
+function spawnSeed() { if (S.found.goldenseed || pickups.some(p => p.item === 'goldenseed')) return; pickups.push({ x: HARV_D.mazeCenter.x, y: HARV_D.mazeCenter.y, vx: 0, vy: 0, item: 'goldenseed', t: 0.4, keep: true }); }
 function spawnComb() { if (S.found.comb || pickups.some(p => p.item === 'comb')) return; pickups.push({ x: VALE_D.islet.x, y: VALE_D.islet.y, vx: 0, vy: 0, item: 'comb', t: 0.4, keep: true }); }
 function spawnRing() {
   if (S.found.ring || pickups.some(p => p.item === 'ring')) return;
@@ -1414,6 +1463,7 @@ function acceptQuest(q) {
   if (q.goal.find === 'bloom') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (q.goal.find === 'chime') spawnFind('chime', 11, SKY_D.x0, DW);
   if (q.goal.find === 'comb') spawnComb();
+  if (q.goal.find === 'goldenseed') spawnSeed();
   if (q.goal.find === 'lens') spawnFind('lens', 18, STAR_D.x0, DW);
   if (q.goal.find === 'mainspring') spawnFind('mainspring', 17, COG_D.x0, DW);
   if (q.goal.find === 'compass') spawnFind('compass', 16, REEF_D.x0, DW);
@@ -1445,7 +1495,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1459,9 +1509,9 @@ const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- objects ----------
 const resources = [], enemies = [], pickups = [], particles = [], floats = [], decor = [], animals = [], ambient = [];
-const SOLID = { tree: 11, rock: 12, crystal: 11, pot: 8, crate: 11, vine: 15, obsidian: 12, tallgrass: 0 };
-const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5, pot: 1, crate: 2, vine: 2, obsidian: 5, tallgrass: 1 };
-const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round'], ['blossom', 'blossom', 'tree_round'], ['kelp'], ['tree_dead'], ['tree_fir', 'tree_pine']];
+const SOLID = { tree: 11, rock: 12, crystal: 11, pot: 8, crate: 11, vine: 15, obsidian: 12, tallgrass: 0, pumpkin: 9 };
+const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5, pot: 1, crate: 2, vine: 2, obsidian: 5, tallgrass: 1, pumpkin: 1 };
+const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round'], ['blossom', 'blossom', 'tree_round'], ['kelp'], ['tree_dead'], ['tree_fir', 'tree_pine'], ['tree_orange', 'tree_autumn', 'tree_orange']];
 function addRes(type, tx, ty) {
   const r = { type, x: tx * T + 16 + (rng() - 0.5) * 10, y: ty * T + 20 + (rng() - 0.5) * 6, hp: RES_HP[type], max: RES_HP[type], alive: true, respawn: 0, shake: 0, seed: rng() };
   if (type === 'tree') { const k = TREE_KINDS[region[ty * W + tx]] || TREE_KINDS[4]; r.key = k[Math.floor(r.seed * k.length)]; }
@@ -1573,10 +1623,17 @@ for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
   const r = rng();
   if (r < 0.06) addRes('tree', x, y); else if (r < 0.1) addRes('crystal', x, y); else if (r < 0.12) addRes('rock', x, y); else if (r < 0.14) decor.push({ crater: true, x: x * T + 16, y: y * T + 20, v: Math.floor(r * 1000) }); else if (r < 0.17) decor.push({ prop: 'flowers', x: x * T + 16, y: y * T + 22 });
 }
+for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
+  const x = HARV_D.x0 + lx, t = tiles[y * W + x];
+  if (t !== LAND || nearHarvSite(x, y, 5) || !isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1))) continue;
+  const r = rng();
+  if (r < 0.1) addRes('tree', x, y); else if (r < 0.14) addRes('pumpkin', x, y); else if (r < 0.155) decor.push({ scareprop: true, x: x * T + 16, y: y * T + 20, solid: 8 }); else if (r < 0.17) addRes('herb', x, y);
+}
+for (let i = 0; i < 8; i++) { const x = Math.round(HARV_D.camp.x / T) - 6 + (i % 4) * 2, y = Math.round(HARV_D.camp.y / T) + 4 + Math.floor(i / 4) * 2; if (tiles[y * W + x] === LAND) addRes('pumpkin', x, y); }
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
-    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 15 ? VALE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 16 ? REEF_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 17 ? COG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 18 ? STAR_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
+    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 15 ? VALE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 16 ? REEF_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 17 ? COG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 18 ? STAR_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 19 ? HARV_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
   }
   return [cx * T + 300, cy * T];
 }
@@ -1642,6 +1699,10 @@ const ENEMY = {
   voidorb: { name: 'Void Orb', proc: 'voidorb', ai: 'voidorb', hp: 3, sp: 40, dmg: 1, aggro: 200, drops: [['crystal', 2]], col: '#8a6ab8', flyer: true },
   mgolem:  { name: 'Meteor Golem', proc: 'mgolem', ai: 'mgolem', hp: 6, sp: 32, dmg: 1, aggro: 200, drops: [['starshard', 1], ['stone', 2]], col: '#ffb347', heavy: true },
   hopper:  { name: 'Lunar Hopper', proc: 'hopper', ai: 'hopper', hp: 4, sp: 60, dmg: 1, aggro: 220, drops: [['goo', 1], ['gold', 3]], col: '#e6e6f2' },
+  stalker: { name: 'Scarecrow Stalker', proc: 'stalker', ai: 'stalker', hp: 4, sp: 150, dmg: 2, aggro: 260, drops: [['corn', 1], ['gold', 3]], col: '#c8a040' },
+  crow:    { name: 'Crow', proc: 'crow', ai: 'crow', hp: 1, sp: 120, dmg: 1, aggro: 220, drops: [['corn', 1]], col: '#2a2a38', flyer: true },
+  jack:    { name: 'Jack-o\'-Lantern', proc: 'jack', ai: 'jack', hp: 3, sp: 60, dmg: 1, aggro: 200, drops: [['corn', 1], ['gold', 2]], col: '#e8803a' },
+  cornwraith: { name: 'Corn Wraith', proc: 'cornwraith', ai: 'ghost', hp: 3, sp: 40, dmg: 1, aggro: 220, drops: [['corn', 2]], col: '#c8b070', flyer: true, ghostly: true },
   icemage: { name: 'Ice Mage', sprite: 'mage_ice', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 2], ['gold', 3]], col: '#9fe8ff' },
   mage:    { name: 'Cultist', sprite: 'mage', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 1], ['gold', 3]], col: '#e08a3c' },
 };
@@ -1659,9 +1720,11 @@ for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['bandit', 4, 2], [
   ['moth', 15, 5], ['fox', 15, 3], ['tanuki', 15, 4], ['moth', 3, 2], ['tanuki', 4, 2], ['fox', 12, 2],
   ['jellyfish', 16, 5], ['puffer', 16, 4], ['shark', 16, 3], ['jellyfish', 8, 2], ['jellyfish', 3, 2],
   ['soldier', 17, 4], ['sparkbot', 17, 4], ['beetle', 17, 3], ['turret', 17, 4], ['sparkbot', 2, 2], ['beetle', 8, 2],
-  ['starsprite', 18, 5], ['voidorb', 18, 3], ['mgolem', 18, 3], ['hopper', 18, 3], ['starsprite', 12, 2], ['voidorb', 13, 2]])
+  ['starsprite', 18, 5], ['voidorb', 18, 3], ['mgolem', 18, 3], ['hopper', 18, 3], ['starsprite', 12, 2], ['voidorb', 13, 2],
+  ['stalker', 19, 4], ['jack', 19, 4], ['cornwraith', 19, 3], ['stalker', 3, 1]])
   for (let i = 0; i < n; i++) addEnemy(kind, rg);
 { let n = 0; for (let i = 0; i < 5000 && n < 6; i++) { const x = REEF_D.x0 + 3 + Math.floor(hash(i, 77) * (DW - 6)), y = 14 + Math.floor(hash(77, i) * 27); if (tiles[y * W + x] === LAND && tiles[(y - 1) * W + x] === DEEP && !nearReefSite(x, y, 6)) { enemies.push(makeEnemy('eel', x * T + 16, y * T + 16)); n++; } } }
+for (const rg of [19, 19, 19, 3]) { const [x, y] = randomTileIn(rg, 9); for (let i = 0; i < 3; i++) enemies.push(makeEnemy('crow', x + (i - 1) * 24, y + (i % 2) * 16)); }
 for (const [x, y] of KOI_SPOTS) enemies.push(makeEnemy('koi', x * T + 16, y * T + 16));
 for (const rg of [14, 14, 14, 3]) { const [x, y] = randomTileIn(rg, 9); for (let i = 0; i < 2; i++) enemies.push(makeEnemy('raptor', x + i * 30, y)); }
 for (let g = 0; g < 4; g++) { const [x, y] = randomTileIn(13, 9); for (let i = 0; i < 3; i++) enemies.push(makeEnemy('glimbat', x + (i - 1) * 24, y + (i % 2) * 18)); }
@@ -1899,6 +1962,7 @@ const NPCS = [
   { id: 'zahir', name: 'Zahir', x: SUN_D.mirra.x - 70, y: SUN_D.mirra.y + 36, sheet: 'zahir_idle', walk: 'zahir_walk', verb: 'Trade with', path: [[SUN_D.mirra.x - 70, SUN_D.mirra.y + 36], [SUN_D.mirra.x - 110, SUN_D.mirra.y + 40]] },
   { id: 'amara', name: 'Amara', x: SUN_D.mirra.x + 80, y: SUN_D.mirra.y + 40, sheet: 'amara_idle', walk: 'amara_walk', verb: 'Talk to', path: [[SUN_D.mirra.x + 80, SUN_D.mirra.y + 40], [SUN_D.mirra.x + 120, SUN_D.mirra.y + 50]] },
   { id: 'rosa', name: 'Captain Rosa', x: SUN_D.cove.x - 40, y: SUN_D.cove.y - 10, sheet: 'rosa_idle', walk: 'rosa_walk', verb: 'Talk to', path: [[SUN_D.cove.x - 40, SUN_D.cove.y - 10], [SUN_D.cove.x + 10, SUN_D.cove.y + 20]] },
+  { id: 'bram', name: 'Farmer Bram', x: HARV_D.camp.x + 60, y: HARV_D.camp.y + 30, sheet: 'bram_idle', walk: 'bram_walk', verb: 'Talk to', path: [[HARV_D.camp.x + 60, HARV_D.camp.y + 30], [HARV_D.camp.x + 90, HARV_D.camp.y + 50]] },
   { id: 'lio', name: 'Astronomer Lio', x: STAR_D.camp.x + 60, y: STAR_D.camp.y + 30, sheet: 'lio_idle', walk: 'lio_walk', verb: 'Talk to', path: [[STAR_D.camp.x + 60, STAR_D.camp.y + 30], [STAR_D.camp.x + 90, STAR_D.camp.y + 50]] },
   { id: 'ada', name: 'Tinker Ada', x: COG_D.camp.x + 60, y: COG_D.camp.y + 30, sheet: 'ada_idle', walk: 'ada_walk', verb: 'Talk to', path: [[COG_D.camp.x + 60, COG_D.camp.y + 30], [COG_D.camp.x + 90, COG_D.camp.y + 50]] },
   { id: 'marlo', name: 'Diver Marlo', x: REEF_D.camp.x + 60, y: REEF_D.camp.y + 30, sheet: 'marlo_idle', walk: 'marlo_walk', verb: 'Talk to', path: [[REEF_D.camp.x + 60, REEF_D.camp.y + 30], [REEF_D.camp.x + 90, REEF_D.camp.y + 50]] },
@@ -2077,6 +2141,16 @@ if (HAMLET) {
   for (const [ox, oy, k] of [[110, 10, 'crate'], [124, 26, 'barrel']]) decor.push({ key: k, x: STAR_D.camp.x + ox, y: STAR_D.camp.y + oy, s: 2, solid: 10 });
   addSign('Observatory', 'The Observatory. Meteor showers fall often: mind the red rings, and pick up the star shards.', STAR_D.camp.x - 60, STAR_D.camp.y + 80);
 }
+// the hay wagon east of Brindle Village, to Harvest Hollow
+{
+  const WG = findSpot(range(cx + 6, cx + 12), range(cy + 3, cy + 9)) || findSpot(range(cx - 12, cx + 12), range(cy + 3, cy + 12)) || { x: (cx + 8) * T, y: (cy + 6) * T + 4 };
+  addFerry('wagon_out', 'Hay Wagon', WG.x + 16, WG.y + 8); NPCS[NPCS.length - 1].verb = 'Hop on';
+  addFerry('wagon_home', 'Hay Wagon to Brindle Village', (HARV_D.x0 + 23) * T + 16, 4 * T + 8); NPCS[NPCS.length - 1].verb = 'Hop on';
+  addSign('Wagon sign', 'Hay wagon to Harvest Hollow. The pumpkins are huge this year. So are the crows.', WG.x + 90, WG.y - 20);
+  decor.push({ fire: true, x: HARV_D.camp.x + 10, y: HARV_D.camp.y + 60, solid: 12 }, { scareprop: true, x: HARV_D.camp.x - 110, y: HARV_D.camp.y + 30, solid: 8 });
+  for (const [ox, oy, k] of [[110, 10, 'barrel'], [124, 26, 'crate']]) decor.push({ key: k, x: HARV_D.camp.x + ox, y: HARV_D.camp.y + oy, s: 2, solid: 10 });
+  addSign('Harvest Farm', 'Harvest Farm. Bounce across the river on the hay bales. And never turn your back on a scarecrow.', HARV_D.camp.x - 60, HARV_D.camp.y + 80);
+}
 addFerry('ferry_home', 'Boat to Saltmarsh', (SUN_D.x0 + 21) * T + 6, 3 * T + 16);
 addSign('Mirra Oasis', 'Mirra Oasis. Shade, cool water and Zahir\'s bazaar. Corsair\'s Cove lies down the east path, the Sunken Ruins to the southwest.', SUN_D.mirra.x + 40, SUN_D.mirra.y - 20);
 addSign('Corsair\'s Cove', 'Corsair\'s Cove. No questions asked, no gold returned.', SUN_D.cove.x - 90, SUN_D.cove.y - 40);
@@ -2137,6 +2211,8 @@ const ICON_DRAW = {
   sunstone: c => { c.fillStyle = '#b8862a'; diamond(c, 16, 18, 11, 14); c.fillStyle = '#f4b740'; diamond(c, 16, 18, 9, 11); c.fillStyle = '#ffe9a8'; diamond(c, 14, 15, 3, 5); c.strokeStyle = 'rgba(255,214,90,.8)'; c.lineWidth = 2; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; c.beginPath(); c.moveTo(16 + Math.cos(a) * 12, 16 + Math.sin(a) * 12); c.lineTo(16 + Math.cos(a) * 15, 16 + Math.sin(a) * 15); c.stroke(); } },
   idol: c => { c.fillStyle = '#7a5a14'; c.fillRect(9, 6, 14, 22); c.fillStyle = '#f4b740'; c.fillRect(10, 7, 12, 20); c.fillStyle = '#7a5a14'; c.fillRect(12, 11, 3, 3); c.fillRect(17, 11, 3, 3); c.fillRect(13, 18, 6, 2); c.fillStyle = '#ec5257'; c.fillRect(15, 3, 2, 4); c.fillStyle = '#ffe9a8'; c.fillRect(11, 8, 2, 6); },
   obsidian: c => { c.fillStyle = '#16121c'; c.beginPath(); c.moveTo(6, 28); c.lineTo(10, 10); c.lineTo(16, 3); c.lineTo(21, 12); c.lineTo(26, 28); c.closePath(); c.fill(); c.fillStyle = '#4a3a62'; c.beginPath(); c.moveTo(11, 26); c.lineTo(13, 12); c.lineTo(16, 7); c.lineTo(17, 22); c.closePath(); c.fill(); c.fillStyle = '#c8b8ff'; c.fillRect(14, 9, 2, 6); },
+  corn: c => { c.fillStyle = '#7a8a3a'; c.beginPath(); c.moveTo(10, 28); c.quadraticCurveTo(6, 16, 12, 6); c.lineTo(14, 26); c.closePath(); c.fill(); c.beginPath(); c.moveTo(22, 28); c.quadraticCurveTo(26, 16, 20, 6); c.lineTo(18, 26); c.closePath(); c.fill(); c.fillStyle = '#e8c060'; c.beginPath(); c.ellipse(16, 15, 5, 11, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c8a040'; for (let y = 7; y < 24; y += 3) for (let x = 13; x < 20; x += 3) c.fillRect(x, y, 1.5, 1.5); },
+  goldenseed: c => { c.fillStyle = 'rgba(255,214,90,.4)'; circle(c, 16, 16, 12); c.fillStyle = '#d9a23c'; c.beginPath(); c.ellipse(16, 17, 6, 9, 0.3, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffe9a8'; c.beginPath(); c.ellipse(14, 14, 2, 4, 0.3, 0, Math.PI * 2); c.fill(); c.fillStyle = '#5a7a34'; c.fillRect(17, 5, 2, 5); },
   starshard: c => { c.fillStyle = 'rgba(159,212,255,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#5a7ab0'; diamond(c, 16, 16, 7, 12); c.fillStyle = '#9fd4ff'; diamond(c, 16, 16, 5, 9); c.fillStyle = '#ffffff'; diamond(c, 14, 13, 1.5, 4); c.fillStyle = '#ffe9a8'; c.fillRect(24, 6, 2, 2); c.fillRect(6, 24, 2, 2); },
   lens: c => { c.fillStyle = '#8a6a34'; circle(c, 16, 16, 11); c.fillStyle = 'rgba(159,212,255,.8)'; circle(c, 16, 16, 8); c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(13, 13, 3, 2, -0.6, 0, Math.PI * 2); c.fill(); },
   gear: c => { c.save(); c.translate(16, 16); c.fillStyle = '#8a6a34'; for (let i = 0; i < 8; i++) { c.save(); c.rotate(i / 8 * Math.PI * 2); c.fillRect(-2.5, -13, 5, 5); c.restore(); } c.beginPath(); c.arc(0, 0, 10, 0, Math.PI * 2); c.fill(); c.fillStyle = '#d0aa5c'; c.beginPath(); c.arc(0, 0, 7, 0, Math.PI * 2); c.fill(); c.fillStyle = '#8a6a34'; c.beginPath(); c.arc(0, 0, 3, 0, Math.PI * 2); c.fill(); c.restore(); },
@@ -2185,7 +2261,7 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart'];
 const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
@@ -2306,6 +2382,14 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">Harvest Hollow</div>
+      <dl class="controls">
+      <dt>Getting there</dt><dd>Hop on the Hay Wagon east of Brindle Village. The wagon at Harvest Farm brings you back.</dd>
+      <dt>Hay bales</dt><dd>A river cuts the valley in two. Step on a springy hay bale and it bounces you across to the matching bale on the other side.</dd>
+      <dt>Corn maze</dt><dd>South of the river lies a corn maze. Find your way to its heart. Smash pumpkins for golden corn and coins.</dd>
+      <dt>Creatures</dt><dd>Scarecrow stalkers only move when you look away: keep facing them. Crows circle, then dive. Jack-o'-lanterns spin and spit seeds, and burst when defeated. Corn wraiths fade in and out of sight.</dd>
+      <dt>Golden corn</dt><dd>Pumpkins and field creatures drop golden corn. It crafts the wide-sweeping Harvest Scythe and the Harvest Coat.</dd>
+      <dt>Elsewhere</dt><dd>Crows now flock over the meadow, and a scarecrow stalker lurks there too.</dd></dl>
       <div class="label">The Astral Sanctum</div>
       <dl class="controls">
       <dt>Getting in</dt><dd>A domed temple at the south end of Starfall Plateau.</dd>
@@ -2659,7 +2743,7 @@ function findTarget() {
   return { enemy, res };
 }
 function onAction() {
-  if (P.ride) return false;
+  if (P.ride || P.bounce) return false;
   if (dlg) { advanceDialogue(); return false; }
   if (!$('victory').hidden || panel || P.dash) return false;
   if (P.act) { if (!['faint', 'drink', 'spin'].includes(P.act.kind)) P.queued = true; return true; }
@@ -2694,7 +2778,7 @@ function onAction() {
     face(res);
     if (res.type === 'tree') doAct('axe', a => hitResource(res, a));
     else if (res.type === 'herb') doAct('gather', a => hitResource(res, a));
-    else if (res.type === 'pot' || res.type === 'crate' || res.type === 'vine' || res.type === 'tallgrass') doAct('sword', a => hitResource(res, a));
+    else if (res.type === 'pot' || res.type === 'crate' || res.type === 'vine' || res.type === 'tallgrass' || res.type === 'pumpkin') doAct('sword', a => hitResource(res, a));
     else doAct(S.tools.pickaxe ? 'pick' : 'sword', a => hitResource(res, a));
     return true;
   }
@@ -2711,6 +2795,9 @@ function interact(n) {
   }
   if (n.sign) { say(n.name, [n.text]); return; }
   if (n.id === 'ysolde') { shopName = 'Ysolde\'s Trading Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
+  if (n.boat && n.id === 'wagon_out') { const first = !S.found.harvest; S.found.harvest = true; travel(HARV_D.start.x, HARV_D.start.y, 0, 1, 'Harvest Hollow'); if (first) setTimeout(() => toast('Golden fields and orange woods. Harvest Farm is just south of the wagon.', 4500), 1200); return; }
+  if (n.boat && n.id === 'wagon_home') { const Wg = NPCS.find(m => m.id === 'wagon_out'); travel(Wg.x, Wg.y + 50, 0, 1, 'Brindle Isle'); return; }
+  if (n.id === 'bram') { shopName = 'Bram\'s Farm Stand'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
   if (n.boat && n.id === 'beam_out') { const first = !S.found.star; S.found.star = true; travel(STAR_D.start.x, STAR_D.start.y, 0, 1, 'Starfall Plateau'); if (first) setTimeout(() => toast('A plateau beneath a sky full of stars. The Observatory is just south of the moonbeam.', 4500), 1200); return; }
   if (n.boat && n.id === 'beam_home') { const M = NPCS.find(m => m.id === 'beam_out'); travel(M.x, M.y + 50, 0, 1, 'The Cloudspire Isles'); return; }
   if (n.id === 'lio') { shopName = 'Lio\'s Star Charts'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
@@ -2873,7 +2960,7 @@ function hitResource(r, a) {
   const power = (r.type === 'rock' || r.type === 'crystal' || r.type === 'obsidian') ? (S.tools.pickaxe ? 2 : 1) : (weaponDmg() >= 2 && r.type === 'tree' ? 2 : 1);
   r.hp -= power * (sp && sp !== 'Whirlwind' ? 2 : 1);
   if (sp && sp !== 'Whirlwind') { impact(6); burst(r.x, r.y - 18, '#ffe08a', 12); }
-  const col = { tree: '#7a4b27', rock: '#9a978f', herb: '#5bbf55', crystal: '#a593ff', pot: '#b5652f', crate: '#a8713f', vine: '#4f8a3a', obsidian: '#3a2e4a', tallgrass: '#5aa65c' }[r.type];
+  const col = { tree: '#7a4b27', rock: '#9a978f', herb: '#5bbf55', crystal: '#a593ff', pot: '#b5652f', crate: '#a8713f', vine: '#4f8a3a', obsidian: '#3a2e4a', tallgrass: '#5aa65c', pumpkin: '#e8803a' }[r.type];
   if (r.hp > 0) SFX.play(r.type === 'tree' ? 'chop' : r.type === 'herb' || r.type === 'crate' ? 'pick' : 'mine');
   if (r.type === 'tree') for (let i = 0; i < 4; i++) particles.push({ x: r.x + (rng() - 0.5) * 30, y: r.y - 40 - rng() * 20, vx: (rng() - 0.5) * 40, vy: -20, life: 0.9, color: i % 2 ? '#5aa65c' : '#3d8448', leaf: true });
   burst(r.x, r.y - 16, col, 6);
@@ -2881,6 +2968,7 @@ function hitResource(r, a) {
   r.alive = false; r.respawn = 35 + rng() * 20; r.fall = 0; r.fallDir = P.x <= r.x ? 1 : -1;
   SFX.play(r.type === 'tree' ? 'fall' : r.type === 'herb' ? 'pick' : 'crumble');
   if (r.type === 'pot' || r.type === 'crate') r.fall = 9;
+  if (r.type === 'pumpkin') { r.respawn = 60; r.fall = 9; const roll = rng(); if (roll < 0.5) drop(r.x, r.y - 6, 'corn', 1); else if (roll < 0.8) drop(r.x, r.y - 6, 'gold', 2 + Math.floor(rng() * 3)); for (let i = 0; i < 8; i++) particles.push({ x: r.x, y: r.y - 10, vx: (rng() - 0.5) * 120, vy: -60 - rng() * 60, life: 0.5, color: i % 2 ? '#e8803a' : '#ffe9a8', size: 4 }); }
   if (r.type === 'tallgrass') { r.respawn = 40; r.fall = 9; const roll = rng(); if (roll < 0.2) drop(r.x, r.y - 6, 'herb', 1); else if (roll < 0.34) drop(r.x, r.y - 6, 'gold', 1 + Math.floor(rng() * 2)); else if (roll < 0.4) drop(r.x, r.y - 6, 'goo', 1); for (let i = 0; i < 6; i++) particles.push({ x: r.x + (rng() - 0.5) * 20, y: r.y - 10, vx: (rng() - 0.5) * 80, vy: -60 - rng() * 40, life: 0.5, color: i % 2 ? '#5aa65c' : '#3d8448', leaf: true }); }
   if (r.type === 'vine') { r.respawn = 1e9; r.fall = 9; floatText(r.x, r.y - 50, 'Cut through!', '#c8e8b0'); }
   if (r.type === 'rock' || r.type === 'crystal') for (let i = 0; i < 10; i++) { const a = rng() * Math.PI * 2, v = 60 + rng() * 120; particles.push({ x: r.x, y: r.y - 10, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 90, life: 0.7, color: r.type === 'rock' ? (i % 2 ? '#9c9690' : '#6c6764') : (i % 2 ? '#a593ff' : '#e6e0ff'), size: 5 }); }
@@ -2908,6 +2996,7 @@ function killEnemy(e) {
   e.alive = false; e.respawn = 25; e.dieT = 0.4; e.state = 'move'; e.faded = false; e.mode = undefined; e.decoys = []; SFX.play('slime');
   burst(e.x, e.y - 10, D.col, 16);
   for (const [item, n] of D.drops) drop(e.x, e.y - 6, item, n);
+  if (e.kind === 'jack') for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; projectiles.push({ kind: 'rock', seed: true, sx: e.x, sy: e.y - 16, x: e.x, y: e.y - 16, tx: e.x + Math.cos(a) * 90, ty: e.y + Math.sin(a) * 70, t: 0, dur: 0.6, z: 0 }); }
   if (e.kind === 'mgolem') { projectiles.push({ kind: 'bomb', x: e.x, y: e.y, vx: 0, vy: 0, t: 0.6, life: 1.6 }); floatText(e.x, e.y - 50, 'It\'s going to blow!', '#ffb347'); }
   if (e.kind === 'bogslime') for (let i = 0; i < 2; i++) { const m = makeEnemy('bogling', e.x + (i ? 16 : -16), e.y + 4); m.minion = true; m.noRespawn = true; m.spawnT = 0.3; enemies.push(m); }
   if (e.loot) { drop(e.x, e.y - 6, 'gold', Math.min(12, e.loot), Math.ceil(e.loot / Math.min(12, e.loot))); floatText(e.x, e.y - 50, 'Your gold!', '#f4b740'); e.loot = 0; }
@@ -2980,7 +3069,7 @@ function update(dt) {
   if (hitStop > 0) { hitStop -= dt; return; }
   S.time += dt;
   // hero action
-  let moveMul = P.ride ? 0 : 1;
+  let moveMul = P.ride || P.bounce ? 0 : 1;
   if (P.ride) updateRide(dt);
   P.dashCd = Math.max(0, P.dashCd - dt);
   if (P.dash) {
@@ -3024,7 +3113,7 @@ function update(dt) {
   P.inv = Math.max(0, P.inv - dt); P.slow = Math.max(0, (P.slow || 0) - dt); P.hex = Math.max(0, (P.hex || 0) - dt);
   if (!P.dash && dungeonAt(P.x) === TOMB_D) for (const tr of TRAPS) if (trapState(tr) === 2 && P.x > tr.x + 2 && P.x < tr.x + 30 && P.y > tr.y + 4 && P.y < tr.y + 34) { damagePlayer(1, { x: tr.x + 16, y: tr.y + 40 }); break; }
   if (gearA().regen && S.hp > 0 && S.hp < maxHp()) { P.regenT = (P.regenT || 0) + dt; if (P.regenT > 8) { P.regenT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#7fe0f0'); } }
-  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - VALE_D.camp.x - 10, P.y - VALE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - REEF_D.camp.x, P.y - REEF_D.camp.y - 30) < 3 * T || Math.hypot(P.x - COG_D.camp.x, P.y - COG_D.camp.y - 30) < 3 * T || Math.hypot(P.x - STAR_D.camp.x - 10, P.y - STAR_D.camp.y - 60) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
+  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - VALE_D.camp.x - 10, P.y - VALE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - REEF_D.camp.x, P.y - REEF_D.camp.y - 30) < 3 * T || Math.hypot(P.x - COG_D.camp.x, P.y - COG_D.camp.y - 30) < 3 * T || Math.hypot(P.x - STAR_D.camp.x - 10, P.y - STAR_D.camp.y - 60) < 3 * T || Math.hypot(P.x - HARV_D.camp.x - 10, P.y - HARV_D.camp.y - 60) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
   if (S.bridge && !edgeToast && P.y > (H - 6) * T && !inDungeon(P.x)) { edgeToast = true; toast('The mainland lies at the end of the bridge. Keep walking south.', 3500); }
   for (const r of resources) {
     r.shake = Math.max(0, r.shake - dt);
@@ -3035,7 +3124,7 @@ function update(dt) {
   for (const e of enemies) updateEnemy(e, dt, fainted);
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].remove) enemies.splice(i, 1);
   updateProjectiles(dt, fainted);
-  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); updateAir(dt, fainted); updateTelepads(fainted); updateMeteors(dt); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D || dungeonAt(P.x) === TOWER_D) updateJets(dt);
+  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); updateAir(dt, fainted); updateTelepads(fainted); updateMeteors(dt); updateBouncers(dt, fainted); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D || dungeonAt(P.x) === TOWER_D) updateJets(dt);
   updateBosses(dt, fainted);
   updateWorldLinks(dt);
   for (let i = pickups.length - 1; i >= 0; i--) {
@@ -3047,6 +3136,7 @@ function update(dt) {
       pickups.splice(i, 1);
       if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
       else if (p.item === 'idol') { S.found.idol = true; banner('Found the golden idol!', '#ffe08a'); SFX.play('lucky'); questTick(); }
+      else if (p.item === 'goldenseed') { S.found.goldenseed = true; banner('Found the golden seed!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'lens') { S.found.lens = true; banner('Found the telescope lens!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'mainspring') { S.found.mainspring = true; banner('Found the great mainspring!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'compass') { S.found.compass = true; banner('Found the brass compass!', '#ffe08a'); SFX.play('lucky'); questTick(); }
@@ -6736,7 +6826,7 @@ function updateStarFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
     else wander(D.sp * 0.4);
     return true;
   }
-  return false;
+  return updateHarvFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander);
 }
 Object.assign(PROC_DRAW, {
   sprite(c, e, k) {
@@ -6875,6 +6965,129 @@ function drawStarStone(c, sw, lit) {
   c.fillStyle = lit ? '#ffe9a8' : '#5a5490'; for (const [ox, oy] of [[-4, -20], [3, -14], [-2, -8], [5, -22]]) circle(c, sw.x + ox, sw.y + oy, lit ? 2 : 1.4);
   if (lit) { c.strokeStyle = 'rgba(255,233,168,.8)'; c.lineWidth = 1; c.beginPath(); c.moveTo(sw.x - 4, sw.y - 20); c.lineTo(sw.x + 3, sw.y - 14); c.lineTo(sw.x - 2, sw.y - 8); c.moveTo(sw.x + 3, sw.y - 14); c.lineTo(sw.x + 5, sw.y - 22); c.stroke(); c.fillStyle = `rgba(255,233,168,${0.2 + Math.sin(time * 4) * 0.08})`; circle(c, sw.x, sw.y - 16, 20); }
 }
+// ---------- springy hay bales ----------
+let bounceLock = null;
+function updateBouncers(dt, fainted) {
+  if (P.bounce) {
+    const B = P.bounce; B.t += dt; const k = Math.min(1, B.t / B.dur);
+    P.x = B.sx + (B.tx - B.sx) * k; P.y = B.sy + (B.ty - B.sy) * k; B.lift = Math.sin(Math.PI * k) * 90; P.inv = Math.max(P.inv, 0.2);
+    if (k >= 1) { P.bounce = null; burst(P.x, P.y, '#e8c060', 10); SFX.play('crumble'); }
+    return;
+  }
+  if (fainted || P.ride || dungeonAt(P.x) !== HARV_D) return;
+  let on = null;
+  for (const b of BOUNCERS) for (const [from, to] of [[b.a, b.b], [b.b, b.a]]) if (Math.hypot(P.x - from.x, P.y - from.y) < 16) on = { from, to };
+  if (!on) { bounceLock = null; return; }
+  if (bounceLock === on.from) return;
+  bounceLock = on.to; P.bounce = { sx: P.x, sy: P.y, tx: on.to.x, ty: on.to.y, t: 0, dur: 0.75, lift: 0 }; SFX.play('leap'); burst(P.x, P.y, '#e8c060', 12);
+}
+function drawBouncers(c, inView) {
+  for (const b of BOUNCERS) for (const q of [b.a, b.b]) {
+    if (!inView(q.x, q.y, 40)) continue;
+    const sq = 1 + Math.sin(time * 4 + q.x) * 0.05;
+    shadow(c, q.x, q.y + 4, 22, 6);
+    c.fillStyle = '#c8a040'; c.fillRect(q.x - 20, q.y - 14 * sq, 40, 18 * sq); c.fillStyle = '#e8c060'; c.fillRect(q.x - 20, q.y - 14 * sq, 40, 5);
+    c.strokeStyle = '#8a6a24'; c.lineWidth = 1; for (let i = 0; i < 5; i++) { c.beginPath(); c.moveTo(q.x - 18 + i * 9, q.y - 12 * sq); c.lineTo(q.x - 16 + i * 9, q.y + 2); c.stroke(); }
+    c.fillStyle = '#c8402a'; c.fillRect(q.x - 21, q.y - 8 * sq, 42, 2);
+    const ph = (time * 1.5 + q.x * 0.01) % 1; c.strokeStyle = `rgba(255,233,168,${0.6 * (1 - ph)})`; c.lineWidth = 2; c.beginPath(); c.moveTo(q.x - 6, q.y - 20 - ph * 14); c.lineTo(q.x, q.y - 26 - ph * 14); c.lineTo(q.x + 6, q.y - 20 - ph * 14); c.stroke();
+  }
+}
+function drawAutumnTile(c, x, y, px, py, t) {
+  const h = hash(x, y);
+  if (t === HEDGE) { spr(c, 'grass0', px, py); c.fillStyle = '#4a6a2a'; c.fillRect(px + 1, py + 4, T - 2, T - 4); c.fillStyle = '#5a7a34'; for (const [ox, oy, r] of [[8, 10, 7], [20, 9, 8], [14, 18, 8], [26, 18, 6], [6, 22, 6]]) circle(c, px + ox, py + oy, r); c.fillStyle = '#c8402a'; if (h > 0.6) circle(c, px + 10 + h * 10, py + 12, 2); return; }
+  if (t === CORN) { spr(c, 'p_c', px, py); c.fillStyle = 'rgba(120,90,30,.3)'; c.fillRect(px, py, T, T); for (let i = 0; i < 4; i++) { const ox = 3 + i * 8 + (h * 3), sw = Math.sin(time * 0.0 + i + h * 5) * 2; c.strokeStyle = i % 2 ? '#b0902a' : '#c8a83a'; c.lineWidth = 3; c.beginPath(); c.moveTo(px + ox, py + T); c.lineTo(px + ox + sw, py - 4); c.stroke(); c.fillStyle = '#e8c060'; c.fillRect(px + ox - 1 + sw, py + 4 + (i % 2) * 6, 3, 7); c.fillStyle = '#7a8a3a'; c.beginPath(); c.ellipse(px + ox + 4, py + 14 + i * 2, 5, 1.5, 0.6, 0, Math.PI * 2); c.fill(); } return; }
+  if (t === DEEP) {
+    spr(c, edgeKey('w_', (xx, yy) => isLand(tileAt(xx, yy)) || tileAt(xx, yy) === HEDGE || tileAt(xx, yy) === CORN, x, y), px, py);
+    c.fillStyle = 'rgba(60,90,120,.25)'; c.fillRect(px, py, T, T); if (h > 0.85) { c.fillStyle = '#e8703a'; c.beginPath(); c.ellipse(px + h * 24, py + 10 + h * 10, 3, 1.6, h * 5, 0, Math.PI * 2); c.fill(); }
+    return;
+  }
+  spr(c, h < 0.35 ? 'grass1' : 'grass0', px, py);
+  if (t === PATH) spr(c, edgeKey('p_', notPath, x, y), px, py);
+  c.fillStyle = t === PATH ? 'rgba(160,90,30,.12)' : 'rgba(200,120,30,.24)'; c.fillRect(px, py, T, T);
+  if (t !== PATH && h > 0.76) { c.fillStyle = ['#e8703a', '#c8402a', '#e8c060'][Math.floor(h * 30) % 3]; c.beginPath(); c.ellipse(px + h * 22, py + 8 + h * 14, 3, 1.8, h * 6, 0, Math.PI * 2); c.fill(); }
+}
+function drawPumpkin(c, r) {
+  const s = r.shake ? Math.sin(time * 70) * 1.5 : 0;
+  shadow(c, s, -2, 13, 4);
+  c.fillStyle = '#c8602a'; for (const ox of [-7, 0, 7]) ellipse(c, ox + s, -9, 7, 9); c.fillStyle = '#e8803a'; ellipse(c, s, -10, 6, 8);
+  c.fillStyle = '#4a6a2a'; c.fillRect(-1 + s, -22, 3, 6); c.strokeStyle = '#5a7a34'; c.lineWidth = 2; c.beginPath(); c.moveTo(1 + s, -20); c.quadraticCurveTo(8, -24, 9, -18); c.stroke();
+}
+function drawScarecrowProp(c, o) {
+  shadow(c, o.x, o.y + 2, 10, 4);
+  c.fillStyle = '#6a4424'; c.fillRect(o.x - 2, o.y - 46, 4, 48); c.fillRect(o.x - 18, o.y - 36, 36, 4);
+  c.fillStyle = '#8a3a2a'; c.fillRect(o.x - 9, o.y - 38, 18, 18); c.fillStyle = '#e8c060'; c.fillRect(o.x - 18, o.y - 34, 5, 6); c.fillRect(o.x + 13, o.y - 34, 5, 6);
+  c.fillStyle = '#e6d2a0'; circle(c, o.x, o.y - 46, 8); c.fillStyle = '#6a4a2a'; c.beginPath(); c.moveTo(o.x - 13, o.y - 50); c.lineTo(o.x + 13, o.y - 50); c.lineTo(o.x, o.y - 64); c.closePath(); c.fill();
+  c.fillStyle = '#1a1210'; c.fillRect(o.x - 4, o.y - 48, 2, 2); c.fillRect(o.x + 2, o.y - 48, 2, 2);
+}
+function drawHayWagon(c, x, y, home) {
+  shadow(c, x, y + 4, 36, 8);
+  c.fillStyle = '#5a3a22'; c.fillRect(x - 34, y - 18, 68, 14); c.fillStyle = '#8a5a32'; c.fillRect(x - 34, y - 18, 68, 4);
+  c.fillStyle = '#e8c060'; c.beginPath(); c.ellipse(x, y - 26, 30, 14, 0, Math.PI, 0); c.fill(); c.fillStyle = '#c8a040'; for (let i = 0; i < 6; i++) c.fillRect(x - 24 + i * 9, y - 34 + (i % 2) * 4, 2, 10);
+  for (const s of [-1, 1]) { c.fillStyle = '#3a2414'; circle(c, x + s * 24, y - 2, 9); c.fillStyle = '#8a5a32'; circle(c, x + s * 24, y - 2, 4); }
+  c.strokeStyle = '#5a3a22'; c.lineWidth = 3; c.beginPath(); c.moveTo(x + 34, y - 10); c.lineTo(x + 52, y - 4); c.stroke();
+}
+// ---------- Harvest creatures: scarecrow stalkers, crows, jack-o'-lanterns, corn wraiths ----------
+function updateHarvFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
+  const ai = AI(e.kind);
+  if (ai === 'stalker') {
+    const looking = (P.fx * -dx + P.fy * -dy) / d > 0.35;
+    e.frozen2 = looking;
+    if (chase && !looking) { moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); if (Math.random() < dt * 6) particles.push({ x: e.x, y: e.y - 4, vx: (Math.random() - 0.5) * 30, vy: -10, life: 0.4, color: '#c8a040', size: 2 }); }
+    if (d < 22 && !fainted && P.inv <= 0) damagePlayer(D.dmg, e);
+    return true;
+  }
+  if (ai === 'crow') {
+    if (e.state === 'dive') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); if (!e.hit && d < 20 && !fainted) { e.hit = true; damagePlayer(D.dmg, e); } if (e.st <= 0) { e.state = 'move'; e.cd = 1.6 + rng(); } return true; }
+    if (chase) { const a = e.anim * 2.4 + e.hx, tx = P.x + Math.cos(a) * 90, ty = P.y - 10 + Math.sin(a) * 60, ex = tx - e.x, ey = ty - e.y, el = Math.hypot(ex, ey) || 1; moveEnemy(e, ex / el * Math.min(el, D.sp * dt), ey / el * Math.min(el, D.sp * dt)); if (e.cd <= 0) { e.state = 'dive'; e.st = 0.4; e.lx = dx / d * 330; e.ly = dy / d * 330; e.hit = false; SFX.play('dash'); } }
+    else moveEnemy(e, Math.cos(e.anim * 1.4) * 30 * dt + (e.hx - e.x) * 0.3 * dt, Math.sin(e.anim * 1.1) * 20 * dt + (e.hy - e.y) * 0.3 * dt);
+    return true;
+  }
+  if (ai === 'jack') {
+    if (e.state === 'spin') { e.st -= dt; if (e.st <= 0) { e.flip = !e.flip; for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + (e.flip ? Math.PI / 4 : 0), r2 = 110; projectiles.push({ kind: 'rock', seed: true, sx: e.x, sy: e.y - 20, x: e.x, y: e.y - 20, tx: e.x + Math.cos(a) * r2, ty: e.y + Math.sin(a) * r2 * 0.75, t: 0, dur: 0.7, z: 0 }); } SFX.play('swing'); e.state = 'move'; e.cd = 2.2 + rng(); } return true; }
+    if (e.state === 'leap') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); e.lift = Math.sin(Math.PI * Math.max(0, 1 - e.st / 0.4)) * 18; if (e.st <= 0) { e.state = 'move'; e.lift = 0; e.wt = 0.6 + rng() * 0.5; } return true; }
+    e.wt = (e.wt || 0) - dt;
+    if (chase && d < 140 && e.cd <= 0) { e.state = 'spin'; e.st = 0.5; return true; }
+    if (e.wt <= 0) { const a = chase ? Math.atan2(dy, dx) : rng() * Math.PI * 2; e.state = 'leap'; e.st = 0.4; e.lx = Math.cos(a) * 150; e.ly = Math.sin(a) * 150; }
+    touch(D.dmg); return true;
+  }
+  return false;
+}
+Object.assign(PROC_DRAW, {
+  stalker(c, e, k) {
+    const frozen = e.frozen2, sway = frozen ? 0 : Math.sin(e.anim * 14) * 3;
+    shadow(c, e.x, e.y + 2, 10 * k, 4 * k);
+    c.fillStyle = '#6a4424'; c.fillRect(e.x - 2 + sway * 0.3, e.y - 44, 4, 44); c.fillRect(e.x - 17 + sway, e.y - 34, 34, 4);
+    c.fillStyle = '#5a3a6a'; c.fillRect(e.x - 9 + sway * 0.6, e.y - 36, 18, 18); c.fillStyle = '#e8c060'; c.fillRect(e.x - 18 + sway, e.y - 32, 5, 6); c.fillRect(e.x + 13 + sway, e.y - 32, 5, 6);
+    c.fillStyle = '#e6d2a0'; circle(c, e.x + sway, e.y - 44, 8); c.fillStyle = '#3a2a1a'; c.beginPath(); c.moveTo(e.x - 13 + sway, e.y - 48); c.lineTo(e.x + 13 + sway, e.y - 48); c.lineTo(e.x + sway, e.y - 62); c.closePath(); c.fill();
+    c.fillStyle = frozen ? '#1a1210' : '#e0503a'; c.fillRect(e.x - 4 + sway, e.y - 46, 3, 3); c.fillRect(e.x + 2 + sway, e.y - 46, 3, 3);
+    if (!frozen) { c.strokeStyle = '#1a1210'; c.lineWidth = 1; c.beginPath(); c.moveTo(e.x - 4 + sway, e.y - 40); for (let i = 0; i < 4; i++) c.lineTo(e.x - 4 + i * 2.5 + sway, e.y - 40 + (i % 2 ? 2 : 0)); c.stroke(); }
+  },
+  crow(c, e, k) {
+    const y = e.y - (e.state === 'dive' ? 12 : 34) + Math.sin(e.anim * 5) * 3, f = (e.state === 'dive' ? e.lx : P.x - e.x) < 0 ? -1 : 1, flap = Math.sin(time * 20 + e.hx) * 6;
+    shadow(c, e.x, e.y + 2, 8 * k, 3 * k);
+    c.fillStyle = '#1a1a24'; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(e.x, y); c.lineTo(e.x + s * 14 * k, y - 3 - flap * s * s); c.lineTo(e.x + s * 9 * k, y + 3); c.closePath(); c.fill(); }
+    c.fillStyle = '#2a2a38'; ellipse(c, e.x, y, 7 * k, 5 * k); circle(c, e.x + f * 6 * k, y - 3, 4 * k);
+    c.fillStyle = '#e8c060'; c.beginPath(); c.moveTo(e.x + f * 9 * k, y - 4); c.lineTo(e.x + f * 14 * k, y - 2); c.lineTo(e.x + f * 9 * k, y - 1); c.fill(); c.fillStyle = '#e0503a'; c.fillRect(e.x + f * 7 * k - 1, y - 5, 2, 2);
+  },
+  jack(c, e, k) {
+    const lift = e.lift || 0, spin = e.state === 'spin' ? time * 20 : 0, y = e.y - 12 - lift;
+    shadow(c, e.x, e.y + 2, 12 * k, 4 * k);
+    c.save(); c.translate(e.x, y); c.rotate(Math.sin(spin) * 0.3);
+    c.fillStyle = '#c8602a'; for (const ox of [-6, 0, 6]) ellipse(c, ox, 0, 7 * k, 10 * k); c.fillStyle = '#e8803a'; ellipse(c, 0, -1, 6 * k, 9 * k);
+    c.fillStyle = '#4a6a2a'; c.fillRect(-1, -14, 3, 5);
+    const g = `rgba(255,214,90,${0.7 + Math.sin(time * 8 + e.hx) * 0.3})`; c.fillStyle = g; c.beginPath(); c.moveTo(-7, -4); c.lineTo(-3, -6); c.lineTo(-4, -1); c.closePath(); c.fill(); c.beginPath(); c.moveTo(7, -4); c.lineTo(3, -6); c.lineTo(4, -1); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(-7, 3); c.lineTo(-4, 5); c.lineTo(-1, 3); c.lineTo(2, 5); c.lineTo(5, 3); c.lineTo(7, 4); c.lineTo(4, 8); c.lineTo(-4, 8); c.closePath(); c.fill();
+    c.restore();
+  },
+  cornwraith(c, e, k) {
+    const a = e.faded ? 0.25 : 0.85, y = e.y - 30 + Math.sin(e.anim * 2) * 4;
+    c.save(); c.globalAlpha = a;
+    c.fillStyle = '#c8b070'; c.beginPath(); c.moveTo(e.x - 12, y + 18); c.quadraticCurveTo(e.x - 14, y - 10, e.x, y - 16); c.quadraticCurveTo(e.x + 14, y - 10, e.x + 12, y + 18); for (let i = 0; i < 4; i++) c.lineTo(e.x + 12 - (i + 0.5) * 6, y + 18 + (i % 2 ? -4 : 4)); c.closePath(); c.fill();
+    c.strokeStyle = '#8a7030'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(e.x - 8 + i * 5, y - 6); c.lineTo(e.x - 9 + i * 5, y + 16); c.stroke(); }
+    c.fillStyle = '#7fe07a'; c.fillRect(e.x - 5, y - 6, 3, 3); c.fillRect(e.x + 2, y - 6, 3, 3);
+    c.restore();
+  },
+});
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -6883,6 +7096,7 @@ function updateAmbient(dt) {
     const tx = Math.floor(x / T), ty = Math.floor(y / T), rg = region[ty * W + tx];
     if (isLand(tileAt(tx, ty))) {
       if (rg === 4) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: Math.random() < 0.5 ? '#5aa65c' : '#d9a23c' });
+      else if (rg === 19) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: ['#e8703a', '#c8402a', '#e8c060'][Math.floor(Math.random() * 3)] });
       else if (rg === 18) ambient.push({ kind: 'glow', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10 });
       else if (rg === 17) ambient.push({ kind: 'mote', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 6, vy: -4 - Math.random() * 4 });
       else if (rg === 16) ambient.push({ kind: 'bub', x, y: y + 60, life: 4, ph: Math.random() * 6 });
@@ -6993,6 +7207,7 @@ function drawRes(c, r) {
     else if (r.type === 'vine') drawVine(c, r);
     else if (r.type === 'obsidian') drawObsidian(c, r);
     else if (r.type === 'tallgrass') drawTallGrass(c, r);
+    else if (r.type === 'pumpkin') drawPumpkin(c, r);
     else if (r.type === 'crystal') {
       const gl = 0.22 + Math.sin(time * 3 + r.seed * 10) * 0.08;
       c.fillStyle = `rgba(165,147,255,${gl})`; circle(c, 0, -19, 22);
@@ -7569,7 +7784,7 @@ function drawProp(c, o) {
 
 function drawNPC(c, n) {
   const near = Math.hypot(n.x - P.x, n.y - P.y) < 50;
-  if (n.boat) { if (n.id.startsWith('beam_')) drawMoonbeam(c, n.x, n.y, n.id === 'beam_home'); else if (n.id.startsWith('cogpad')) drawBigPad(c, n.x, n.y); else if (n.id.startsWith('bell_')) drawDivingBell(c, n.x, n.y, n.id === 'bell_home'); else if (n.id.startsWith('pass_')) drawPass(c, n.x, n.y, n.id === 'pass_home'); else if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
+  if (n.boat) { if (n.id.startsWith('wagon_')) drawHayWagon(c, n.x, n.y, n.id === 'wagon_home'); else if (n.id.startsWith('beam_')) drawMoonbeam(c, n.x, n.y, n.id === 'beam_home'); else if (n.id.startsWith('cogpad')) drawBigPad(c, n.x, n.y); else if (n.id.startsWith('bell_')) drawDivingBell(c, n.x, n.y, n.id === 'bell_home'); else if (n.id.startsWith('pass_')) drawPass(c, n.x, n.y, n.id === 'pass_home'); else if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bed) { drawBed(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText('Bed').width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText('Bed', n.x, n.y + 17); } return; }
   if (n.sign) { drawSign(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bench) {
@@ -7632,6 +7847,7 @@ function render() {
   if (CD === CINDER_D || CD === FORGE_D) drawCinderGround(ctx, camX, camY, viewW, viewH, inViewT);
   if (CD === CAVE_D || CD === VAULT_D) drawRails(ctx, inViewT);
   if (CD === COG_D || CD === TOWER_D) drawTelepads(ctx, inViewT);
+  if (CD === HARV_D) drawBouncers(ctx, inViewT);
   if (CD === SERP_D) drawDartTraps(ctx);
   if (CD === VALE_D || CD === SHRINE_D) drawLilyWobble(ctx);
   if (CD === REEF_D || CD === PALACE_D) drawAirVents(ctx, inViewT);
@@ -7645,7 +7861,7 @@ function render() {
   }
   const list = [];
   for (const d of decor) if (inView(d.x, d.y)) { if (d.prop === 'rug' || d.prop === 'flowers' || d.wall) { if (d.prop === 'rug' || d.prop === 'flowers') drawProp(ctx, d); else list.push([d.y - 200, 5, d]); } else list.push([d.y, 5, d]); }
-  for (const r of resources) if ((r.alive || (r.type !== 'herb' && r.type !== 'pot' && r.type !== 'crate' && r.type !== 'vine' && r.type !== 'tallgrass')) && inView(r.x, r.y)) list.push([r.y, 0, r]);
+  for (const r of resources) if ((r.alive || (r.type !== 'herb' && r.type !== 'pot' && r.type !== 'crate' && r.type !== 'vine' && r.type !== 'tallgrass' && r.type !== 'pumpkin')) && inView(r.x, r.y)) list.push([r.y, 0, r]);
   for (const e of enemies) if ((e.alive || e.dieT > 0) && inView(e.x, e.y)) list.push([e.y, 1, e]);
   for (const n of NPCS) if (inView(n.x, n.y)) list.push([n.y, 2, n]);
   for (const a of animals) if (inView(a.x, a.y)) list.push([a.y, 6, a]);
@@ -7666,7 +7882,7 @@ function render() {
     else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : o.id === 'shrine' ? drawShrineGate : o.id === 'palace' ? drawPalaceGate : o.id === 'tower' ? drawClockTower : o.id === 'sanctum' ? drawSanctumGate : drawCryptDoor)(ctx);
     else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : dungeonAt(o.x) === SHRINE_D ? drawBell : dungeonAt(o.x) === PALACE_D ? drawClam : dungeonAt(o.x) === TOWER_D ? drawLever : dungeonAt(o.x) === SANCT_D ? drawStarStone : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
-    else if (kind === 3) { if (P.ride) drawCart(ctx, P.x, P.y + 6); drawPlayer(ctx); if (P.ride) drawCartFront(ctx, P.x, P.y + 6); }
+    else if (kind === 3) { if (P.ride) drawCart(ctx, P.x, P.y + 6); if (P.bounce) { shadow(ctx, P.x, P.y + 1, 12, 4); ctx.save(); ctx.translate(0, -P.bounce.lift); } drawPlayer(ctx); if (P.bounce) ctx.restore(); if (P.ride) drawCartFront(ctx, P.x, P.y + 6); }
     else if (kind === 4) drawHouse(ctx, o);
     else if (kind === 5 && o.prop) { if (o.prop === 'rug') continue; drawProp(ctx, o); }
     else if (kind === 5 && o.bigshroom) drawBigShroom(ctx, o);
@@ -7675,6 +7891,7 @@ function render() {
     else if (kind === 5 && o.lantern) drawLantern(ctx, o.lantern);
     else if (kind === 5 && o.steampipe) drawSteamPipe(ctx, o);
     else if (kind === 5 && o.telescope) drawTelescope(ctx, o);
+    else if (kind === 5 && o.scareprop) drawScarecrowProp(ctx, o);
     else if (kind === 5 && o.crater) drawCrater(ctx, o);
     else if (kind === 5 && o.biggear) drawBigGear(ctx, o);
     else if (kind === 5 && o.templeIdol) drawTempleIdol(ctx, o);
@@ -7787,6 +8004,7 @@ async function start(hot) {
   if (qState('bloom') && qState('bloom').state === 'active') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (qState('chime') && qState('chime').state === 'active') spawnFind('chime', 11, SKY_D.x0, DW);
   if (qState('comb') && qState('comb').state === 'active') spawnComb();
+  if (qState('seed') && qState('seed').state === 'active') spawnSeed();
   if (qState('lens') && qState('lens').state === 'active') spawnFind('lens', 18, STAR_D.x0, DW);
   if (qState('mainspring') && qState('mainspring').state === 'active') spawnFind('mainspring', 17, COG_D.x0, DW);
   if (qState('compass') && qState('compass').state === 'active') spawnFind('compass', 16, REEF_D.x0, DW);
