@@ -75,9 +75,11 @@
 
   const VILLAGE_B_RIVER = ['ford', 'bridge', 'brook', 'wade', 'water', 'burn'];
   const VILLAGE_B_SEA = ['haven', 'port', 'sands', 'cove', 'bay', 'quay'];
-  const VILLAGE_B_KIND = { market: ['market', 'cross', 'chester', 'borough'], windmill: ['mill', 'hill', 'down', 'barrow'], lake: ['mere', 'lake', 'water', 'pool'], castle: ['castle', 'keep', 'tower', 'gate'], forest: ['wood', 'grove', 'holt', 'shaw'], mountain: ['crag', 'peak', 'fell', 'tor'], canal: ['lock', 'wharf', 'cut', 'basin'], orchard: ['orchard', 'garth', 'apple', 'pippin'] };
+  const VILLAGE_B_KIND = { market: ['market', 'cross', 'chester', 'borough'], windmill: ['mill', 'hill', 'down', 'barrow'], lake: ['mere', 'lake', 'water', 'pool'], castle: ['castle', 'keep', 'tower', 'gate'], forest: ['wood', 'grove', 'holt', 'shaw'], mountain: ['crag', 'peak', 'fell', 'tor'], canal: ['lock', 'wharf', 'cut', 'basin'], orchard: ['orchard', 'garth', 'apple', 'pippin'], railway: ['junction', 'halt', 'sidings', 'cross'], marsh: ['marsh', 'fen', 'moss', 'mire'] };
   function genLayout(opts = {}) {
-    const kind = opts.kind || pick(KIND_NAMES);
+    let kind = opts.kind || pick(KIND_NAMES);
+    const harbour = kind === 'harbour';
+    if (harbour) kind = 'seaside'; // a harbour town is a seaside village with a working harbour
     const season = opts.season || pick(SEASON_NAMES);
     const weatherName = opts.weather || pickWeather(season);
     const roadY = kind === 'seaside' ? 24 + Math.floor(rand() * 8) : 29 + Math.floor(rand() * 10);  // top row of the 2-wide east–west road
@@ -95,7 +97,7 @@
       night: opts.night !== undefined ? opts.night : run.day >= 2 && rand() < 0.22,
       pest: opts.pest !== undefined ? opts.pest : (run.day >= 2 && rand() < 0.45) || run.day >= 5,
       eclipse: opts.eclipse !== undefined ? opts.eclipse : rand() < 0.1 ? { at: 0.3 + rand() * 0.25, dur: 30 } : null,
-      kind, season, weather: weatherName, weatherPlan: opts.plan || planWeather(season, weatherName), planIdx: 1, roadY, roadX,
+      kind, harbour, season, weather: weatherName, weatherPlan: opts.plan || planWeather(season, weatherName), planIdx: 1, roadY, roadX,
       plaza: { x: roadX - 5, y: roadY - 5, w: 12, h: 12 },
       quads,
       pondQ: quads[order[0]], gardenQ: quads[order[1]], homeQs: [quads[order[2]], quads[order[3]]],
@@ -226,6 +228,7 @@
       }
     }
     buildCanal();
+    buildRailway();
     // In winter, ponds and rivers freeze over
     if (hasIce()) for (let i = 0; i < MW * MH; i++) if (map[i] === WATER) map[i] = ICE;
 
@@ -977,10 +980,10 @@
         hitbox: box(X, y - 6, TILE, 7),
         bounds: { l: X - 4, r: X + TILE + 4, t: y - 24, b: y + 4 },
         draw(ctx) {
-          ctx.fillStyle = '#c99b63';
+          ctx.fillStyle = this.paint || '#c99b63';
           ctx.fillRect(X, y - 16, TILE, 3.5);
           ctx.fillRect(X, y - 8, TILE, 3.5);
-          ctx.fillStyle = '#a87a45';
+          ctx.fillStyle = this.paint ? shade(this.paint, -0.15) : '#a87a45';
           roundRect(ctx, X + 1, y - 20, 5, 20, 2, true);
           roundRect(ctx, X + TILE - 6, y - 20, 5, 20, 2, true);
         },
@@ -992,9 +995,9 @@
       hitbox: box(x - 4, Y, 8, TILE),
       bounds: { l: x - 8, r: x + 8, t: Y - 22, b: Y + TILE + 4 },
       draw(ctx) {
-        ctx.fillStyle = '#c99b63';
+        ctx.fillStyle = this.paint || '#c99b63';
         ctx.fillRect(x - 1.5, Y - 14, 3.5, TILE);
-        ctx.fillStyle = '#a87a45';
+        ctx.fillStyle = this.paint ? shade(this.paint, -0.15) : '#a87a45';
         roundRect(ctx, x - 2.5, Y + TILE - 20, 5, 20, 2, true);
       },
     };
@@ -1099,7 +1102,7 @@
 
   function makeSign(x, y, rightLabel = 'POND', leftLabel = 'GARDEN') {
     return {
-      kind: 'sign', x, y,
+      kind: 'sign', x, y, right: rightLabel, left: leftLabel,
       hitbox: box(x - 3, y - 5, 6, 6),
       bounds: { l: x - 34, r: x + 34, t: y - 50, b: y + 6 },
       shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 6, y, 10, 3); },
@@ -1111,8 +1114,8 @@
         ctx.fillStyle = '#4a3220';
         ctx.font = 'bold 6px Nunito, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(rightLabel, x + 13, y - 36);
-        ctx.fillText(leftLabel, x - 13, y - 21);
+        ctx.fillText(this.right, x + 13, y - 36);
+        ctx.fillText(this.left, x - 13, y - 21);
       },
     };
   }
@@ -1478,6 +1481,7 @@
     else if (player.sled) maxSpd = onHill(player.x, player.y) ? 290 : 115;
     else if (player.hidingIn && player.hidingIn.kind === 'drift') maxSpd *= 0.6; // wading through snow
     else if (inFlood(player.x, player.y)) maxSpd *= 0.65; // wading through flood water
+    else if (inBog(player.x, player.y)) maxSpd *= 0.45; // stuck in the sucking mud
     else if (player.stuffed) maxSpd = Math.min(maxSpd, WALK_SPEED * 0.75); // waddle
     else if (player.sugar > 0) maxSpd *= 1.25;                         // zoom
     const tx = ix * maxSpd, ty = iy * maxSpd;
@@ -2396,6 +2400,8 @@
     if (rideAction()) return;
     if (rummageAction()) return;
     if (player.held && !(petChoice() === 'wardrobe')) { dropHeld(false); return; }
+    if (!target && signAction()) return;
+    if (!target && knockAction()) return;
     const pc = petChoice();
     if (pc === 'dog') { petDog(); return; }
     if (pc === 'cat') { petCat(); return; }
@@ -2429,6 +2435,11 @@
     if (it.blown) completeTask('umbrella');
     if (it.kind === 'ring') completeTask('lockring');
     if (it.woodnuts) completeTask('woodpecker');
+    if (it.kind === 'suitcase') completeTask('luggage');
+    if (it.catch) completeTask('catch');
+    if (it.kind === 'wispgem') completeTask('wisp');
+    if (it.stall && L.harbour) completeTask('fishmarket');
+    if (it.trainOff !== undefined) delete it.trainOff;
     if (it.scarehat) completeTask('scarehat');
     if (areaOf(it.x, it.y) > 0) budgieTattle(it);
     if (it.shop) {
@@ -3604,6 +3615,15 @@
     { id: 'marshmallow', tier: 'Easy', text: 'Toast a marshmallow', hint: 'hold it by the campfire', req: ['camp'] },
     { id: 'rummage', tier: 'Easy', text: 'Rummage through the scrapyard', hint: 'E by a junk pile', req: ['scrap'] },
     { id: 'crowfield', tier: 'Easy', text: 'Scatter the crows from the field', req: ['fieldcrows'] },
+    { id: 'trainride', tier: 'Easy', text: 'Ride the train', hint: 'hop on at the station', req: ['rail'] },
+    { id: 'luggage', tier: 'Easy', text: 'Pinch luggage off the station platform', req: ['rail'] },
+    { id: 'traintoot', tier: 'Easy', text: 'Get tooted at by the train', hint: 'stand on the tracks... then move!', req: ['rail'] },
+    { id: 'lighthouse', tier: 'Easy', text: 'Climb the lighthouse', req: ['harbourtown'] },
+    { id: 'lobster', tier: 'Easy', text: 'Raid a lobster pot', req: ['harbourtown'] },
+    { id: 'bog', tier: 'Easy', text: 'Get stuck in the sucking mud', req: ['bog'] },
+    { id: 'stilthut', tier: 'Easy', text: 'Hide in a stilt hut', req: ['huts'] },
+    { id: 'toad', tier: 'Easy', text: 'Hear the giant toad croak', req: ['bog'] },
+    { id: 'signswap', tier: 'Easy', text: 'Swap the signposts round', hint: 'E at the plaza sign' },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3700,6 +3720,14 @@
     { id: 'crowquest', tier: 'Medium', text: 'Bring the crow something shiny', hint: 'drop it by the crow with the “!”', req: ['qcrow'] },
     { id: 'foxquest', tier: 'Medium', text: 'Bring the hungry fox an egg', hint: 'its den is at the forest edge', req: ['qfox'] },
     { id: 'molequest', tier: 'Medium', text: 'Dig up 3 worms for the mole', hint: 'B on grass with empty paws', req: ['qmole'] },
+    { id: 'trainthrow', tier: 'Medium', text: 'Throw something onto the train', req: ['rail'] },
+    { id: 'fishmarket', tier: 'Medium', text: 'Swipe a fish from the fish market', req: ['harbourtown'] },
+    { id: 'catch', tier: 'Medium', text: 'Pinch the fishing boat’s catch', hint: 'it unloads at the end of the pier', req: ['harbourtown'] },
+    { id: 'toadsnack', tier: 'Medium', text: 'Lose a snack to the giant toad’s tongue', req: ['bog'] },
+    { id: 'wisp', tier: 'Medium', text: 'Follow the will-o’-the-wisp to its treasure', hint: 'over the marsh, after dusk', req: ['wisp'] },
+    { id: 'knock', tier: 'Medium', text: 'Knock on a door and hide before they answer', hint: 'E at a door, then run!' },
+    { id: 'whoopee', tier: 'Medium', text: 'Catch someone with a whoopee cushion', hint: 'leave it where someone sits' },
+    { id: 'paint', tier: 'Medium', text: 'Paint 10 fence panels pink', goal: 10, hint: 'carry the paint pot along a fence' },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3791,7 +3819,7 @@
   const chitterRadius = () => 95 * (1 + 0.35 * lvl('chitter'));
 
   function setupRun(day) {
-    Object.assign(run, { day, eaten: 0, tobyHits: 0, prints: 0, crows: 0, fireflies: 0, puddles: 0, eggs: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
+    Object.assign(run, { day, eaten: 0, tobyHits: 0, prints: 0, painted: 0, crows: 0, fireflies: 0, puddles: 0, eggs: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
     run.maxStrikes = 3 + lvl('fur');
     run.timeTotal = Math.min(600, 420 + 30 * (day - 1)) + 60 * lvl('day'); // the bigger village takes a little longer to ransack
     run.timeLeft = run.timeTotal;
@@ -3878,6 +3906,11 @@
       if (r === 'candy' && !(L.fair && L.fair.candy)) return false;
       if (r === 'tent' && !(L.fair && L.fair.tent)) return false;
       if (r === 'camp' && !L.camp) return false;
+      if (r === 'rail' && !L.rail) return false;
+      if (r === 'harbourtown' && !(L.harbour && L.lighthouse)) return false;
+      if (r === 'bog' && !L.bog) return false;
+      if (r === 'huts' && !(L.huts && L.huts.length)) return false;
+      if (r === 'wisp' && !(L.bog && !isWinter())) return false;
       if (r === 'scrap' && !L.scrap) return false;
       if (r === 'field' && !(L.fieldCrows && L.fieldCrows.length)) return false;
       if (r === 'fishbowl' && !L.fishHouse) return false;
@@ -4057,10 +4090,10 @@
     updateRunBar();
     document.getElementById('rc-day').textContent = `Day ${run.day}`;
     document.getElementById('rc-town').textContent = L.name;
-    document.getElementById('rc-season').textContent = `${cap(L.season)}${L.weather !== 'clear' ? ', ' + WEATHER_LABEL[L.weather].toLowerCase() : ''} \u00b7 ${KIND_LABEL[L.kind]} village${L.event ? ' \u00b7 ' + EVENT_LABEL[L.event] + '!' : ''}${L.night ? ' \u00b7 Night raid!' : ''}`;
+    document.getElementById('rc-season').textContent = `${cap(L.season)}${L.weather !== 'clear' ? ', ' + WEATHER_LABEL[L.weather].toLowerCase() : ''} \u00b7 ${KIND_LABEL[L.harbour ? 'harbour' : L.kind]} village${L.event ? ' \u00b7 ' + EVENT_LABEL[L.event] + '!' : ''}${L.night ? ' \u00b7 Night raid!' : ''}`;
     const later = (L.weatherPlan || []).slice(1).find((s) => s.w !== L.weather);
     const forecast = later ? `Forecast: ${later.w === 'clear' ? 'clearing up' : WEATHER_LABEL[later.w].toLowerCase()} later.` : '';
-    document.getElementById('rc-tip').textContent = [L.eclipse && !L.night ? 'Stargazers say there’ll be a solar eclipse today!' : '', L.night ? 'Night raid! Most villagers are asleep in bed: walk, don’t run, near them. The night watchman’s lantern sees far.' : '', L.pest ? 'The pest controller is in town: he follows your trail and has set cage traps on the paths.' : '', EVENT_TIP[L.event], KIND_TIP[L.kind], WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season]].filter(Boolean).join(' ');
+    document.getElementById('rc-tip').textContent = [L.eclipse && !L.night ? 'Stargazers say there’ll be a solar eclipse today!' : '', L.night ? 'Night raid! Most villagers are asleep in bed: walk, don’t run, near them. The night watchman’s lantern sees far.' : '', L.pest ? 'The pest controller is in town: he follows your trail and has set cage traps on the paths.' : '', EVENT_TIP[L.event], KIND_TIP[L.harbour ? 'harbour' : L.kind], WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season]].filter(Boolean).join(' ');
     const m = Math.floor(run.timeTotal / 60), s = run.timeTotal % 60;
     document.getElementById('rc-tasks').textContent = `${run.tasks.length} tasks`;
     document.getElementById('rc-time').textContent = `${m}:${String(s).padStart(2, '0')} until sunset`;
@@ -4302,7 +4335,7 @@
   }
 
   function updateHiding(dt) {
-    if (player.tree || player.roof || (player.ride && (player.ride.kind === 'cable' || player.ride.kind === 'wheel'))) { // villagers never look up
+    if (player.tree || player.roof || (player.ride && ['cable', 'wheel', 'lighthouse'].includes(player.ride.kind))) { // villagers never look up
       player.hidden = true; player.hidingIn = null;
       const pill = document.getElementById('hidden-pill'); if (pill.hidden === !paused) pill.hidden = paused;
       return;
@@ -4338,6 +4371,7 @@
       if (bush.kind === 'armour') completeTask('armour');
       if (bush.kind === 'hollowtree') completeTask('hollow');
       if (bush.kind === 'tent') completeTask('tent');
+      if (bush.kind === 'stilthut') completeTask('stilthut');
       // Chasers who weren't right on top of you lose track in the leaves
       for (const v of villagers) {
         if (v.state === 'chase' && Math.hypot(v.x - player.x, v.y - player.y) > 60) {
@@ -5254,7 +5288,7 @@
   // it looks and what there is to do.
   // ---------------------------------------------------------------------------
   const SEASON_NAMES = ['spring', 'summer', 'autumn', 'winter'];
-  const KIND_NAMES = ['pond', 'river', 'seaside', 'market', 'windmill', 'lake', 'castle', 'forest', 'mountain', 'canal', 'orchard'];
+  const KIND_NAMES = ['pond', 'river', 'seaside', 'market', 'windmill', 'lake', 'castle', 'forest', 'mountain', 'canal', 'orchard', 'railway', 'harbour', 'marsh'];
   const SEASON_LOOK = {
     spring: { grass: '#7cba55', patch: ['rgba(110,170,70,0.35)', 'rgba(175,220,120,0.3)'], blade: ['rgba(70,135,50,0.55)', 'rgba(175,225,120,0.5)'], blades: 9000,
       flowers: 1200, petals: ['#ffffff', '#ffd1e3', '#ff9ec4', '#c9b3ff', '#fff3a8'], path: ['#b08b55', '#cfac72'], sand: ['#c9b57e', '#e3cf96'],
@@ -5282,7 +5316,8 @@
   const KIND_TIP = { pond: '', river: 'A river runs right through the village.', seaside: 'The village sits by the sea, with a pier.',
     market: 'It’s market day! The stalls are full of goodies, and the stallholders are watching.', windmill: 'A windmill turns on the hill: flour sacks, a wheat field and a hay barn.', lake: 'A big lake with an island in the middle. Take the rowing boat from the jetty.',
     castle: 'Old castle ruins with a moat: ring the bell, hide in the armour, and there’s a treasure chest in the courtyard.', forest: 'A village deep in the woods: treehouses with a rope bridge, a woodpile, fairy rings and a hollow tree.',
-    mountain: 'A village on a mountainside: a rocky slope with goats, a cable car up to the lookout, and a cave that echoes.', canal: 'A canal runs through the village: narrowboats you can hop aboard, a lock you can drain, and humpback bridges.', orchard: 'An orchard village: apple trees to shake, a cider press, and a hedge maze.' };
+    mountain: 'A village on a mountainside: a rocky slope with goats, a cable car up to the lookout, and a cave that echoes.', canal: 'A canal runs through the village: narrowboats you can hop aboard, a lock you can drain, and humpback bridges.', orchard: 'An orchard village: apple trees to shake, a cider press, and a hedge maze.',
+    railway: 'A railway runs through the village: hop on the little train at the station, and mind the level crossing.', harbour: 'A harbour town: a lighthouse, lobster pots, a fish market, and a fishing boat bringing in its catch.', marsh: 'A village beside a marsh: boardwalks over sucking mud, stilt huts, a giant toad, and strange lights at night.' };
   const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
   // --- Seasonal objects ---------------------------------------------------------
@@ -5870,6 +5905,7 @@
     spawnRainCritters();
     spawnMoreCritters();
     spawnOutskirtsCritters();
+    spawnMarshCritters();
   }
 
   // Something scary happened near (x, y): birds and frogs bolt (see also farmNightScare)
@@ -5926,6 +5962,7 @@
       if (RN_TYPES.has(c.type)) { updateRainCritter(c, dt, near); continue; }
       if (c.type === 'mgoat') { updateMGoat(c, dt); continue; }
       if (OK_TYPES.has(c.type)) { updateOutskirtsCritter(c, dt, near); continue; }
+      if (c.type === 'gtoad' || c.type === 'wisp') { updateMarshCritter(c, dt); continue; }
 
       if (c.type === 'duck') {
         c.panic = Math.max(0, c.panic - dt);
@@ -6075,6 +6112,7 @@
     if (RN_TYPES.has(c.type)) { drawRainCritter(ctx, c, t); return; }
     if (c.type === 'mgoat') { drawMGoat(ctx, c); return; }
     if (OK_TYPES.has(c.type)) { drawOutskirtsCritter(ctx, c, t); return; }
+    if (c.type === 'gtoad' || c.type === 'wisp') { drawMarshCritter(ctx, c, t); return; }
     if (c.type === 'frog' && c.gone > 0) return;
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -7246,7 +7284,7 @@
     scarecrows: 'Scarecrow festival: everyone’s made a scarecrow. It would be a shame if they fell over...',
     funfair: 'The funfair’s in town! A carousel, a big wheel, a coconut shy, candyfloss and a hall of mirrors.',
   };
-  const KIND_LABEL = { pond: 'Pond', river: 'Riverside', seaside: 'Seaside', market: 'Market', windmill: 'Windmill', lake: 'Lakeside', castle: 'Castle', forest: 'Forest', mountain: 'Mountain', canal: 'Canal', orchard: 'Orchard' };
+  const KIND_LABEL = { pond: 'Pond', river: 'Riverside', seaside: 'Seaside', market: 'Market', windmill: 'Windmill', lake: 'Lakeside', castle: 'Castle', forest: 'Forest', mountain: 'Mountain', canal: 'Canal', orchard: 'Orchard', railway: 'Railway', harbour: 'Harbour', marsh: 'Marsh' };
   function pickEvent(season) { return rand() < 0.4 ? pick(EVENTS_BY_SEASON[season]) : null; }
 
   // --- New items -----------------------------------------------------------------------------
@@ -7547,6 +7585,7 @@
     L.castle = null; L.treehouses = null; L.museum = null;
     if (L.kind === 'castle') buildCastle(markSolid, place);
     if (L.kind === 'forest') buildForest(markSolid, place);
+    buildMarsh(markSolid, place);
     buildMoreEarly(markSolid, place);
     buildOutskirts(markSolid, place);
     if (L.kind === 'castle' || (L.kind !== 'market' && rand() < 0.3)) buildMuseum(markSolid, place);
@@ -7555,7 +7594,7 @@
   function buildKindLate() {
     const T = TILE, P = L.plaza, px = P.x, py = P.y;
     L.stalls = null; L.cart = null; L.festCrows = []; L.bonfire = null; L.fireworks = [];
-    placeCastleObjects(); placeForestObjects(); placeMuseumObjects(); placeRace(); placeMoreObjects(); placeOutskirtsObjects();
+    placeCastleObjects(); placeForestObjects(); placeMuseumObjects(); placeRace(); placeMoreObjects(); placeOutskirtsObjects(); placeRailObjects();
     if (L.museum) L.homes.guard = L.homes.percy;
     L.homes.pest = L.homes.percy; L.homes.watch = L.homes.percy;
     L.lights = objects.filter((o) => o.kind === 'lamp');
@@ -7613,6 +7652,8 @@
     }
     placeMoreItems();
     placeOutskirtsItems();
+    placePrankItems();
+    if (L.rail) for (let k = 0; k < 3; k++) placeFree('suitcase', L.rail.station.x - 90 + k * 22, L.rail.station.y - 4, { owner: 'percy' });
     if (L.castleChest) addItem('chest', L.castleChest.x, L.castleChest.y);
     if (L.plinths) ['crown', 'gem', 'goldvase'].forEach((k, i) => { const p = L.plinths[i]; addItem(k, p.x, p.y - 2, { z: 18, owner: 'guard' }).museum = true; });
     if (L.rings) for (const R of L.rings) for (let k = 0; k < 2; k++) placeFree('mushroom', R.x + rr(-40, 40), R.y + rr(18, 30));
@@ -9199,6 +9240,9 @@
       for (const o of L.lights || []) light(o.x, o.y - 30, 95, 0.95);
       for (const hs of L.houses) light((hs.doorX + 0.5) * TILE, (hs.y + hs.h) * TILE - 10, 48, 0.8);
       if (L.bonfire) light(L.bonfire.x, L.bonfire.y - 10, 140, 1);
+      if (L.lighthouse) { const H = L.lighthouse, a = time * 0.9; light(H.x, H.y - 140, 70, 1); light(H.x + Math.cos(a) * 200, H.y - 140 + Math.sin(a) * 100, 60, 0.8); }
+      for (const c of critters) if (c.type === 'wisp' && !c.done) light(c.x, c.y - c.z, 40, 0.8);
+      if (L.rail && L.train) light(L.train.x + L.train.dir * 30, L.rail.y - 10, 70, 0.8);
       const wt = VILLAGER.watch;
       if (wt && areaOf(wt.x, wt.y) === 0) light(wt.x + (wt.dir === 'left' ? -8 : 8), wt.y - 14, 120, 1);
       for (const c of critters) if (c.type === 'firefly' && !c.caught) light(c.x, c.y - c.z, 14, 0.6);
@@ -10176,6 +10220,8 @@
     }
     if (player.held && player.held.type.heavy) return false;
     const near = (x, y, r) => Math.hypot(player.x - x, player.y - y) < r;
+    if (trainBoardable() && !(target && itemReach(target) < 12)) { player.ride = { kind: 'train', off: clamp(player.x - L.train.x, -L.train.dir * L.train.cars * 66 - 20, 20), start: L.train.x }; sfx('tap'); return true; }
+    if (lighthouseNear()) { player.ride = { kind: 'lighthouse' }; sfx('creak'); completeTask('lighthouse'); return true; }
     const C = L.cable;
     if (C && near(C.a.x, C.a.y + 10, 26) && C.at === 'a') { player.ride = { kind: 'cable', t: 0, dir: 1 }; sfx('creak'); return true; }
     if (C && near(C.b.x, C.b.y + 10, 26) && C.at === 'b') { player.ride = { kind: 'cable', t: 1, dir: -1 }; sfx('creak'); return true; }
@@ -10188,6 +10234,8 @@
   const rideNear = () => {
     if (!L || player.ride) return null;
     const near = (x, y, r) => Math.hypot(player.x - x, player.y - y) < r, C = L.cable, F = L.fair;
+    if (trainBoardable()) return 'hop on the train';
+    if (lighthouseNear()) return 'climb the lighthouse';
     if (C && ((near(C.a.x, C.a.y + 10, 26) && C.at === 'a') || (near(C.b.x, C.b.y + 10, 26) && C.at === 'b'))) return 'ride the cable car';
     if ((L.boats || []).some((B) => Math.abs(player.x - B.x) < 64 && Math.abs(player.y - B.y) < 90)) return 'hop aboard';
     if (F && F.carousel && near(F.carousel.x, F.carousel.y + 10, 56)) return 'ride the carousel';
@@ -10210,6 +10258,12 @@
       }
       return;
     }
+    if (R.kind === 'train') {
+      const T0 = L.train; player.x = T0.x + R.off; player.y = L.rail.y - 2; player.rideZ = 18; player.dir = T0.dir > 0 ? 'right' : 'left';
+      if (Math.abs(T0.x - R.start) > 200) completeTask('trainride');
+      return;
+    }
+    if (R.kind === 'lighthouse') { const H = L.lighthouse; player.x = H.x; player.y = H.y + 1; player.rideZ = 138; return; }
     if (R.kind === 'boat') {
       const B = R.B;
       if (Math.abs(input.x) > 0.1) { R.off = clamp(R.off + input.x * 60 * dt, -40, 32); player.dir = input.x > 0 ? 'right' : 'left'; player.walk += dt * 8; player.speed = 40; }
@@ -10734,6 +10788,379 @@
   const junkNear = () => !player.held && L && L.junk && L.junk.some((j) => !j.found && Math.hypot(player.x - j.x, player.y - (j.y + 10)) < 26);
 
   // ---------------------------------------------------------------------------
+  // Railway, harbour and marsh villages, and pranks (knock-and-run, swapped
+  // signposts, whoopee cushions, painted fences).
+  // ---------------------------------------------------------------------------
+  Object.assign(ITEM, {
+    suitcase: { name: 'suitcase', h: 12, r: 7, draw(c) { c.fillStyle = '#8a4a2a'; roundRect(c, -7, -11, 14, 11, 2, true); c.fillStyle = '#c9a33a'; c.fillRect(-7, -7, 14, 1.4); c.fillStyle = '#5a3a20'; c.fillRect(-2.5, -13, 5, 2); c.fillStyle = '#f4e3b8'; c.fillRect(2, -10, 4, 3); } },
+    fishcrate: { name: 'crate of fish', h: 11, r: 8, draw(c) { c.fillStyle = '#a0703f'; c.fillRect(-8, -9, 16, 9); c.fillStyle = '#7a5230'; c.fillRect(-8, -9, 16, 2); c.fillStyle = '#9ab8c8'; for (let k = 0; k < 3; k++) ellipse(c, -4 + k * 4, -10, 2.4, 1.2); } },
+    lobster: { name: 'lobster', h: 6, r: 6, draw(c) { c.fillStyle = '#c0392b'; ellipse(c, 0, -3, 5, 2.4); circle(c, -6, -5, 2); circle(c, 6, -5, 2); c.strokeStyle = '#c0392b'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(4, -4); c.lineTo(8, -8); c.moveTo(-4, -4); c.lineTo(-8, -8); c.stroke(); } },
+    wispgem: { name: 'glowing pebble', h: 6, r: 3, draw(c, it, t) { c.fillStyle = `rgba(140,220,255,${0.3 + Math.sin((t || 0) * 4) * 0.15})`; circle(c, 0, -3, 6); c.fillStyle = '#bff1ff'; circle(c, 0, -3, 2.6); } },
+    whoopee: { name: 'whoopee cushion', h: 4, r: 6, draw(c) { c.fillStyle = '#e8456a'; ellipse(c, 0, -2.5, 6, 3); c.fillStyle = '#c0304e'; c.fillRect(5, -3.5, 3, 2); } },
+    paint: { name: 'pot of pink paint', h: 10, r: 5, draw(c) { c.fillStyle = '#8a8e96'; roundRect(c, -5, -9, 10, 9, 2, true); c.fillStyle = '#f28ab8'; ellipse(c, 0, -9, 5, 1.6); c.fillRect(-5, -6, 10, 2.5); c.strokeStyle = '#5a5e66'; c.lineWidth = 0.8; c.beginPath(); c.arc(0, -9, 5, Math.PI, 0); c.stroke(); } },
+  });
+  const PAINT = '#f28ab8';
+
+  // --- Railway: a track across the village, a station, a level crossing and a little train --------
+  function buildRailway() {
+    if (L.kind !== 'railway') return;
+    const south = L.roadY + 14 < MH - 5, ry = south ? L.roadY + 10 : L.roadY - 12;
+    if (ry < 6) return;
+    for (let x = 2; x < MW - 2; x++) { reserve(x, ry - 1, 1, 4); const t0 = getT(x, ry), t1 = getT(x, ry + 1); if (t0 === WATER || t1 === WATER) { setT(x, ry, BRIDGE); setT(x, ry + 1, BRIDGE); } }
+    const sx = clamp(L.roadX + (L.roadX + 16 < MW - 6 ? 7 : -12), 6, MW - 14);
+    reserve(sx - 1, ry - 4, 10, 4);
+    L.rail = { y: (ry + 1) * TILE, row: ry, x0: 4 * TILE, x1: WORLD_W - 4 * TILE, crossX: (L.roadX + 1) * TILE, station: { x: (sx + 4) * TILE, y: (ry - 0.4) * TILE, tx: sx } };
+    L.train = { x: (sx + 4) * TILE, dir: 1, stopT: 3, cars: 2, tootCD: 0 };
+  }
+  function makeTrack() {
+    const R = L.rail;
+    return {
+      kind: 'track', x: WORLD_W / 2, y: R.y - TILE - 30, bounds: { l: 0, r: WORLD_W, t: R.y - TILE - 4, b: R.y + TILE + 4 },
+      draw(ctx) {
+        ctx.fillStyle = 'rgba(120,110,95,0.55)'; ctx.fillRect(R.x0 - 60, R.y - 22, R.x1 - R.x0 + 120, 30); // ballast
+        ctx.fillStyle = '#6b4a2e'; for (let x = R.x0 - 60; x < R.x1 + 60; x += 12) ctx.fillRect(x, R.y - 20, 6, 26);
+        ctx.fillStyle = '#8a8e96'; ctx.fillRect(R.x0 - 60, R.y - 16, R.x1 - R.x0 + 120, 2.5); ctx.fillRect(R.x0 - 60, R.y + 1, R.x1 - R.x0 + 120, 2.5);
+      },
+    };
+  }
+  function makeStation() {
+    const S = L.rail.station, x = S.x, y = S.y;
+    return {
+      kind: 'station', x, y: y - 40, hitbox: box(x - 40, y - 74, 80, 30), bounds: { l: x - 140, r: x + 140, t: y - 130, b: y + 6 },
+      draw(ctx) {
+        ctx.fillStyle = '#b5b0a4'; ctx.fillRect(x - 130, y - 14, 260, 14); ctx.fillStyle = '#f2d06a'; ctx.fillRect(x - 130, y - 2, 260, 2); // the platform
+        ctx.fillStyle = '#c08a52'; ctx.fillRect(x - 40, y - 96, 80, 52); ctx.fillStyle = '#7a3a2a'; poly(ctx, [[x - 48, y - 94], [x + 48, y - 94], [x + 36, y - 116], [x - 36, y - 116]]); ctx.fill();
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; poly(ctx, [[x - 40, y - 100], [x + 40, y - 100], [x + 34, y - 116], [x - 34, y - 116]]); ctx.fill(); }
+        ctx.fillStyle = '#3a2418'; ctx.fillRect(x - 8, y - 70, 16, 26); ctx.fillStyle = duskK > 0.35 ? '#ffd98a' : '#9fd3e8'; ctx.fillRect(x - 32, y - 80, 16, 12); ctx.fillRect(x + 16, y - 80, 16, 12);
+        ctx.fillStyle = '#f4e3b8'; roundRect(ctx, x - 30, y - 92, 60, 10, 2, true); ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 6.5px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(L.name.toUpperCase(), x, y - 85);
+        ctx.fillStyle = '#2b2d33'; ctx.fillRect(x + 70, y - 60, 2, 46); ctx.fillStyle = '#f4f2ee'; circle(ctx, x + 71, y - 62, 7); ctx.strokeStyle = '#2b2d33'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 71, y - 62, 7, 0, Math.PI * 2); ctx.moveTo(x + 71, y - 62); ctx.lineTo(x + 71, y - 67); ctx.moveTo(x + 71, y - 62); ctx.lineTo(x + 74, y - 62); ctx.stroke();
+      },
+    };
+  }
+  function makeCrossing() {
+    const R = L.rail, x = R.crossX;
+    return {
+      kind: 'crossing', x, y: R.y + TILE, bounds: { l: x - 60, r: x + 60, t: R.y - 80, b: R.y + TILE + 4 },
+      draw(ctx, t) {
+        const down = L.train && Math.abs(L.train.x - x) < 280;
+        for (const s of [-1, 1]) {
+          const px = x + s * 44, py = s < 0 ? R.y - TILE - 6 : R.y + TILE;
+          ctx.fillStyle = '#f4f2ee'; ctx.fillRect(px - 2, py - 30, 4, 30);
+          ctx.fillStyle = down && Math.floor(t * 4) % 2 ? '#ff4040' : '#5a2020'; circle(ctx, px - 4, py - 30, 2.4); ctx.fillStyle = down && Math.floor(t * 4) % 2 === 0 ? '#ff4040' : '#5a2020'; circle(ctx, px + 4, py - 30, 2.4);
+          ctx.save(); ctx.translate(px, py - 20); ctx.rotate(down ? 0 : -s * 1.3);
+          for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#e8453c' : '#f4f2ee'; ctx.fillRect(-s * k * 7 - (s > 0 ? 7 : 0), -2, 7, 4); }
+          ctx.restore();
+        }
+      },
+    };
+  }
+  function makeTrainObj() {
+    const T0 = L.train, R = L.rail;
+    return {
+      kind: 'train', get x() { return T0.x; }, get y() { return R.y + 2; },
+      get bounds() { return { l: T0.x - 180, r: T0.x + 180, t: R.y - 70, b: R.y + 10 }; },
+      draw(ctx, t) {
+        const d = T0.dir, y = R.y;
+        for (let k = T0.cars; k >= 1; k--) { // carriages behind the engine
+          const cx = T0.x - d * k * 66;
+          ctx.fillStyle = '#2b2d33'; circle(ctx, cx - 18, y + 2, 5); circle(ctx, cx + 18, y + 2, 5);
+          ctx.fillStyle = k % 2 ? '#3f7f6a' : '#7a2e3a'; roundRect(ctx, cx - 28, y - 30, 56, 30, 4, true);
+          ctx.fillStyle = '#bfe4f2'; for (let w = 0; w < 3; w++) ctx.fillRect(cx - 22 + w * 16, y - 24, 11, 9);
+          ctx.fillStyle = '#c9a33a'; ctx.fillRect(cx - 28, y - 32, 56, 3);
+        }
+        const ex = T0.x;
+        ctx.fillStyle = '#2b2d33'; for (const wx of [-16, 0, 16]) circle(ctx, ex + wx, y + 1, 6.5);
+        ctx.fillStyle = '#c0392b'; roundRect(ctx, ex - 26, y - 22, 40, 20, 4, true);
+        ctx.fillStyle = '#2b2d33'; ctx.fillRect(ex - d * 20 - 8, y - 40, 16, 22); ctx.fillStyle = '#bfe4f2'; ctx.fillRect(ex - d * 20 - 5, y - 36, 10, 7);
+        ctx.fillStyle = '#2b2d33'; ctx.fillRect(ex + d * 8 - 3, y - 36, 6, 14);
+        ctx.fillStyle = '#c9a33a'; circle(ctx, ex + d * 16, y - 12, 4);
+        if (T0.stopT <= 0 && Math.random() < 0.3 && !paused) particles.push({ x: ex + d * 8, y: y - 2, r: rr(4, 7), life: 1.2, max: 1.2, vy: -30 });
+      },
+    };
+  }
+  function updateTrain(dt) {
+    const T0 = L.train, R = L.rail;
+    if (!T0) return;
+    T0.tootCD = Math.max(0, T0.tootCD - dt);
+    const span = T0.cars * 66 + 30;
+    // things thrown onto the train ride along on the roof
+    for (const it of items) {
+      if (it.trainOff !== undefined && !it.held && !it.air) { it.x = T0.x + it.trainOff; it.y = R.y - 1; it.z = 30; continue; }
+      if (it.air && it.z < 40 && Math.abs(it.y - R.y) < 18 && (it.x - T0.x) * T0.dir < 30 && (it.x - T0.x) * T0.dir > -span) { it.air = false; it.vx = it.vy = it.vz = 0; it.trainOff = it.x - T0.x; it.z = 30; completeTask('trainthrow'); }
+    }
+    if (T0.stopT > 0) { T0.stopT -= dt; return; }
+    const st = R.station.x, before = T0.x;
+    T0.x += T0.dir * 95 * dt;
+    if (before !== st && (before - st) * (T0.x - st) <= 0) { T0.x = st; T0.stopT = 5; sfx('ding'); }
+    if (T0.x > R.x1) { T0.x = R.x1; T0.dir = -1; T0.stopT = 2; } else if (T0.x < R.x0) { T0.x = R.x0; T0.dir = 1; T0.stopT = 2; }
+    const onTrack = areaOf(player.x, player.y) === 0 && Math.abs(player.y - R.y) < 22 && !player.ride;
+    const ahead = (player.x - T0.x) * T0.dir;
+    if (onTrack && ahead > 0 && ahead < 160 && T0.tootCD <= 0) { T0.tootCD = 3; sfx('honk'); sfx('honk'); player.bubble = { text: 'TOOT TOOT!', t: 1.2 }; completeTask('traintoot'); }
+    if (onTrack && ahead > -span && ahead < 30) knockPlayer(player.x, R.y + (player.y < R.y ? 40 : -40), 260);
+  }
+  const trainBoardable = () => { const T0 = L && L.train; return !!T0 && T0.stopT > 0 && !player.ride && Math.abs(player.x - T0.x) < T0.cars * 66 + 30 && Math.abs(player.y - L.rail.y) < 60; };
+
+  // --- Harbour: a lighthouse, lobster pots, a fish market and a fishing boat --------------------
+  function makeLighthouse(x, y) {
+    return {
+      kind: 'lighthouse', x, y, hitbox: box(x - 16, y - 12, 32, 13), bounds: { l: x - 30, r: x + 30, t: y - 170, b: y + 6 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 14, y, 26, 7); },
+      draw(ctx, t) {
+        for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#f4f2ee' : '#c0392b'; poly(ctx, [[x - 16 + k * 1.2, y - k * 22], [x + 16 - k * 1.2, y - k * 22], [x + 16 - (k + 1) * 1.2, y - (k + 1) * 22], [x - 16 + (k + 1) * 1.2, y - (k + 1) * 22]]); ctx.fill(); }
+        ctx.fillStyle = '#2b2d33'; ctx.fillRect(x - 12, y - 146, 24, 14); ctx.fillStyle = duskK > 0.2 ? '#fff3a8' : '#bfe4f2'; ctx.fillRect(x - 9, y - 144, 18, 10);
+        ctx.fillStyle = '#c0392b'; poly(ctx, [[x - 14, y - 146], [x + 14, y - 146], [x, y - 160]]); ctx.fill();
+        ctx.fillStyle = '#3a2418'; roundRect(ctx, x - 5, y - 18, 10, 18, 5, true);
+        if (duskK > 0.2) { const a = t * 0.9, len = 260; ctx.fillStyle = `rgba(255,243,168,${0.18 * duskK})`; poly(ctx, [[x, y - 140], [x + Math.cos(a - 0.12) * len, y - 140 + Math.sin(a - 0.12) * len * 0.5], [x + Math.cos(a + 0.12) * len, y - 140 + Math.sin(a + 0.12) * len * 0.5]]); ctx.fill(); }
+      },
+    };
+  }
+  function makeLobsterPot(x, y) {
+    const P = { x, y, raided: false };
+    (L.pots = L.pots || []).push(P);
+    return {
+      kind: 'lobsterpot', x, y, bounds: { l: x - 12, r: x + 12, t: y - 16, b: y + 3 },
+      draw(ctx) { ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 9, y - 2, 18, 2); ctx.strokeStyle = '#a0703f'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y - 2, 9, 9, 0, Math.PI, 0); ctx.stroke(); for (let k = -6; k <= 6; k += 4) { ctx.beginPath(); ctx.moveTo(x + k, y - 2); ctx.lineTo(x + k * 0.6, y - 10); ctx.stroke(); } if (!P.raided) { ctx.fillStyle = '#c0392b'; ellipse(ctx, x, y - 4, 3, 1.5); } },
+    };
+  }
+  function makeFishingBoat() {
+    const B = L.fboat;
+    return {
+      kind: 'fishingboat', get x() { return B.x; }, get y() { return B.y; }, get bounds() { return { l: B.x - 60, r: B.x + 60, t: B.y - 70, b: B.y + 10 }; },
+      draw(ctx, t) {
+        const x = B.x, y = B.y + Math.sin(t * 1.4) * 1.2, d = B.dir;
+        ctx.fillStyle = 'rgba(200,230,255,0.45)'; ellipse(ctx, x, y + 2, 48, 6);
+        ctx.fillStyle = '#2f5a7a'; poly(ctx, [[x - 40, y - 12], [x + 40, y - 12], [x + d * 46, y - 16], [x + 30, y], [x - 30, y]]); ctx.fill();
+        ctx.fillStyle = '#f4f2ee'; ctx.fillRect(x - d * 14 - 10, y - 30, 20, 18); ctx.fillStyle = '#bfe4f2'; ctx.fillRect(x - d * 14 - 6, y - 26, 12, 6);
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(x + d * 10 - 1.5, y - 52, 3, 40);
+        ctx.strokeStyle = '#3a3530'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(x + d * 10, y - 52); ctx.lineTo(x + d * 40, y - 14); ctx.stroke();
+        ctx.fillStyle = '#c0392b'; poly(ctx, [[x + d * 10, y - 52], [x + d * 22, y - 48], [x + d * 10, y - 44]]); ctx.fill();
+      },
+    };
+  }
+  function buildHarbour() {
+    if (!L.harbour || !L.pier) return;
+    const T = TILE, px = Math.floor(L.pier.x / T);
+    const lx = clamp(px + (px + 22 < MW - 6 ? 18 : -18), 6, MW - 7), ly = (L.shore[lx] - 2.2) * T;
+    L.lighthouse = { x: (lx + 0.5) * T, y: ly, door: { x: (lx + 0.5) * T, y: ly + 12 } };
+    objects.push(makeLighthouse(L.lighthouse.x, L.lighthouse.y));
+    for (const dx of [-5, -3.5, 4.5]) { const tx = clamp(px + Math.round(dx), 4, MW - 5); objects.push(makeLobsterPot((tx + 0.5) * T, (L.shore[tx] - 0.8) * T)); }
+    const mx = clamp(px - 6, 4, MW - 8), my = L.shore[mx] - 4.2;
+    const s = { ...STALLS[2], label: 'FISH MARKET', goods: ['fish', 'fish', 'fish'] };
+    objects.push(makeStall((mx + 1) * T, my * T, s));
+    L.stalls = [{ ...s, x: (mx + 1) * T, y: my * T, vx: (mx + 1) * T, vy: (my - 0.9) * T }];
+    L.fboat = { x: -100, y: L.pier.endY - 6, dir: 1, state: 'in', t: rr(5, 15), dock: L.pier.x - 70 };
+    objects.push(makeFishingBoat());
+  }
+  function updateHarbour(dt) {
+    const B = L.fboat;
+    if (B) {
+      if (B.state === 'wait') { B.t -= dt; if (B.t <= 0) { B.state = 'in'; B.x = -100; B.dir = 1; } }
+      else if (B.state === 'in') { B.x += 60 * dt; if (B.x >= B.dock) { B.x = B.dock; B.state = 'docked'; B.t = 9; const it = addItem('fishcrate', L.pier.x - 4, L.pier.endY - 16, { owner: 'ollie' }); it.catch = true; if (Math.hypot(player.x - B.x, player.y - B.y) < 500) sfx('honk'); } }
+      else if (B.state === 'docked') { B.t -= dt; if (B.t <= 0) { B.state = 'out'; } }
+      else if (B.state === 'out') { B.x += 60 * dt; if (B.x > WORLD_W + 120) { B.state = 'wait'; B.t = rr(25, 45); } }
+    }
+    for (const P of L.pots || []) if (!P.raided && areaOf(player.x, player.y) === 0 && Math.hypot(player.x - P.x, player.y - P.y) < 14) {
+      P.raided = true; const it = addItem('lobster', P.x + 10, P.y + 6); it.touched = true; sfx('splash'); player.bubble = { text: 'a lobster!', t: 1.2 }; completeTask('lobster');
+    }
+    // lobsters pinch
+    const h = player.held;
+    if (h && h.kind === 'lobster') { h.pinchT = (h.pinchT || 0) + dt; if (h.pinchT > 1.5) { h.pinchT = 0; player.bubble = { text: 'OW! It pinched me!', t: 1.2 }; player.hopV = 140; player.hop = 0.01; dropHeld(true); } }
+  }
+  const lighthouseNear = () => L && L.lighthouse && !player.ride && Math.hypot(player.x - L.lighthouse.door.x, player.y - L.lighthouse.door.y) < 22;
+
+  // --- Marsh: a bog of sucking mud with boardwalks, pools, stilt huts, a giant toad, wisps ------------
+  function buildMarsh(markSolid, place) {
+    if (L.kind !== 'marsh') return;
+    const r = place(18, 12);
+    if (!r) return;
+    const B = { x: r.x + 1, y: r.y + 1, w: 16, h: 10 };
+    for (let k = 0; k < 4; k++) { // pools
+      const cx = B.x + 2 + rand() * (B.w - 4), cy = B.y + 2 + rand() * (B.h - 4), rr0 = 1.2 + rand() * 1.4;
+      for (let y = B.y; y < B.y + B.h; y++) for (let x = B.x; x < B.x + B.w; x++) if (Math.hypot(x + 0.5 - cx, (y + 0.5 - cy) * 1.3) < rr0) setT(x, y, WATER);
+    }
+    const my = B.y + Math.floor(B.h / 2), mx = B.x + Math.floor(B.w / 3);
+    for (let x = B.x - 1; x <= B.x + B.w; x++) setT(x, my, BRIDGE); // boardwalks
+    for (let y = B.y - 1; y <= B.y + B.h; y++) setT(mx, y, BRIDGE);
+    L.bog = B; L.boardwalk = { my, mx };
+    reserve(r.x, r.y, 18, 12);
+  }
+  const inBog = (x, y) => { const B = L && L.bog; if (!B || areaOf(x, y) !== 0) return false; const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE); return tx >= B.x && tx < B.x + B.w && ty >= B.y && ty < B.y + B.h && getT(tx, ty) === GRASS; };
+  function makeBog() {
+    const B = L.bog, reeds = Array.from({ length: 30 }, () => [(B.x + rand() * B.w) * TILE, (B.y + rand() * B.h) * TILE]);
+    return {
+      kind: 'bog', x: (B.x + B.w / 2) * TILE, y: B.y * TILE - 40, bounds: { l: B.x * TILE - 10, r: (B.x + B.w) * TILE + 10, t: B.y * TILE - 20, b: (B.y + B.h) * TILE + 10 },
+      draw(ctx, t) {
+        for (let y = B.y; y < B.y + B.h; y++) for (let x = B.x; x < B.x + B.w; x++) {
+          if (getT(x, y) !== GRASS) continue;
+          ctx.fillStyle = (x * 7 + y * 3) % 3 ? '#5a5232' : '#4e4a2c'; ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+          if ((x * 5 + y * 11) % 4 === 0) { const b = (t * 0.5 + x * 0.3) % 1; ctx.fillStyle = `rgba(140,130,90,${0.6 - b * 0.6})`; circle(ctx, x * TILE + 12, y * TILE + 14, 1.5 + b * 3); }
+        }
+        ctx.strokeStyle = '#6a7a3a'; ctx.lineWidth = 1.2;
+        for (const [rx, ry] of reeds) { if (getT(Math.floor(rx / TILE), Math.floor(ry / TILE)) === BRIDGE) continue; ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 2, ry - 12); ctx.moveTo(rx + 2, ry); ctx.lineTo(rx + 3, ry - 10); ctx.stroke(); ctx.fillStyle = '#6b4a2e'; ellipse(ctx, rx - 2, ry - 13, 1.4, 3); }
+      },
+    };
+  }
+  function makeStiltHut(x, y) {
+    const o = {
+      kind: 'stilthut', x, y, r: 16, hitbox: null, rustle: 0, bounds: { l: x - 30, r: x + 30, t: y - 70, b: y + 6 },
+      contains(px, py) { return Math.abs(px - x) < 10 && py > y - 8 && py < y + 4; },
+      draw(ctx) {
+        ctx.fillStyle = '#5a3a20'; for (const lx of [-20, -8, 8, 20]) ctx.fillRect(x + lx - 1.5, y - 24, 3, 26);
+        ctx.fillStyle = '#8a6a46'; ctx.fillRect(x - 24, y - 50, 48, 28);
+        ctx.fillStyle = '#c9a33a'; poly(ctx, [[x - 30, y - 48], [x + 30, y - 48], [x, y - 70]]); ctx.fill();
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; poly(ctx, [[x - 16, y - 56], [x + 16, y - 56], [x, y - 70]]); ctx.fill(); }
+        ctx.fillStyle = '#2a1e14'; ctx.fillRect(x - 6, y - 40, 12, 18);
+        ctx.fillStyle = '#7a5230'; for (let k = 0; k < 4; k++) ctx.fillRect(x - 6, y - 20 + k * 5, 12, 2); // steps down to the boardwalk
+        if (player.hidden && player.hidingIn === o) { ctx.fillStyle = '#ffffff'; circle(ctx, x - 2.5, y - 31, 1.4); circle(ctx, x + 2.5, y - 31, 1.4); }
+      },
+    };
+    return o;
+  }
+  function placeMarsh() {
+    const B = L.bog;
+    if (!B) return;
+    const T = TILE, { my, mx } = L.boardwalk;
+    objects.push(makeBog());
+    L.huts = [];
+    for (const hx of [B.x + B.w - 3, B.x + 2]) { if (Math.abs(hx - mx) < 3) continue; const o = makeStiltHut((hx + 0.5) * T, (my + 0.4) * T); objects.push(o); L.huts.push(o); }
+  }
+  function spawnMarshCritters() {
+    const B = L.bog;
+    if (!B) return;
+    const T = TILE;
+    let pool = null;
+    for (let n = 0; n < 200 && !pool; n++) { const x = B.x + Math.floor(rand() * B.w), y = B.y + Math.floor(rand() * B.h); if (getT(x, y) === GRASS && getT(x + 1, y) === WATER) pool = { x: (x + 0.5) * T, y: (y + 0.7) * T }; }
+    if (!pool) pool = { x: (B.x + 2) * T, y: (B.y + 2) * T };
+    critters.push({ type: 'gtoad', x: pool.x, y: pool.y, z: 0, dir: 'right', walk: 0, ph: 0, croakCD: 0, tongue: 0, flying: true });
+    critters.push({ type: 'wisp', x: (B.x + B.w * 0.7) * T, y: (B.y + B.h * 0.3) * T, z: 14, dir: 'left', walk: 0, ph: 0, flying: true, moves: 0, tx: null });
+  }
+  function updateMarshCritter(c, dt) {
+    const pd = Math.hypot(player.x - c.x, player.y - c.y), outside = areaOf(player.x, player.y) === 0;
+    if (c.type === 'gtoad') {
+      c.croakCD = Math.max(0, c.croakCD - dt); c.tongue = Math.max(0, c.tongue - dt);
+      if (outside && pd < 70 && c.croakCD <= 0) {
+        c.croakCD = 6; c.bubble = { text: 'RIIIBBIT!!', t: 1.2 }; sfx('ribbit'); sfx('moo');
+        for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - c.x, v.y - c.y) < 220) startleV(v, rpick(['What WAS that?!', 'That toad is enormous!', 'Gah!']));
+        completeTask('toad');
+      }
+      const h = player.held;
+      if (outside && h && isFood(h) && pd < 80 && c.tongue <= 0) { // SHLURP
+        c.tongue = 0.5; c.dir = player.x > c.x ? 'right' : 'left';
+        player.held = null; const i = items.indexOf(h); if (i >= 0) items.splice(i, 1);
+        player.bubble = { text: 'hey! my snack!', t: 1.3 }; c.bubble = { text: '*SHLURP* gulp.', t: 1.2 }; sfx('gulp');
+        completeTask('toadsnack');
+      }
+      return;
+    }
+    if (c.type === 'wisp') {
+      c.z = 16 + Math.sin(c.ph * 2) * 5;
+      if (duskK < 0.3 || c.done) return;
+      if (c.tx !== null) { const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy); if (d > 2) { c.x += dx / d * Math.min(d, 70 * dt); c.y += dy / d * Math.min(d, 70 * dt); } else c.tx = null; return; }
+      if (outside && pd < 50) {
+        if (c.moves >= 3) { c.done = true; const it = addItem('wispgem', c.x, c.y); it.touched = false; sfx('happy'); sparkle(c.x, c.y, 10); return; }
+        const B = L.bog; c.moves++; c.tx = clamp(c.x + rr(-160, 160), (B.x - 2) * TILE, (B.x + B.w + 2) * TILE); c.ty = clamp(c.y + rr(-120, 120), (B.y - 2) * TILE, (B.y + B.h + 2) * TILE);
+      }
+    }
+  }
+  function drawMarshCritter(ctx, c, t) {
+    if (c.type === 'wisp') {
+      if (duskK < 0.3 || c.done) return;
+      const g = 0.6 + Math.sin(t * 5) * 0.3;
+      ctx.fillStyle = `rgba(140,220,255,${0.2 * g})`; circle(ctx, c.x, c.y - c.z, 12);
+      ctx.fillStyle = `rgba(200,245,255,${0.7 * g})`; circle(ctx, c.x, c.y - c.z, 3.5);
+      return;
+    }
+    ctx.save(); ctx.translate(c.x, c.y); if (c.dir === 'left') ctx.scale(-1, 1);
+    ctx.fillStyle = 'rgba(20,30,10,0.25)'; ellipse(ctx, 0, 0, 16, 4);
+    const puff = c.croakCD > 5 ? 4 : 0;
+    ctx.fillStyle = '#5a7a3a'; ellipse(ctx, 0, -9, 15, 10); ellipse(ctx, -10, -3, 6, 3.5); ellipse(ctx, 10, -3, 6, 3.5);
+    ctx.fillStyle = '#e8d8a0'; ellipse(ctx, 6, -5, 6 + puff, 4 + puff * 0.6);
+    ctx.fillStyle = '#7a9a4a'; circle(ctx, 4, -18, 4.5); circle(ctx, 12, -16, 4.5);
+    ctx.fillStyle = '#f2c14e'; circle(ctx, 4.5, -19, 2.4); circle(ctx, 12.5, -17, 2.4); ctx.fillStyle = '#1d1d22'; ctx.fillRect(3, -19.5, 3, 1); ctx.fillRect(11, -17.5, 3, 1);
+    if (c.tongue > 0) { const len = (0.5 - Math.abs(c.tongue - 0.25)) * 160; ctx.strokeStyle = '#e8708a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(14, -10); ctx.lineTo(14 + len, -12); ctx.stroke(); ctx.fillStyle = '#e8708a'; circle(ctx, 14 + len, -12, 2.4); }
+    ctx.restore();
+  }
+
+  // --- Pranks -------------------------------------------------------------------------------------------
+  function doorNear() {
+    if (!L || !L.rooms || areaOf(player.x, player.y) !== 0) return null;
+    for (const h of L.rooms) { if (!h) continue; const wall = (h.y + h.h) * TILE; if (Math.abs(player.x - h.doorOut.x) < 16 && player.y - wall > 6 && player.y - wall < 32) return h; }
+    return null;
+  }
+  function knockAction() {
+    const h = doorNear();
+    if (!h || L.knock) return false;
+    for (let k = 0; k < 3; k++) setTimeout(() => sfx('tap'), k * 160);
+    player.bubble = { text: 'knock knock!', t: 1 };
+    L.knock = { h, t: 2.6 };
+    return true;
+  }
+  function updatePranks(dt) {
+    // knock-and-run: someone comes to the door
+    const K = L.knock;
+    if (K) {
+      K.t -= dt;
+      if (K.t <= 0 && !K.answered) {
+        K.answered = true; K.t = 3;
+        const v = villagers.find((x) => areaOf(x.x, x.y) === K.h.area && x.state !== 'chase') || null;
+        if (!v) { toast('Nobody’s home...', 'Knock knock', true); L.knock = null; return; }
+        Object.assign(v, { x: K.h.doorOut.x, y: K.h.doorOut.y - 2, dir: 'down', path: null, state: 'act', actT: 3 }); K.v = v;
+        const seen = canSeePlayer(v) && Math.hypot(player.x - v.x, player.y - v.y) < 150;
+        if (seen) { v.cooldown = 0; startleV(v, 'YOU! Knock-knock, is it?!', { state: 'chase', target: null }); v.stateT = 7; }
+        else { say(v, rpick(['Hello? ...Who’s there?', 'Hmph. Kids.', 'Is anybody there?']), 2); completeTask('knock'); }
+      } else if (K.answered && K.t <= 0) { if (K.v && K.v.state === 'act') toRoute(K.v); L.knock = null; }
+    }
+    // whoopee cushions where someone sits down
+    for (const it of items) {
+      if (it.kind !== 'whoopee' || it.held || it.air || it.used) continue;
+      for (const v of villagers) {
+        const st = v.stops[v.stopIdx];
+        if (v.state !== 'act' || !st || st.act !== 'sit' || Math.hypot(v.x - it.x, v.y - it.y) > 26) continue;
+        it.used = true; tone(90, 60, 0.5, 'sawtooth', 0.08); noise(0.4, 0.06, 300);
+        startleV(v, rpick(['Oh my! I beg your pardon!', 'That WASN’T me!', 'Goodness gracious!'])); completeTask('whoopee');
+        lookTowards(v.x, v.y, 200, () => rpick(['Hee hee!', 'Pfft!', 'Excuse YOU!']));
+        break;
+      }
+    }
+    // painting fences pink
+    if (player.held && player.held.kind === 'paint' && areaOf(player.x, player.y) === 0) for (const o of solidObjects) {
+      if (o.kind !== 'fence' || o.paint || Math.hypot(o.x - player.x, o.y - player.y) > 22) continue;
+      o.paint = PAINT; run.painted = (run.painted || 0) + 1; setProgress('paint', run.painted);
+      if (Math.random() < 0.3) particles.push({ kind: 'shard', col: PAINT, x: o.x, y: o.y, z: 10, vx: rr(-20, 20), vy: rr(-10, 10), vz: rr(20, 50), life: 0.5, max: 0.5 });
+      for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - o.x, v.y - o.y) < 200 && (v.paintCD || 0) < time && canSeePlayer(v)) { v.paintCD = time + 15; say(v, rpick(['Is that... PINK?!', 'Who’s painting my fence?!']), 1.8); }
+    }
+    // villagers puzzled by the swapped signpost
+    if (L.signSwapped) for (const v of villagers) if (!v.signSeen && areaOf(v.x, v.y) === 0 && Math.hypot(v.x - L.signSwapped.x, v.y - L.signSwapped.y) < 70) { v.signSeen = true; say(v, rpick([`Hang on, the ${L.signSwapped.right}’s that way?`, 'Has someone moved the sign?', 'I’m sure the pond was the other way...']), 2); v.dir = rpick(['left', 'right', 'up', 'down']); }
+  }
+  function signAction() {
+    if (!L || areaOf(player.x, player.y) !== 0) return false;
+    const s = objects.find((o) => o.kind === 'sign' && o.right !== undefined && Math.hypot(player.x - o.x, player.y - o.y) < 24);
+    if (!s) return false;
+    [s.left, s.right] = [s.right, s.left]; sfx('creak'); player.bubble = { text: 'hee hee', t: 1 };
+    L.signSwapped = s; for (const v of villagers) v.signSeen = false;
+    completeTask('signswap');
+    return true;
+  }
+  const signNear = () => L && areaOf(player.x, player.y) === 0 && !player.held && objects.some((o) => o.kind === 'sign' && o.right !== undefined && Math.hypot(player.x - o.x, player.y - o.y) < 24);
+  function placePrankItems() {
+    for (let k = 0; k < 2; k++) { const s = freeSpotNear(L.plaza.x + (k ? 14 : -3), L.plaza.y + 4 + k * 4, 1, 1, 4); if (s) addItem('whoopee', (s[0] + 0.5) * TILE, (s[1] + 0.6) * TILE); }
+    const g = L.garden; if (g) placeFree('paint', (g.x - 2) * TILE, (g.y + 2) * TILE, { owner: 'bertram' });
+  }
+
+  function updateRailHarbour(dt) {
+    if (!L || !started || paused) return;
+    if (L.rail) updateTrain(dt);
+    if (L.harbour) updateHarbour(dt);
+    updatePranks(dt);
+    if (inBog(player.x, player.y) && !player.ride) { player.mud = Math.max(player.mud || 0, 30); if (player.speed > 5) completeTask('bog'); if (Math.random() < 0.08) particles.push({ x: player.x + rr(-5, 5), y: player.y, r: 2, life: 0.5, max: 0.5, vy: -4, soil: true }); }
+  }
+  function placeRailObjects() {
+    if (L.rail) { objects.push(makeTrack()); objects.push(makeStation()); objects.push(makeCrossing()); objects.push(makeTrainObj()); }
+    buildHarbour();
+    placeMarsh();
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -11093,8 +11520,10 @@
     const pc = petChoice();
     if (pc === 'wardrobe') drawPrompt(ctx, { x: nearWardrobe.x, y: nearWardrobe.y, z: 0, owner: null, type: { h: 74, name: 'hide in wardrobe' } }, t);
     else if (player.roof && started && player.x > roofRect(player.roof).r - 26 && player.y > roofRect(player.roof).b - 24) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'climb down' } }, t);
-    else if (player.ride && (player.ride.kind === 'boat' || player.ride.kind === 'carousel') && started) drawPrompt(ctx, { x: player.x, y: player.y - (player.rideZ || 0), z: 0, owner: null, type: { h: 30, name: 'hop off' } }, t);
+    else if (player.ride && ['boat', 'carousel', 'train', 'lighthouse'].includes(player.ride.kind) && started) drawPrompt(ctx, { x: player.x, y: player.y - (player.rideZ || 0), z: 0, owner: null, type: { h: 30, name: 'hop off' } }, t);
     else if (leverNear() && started) drawPrompt(ctx, { x: L.canal.lock.lever.x, y: L.canal.lock.lever.y, z: 0, owner: null, type: { h: 20, name: L.canal.lock.target ? 'drain the lock' : 'fill the lock' } }, t);
+    else if (signNear() && started && !target) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'swap the signs' } }, t);
+    else if (doorNear() && started && !target && !player.held && !L.knock) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'knock (or walk in)' } }, t);
     else if (junkNear() && started && !target) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'rummage' } }, t);
     else if (rideNear() && started && !target) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: rideNear() } }, t);
     else if (pipeNear() && started && !target) drawPrompt(ctx, { x: player.x, y: player.y, z: 0, owner: null, type: { h: 30, name: 'climb the drainpipe' } }, t);
@@ -11216,6 +11645,7 @@
       updateRainy(dt);
       updateMore(dt);
       updateOutskirts(dt);
+      updateRailHarbour(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
@@ -11262,7 +11692,7 @@
     placePuddles();
     spawnCritters();
     spawnWeather();
-    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack' || o.kind === 'drift' || o.kind === 'igloo' || o.kind === 'armour' || o.kind === 'hollowtree' || o.kind === 'cave' || o.kind === 'mirrortent' || o.kind === 'tent'); // places to hide
+    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile' || o.kind === 'wheat' || o.kind === 'haystack' || o.kind === 'drift' || o.kind === 'igloo' || o.kind === 'armour' || o.kind === 'hollowtree' || o.kind === 'cave' || o.kind === 'mirrortent' || o.kind === 'tent' || o.kind === 'stilthut'); // places to hide
     spawnAmbient();
     Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null, mud: 0, spin: 0, boat: false, boatFrom: null, flour: 0, sled: false, tongueDone: false, tree: null, disguise: null, digging: null, roof: null, caged: 0, swim: false, ride: null, rideZ: 0, worms: 0 });
     target = null;

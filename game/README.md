@@ -21,7 +21,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Mute sound | N | — |
 
 ## What's in the game
-- **Seasons and village kinds**: every daily village rolls one of four seasons and one of eleven kinds.
+- **Seasons and village kinds**: every daily village rolls one of four seasons and one of fourteen kinds.
   - *Spring*: blossom trees, drifting petals, Mrs. Fennick's tulip beds to trample, painted eggs hidden by bushes.
   - *Summer*: washing drying on lines (steal it), Rosa's lemonade on the picnic table.
   - *Autumn*: orange and red trees, falling leaves, chimney smoke, leaf piles to jump in (noisy) or hide in.
@@ -51,6 +51,16 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     (something glints in the mud when it's empty).
   - *Orchard*: rows of fruit trees (run into the trunk to shake down apples onto anyone underneath), a cider
     press that turns three apples into a jug of cider, and a hedge maze that's different every time.
+  - *Railway*: a track across the village with a level crossing (the barriers come down and the lights
+    flash as the train nears), a station with luggage on the platform, and a little steam train shuttling
+    back and forth: hop on (E) when it stops at the station, throw things onto its roof, and don't stand on
+    the tracks.
+  - *Harbour*: a seaside town with a red-and-white lighthouse (climb it; its beam sweeps at dusk), lobster pots
+    on the beach (a lobster pinches if you hold it too long), a fish market stall, and a fishing boat that
+    sails in, unloads its catch at the end of the pier, and sails off again.
+  - *Marsh*: a bog of sucking mud (slow and very muddy) with pools, boardwalks across it, stilt huts to hide
+    in, a giant toad whose croak makes the whole village jump (and whose tongue snatches snacks), and a
+    will-o'-the-wisp at dusk that leads you to a glowing pebble if you keep following it.
 - **Shops**: Rosa's house is the bakery, Granny Mabel's the sweet shop and Percy's the post office. Each has a
   sign and awning outside, a doorbell that rings when you walk in, a counter of goods inside, and the
   shopkeeper spends part of the day behind it.
@@ -62,6 +72,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Museum heist* (every castle village, sometimes elsewhere): treasures on plinths behind blinking red
     tripwires, and a guard on patrol. Touch a tripwire while it's on and the alarm goes off and the guard
     gives chase.
+- **Pranks** (every village): E at a front door knocks, so run and hide before they answer; E at the plaza
+  signpost swaps it round and confuses passers-by; whoopee cushions go where someone sits down; and a pot
+  of pink paint turns any fence you walk along pink.
 - **Disguises and tricks**:
   - *Disguises*: hold a hat, bucket, pot, shirt, sock or the museum crown and press G to wear it. Villagers
     won't notice what you're carrying unless they get close ("Morning, stranger!"), but whoever owns the
@@ -177,7 +190,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 229 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 246 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -262,6 +275,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   woodland, pets, outskirts and favours: `buildOutskirts()` / `placeOutskirtsObjects()` / `placeOutskirtsItems()`,
   `spawnOutskirtsCritters()` / `updateOutskirtsCritter()` / `okScare()` / `drawOutskirtsCritter()`, `questReward()`,
   `budgieTattle()`, `rummageAction()`, `updateOutskirts()`; map size: `MW` / `MH` / `AREA_K` at the top;
+  railway, harbour, marsh and pranks: `buildRailway()` / `updateTrain()`, `buildHarbour()` / `updateHarbour()`,
+  `buildMarsh()` / `placeMarsh()` / `inBog()`, `knockAction()`, `signAction()`, `updatePranks()`, `updateRailHarbour()`;
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
