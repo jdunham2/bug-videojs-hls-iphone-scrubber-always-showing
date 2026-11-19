@@ -21,7 +21,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Mute sound | N | — |
 
 ## What's in the game
-- **Seasons and village kinds**: every daily village rolls one of four seasons and one of eight kinds.
+- **Seasons and village kinds**: every daily village rolls one of four seasons and one of eleven kinds.
   - *Spring*: blossom trees, drifting petals, Mrs. Fennick's tulip beds to trample, painted eggs hidden by bushes.
   - *Summer*: washing drying on lines (steal it), Rosa's lemonade on the picnic table.
   - *Autumn*: orange and red trees, falling leaves, chimney smoke, leaf piles to jump in (noisy) or hide in.
@@ -44,6 +44,13 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Forest*: extra-thick woods, two treehouses joined by a rope bridge (E at a ladder to climb up; left and
     right to cross; villagers never look up; F drops things on whoever's below), Bertram chopping wood by a
     woodpile you can send rolling, fairy rings of mushrooms (chitter inside one), and a hollow tree to hide in.
+  - *Mountain*: a rocky slope with mountain goats that bound uphill when chased, boulders to roll down onto
+    whoever's at the bottom, a cable car (E at the station) up to a lookout, and a cave where chitters echo.
+  - *Canal*: a canal runs right across the village with a towpath and humpback bridges; hop aboard a
+    narrowboat as it chugs along (E beside it), and pull the lock's red lever to drain or fill the lock
+    (something glints in the mud when it's empty).
+  - *Orchard*: rows of fruit trees (run into the trunk to shake down apples onto anyone underneath), a cider
+    press that turns three apples into a jug of cider, and a hedge maze that's different every time.
 - **Shops**: Rosa's house is the bakery, Granny Mabel's the sweet shop and Percy's the post office. Each has a
   sign and awning outside, a doorbell that rings when you walk in, a counter of goods inside, and the
   shopkeeper spends part of the day behind it.
@@ -81,6 +88,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Bonfire night* (autumn, winter): a bonfire, toffee apples, a box of rockets (throw one in the fire to set
     it off; every villager nearby jumps), and fireworks once dusk falls.
   - *Scarecrow festival* (summer, autumn): prize scarecrows around the village, waiting to be knocked over.
+  - *Funfair* (spring to autumn): a carousel and a big wheel to ride (E), a coconut shy (knock all three off for
+    a prize teddy), a candyfloss stand, and a hall of mirrors whose reflections confuse anyone chasing you.
   - Every village also has a hen house: hens panic and squawk when chased (loud enough to make villagers look)
     and their eggs can be stolen, eaten or smashed.
 - **Weather**: each village also rolls weather that suits its season.
@@ -153,7 +162,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 195 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 212 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -232,6 +241,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   rainy days and wild weather: `spawnRainCritters()` / `updateRainCritter()` / `rainScare()` / `drawRainCritter()`,
   `placeWebs()`, `lightningStrike()` / `drawBolt()`, `inFlood()` / `drawFlood()`, `drawGutters()`, `puddleJump()`,
   `updateRainy()` (worms, frog rain, webs, floods, umbrellas, gutters, prints, eclipse);
+  mountain, canal, orchard and funfair: `buildMoreEarly()` / `placeMoreObjects()` / `placeMoreItems()`,
+  `buildCanal()`, `buildMaze()`, `rideAction()` / `updateRide()` (cable car, narrowboats, carousel, big wheel),
+  `leverAction()`, `shakeTree()`, `caveEcho()`, `updateMGoat()`, `updateMore()`;
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
