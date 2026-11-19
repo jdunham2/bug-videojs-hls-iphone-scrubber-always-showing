@@ -113,10 +113,10 @@ const ITEMS=[
   {id:'target',name:"Hunter's Target",r:1,price:28,sym:'◎',col:'#ff5d3d',mods:{bossDmg:25},extra:'+25% damage to elites and bosses'},
   {id:'wheel',name:'Prize Wheel',r:1,price:28,sym:'✺',col:'#ffcc4d',mods:{comboDmg:1},extra:'+1% damage per 5 combo (up to +30%)',max:1},
   {id:'saws',name:'Sawblades',r:2,price:56,sym:'✹',col:'#c8d0e0',mods:{saws:2},extra:'Two sawblades orbit you, cutting aliens they touch',max:2},
-  {id:'bombs',name:'Bomb Bag',r:2,price:52,sym:'●',col:'#3a3a48',mods:{bombs:1},extra:'Drops a bomb at your feet every 6s',max:2},
+  {id:'bombs',name:'Bomb Bag',r:2,price:52,sym:'●',col:'#3a3a48',mods:{bombs:1},extra:'Tosses a bomb at the nearest alien every 6s',max:2},
   {id:'trophy',name:"Champion's Trophy",r:2,price:50,sym:'♛',col:'#ffcc4d',mods:{extraChoice:1,luck:10},extra:'+1 level-up choice',max:1},
   {id:'candle',name:'Spirit Candle',r:3,price:88,sym:'✦',col:'#a8b8ff',mods:{revive:1},extra:'Once per wave, survive a deadly hit with half your HP',max:1},
-  {id:'glassball',name:'Glass Cannonball',r:3,price:85,sym:'●',col:'#6fe3ff',mods:{dmg:50,maxHpPct:-35},extra:'-35% Max HP',max:1},
+  {id:'glassball',name:'Glass Cannonball',r:3,price:85,sym:'●',col:'#6fe3ff',mods:{dmg:40,maxHpPct:-35},extra:'-35% Max HP',max:1},
 ];
 const ITEM_BY=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
 function iconHTML(key,fallback,col,cls='iimg'){const a=A[key];return a?`<img class="${cls}" src="${a.src}" alt="">`:`<span class="sym" style="color:${col}">${fallback}</span>`}
@@ -970,7 +970,7 @@ function update(dt){
     if(S.saws){run.sawA+=dt*3.2;const n=S.saws,sd=Math.round((9+S.melee*.6)*(1+S.dmg/100));for(let k=0;k<n;k++){const a=run.sawA+k/n*TAU,sx=P.x+Math.cos(a)*72,sy=P.y+Math.sin(a)*72;
       for(const e of enemies){if(e.dead||e.popT!=null||e.under||e.z>20||(e.sawCd>0))continue;if(d2(sx,sy,e.x,e.y)<(e.r+16)*(e.r+16)){e.sawCd=.35;hurtEnemy(e,sd,false,a+Math.PI/2,8);for(let q=0;q<3;q++)parts.push({x:sx,y:sy,vx:rand(-150,150),vy:rand(-150,150),t:0,life:.2,c:'#fff3b0',s:2})}}}
       for(const e of enemies)if(e.sawCd>0)e.sawCd-=dt}
-    if(S.bombs){run.bombT-=dt;if(run.bombT<=0){run.bombT=6/Math.min(2,S.bombs);mines.push({x:P.x,y:P.y+P.r*.5,t:0,arm:99,life:1.3,timed:true,dmg:Math.round((30+run.wave*2)*(1+S.dmg/100)),def:{id:'bombbag',blast:90,knock:22}});sfx('click')}}
+    if(S.bombs){run.bombT-=dt;if(run.bombT<=0){run.bombT=6/Math.min(2,S.bombs);const bt=nearestEnemy(P.x,P.y,320);mines.push({x:bt?bt.x:P.x,y:bt?bt.y:P.y+P.r*.5,t:0,arm:99,life:bt?.9:1.3,timed:true,dmg:Math.round((30+run.wave*2)*(1+S.dmg/100)),def:{id:'bombbag',blast:90,knock:22}});sfx('click')}}
     if(run.rageT>0){run.rageT-=dt;if(Math.random()<dt*14)parts.push({x:P.x+rand(-12,12),y:P.y-rand(0,20),vx:0,vy:-60,t:0,life:.4,c:'#ff5d3d',s:3,fade:1})}
     if(run.char.aura){run.auraT-=dt;if(run.auraT<=0){run.auraT=.5;const ad=Math.round(2+run.wave*.3+S.melee*.4);for(const e of enemies){if(e.dead||e.popT!=null||e.under)continue;if(Math.hypot(e.x-P.x,e.y-P.y)<80+e.r)hurtEnemy(e,ad,false,Math.atan2(e.y-P.y,e.x-P.x),3)}}}
   }
