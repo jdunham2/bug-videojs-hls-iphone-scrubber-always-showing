@@ -1620,7 +1620,7 @@ function attack(fresh) {
     const a = ang + (w.spread ? rnd(-w.spread, w.spread) : 0), sp = w.spd * (w.spread ? rnd(.85, 1.1) : 1);
     shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, boom: w.boom, flame: w.flame, magic: w.free || w.plasma, stunHit: w.stunHit, poison: w.poison});
   }
-  if (multi() && NET.room) NET.room.emit('fx', {x: mx | 0, y: my | 0, a: +ang.toFixed(2), w: P.weapon}).catch(() => {});
+  netFx({x: mx | 0, y: my | 0, a: +ang.toFixed(2), w: P.weapon});
   if (w.quiet) snd(w.flame ? 160 : 760, .07, w.flame ? 'sawtooth' : 'sine', .025, w.flame ? -60 : 300);
   else if (w.ammo === 'arrows') snd(620, .09, 'triangle', .05, -420);
   else { burst(mx, my, '#ffd27a', 5); if (w.smoke) burst(mx, my, '#c9c4bc', 12); shake = Math.max(shake, w.light ? 3 : 7); snd(w.light ? 210 : 130, w.light ? .12 : .22, 'sawtooth', .1, -100); snd(1400, .05, 'square', .04, -1100); }
@@ -1693,7 +1693,7 @@ function throwGrenade() {
   let tx = touchMode ? P.x + Math.cos(P.ang) * 230 : mouse.wx, ty = touchMode ? P.y + Math.sin(P.ang) * 230 : mouse.wy;
   const d = dist(tx, ty, P.x, P.y); if (d > 340) { tx = P.x + (tx - P.x) / d * 340; ty = P.y + (ty - P.y) / d * 340; }
   P.grenades--; shots.push({bomb: true, x: P.x, y: P.y, x0: P.x, y0: P.y, tx, ty, t: 0, T: .65, vx: 1, vy: 0}); snd(300, .15, 'sine', .05, 200); hud();
-  if (multi() && NET.room) NET.room.emit('fx', {w: 'grenade', x: P.x | 0, y: P.y | 0, tx: tx | 0, ty: ty | 0}).catch(() => {});
+  netFx({w: 'grenade', x: P.x | 0, y: P.y | 0, tx: tx | 0, ty: ty | 0});
 }
 function spendAmmo(w, need) { // some weapons get several shots from one unit of ammo
   if (w.free) return;
@@ -1876,8 +1876,35 @@ const SHIRTS = ['#3f7fbf', '#3fa66b', '#c9a227', '#8a56c2', '#c25690', '#d07a2d'
 let selMap = 'forest';
 let lobby = null, db = null, userNS = null, uid = null, nid = 0, savedGame = null, openGames = [], menuMsg = '';
 const host = () => NET.mode === 'host', client = () => NET.mode === 'client', multi = () => NET.mode !== 'solo';
-const netAct = d => { if (client() && NET.room) NET.room.emit('act', d).catch(() => {}); };
-const netEv = d => { if (host() && NET.room) NET.room.emit('ev', d).catch(() => {}); };
+/* messages are batched (the room drops sends past ~40 a second), kept under its 4 KB limit, and, for friends
+   who may not send events (Viewers), carried in their presence instead, which anyone in the room may set */
+const OUT = {act: [], ev: [], fx: []};
+NET.box = []; NET.bseq = 0; NET.xseen = new Map(); NET.noEmit = false; NET.flushT = 0; NET.h = null;
+const netAct = d => { if (client() && NET.room) OUT.act.push(d); };
+const netEv = d => { if (host() && NET.room) OUT.ev.push(d); };
+const netFx = d => { if (multi() && NET.room) OUT.fx.push(d); };
+const jlen = o => JSON.stringify(o).length;
+function boxIt(t, d) { NET.box.push({s: ++NET.bseq, t, d, n: 0}); if (NET.box.length > 120) NET.box.splice(0, NET.box.length - 120); }
+function emitTo(t, d) {
+  if (!NET.room) return; if (NET.noEmit) return boxIt(t, d);
+  NET.room.emit(t, d).catch(e => { if (e && e.code === 'not_permitted') { NET.noEmit = true; boxIt(t, d); } });
+}
+function batches(list, max) { const out = []; let cur = [], len = 10; for (const d of list) { const l = jlen(d) + 1; if (cur.length && len + l > max) { out.push(cur); cur = []; len = 10; } cur.push(d); len += l; } if (cur.length) out.push(cur); return out; }
+function flushOut() {
+  if (!NET.room) return;
+  const rv = OUT.fx.filter(d => d.w === 'revive'); OUT.fx = rv.concat(NET.noEmit ? [] : OUT.fx.filter(d => d.w !== 'revive').slice(-3)); // shots are only for show
+  for (const t of ['act', 'ev', 'fx']) { if (!OUT[t].length) continue; for (const b of batches(OUT[t], NET.noEmit ? 900 : 3000)) emitTo(t, {b}); OUT[t] = []; }
+}
+function packBox(base) { // what this player could not send as events rides along in presence, each entry three times
+  let room = 3800 - jlen(base); const x = [];
+  for (const e of NET.box) { if (e.n >= 3) continue; const v = [e.s, e.t, e.d], l = jlen(v) + 1; if (l > 3800 - jlen(base)) { e.n = 3; continue; } if (l > room) break; x.push(v); e.n++; room -= l; }
+  NET.box = NET.box.filter(e => e.n < 3); return x;
+}
+function readBox(peer, pr) {
+  if (!Array.isArray(pr.x) || !NET.h) return; let last = NET.xseen.get(peer) || 0;
+  for (const e of pr.x) { if (!Array.isArray(e) || !(e[0] > last)) continue; last = e[0]; const f = NET.h[e[1]]; if (f) try { f({peer, isMe: false, data: e[2]}); } catch (err) {} }
+  NET.xseen.set(peer, last);
+}
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function players() { const l = P.dead ? [] : [P]; if (host()) for (const o of NET.others.values()) if (!o.dead) l.push(o); return l; }
 function nearestPlayer(x, y) { let b = P, bd = 1e9; for (const p of players()) { const d = dist(x, y, p.x, p.y); if (d < bd) { bd = d; b = p; } } return b; }
@@ -2044,7 +2071,7 @@ function packAnimals() { // bosses first, then the animals closest to any player
   let out = '', n = 0;
   for (const [, a] of list) {
     const e = [a.id, AK.indexOf(a.type), a.x | 0, a.y | 0, (a.ang * 10) | 0, Math.max(1, Math.ceil(a.hp / a.max * 100)), (a.wind > 0 ? 1 : 0) | (a.ch > 0 ? 2 : 0)].join(',');
-    if (out.length + e.length > 2500 || n >= 100) break; out += (n++ ? ';' : '') + e;
+    if (out.length + e.length > (NET.noEmit ? 1500 : 2500) || n >= 100) break; out += (n++ ? ';' : '') + e;
   }
   return out;
 }
@@ -2053,17 +2080,22 @@ function worldState() {
     a: packAnimals()};
 }
 function sendSync() {
-  const l = packStructs(), n = Math.max(1, Math.ceil(l.length / 160)), c = ++NET.cyc;
-  for (let i = 0; i < n; i++) { const d = {c, i, n, s: l.slice(i * 160, i * 160 + 160).join(';')}; if (!i) { d.dt = deadList(trees).slice(0, 200); d.dr = deadList(rocks); } NET.room.emit('sync', d).catch(() => {}); }
-  const il = items.map(i => [i.id, IK.indexOf(i.type), i.x | 0, i.y | 0].join(',')), nn = Math.max(1, Math.ceil(il.length / 110));
-  for (let i = 0; i < nn; i++) netEv({k: 'it', c, i, n: nn, l: il.slice(i * 110, i * 110 + 110).join(';')});
+  const c = ++NET.cyc, max = NET.noEmit ? 800 : 3000, chunks = []; let cur = {s: [], t: [], r: []}, len = 60;
+  const add = (k, v) => { const l = String(v).length + 1; if (len + l > max) { chunks.push(cur); cur = {s: [], t: [], r: []}; len = 60; } cur[k].push(v); len += l; };
+  for (const e of packStructs()) add('s', e); for (const i of deadList(trees)) add('t', i); for (const i of deadList(rocks)) add('r', i);
+  chunks.push(cur); chunks.forEach((ch, i) => emitTo('sync', {c, i, n: chunks.length, s: ch.s.join(';'), t: ch.t, r: ch.r}));
+  let its = items; if (NET.noEmit) { const pl = players(); its = items.filter(i => pl.some(q => dist(i.x, i.y, q.x, q.y) < 1400)).slice(0, 120); }
+  const il = its.map(i => [i.id, IK.indexOf(i.type), i.x | 0, i.y | 0].join(',')), per = NET.noEmit ? 40 : 110, nn = Math.max(1, Math.ceil(il.length / per));
+  for (let i = 0; i < nn; i++) netEv({k: 'it', c, i, n: nn, l: il.slice(i * per, i * per + per).join(';')});
 }
 function netSend(dt) {
   if (!multi() || !NET.room) return;
   if (P.swing > 0 && !NET.wasSw) NET.swSeq = (NET.swSeq + 1) % 1000; NET.wasSw = P.swing > 0;
+  if ((NET.flushT -= dt) <= 0) { NET.flushT = .2; flushOut(); }
   if ((NET.sendT -= dt) > 0) return; NET.sendT = .1;
   const p = {p: myState()};
-  if (host()) { p.w = worldState(); p.bg = document.hidden ? 1 : 0; if ((NET.syncT -= .1) <= 0) { NET.syncT = 3; sendSync(); } }
+  if (host()) { p.w = worldState(); p.bg = document.hidden ? 1 : 0; if ((NET.syncT -= .1) <= 0) { NET.syncT = NET.noEmit ? 8 : 3; sendSync(); flushOut(); } }
+  const x = NET.box.length ? packBox(p) : []; p.x = x.length ? x : null;
   NET.room.presence(p).catch(() => {});
 }
 function applyWorld(w) {
@@ -2100,7 +2132,7 @@ function netPoll(dt) {
   for (const p of NET.room.peers()) {
     if (p.isMe && p.sameTab) { NET.me = p.peer; continue; }
     const pr = p.presence; if (p.kind !== 'viewer' || !pr || !Array.isArray(pr.p)) continue;
-    seen.add(p.peer); let o = NET.others.get(p.peer);
+    seen.add(p.peer); readBox(p.peer, pr); let o = NET.others.get(p.peer);
     if (!o) { o = {peer: p.peer, by: p.by, r: 13, x: +pr.p[0] || CX, y: +pr.p[1] || CY, ang: 0, sw: 0, seq: pr.p[5], name: ''}; NET.others.set(p.peer, o); toast('A player joined.'); resolveNames(); NET.syncT = 0; }
     if (o.pr !== pr) {
       o.pr = pr; const a = pr.p; o.tx = +a[0] || 0; o.ty = +a[1] || 0; o.tang = (+a[2] || 0) / 100; o.w = WKEYS[a[3]] || 'axe'; o.hp = +a[4] || 0;
@@ -2182,24 +2214,31 @@ function onEv(d) { // the host told us something happened
 function onSync(d) {
   if (d.c !== NET.cyc) { NET.cyc = d.c; NET.chunks = []; }
   NET.chunks[d.i | 0] = d; if (NET.chunks.filter(Boolean).length !== d.n) return;
-  const all = [], now = performance.now(); for (const c of NET.chunks) if (c.s) all.push(...String(c.s).split(';'));
-  const ch = applyStructs(all, now); applyDead(trees, NET.chunks[0].dt || [], now); applyDead(rocks, NET.chunks[0].dr || [], now);
+  const all = [], dt = [], dr = [], now = performance.now();
+  for (const c of NET.chunks) { if (c.s) all.push(...String(c.s).split(';')); if (Array.isArray(c.t)) dt.push(...c.t); if (Array.isArray(c.r)) dr.push(...c.r); }
+  const ch = applyStructs(all, now); applyDead(trees, dt, now); applyDead(rocks, dr, now);
   if (ch) recalc();
 }
 function wire() {
-  const r = NET.room;
-  r.on('act', m => { if (!m.isMe && host() && running && m.data) onAct(m.data); });
-  r.on('ev', m => { if (client() && running && m.peer === NET.hostPeer && m.data) onEv(m.data); });
-  r.on('sync', m => { if (client() && running && m.peer === NET.hostPeer && m.data) onSync(m.data); });
-  r.on('fx', m => { // someone else fired: show the shot, it does no damage here
-    const d = m.data || {}, w = WPN[d.w]; if (m.isMe || !running) return;
+  const r = NET.room, each = (m, f) => { const d = m.data; if (!d) return; if (Array.isArray(d.b)) { for (const x of d.b) if (x && typeof x === 'object') f(x); } else f(d); };
+  NET.h = {
+    act: m => { if (!m.isMe && host() && running) each(m, onAct); },
+    ev: m => { if (client() && running && m.peer === NET.hostPeer) each(m, onEv); },
+    sync: m => { if (client() && running && m.peer === NET.hostPeer && m.data) onSync(m.data); },
+    fx: m => { if (!m.isMe && running) each(m, onFx); },
+  };
+  for (const t in NET.h) r.on(t, NET.h[t]);
+}
+function onFx(d) { // someone else fired: show the shot, it does no damage here
+  {
+    const w = WPN[d.w];
     if (d.w === 'revive') { if (d.p === NET.me && P.dead) { P.revived = true; P.respawn = 0; } return; }
     if (d.w === 'grenade' && isFinite(d.x + d.y + d.tx + d.ty)) { shots.push({bomb: true, fx: true, x: d.x, y: d.y, x0: d.x, y0: d.y, tx: d.tx, ty: d.ty, t: 0, T: .65, vx: 1, vy: 0}); return; }
     if (d.w === 'turret' && isFinite(d.x + d.y + d.a)) { shots.push({x: d.x, y: d.y, vx: Math.cos(d.a) * 900, vy: Math.sin(d.a) * 900, life: .42, dmg: 0, pierce: 0, hit: new Set(), arrow: true, ghost: true, fx: true}); return; }
     if (!w || !w.ammo || !isFinite(d.x + d.y + d.a)) return;
     for (let i = 0; i < (w.pellets || 1); i++) { const a = d.a + (w.spread ? rnd(-w.spread, w.spread) : 0); shots.push({x: d.x, y: d.y, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd, life: w.range / w.spd, dmg: 0, pierce: 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, boom: w.boom, flame: w.flame, magic: w.free || w.plasma, stunHit: w.stunHit, poison: w.poison, fx: true}); }
     if (dist(d.x, d.y, P.x, P.y) < 700) w.ammo === 'arrows' ? snd(620, .09, 'triangle', .03, -420) : snd(150, .15, 'sawtooth', .05, -100);
-  });
+  }
 }
 function audioOn() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
 function enter(msg) { cam.x = P.x; cam.y = P.y; running = true; paused = false; $('start').hidden = true; $('end').hidden = true; $('hud').hidden = false; hud(); toast(msg); }
@@ -2211,7 +2250,7 @@ async function hostGame(sv) {
   if (!lobby || NET.room) return;
   const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let code = ''; for (let i = 0; i < 4; i++) code += L[Math.random() * L.length | 0];
   audioOn(); menuNote('Opening game ' + code + '…');
-  try { NET.room = await lobby.join('th-' + code.toLowerCase()); } catch (e) { return menuNote('Could not open a game right now. Try again in a moment.'); }
+  try { NET.room = await lobby.join('th-' + code.toLowerCase()); } catch (e) { return menuNote(e && e.code === 'not_permitted' ? 'Online games are not available to you on this page. Ask the owner to share it with you.' : 'Could not open a game right now. Try again in a moment.'); }
   NET.mode = 'host'; NET.code = code; wire(); start(sv); menuNote('');
   lobby.presence({game: code}).catch(() => {}); NET.sendT = 0; netSend(1);
   toast('Game ' + code + ' is open. Give your friends the code.');
@@ -2220,7 +2259,7 @@ async function joinGame(code) {
   if (!lobby || NET.room) return;
   code = String(code || '').toUpperCase().replace(/[^A-Z]/g, ''); if (code.length !== 4) return menuNote('Enter the 4-letter code from your host.');
   audioOn(); menuNote('Joining ' + code + '…');
-  let r; try { r = await lobby.join('th-' + code.toLowerCase()); } catch (e) { return menuNote('Could not join right now. Try again in a moment.'); }
+  let r; try { r = await lobby.join('th-' + code.toLowerCase()); } catch (e) { return menuNote(e && e.code === 'not_permitted' ? 'Online games are not available to you on this page. Ask the owner to share it with you.' : 'Could not join right now. Try again in a moment.'); }
   let w = null, hp = null;
   for (let i = 0; i < 48 && !w; i++) { if (i === 16) menuNote('Still looking for game ' + code + '…'); for (const p of r.peers()) if (!p.isMe && p.presence && p.presence.w) { w = p.presence.w; hp = p.peer; } if (!w) await new Promise(s => setTimeout(s, 250)); }
   if (!w || w.o) { r.leave().catch(() => {}); return menuNote('No game with the code ' + code + ' is running.'); }
@@ -2233,7 +2272,7 @@ function quit(msg) { // save, leave any shared game, and go back to the menu
   if (NET.room) NET.room.leave().catch(() => {});
   if (host() && lobby) lobby.presence({game: null}).catch(() => {});
   for (const o of NET.others.values()) { dropCompanions(o); if (o.m) scene.remove(o.m.g); }
-  NET.others.clear(); NET.amap.clear(); NET.room = null; NET.mode = 'solo'; NET.code = ''; NET.hostPeer = null; NET.chunks = [];
+  NET.others.clear(); NET.amap.clear(); NET.box = []; NET.xseen.clear(); NET.noEmit = false; OUT.act = []; OUT.ev = []; OUT.fx = []; NET.h = null; NET.room = null; NET.mode = 'solo'; NET.code = ''; NET.hostPeer = null; NET.chunks = [];
   running = false; $('hud').hidden = true; $('end').hidden = true; $('start').hidden = false; menuNote(msg || ''); 
 }
 function menuNote(msg) { menuMsg = msg; refreshMenu(); }
@@ -2245,7 +2284,7 @@ function refreshMenu() {
   const mb = $('maps'); mb.textContent = '';
   for (const k in MAPS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tool' + (k === selMap ? ' sel' : ''); b.textContent = MAPS[k].name; const sm = document.createElement('small'); sm.textContent = MAPS[k].note; b.appendChild(sm); b.addEventListener('click', () => { selMap = k; refreshMenu(); }); mb.appendChild(b); }
   $('hostsaved').hidden = !savedGame; $('mprow').hidden = !lobby;
-  $('mpnote').textContent = menuMsg || (lobby ? 'Host a game and give your friends the 4-letter code. They need access to this page: use Share and add them as Contributors.' : 'Playing with friends works when this page is open on claude.ai and you are signed in.');
+  $('mpnote').textContent = menuMsg || (lobby ? 'Host a game and give your friends the 4-letter code. They need access to this page: open Share and add them. They must be signed in to claude.ai.' : 'Playing with friends works when this page is open on claude.ai and you are signed in.');
   const box = $('open'); box.textContent = '';
   for (const c of openGames) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = 'Join ' + c; b.addEventListener('click', () => joinGame(c)); box.appendChild(b); }
 }
@@ -2299,7 +2338,7 @@ function updPlayer(dt) {
       let best = null, bd = 430; for (const a of animals) { if (A[a.type].passive || a.flee) continue; const dd = dist(a.x, a.y, P.x, P.y); if (dd < bd) { bd = dd; best = a; } }
       P.vcd = best ? 2.6 : .3;
       if (best) { const g = Math.atan2(best.y - P.y, best.x - P.x), w = WPN.launcher; shots.push({x: P.x + Math.cos(g) * 40, y: P.y + Math.sin(g) * 40, vx: Math.cos(g) * w.spd, vy: Math.sin(g) * w.spd, life: bd / w.spd + .05, dmg: 20, pierce: 0, hit: new Set(), rocket: 1, boom: 50, ghost: true}); shake = Math.max(shake, 5); snd(90, .25, 'sawtooth', .09, -40);
-        if (multi() && NET.room) NET.room.emit('fx', {x: P.x | 0, y: P.y | 0, a: +g.toFixed(2), w: 'launcher'}).catch(() => {}); }
+        netFx({x: P.x | 0, y: P.y | 0, a: +g.toFixed(2), w: 'launcher'}); }
     }
     P.vehicle.x = P.x; P.vehicle.y = P.y;
     if (ride.ram && ml > .3) for (const a of animals) { // run them down
@@ -2348,7 +2387,7 @@ function update(dt) {
     s.cdT = gun.cd; s.aim = Math.atan2(best.y - y, best.x - x);
     shots.push({x, y, vx: Math.cos(s.aim) * gun.spd, vy: Math.sin(s.aim) * gun.spd, life: gun.boom ? bd / gun.spd + .05 : gun.range / gun.spd, stunHit: gun.stun, poison: gun.poison, rocket: gun.boom ? 1 : 0, boom: gun.boom, dmg: gun.dmg, pierce: gun.pierce, hit: new Set(), arrow: true, ghost: true});
     if (dist(x, y, P.x, P.y) < 700) snd(520, .07, 'triangle', .035, -300);
-    if (host() && NET.room) NET.room.emit('fx', {w: 'turret', x, y, a: +s.aim.toFixed(2)}).catch(() => {});
+    if (host()) netFx({w: 'turret', x, y, a: +s.aim.toFixed(2)});
   }
   for (const o of trees) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
   for (const o of rocks) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
@@ -2402,7 +2441,7 @@ function update(dt) {
     if (tile && tile.type === 'mine' && !d.passive && !d.fly) { // boom
       grid[tile.ty * W + tile.tx] = null; gridDelta(tile.tx, tile.ty); const bx = tile.tx * T + 24, by = tile.ty * T + 24;
       explode({x: bx, y: by, boom: 130});
-      if (host() && NET.room) NET.room.emit('fx', {w: 'grenade', x: bx, y: by, tx: bx, ty: by}).catch(() => {});
+      if (host()) netFx({w: 'grenade', x: bx, y: by, tx: bx, ty: by});
     }
     if (tile && tile.type === 'flametrap' && !d.passive && !d.fly) {
       a.hp -= 34 * dt; tile.hp -= 3 * dt; if (Math.random() < dt * 10) burst(a.x, a.y, '#ff8a2a', 2);
@@ -2436,7 +2475,7 @@ function updRevive(dt) { // stand next to a downed friend for 2.5 seconds to get
   if (!multi() || P.dead || !NET.room) return;
   for (const o of NET.others.values()) {
     if (!o.dead) { o.revT = 0; continue; }
-    if (dist(o.x, o.y, P.x, P.y) < 48) { o.revT = (o.revT || 0) + dt; if (o.revT >= 2.5) { o.revT = 0; NET.room.emit('fx', {w: 'revive', p: o.peer}).catch(() => {}); toast('You helped ' + (o.name || 'your friend') + ' up.'); } }
+    if (dist(o.x, o.y, P.x, P.y) < 48) { o.revT = (o.revT || 0) + dt; if (o.revT >= 2.5) { o.revT = 0; netFx({w: 'revive', p: o.peer}); toast('You helped ' + (o.name || 'your friend') + ' up.'); } }
     else o.revT = Math.max(0, (o.revT || 0) - dt);
   }
 }
@@ -3475,7 +3514,7 @@ addEventListener('pagehide', () => saveGame(true));
 addEventListener('resize', resize);
 
 initScene(); setupPost(); resize(); reset(1, 'forest'); applyQuality(); G.dark = .3; renderRecords(); refreshMenu();
-window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, get NET() { return NET; }, get items() { return items; }, get rocks() { return rocks; }, get ponds() { return ponds; }, get house() { return house; }, get prog() { return prog; }, canPlace, setTool: t => { tool = t; }, get trees() { return trees; }, reset, mk, recalc};
+window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, get NET() { return NET; }, get items() { return items; }, get rocks() { return rocks; }, get ponds() { return ponds; }, get house() { return house; }, get prog() { return prog; }, canPlace, setTool: t => { tool = t; }, get trees() { return trees; }, reset, mk, recalc, hitAnimal};
 (async () => { // light up saving and multiplayer once the page knows where it is running
   const cl = window.claude;
   if (cl && cl.use) { try { [db, userNS, lobby] = await Promise.all([cl.use('db'), cl.use('user'), cl.use('room')]); uid = userNS ? await userNS.id() : null; } catch (e) {} }
