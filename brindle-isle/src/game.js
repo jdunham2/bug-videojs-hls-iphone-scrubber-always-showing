@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 25, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 26, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -779,7 +779,36 @@ const STAR_D = makeDungeon('star', 'Starfall Plateau', 24, null, { outdoor: true
   D.camp = { x: (X + 20) * T, y: 10 * T };
   D.start = { x: (X + 20) * T, y: 4 * T + 8 };
 }
-const nearStarSite = (tx, ty, d) => Math.hypot(tx - STAR_D.camp.x / T, ty - STAR_D.camp.y / T) < d || Math.hypot(tx - STAR_D.x0 - 20, ty - 4) < 3;
+const nearStarSite = (tx, ty, d) => Math.hypot(tx - STAR_D.camp.x / T, ty - STAR_D.camp.y / T) < d || Math.hypot(tx - STAR_D.x0 - 20, ty - 4) < 3 || Math.hypot(tx - STAR_D.x0 - 20, ty - 38) < 4;
+// ---------- the Astral Sanctum: a temple open to the stars at the south of the plateau ----------
+const SANCT = { x: (STAR_D.x0 + 20) * T, y: 38 * T + 4, tx: STAR_D.x0 + 20, ty: 38 };
+for (let y = 35; y <= 41; y++) for (let lx = 16; lx <= 24; lx++) tiles[y * W + STAR_D.x0 + lx] = LAND;
+ENTRANCES.push(SANCT); pathLine(STAR_D.x0 + 20, 35, STAR_D.x0 + 20, 39);
+const SANCT_D = makeDungeon('sanctum', 'The Astral Sanctum', 25, SANCT, { tint: 'rgb(195,195,245)',
+  gateMsg: 'The star gate is sealed. Defeat every creature in the gallery.', bossDoorMsg: 'A door painted with the night sky. The Constellation Lion keeps its key.',
+  objective: g => !g.open.gate ? 'Defeat every creature in the gallery to open the star gate. Watch for falling meteors!'
+    : !g.open.sw ? 'The void blocks the way. Light the three constellation stones to form a starlight bridge.'
+    : !g.open.lock ? (g.keys ? 'Use the small key on the door in the west wall, north of the void.' : 'Find a small key in the alcove on the far side of the void.')
+    : !S.defeated.lion ? 'Defeat the Constellation Lion. When it scatters into stars, strike the stars before they return.'
+    : !g.open.boss ? 'Open the night-sky door north of the void with the Boss Key.'
+    : !S.defeated.weaver ? 'Defeat the Starweaver. Break the four pylons holding her threads to bring her down.' : 'The stars are calm. Take the stairs back up.' });
+{
+  const D = SANCT_D;
+  carve(D, 6, 1, 33, 10);                          // the Starweaver's web
+  carve(D, 19, 11, 20, 12);
+  carve(D, 12, 13, 27, 24);                        // the hall of the void
+  for (let x = 12; x <= 27; x++) for (let y = 16; y <= 20; y++) dset(D, x, y, DEEP);
+  carve(D, 28, 13, 30, 15);                        // key alcove (north bank)
+  carve(D, 1, 13, 10, 24);                         // the Constellation Lion's court
+  carve(D, 3, 26, 36, 33);                         // the open gallery
+  carve(D, 19, 34, 20, 34); entryHall(D);
+  addDoor(D, 'gate', 'gate', [[19, 25], [20, 25]], GATE);
+  addDoor(D, 'sw', 'switch', [[19, 16], [20, 16], [19, 17], [20, 17], [19, 18], [20, 18], [19, 19], [20, 19], [19, 20], [20, 20]], DEEP, [19, 21]);
+  addDoor(D, 'lock', 'lock', [[11, 14], [11, 15]], LOCK, [10, 14]);
+  addDoor(D, 'boss', 'boss', [[19, 11], [20, 11]], BDOOR);
+  for (const [i, x, y] of [[1, 13, 22], [2, 26, 22], [3, 15, 23]]) D.switches.push({ id: 's' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
+  for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
+}
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -983,6 +1012,7 @@ function drawDungeonTile(c, x, y) {
     c.fillStyle = '#2a1a16'; if (floorLike(tileAt(x, y - 1))) c.fillRect(px, py, T, 4); if (floorLike(tileAt(x, y + 1))) c.fillRect(px, py + T - 4, T, 4); if (floorLike(tileAt(x - 1, y))) c.fillRect(px, py, 4, T); if (floorLike(tileAt(x + 1, y))) c.fillRect(px + T - 4, py, 4, T);
     return;
   }
+  if (t === DEEP && D.id === 'sanctum') { const h = hash(x, y); c.fillStyle = '#070a1e'; c.fillRect(px, py, T, T); if (h > 0.5) { c.fillStyle = h > 0.88 ? '#ffffff' : 'rgba(200,210,255,.7)'; c.fillRect(px + h * 28, py + (1 - h) * 28, h > 0.88 ? 2 : 1, h > 0.88 ? 2 : 1); } if (floorLike(tileAt(x, y - 1))) { c.fillStyle = '#3a3460'; c.fillRect(px, py, T, 10); } return; }
   if (t === DEEP) { c.fillStyle = '#030308'; c.fillRect(px, py, T, T); if (floorLike(tileAt(x, y - 1))) { c.fillStyle = '#2a2638'; c.fillRect(px, py, T, 12); c.fillStyle = '#1a1826'; c.fillRect(px, py + 8, T, 4); } return; }
   if (t === POOL) spr(c, 'w_c', px, py);
   else if (floorLike(t)) {
@@ -1077,6 +1107,7 @@ const ITEMS = {
   dragonpearl: { name: 'Dragon Pearl', price: 800 },
   krakenbeak: { name: 'Kraken Beak', price: 850 },
   clockheart: { name: 'Clockwork Heart', price: 900 },
+  cosmicheart: { name: 'Heart of the Cosmos', price: 950 },
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
@@ -1123,6 +1154,7 @@ const ARMORS = {
   fur:     { name: 'Jarl\'s Fur Mantle', hearts: 4, tint: ['#4a3524', '#a07b56', '#efe6d8'], cost: { horn: 1, goo: 8 }, warm: true, desc: '+4 hearts, and too warm to be slowed by ice, webs or chills.' },
   dragonscale: { name: 'Dragonscale Mail', hearts: 6, tint: ['#3a0e0a', '#8a2a1a', '#ffb347'], cost: { dragonscale: 1, obsidian: 6 }, sturdy: true, fireproof: true, desc: 'Scales of the Magma Drake. +6 hearts, barely knocked back, and fire only deals 1 damage.' },
   barkskin: { name: 'Barkskin Mail', hearts: 5, tint: ['#2a1c10', '#5a3e26', '#7fb85a'], cost: { heartwood: 1, herb: 10 }, regen: true, desc: 'Grown from the Rotroot\'s heart. +5 hearts, and slowly heals you anywhere.' },
+  celestial: { name: 'Celestial Raiment', hearts: 9, tint: ['#1a1840', '#5a4a9a', '#ffe9a8'], cost: { cosmicheart: 1, starshard: 8 }, regen: true, fireproof: true, breath: 2, desc: 'Woven from the Heart of the Cosmos. +9 hearts, the most of any armor, slowly heals you, fire only deals 1 damage, and double air.' },
   abyssal: { name: 'Abyssal Plate', hearts: 8, tint: ['#1a1030', '#6a3a8a', '#9fe8ff'], cost: { krakenbeak: 1, coral: 8 }, sturdy: true, breath: 3, desc: 'Forged from the Kraken\'s beak. +8 hearts, the most of any armor, barely knocked back, and triple air underwater.' },
   serpentscale: { name: 'Serpent Scale Armor', hearts: 7, tint: ['#1a3a1a', '#4a8a3a', '#ffd65a'], cost: { serpenteye: 1, jade: 8 }, sturdy: true, regen: true, desc: 'Scales of the Serpent Queen. +7 hearts, the most of any armor, barely knocked back, and slowly heals you.' },
   prismplate: { name: 'Prismatic Plate', hearts: 6, tint: ['#2a2050', '#a593ff', '#9fe8ff'], cost: { prismheart: 1, glimmer: 6 }, speed: 1.15, sturdy: true, desc: 'Grown from the Hydra\'s heart. +6 hearts, 15% faster, and hits barely knock you back.' },
@@ -1180,6 +1212,9 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'sanctum', giver: 'lio', name: 'The Astral Sanctum', req: 'starfoes', goal: { boss: ['lion', 'weaver'] }, reward: { gold: 620, items: { crystal: 18 } },
+    offer: ['South of here stands the Astral Sanctum, a temple open to the sky. The old stargazers built it.', 'A lion made of stars guards it, and the Starweaver spins her web beneath the dome. Cut her threads, friend, and bring the stars back to order.'],
+    done: ['The constellations are back where they belong! Take the Heart of the Cosmos. Wear it, and the heavens will protect you.'] },
   { id: 'sprites', giver: 'lio', name: 'Twinkle Trouble', goal: { kill: [['starsprite', 5]] }, reward: { gold: 160, items: { starshard: 4 } },
     offer: ['Welcome to the Observatory! I\'m Lio. The star sprites keep flitting in front of my telescope.', 'Catch five of them, would you? They burst into little stars when they attack: dodge sideways.'],
     done: ['Clear skies at last! Here, some star shards. They glow beautifully in a blade.'] },
@@ -1410,7 +1445,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1658,6 +1693,11 @@ dSpawn(TOMB_D, [['scarab', 15, 37], ['scarab', 24, 37], ['scarab', 21, 40], ['mu
 dChest(TOMB_D, 'key', 'key', 37, 26); dChest(TOMB_D, 'hall', 'gold', 32, 13);
 dPillars(TOMB_D, [[15, 14], [29, 14], [15, 19], [29, 19]]);
 for (const [x, y] of [[14, 41], [25, 41], [5, 23], [34, 23]]) addRes('pot', TOMB_D.x0 + x, y);
+dSpawn(SANCT_D, [['starsprite', 15, 38], ['hopper', 24, 38], ['starsprite', 8, 29], ['voidorb', 30, 30], ['mgolem', 20, 29], ['starsprite', 26, 32], ['hopper', 12, 31], ['voidorb', 6, 32],
+  ['starsprite', 24, 14], ['mgolem', 15, 22], ['hopper', 24, 22]]);
+dChest(SANCT_D, 'key', 'key', 29, 14); dChest(SANCT_D, 'hall', 'gold', 13, 14);
+dPillars(SANCT_D, [[12, 28], [27, 31], [6, 27], [33, 33]]);
+for (const [x, y] of [[14, 41], [25, 41], [36, 33], [3, 26], [27, 24]]) addRes('pot', SANCT_D.x0 + x, y);
 dSpawn(TOWER_D, [['sparkbot', 15, 38], ['sparkbot', 24, 37], ['soldier', 20, 39], ['beetle', 8, 27], ['beetle', 30, 32], ['soldier', 15, 32], ['sparkbot', 26, 27],
   ['turret', 13, 14], ['turret', 26, 14], ['soldier', 18, 19], ['beetle', 22, 22], ['turret', 14, 23]]);
 dChest(TOWER_D, 'key', 'key', 31, 20); dChest(TOWER_D, 'hall', 'gold', 24, 14);
@@ -1732,6 +1772,12 @@ const BOSS_INFO = {
   scarab: { name: 'The Golden Scarab', hp: 80, contact: 40, wake: 5 * T, col: '#ffd65a',
     seq: { 1: ['scuttle', 'roll', 'scuttle', 'beam'], 2: ['roll', 'dive', 'beam', 'scuttle', 'roll'], 3: ['beam', 'roll', 'dive', 'roll', 'beam', 'scuttle'] },
     lines: { 2: 'The Golden Scarab takes flight!', 3: 'The Golden Scarab blazes like the sun!' } },
+  lion:   { name: 'The Constellation Lion', hp: 60, contact: 28, wake: 4 * T, col: '#9fd4ff',
+    seq: { 1: ['prowl', 'pounce', 'prowl', 'pounce'], 2: ['prowl', 'roar', 'pounce', 'pounce'], 3: ['roar', 'pounce', 'summon', 'pounce', 'roar'] },
+    lines: { 2: 'The Constellation Lion roars across the sky!', 3: 'The Constellation Lion calls the star sprites!' } },
+  weaver: { name: 'The Starweaver', hp: 96, contact: 30, wake: 6 * T, col: '#ffe9a8',
+    seq: { 1: ['web', 'starrain', 'web', 'lattice'], 2: ['lattice', 'web', 'starrain', 'brood'], 3: ['starrain', 'lattice', 'web', 'brood', 'lattice'] },
+    lines: { 2: 'The Starweaver weaves a burning lattice!', 3: 'The Starweaver calls down the heavens!' } },
   knight2: { name: 'The Clockwork Knight', hp: 64, contact: 30, wake: 4 * T, col: '#b08a44',
     seq: { 1: ['march', 'march', 'thrust'], 2: ['march', 'thrust', 'march', 'bots'], 3: ['march', 'bots', 'thrust', 'march', 'thrust'] },
     lines: { 2: 'The Clockwork Knight winds up faster!', 3: 'The Clockwork Knight calls his sparkbots!' } },
@@ -1816,6 +1862,8 @@ const BOSSES = [
   makeBoss('jarl', FROST_D.camp.x, FROST_D.camp.y, { cx: FROST_D.camp.x, cy: FROST_D.camp.y, r: 5.6 * T }),
   makeBoss('mummy', (TOMB_D.x0 + 5) * T + 16, 16 * T, roomArena(TOMB_D, 1, 12, 10, 20)),
   makeBoss('scarab', (TOMB_D.x0 + 20) * T, 5 * T, roomArena(TOMB_D, 8, 1, 31, 10)),
+  makeBoss('lion', (SANCT_D.x0 + 5) * T + 16, 18 * T, roomArena(SANCT_D, 1, 13, 10, 24)),
+  makeBoss('weaver', (SANCT_D.x0 + 20) * T, 6 * T, roomArena(SANCT_D, 6, 1, 33, 10)),
   makeBoss('knight2', (TOWER_D.x0 + 5) * T + 16, 16 * T, roomArena(TOWER_D, 1, 13, 10, 24)),
   makeBoss('clock', (TOWER_D.x0 + 20) * T, 6 * T, roomArena(TOWER_D, 6, 1, 33, 10)),
   makeBoss('siren', (PALACE_D.x0 + 5) * T + 16, 18 * T, roomArena(PALACE_D, 1, 13, 10, 24)),
@@ -2105,6 +2153,7 @@ const ICON_DRAW = {
   feather: c => { c.save(); c.translate(16, 16); c.rotate(-0.6); c.fillStyle = '#c8b89a'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#efe6d8'; c.beginPath(); c.ellipse(-1, -3, 3, 10, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-0.5, -12, 1.5, 26); c.restore(); },
   chime: c => { c.fillStyle = '#8a6a44'; c.fillRect(6, 4, 20, 3); c.strokeStyle = '#c8c0b0'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(9 + i * 5, 7); c.lineTo(9 + i * 5, 12); c.stroke(); } for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#7fe0f0' : '#bfefff'; c.fillRect(8 + i * 5, 12, 3, 10 + (i % 2) * 6); } c.fillStyle = '#ffffff'; c.fillRect(8, 13, 1, 6); },
   bloom: c => { c.fillStyle = '#3d6a44'; c.fillRect(15, 18, 2, 12); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.fillStyle = i % 2 ? '#ff7a2a' : '#ffb347'; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 13 + Math.sin(a) * 6, 5, 3, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe08a'; circle(c, 16, 13, 3.5); },
+  cosmicheart: c => { c.fillStyle = 'rgba(159,212,255,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#1a1840'; c.beginPath(); c.moveTo(16, 27); c.bezierCurveTo(2, 18, 6, 4, 16, 11); c.bezierCurveTo(26, 4, 30, 18, 16, 27); c.fill(); c.fillStyle = '#ffe9a8'; for (const [ox, oy] of [[12, 13], [19, 12], [16, 19], [21, 17], [11, 18]]) c.fillRect(ox, oy, 1.6, 1.6); },
   clockheart: c => { c.fillStyle = 'rgba(208,170,92,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#8a6a34'; circle(c, 16, 16, 10); c.fillStyle = '#f2e6d0'; circle(c, 16, 16, 7); c.strokeStyle = '#2a2a30'; c.lineWidth = 2; c.beginPath(); c.moveTo(16, 16); c.lineTo(16, 10); c.moveTo(16, 16); c.lineTo(20, 18); c.stroke(); c.fillStyle = '#e0503a'; circle(c, 16, 16, 1.5); },
   krakenbeak: c => { c.fillStyle = 'rgba(154,90,184,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#2a1a1a'; c.beginPath(); c.moveTo(8, 10); c.quadraticCurveTo(26, 6, 26, 16); c.quadraticCurveTo(20, 14, 12, 18); c.closePath(); c.fill(); c.beginPath(); c.moveTo(8, 20); c.quadraticCurveTo(22, 26, 24, 18); c.quadraticCurveTo(18, 20, 12, 18); c.closePath(); c.fill(); c.fillStyle = '#8a7aa8'; c.fillRect(12, 11, 6, 2); },
   dragonpearl: c => { c.fillStyle = 'rgba(255,233,242,.4)'; circle(c, 16, 16, 13); c.fillStyle = '#e8d6e6'; circle(c, 16, 16, 9); c.fillStyle = '#ffffff'; circle(c, 13, 13, 4); c.strokeStyle = '#e8703a'; c.lineWidth = 2; c.beginPath(); c.arc(16, 16, 11, 0.5, 2.6); c.stroke(); },
@@ -2136,8 +2185,8 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart'];
-const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart'];
+const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
   if (DH) return DH.objective(dgs(DH));
@@ -2257,6 +2306,12 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">The Astral Sanctum</div>
+      <dl class="controls">
+      <dt>Getting in</dt><dd>A domed temple at the south end of Starfall Plateau.</dd>
+      <dt>Inside</dt><dd>The gallery is open to the sky: meteors fall here too. Defeat its creatures to open the gate, then light three constellation stones to form a starlight bridge over the void.</dd>
+      <dt>Constellation Lion</dt><dd>After it pounces it scatters into stars across the room. Strike the stars before they fly back, or it heals.</dd>
+      <dt>Starweaver</dt><dd>She hangs out of reach on star threads tied to four pylons. Break all four to bring her down, then strike. Mind her webs, the falling stars, and the burning lattice between her pylons.</dd></dl>
       <div class="label">Starfall Plateau</div>
       <dl class="controls">
       <dt>Getting there</dt><dd>Step into the Moonbeam on the north isle of the Cloudspire Isles. The beam at the Observatory takes you back.</dd>
@@ -2625,6 +2680,10 @@ function onAction() {
   if (gong) { face({ x: gong.x, y: gong.y }); doAct('sword', hitEnemies); return true; }
   const cg = AB && AB.type === 'clock' && AB.state !== 'dazed' && AB.gears && AB.gears.find(g => g.i === AB.glow && Math.hypot(g.x - P.x, g.y - P.y) < 70);
   if (cg) { face({ x: cg.x, y: cg.y }); doAct('sword', hitEnemies); return true; }
+  const ls = AB && AB.type === 'lion' && AB.stars && AB.stars.find(q => Math.hypot(q.x - P.x, q.y - P.y) < 70);
+  if (ls) { face({ x: ls.x, y: ls.y }); doAct('sword', hitEnemies); return true; }
+  const py = AB && AB.type === 'weaver' && AB.state !== 'dazed' && AB.pylons && AB.pylons.find(q => q.hp > 0 && Math.hypot(q.x - P.x, q.y - P.y) < 70);
+  if (py) { face({ x: py.x, y: py.y }); doAct('sword', hitEnemies); return true; }
   const hh = AB && AB.type === 'hydra' && AB.heads && AB.heads.find(h => !h.dead && h.state === 'stuck' && Math.hypot(h.x - P.x, h.y - P.y) < 110);
   if (hh) { face({ x: hh.x, y: hh.y }); doAct('sword', hitEnemies); return true; }
   if (AB && AB.type === 'serpent' && AB.active && AB.trail && AB.trail.length) { const tl = AB.trail[AB.trail.length - 1]; if (Math.hypot(tl.x - P.x, tl.y - P.y) < 100) { face({ x: tl.x, y: tl.y }); doAct('sword', hitEnemies); return true; } }
@@ -2779,7 +2838,7 @@ function hitEnemies(a) {
   }
   const AB = activeBoss();
   if (AB && AB.decoys) for (const dc of AB.decoys) if (!dc.popped && Math.hypot(dc.x - hx, dc.y - 26 - AB.z - hy) < rad + 26) { dc.popped = true; burst(dc.x, dc.y - 40, '#dff6ff', 16); floatText(dc.x, dc.y - 80, 'Just a reflection!', '#c8e8ff'); SFX.play('mine'); hit = true; }
-  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitGong(AB || {}, hx, hy, rad); hitClockGears(AB || {}, hx, hy, rad); hitLanterns(hx, hy, rad);
+  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitGong(AB || {}, hx, hy, rad); hitClockGears(AB || {}, hx, hy, rad); hitLionStars(AB || {}, hx, hy, rad); hitPylons(AB || {}, hx, hy, rad); hitLanterns(hx, hy, rad);
   for (const e of enemies) if (e.alive && e.decoys && e.decoys.length) for (let i = e.decoys.length - 1; i >= 0; i--) { const q = e.decoys[i]; if (Math.hypot(q.x - hx, q.y - 10 - hy) < rad + 6) { e.decoys.splice(i, 1); burst(q.x, q.y - 16, '#ffb347', 12); floatText(q.x, q.y - 40, 'Just an illusion!', '#ffd6a0'); hit = true; } }
   if (AB && AB.type === 'hydra' && hitHydra(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && AB.type === 'serpent' && hitSerpent(AB, hx, hy, rad, dmg)) hit = true;
@@ -3384,6 +3443,7 @@ function damageBoss(B, n) {
   }
   const dazed = B.state === 'dazed';
   let dmg = n * (dazed ? 2 : 1);
+  if (B.type === 'lion' && B.state === 'dim' && !B.starHit) { B.shield = 0.3; floatText(B.x, B.y - 80, 'It\'s scattered into stars!', '#9fd4ff'); return; }
   if (B.type === 'knight2' && B.state !== 'dazed') { n = Math.max(1, Math.ceil(n / 3)); if (rng() < 0.4) floatText(B.x + 30, B.y - 90, 'Armor!', '#c8c0b0'); }
   if (B.type === 'siren' && B.state === 'sing') { B.shield = 0.3; floatText(B.x, B.y - 80, 'Her song shields her!', '#ffd6ea'); SFX.play('mine'); return; }
   if (B.type === 'chameleon' && B.state === 'stalk') { B.state = 'dazed'; B.st = 1.8; floatText(B.x, B.y - 80, 'Found it!', '#ffe08a'); SFX.play('hit'); return; }
@@ -3471,6 +3531,16 @@ function bossStart(B, action) {
     else if (action === 'lash') { B.state = 'lashWind'; B.st = B.phase === 3 ? 0.45 : 0.6; }
     else if (action === 'curse') { B.state = 'curse'; B.st = 0.8; }
     else if (action === 'sarcophagus') { B.state = 'sink'; B.st = 0.5; SFX.play('wisp'); }
+  } else if (B.type === 'lion') {
+    if (action === 'prowl') { B.state = 'prowl'; B.st = 0; }
+    else if (action === 'pounce') { B.state = 'pounceWind'; B.st = 0.5; }
+    else if (action === 'roar') { B.state = 'roar'; B.st = 0.6; }
+    else if (action === 'summon') { B.state = 'summon'; B.st = 0.7; }
+  } else if (B.type === 'weaver') {
+    if (action === 'web') { B.state = 'web'; B.st = 0.5; }
+    else if (action === 'starrain') { B.state = 'starrain'; B.st = 0.6; }
+    else if (action === 'lattice') { B.state = 'lattice'; B.st = 0.8; }
+    else if (action === 'brood') { B.state = 'brood'; B.st = 0.7; }
   } else if (B.type === 'knight2') {
     if (action === 'march') { B.state = 'march'; B.st = 0; }
     else if (action === 'thrust') { B.state = 'thrustWind'; B.st = 0.45; }
@@ -3597,6 +3667,8 @@ function finishBoss(B) {
   if (B.type === 'jarl') { drop(B.x, B.y - 10, 'gold', 20, 10); drop(B.x, B.y - 10, 'horn', 1); banner('Jarl Frostbeard defeated!', '#ffe08a'); }
   if (B.type === 'mummy') { drop(B.x, B.y - 10, 'gold', 16, 5); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mummy King crumbles!', '#ffe08a'); }
   if (B.type === 'scarab') { drop(B.x, B.y - 10, 'gold', 30, 10); drop(B.x, B.y - 10, 'sunstone', 1); banner('The Golden Scarab falls!', '#ffe08a'); }
+  if (B.type === 'lion') { B.stars = []; drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'starshard', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Constellation Lion fades into the night!', '#ffe08a'); }
+  if (B.type === 'weaver') { B.lattice = 0; drop(B.x, B.y - 10, 'gold', 45, 10); drop(B.x, B.y - 10, 'cosmicheart', 1); banner('The Starweaver\'s web unravels!', '#ffe08a'); }
   if (B.type === 'knight2') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'gear', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Clockwork Knight winds down for good!', '#ffe08a'); }
   if (B.type === 'clock') { B.gears = null; drop(B.x, B.y + 20, 'gold', 45, 10); drop(B.x, B.y + 20, 'clockheart', 1); banner('The Great Clock falls silent!', '#ffe08a'); }
   if (B.type === 'siren') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'coral', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Siren\'s song falls silent!', '#ffe08a'); }
@@ -3638,7 +3710,7 @@ function updateBosses(dt, fainted) {
       Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: B.hx, y: B.hy, z: 0, ring: null, alpha: 1 });
       for (const e of enemies) if (e.minion) e.remove = true;
       projectiles.length = 0; bossBar();
-      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; B.tailHits = 0; B.dir = undefined; B.beached = false; B.tgt = null; B.gong = null; B.tents = null; B.cut = 0; B.gears = null; B.glow = -1; if (B.type === 'wraith') blizzard = 0;
+      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; B.heads = null; B.cd = 0; B.pillars = null; B.pillarPhase = 0; B.tailHits = 0; B.dir = undefined; B.beached = false; B.tgt = null; B.gong = null; B.tents = null; B.cut = 0; B.gears = null; B.glow = -1; B.stars = null; B.pylons = null; B.lattice = 0; if (B.type === 'wraith') blizzard = 0;
     if (!fainted) toast(`${B.name} waits for your return.`);
       continue;
     }
@@ -3655,8 +3727,8 @@ function updateBosses(dt, fainted) {
       continue;
     }
     if (B.state === 'wake' || B.state === 'rest') { B.st -= dt; if (B.type === 'wraith') B.z += (20 + Math.sin(B.anim * 2) * 6 - B.z) * Math.min(1, dt * 4); if (B.type === 'wizard') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * 0.1; if (B.type === 'bat') B.z += (46 - B.z) * Math.min(1, dt * 4); if (B.st <= 0) bossNext(B); }
-    else ({ knight2: updateKnight2, clock: updateClock, siren: updateSiren, kraken: updateKraken, elderfox: updateElderFox, koidragon: updateKoiDragon, chameleon: updateChameleon, serpent: updateSerpent, mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
-    const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'fight', 'stalk', 'swim', 'sink', 'slide', 'rise'].includes(B.state);
+    else ({ lion: updateLion, weaver: updateWeaver, knight2: updateKnight2, clock: updateClock, siren: updateSiren, kraken: updateKraken, elderfox: updateElderFox, koidragon: updateKoiDragon, chameleon: updateChameleon, serpent: updateSerpent, mole: updateMole, hydra: updateHydra, shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
+    const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving', 'rumble', 'fight', 'stalk', 'swim', 'sink', 'slide', 'rise', 'dim'].includes(B.state);
     if (B.active && !harmless && B.z < 14 && d < I.contact && !fainted) damagePlayer(2, B);
   }
 }
@@ -6592,7 +6664,7 @@ function drawLever(c, sw, lit) {
 // ---------- meteor showers ----------
 let meteorT = 6, meteorHint = false;
 function updateMeteors(dt) {
-  if (dungeonAt(P.x) !== STAR_D) { meteorT = Math.max(meteorT, 5); return; }
+  if (dungeonAt(P.x) !== STAR_D && !(dungeonAt(P.x) === SANCT_D && P.y > 25 * T)) { meteorT = Math.max(meteorT, 5); return; }
   meteorT -= dt;
   if (meteorT > 0) return;
   meteorT = 9 + rng() * 5;
@@ -6702,6 +6774,107 @@ Object.assign(PROC_DRAW, {
     c.fillStyle = '#c8302a'; c.fillRect(e.x + f * 11 - 1, y - 28, 2, 2); c.fillStyle = '#ffffff'; circle(c, e.x - f * 12, y - 12, 4);
   },
 });
+// ---------- the Constellation Lion: scatters into stars you must strike ----------
+let lionHint = false;
+function hitLionStars(B, hx, hy, rad) {
+  if (B.type !== 'lion' || !B.stars || !B.stars.length) return;
+  for (let i = B.stars.length - 1; i >= 0; i--) { const s = B.stars[i]; if (Math.hypot(s.x - hx, s.y - 14 - hy) > rad + 16) continue; B.stars.splice(i, 1); burst(s.x, s.y - 14, '#ffe9a8', 16); SFX.play('lucky'); floatText(s.x, s.y - 40, 'Star caught!', '#ffe08a'); B.starHit = true; damageBoss(B, 5); B.starHit = false; if (B.state === 'dying') return; }
+}
+function updateLion(B, dt, fainted, d) {
+  const A = B.arena;
+  switch (B.state) {
+    case 'prowl': { B.st += dt; const a = Math.atan2(B.y - P.y, B.x - P.x) + dt * 1.2, tx = P.x + Math.cos(a) * 130, ty = P.y + Math.sin(a) * 90, dx = tx - B.x, dy = ty - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * Math.min(dd, 130 * dt); B.y += dy / dd * Math.min(dd, 130 * dt); clampBoss(B); if (B.st > 1.6) bossRest(B, 0.1); break; }
+    case 'pounceWind': B.st -= dt; if (B.st <= 0) { const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; B.vx = dx / dd * 420; B.vy = dy / dd * 420; B.state = 'pounce'; B.st = 0.35; SFX.play('dash'); } break;
+    case 'pounce': B.st -= dt; B.x += B.vx * dt; B.y += B.vy * dt; clampBoss(B); if (!B.phit && !fainted && !P.dash && d < 36) { B.phit = true; damagePlayer(2, B); }
+      if (B.st <= 0) { B.phit = false; B.state = 'dim'; B.st = B.phase === 3 ? 3.4 : 4.2; const n = B.phase === 1 ? 4 : 5; B.stars = []; for (let i = 0; i < n; i++) B.stars.push({ x: A.x0 + 40 + rng() * (A.x1 - A.x0 - 80), y: A.y0 + 60 + rng() * (A.y1 - A.y0 - 80) }); SFX.play('wisp'); if (!lionHint) { lionHint = true; toast('It scattered into stars! Strike the stars before they fly back to it.', 4000); } }
+      break;
+    case 'dim': B.st -= dt; if (B.st <= 0) { const back = (B.stars || []).length; if (back) { B.hp = Math.min(B.max, B.hp + back * 3); bossBar(); floatText(B.x, B.y - 90, `The stars return! +${back * 3}`, '#9fd4ff'); } B.stars = []; bossRest(B, 0.4); } break;
+    case 'roar': B.st -= dt; if (B.st <= 0) { for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; projectiles.push({ kind: 'star', x: B.x, y: B.y - 30, vx: Math.cos(a) * 150, vy: Math.sin(a) * 150, ang: a, t: 0, life: 2 }); } SFX.play('boss'); bossRest(B, 0.6); } break;
+    case 'summon': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['starsprite', 'starsprite'], 4); bossRest(B, 0.4); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+  }
+}
+function drawLion(c, B) {
+  const dim = B.state === 'dim', x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y, f = P.x < x ? -1 : 1, sc = 1.6;
+  for (const s of B.stars || []) { c.strokeStyle = 'rgba(159,212,255,.35)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x, y - 30); c.lineTo(s.x, s.y - 14); c.stroke(); }
+  for (const s of B.stars || []) { const g = 0.6 + Math.sin(time * 8 + s.x) * 0.3; c.fillStyle = `rgba(255,233,168,${g * 0.35})`; circle(c, s.x, s.y - 14, 18); c.fillStyle = '#ffe9a8'; c.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2 + time * 2, rr = i % 2 ? 4 : 10; c.lineTo(s.x + Math.cos(a) * rr, s.y - 14 + Math.sin(a) * rr); } c.closePath(); c.fill(); }
+  const pts = [[-20, -12], [-14, -30], [8, -34], [20, -28], [26, -44], [34, -38], [14, -12], [-24, -2], [16, -2]].map(([ox, oy]) => [x + ox * f * sc / 1.6, y + oy * sc / 1.6]);
+  c.save(); c.globalAlpha = dim ? 0.18 : 1; bossFlash(c, B);
+  c.fillStyle = 'rgba(30,30,80,.55)'; c.beginPath(); c.ellipse(x, y - 22, 34, 20, 0, 0, Math.PI * 2); c.fill(); c.beginPath(); c.ellipse(x + f * 28, y - 40, 16, 14, 0, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = '#9fd4ff'; c.lineWidth = 2; c.beginPath(); for (const [a, b2] of [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [3, 6], [0, 7], [6, 8], [1, 7]]) { c.moveTo(pts[a][0], pts[a][1]); c.lineTo(pts[b2][0], pts[b2][1]); } c.stroke();
+  for (const [px, py] of pts) { c.fillStyle = '#ffffff'; circle(c, px, py, 3); c.fillStyle = 'rgba(159,212,255,.4)'; circle(c, px, py, 6); }
+  c.fillStyle = B.state === 'dazed' ? '#ffe08a' : '#ffd65a'; circle(c, x + f * 30, y - 42, 3);
+  for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; c.fillStyle = 'rgba(255,233,168,.7)'; circle(c, x + f * 26 + Math.cos(a) * 16, y - 40 + Math.sin(a) * 14, 2); }
+  c.restore();
+  if (B.state === 'pounceWind' || B.state === 'roar') bossWarn(c, { x }, y - 80);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 40, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 70, 20);
+}
+// ---------- the Starweaver: suspended on star threads until her pylons fall ----------
+function weaverPylons(B) { return B.pylons || (B.pylons = [[9, 3], [30, 3], [9, 9], [30, 9]].map(([x, y]) => ({ x: (SANCT_D.x0 + x) * T + 16, y: y * T + 16, hp: 3 }))); }
+let weaverHint = false;
+function hitPylons(B, hx, hy, rad) {
+  if (B.type !== 'weaver' || !B.active || B.state === 'dazed' || B.state === 'dying') return;
+  for (const p of weaverPylons(B)) {
+    if (p.hp <= 0 || Math.hypot(p.x - hx, p.y - 24 - hy) > rad + 16) continue;
+    p.hp--; burst(p.x, p.y - 30, '#9fd4ff', 10); SFX.play('mine');
+    if (p.hp <= 0) { SFX.play('crumble'); burst(p.x, p.y - 30, '#ffe9a8', 20); floatText(p.x, p.y - 70, 'Thread cut!', '#ffe08a');
+      if (weaverPylons(B).every(q => q.hp <= 0)) { B.state = 'dazed'; B.st = 4; impact(12); SFX.play('slam'); floatText(B.x, B.y - 100, 'The Starweaver falls! Strike her!', '#ffe08a'); } }
+  }
+}
+function latticeLines(B) { const p = weaverPylons(B), order = [0, 1, 3, 2]; const ls = []; for (let i = 0; i < 4; i++) { const a = p[order[i]], b2 = p[order[(i + 1) % 4]]; if (a.hp > 0 && b2.hp > 0) ls.push([a, b2]); } return ls; }
+function updateWeaver(B, dt, fainted, d) {
+  const A = B.arena, pyl = weaverPylons(B), down = B.state === 'dazed' || B.state === 'dying';
+  B.z += ((down ? 0 : 80) - B.z) * Math.min(1, dt * (down ? 6 : 2));
+  if (!down) { const tx = A.cx + Math.sin(B.anim * 0.7) * 80, ty = A.cy + Math.cos(B.anim * 0.9) * 30; B.x += (tx - B.x) * Math.min(1, dt); B.y += (ty - B.y) * Math.min(1, dt); }
+  if (B.lattice) { B.lattice -= dt; if (B.lattice < 1.4 && !fainted && !P.dash) for (const [a, b2] of latticeLines(B)) if (segDist(P.x, P.y - 14, a.x, a.y - 24, b2.x, b2.y - 24) < 14) { damagePlayer(2, { x: P.x, y: P.y + 20 }); break; } if (B.lattice <= 0) B.lattice = 0; }
+  if (!weaverHint && B.active) { weaverHint = true; toast('She hangs out of reach on star threads. Break the four glowing pylons to bring her down!', 4500); }
+  switch (B.state) {
+    case 'web': B.st -= dt; if (B.st <= 0) { const a = Math.atan2(P.y - 14 - (B.y - B.z), P.x - B.x); for (const o of [-0.3, 0, 0.3]) projectiles.push({ kind: 'web', x: B.x, y: B.y - B.z, vx: Math.cos(a + o) * 170, vy: Math.sin(a + o) * 170, t: 0, life: 2.4 }); SFX.play('swing'); bossRest(B, 0.6); } break;
+    case 'starrain': B.st -= dt; if (B.st <= 0) { for (let i = 0; i < 6; i++) { const tx = i === 0 ? P.x : A.x0 + 50 + rng() * (A.x1 - A.x0 - 100), ty = i === 0 ? P.y : A.y0 + 60 + rng() * (A.y1 - A.y0 - 80); projectiles.push({ kind: 'rock', fall: true, meteor: true, tx, ty, x: tx, y: ty, t: -i * 0.25, dur: 1, z: 360 }); } SFX.play('boss'); bossRest(B, 1); } break;
+    case 'lattice': B.st -= dt; if (B.st <= 0) { B.lattice = 2.2; SFX.play('wisp'); bossRest(B, 1.6); } break;
+    case 'brood': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['spider', 'spider'], 4); bossRest(B, 0.4); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) { for (const p of pyl) p.hp = 3; floatText(B.x, B.y - 80, 'She weaves new threads!', '#9fd4ff'); bossRest(B, 0.6); } break;
+  }
+}
+function drawWeaver(c, B) {
+  const pyl = weaverPylons(B), x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y - B.z;
+  if (B.lattice) { const hot = B.lattice < 1.4; for (const [a, b2] of latticeLines(B)) { c.strokeStyle = hot ? `rgba(255,233,168,${0.7 + Math.sin(time * 30) * 0.2})` : `rgba(236,82,87,${0.3 + Math.sin(time * 16) * 0.2})`; c.lineWidth = hot ? 6 : 2; c.setLineDash(hot ? [] : [6, 6]); c.beginPath(); c.moveTo(a.x, a.y - 24); c.lineTo(b2.x, b2.y - 24); c.stroke(); c.setLineDash([]); } }
+  for (const p of pyl) {
+    shadow(c, p.x, p.y + 2, 14, 5);
+    if (p.hp <= 0) { c.fillStyle = '#3a3460'; c.fillRect(p.x - 8, p.y - 10, 16, 10); continue; }
+    if (B.state !== 'dazed' && B.active) { c.strokeStyle = 'rgba(200,220,255,.55)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(p.x, p.y - 44); c.lineTo(x, y - 20); c.stroke(); }
+    const g = 0.6 + Math.sin(time * 4 + p.x) * 0.3; c.fillStyle = `rgba(159,212,255,${g * 0.3})`; circle(c, p.x, p.y - 30, 20);
+    c.fillStyle = '#3a3460'; c.beginPath(); c.moveTo(p.x - 10, p.y); c.lineTo(p.x - 6, p.y - 40); c.lineTo(p.x, p.y - 50); c.lineTo(p.x + 6, p.y - 40); c.lineTo(p.x + 10, p.y); c.closePath(); c.fill();
+    c.fillStyle = '#9fd4ff'; c.beginPath(); c.moveTo(p.x - 4, p.y - 6); c.lineTo(p.x - 3, p.y - 38); c.lineTo(p.x, p.y - 44); c.lineTo(p.x + 1, p.y - 8); c.closePath(); c.fill();
+    for (let i = 0; i < 3; i++) { c.fillStyle = i < p.hp ? '#ffe9a8' : '#3a3460'; circle(c, p.x - 6 + i * 6, p.y + 6, 2); }
+  }
+  c.fillStyle = 'rgba(0,0,0,.28)'; ellipse(c, B.x, B.y + 4, 40 * Math.max(0.4, 1 - B.z / 140), 10);
+  c.globalAlpha = 1; bossFlash(c, B);
+  c.strokeStyle = '#2a2448'; c.lineWidth = 5; for (const s of [-1, 1]) for (let i = 0; i < 4; i++) { const a = (i - 1.5) * 0.45, lx = x + s * Math.cos(a) * 46, ly = y - 10 + Math.sin(a) * 30; c.beginPath(); c.moveTo(x + s * 10, y - 14); c.quadraticCurveTo(x + s * 30, y - 40 + i * 8, lx, ly + Math.sin(time * 6 + i) * 3); c.stroke(); }
+  c.fillStyle = '#2a2448'; ellipse(c, x, y - 20, 26, 22); c.fillStyle = '#3a3460'; ellipse(c, x, y - 38, 16, 14);
+  c.fillStyle = 'rgba(159,212,255,.9)'; for (const [ox, oy] of [[-10, -22], [6, -16], [12, -28], [-2, -10], [-14, -14]]) { c.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, rr = i % 2 ? 1.2 : 3; c.lineTo(x + ox + Math.cos(a) * rr, y + oy + Math.sin(a) * rr); } c.closePath(); c.fill(); }
+  c.fillStyle = B.state === 'dazed' ? '#ffe08a' : '#e0503a'; for (const [ox, oy] of [[-6, -42], [6, -42], [-3, -36], [3, -36]]) circle(c, x + ox, y + oy, 2.2);
+  c.globalAlpha = 1;
+  if (B.state === 'starrain' || B.state === 'lattice' || B.state === 'web') bossWarn(c, { x }, y - 80);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 40, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 70, 24);
+}
+function drawSanctumGate(c) {
+  const x = SANCT.x, y = SANCT.y;
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, x, y - 2, 60, 12);
+  c.fillStyle = '#3a3460'; c.fillRect(x - 46, y - 70, 92, 70); c.fillStyle = '#4a4478'; c.fillRect(x - 42, y - 70, 32, 70);
+  c.fillStyle = '#2a2448'; c.beginPath(); c.moveTo(x - 54, y - 70); c.quadraticCurveTo(x, y - 130, x + 54, y - 70); c.closePath(); c.fill();
+  c.fillStyle = '#9fd4ff'; for (const [ox, oy] of [[-24, -90], [0, -104], [22, -92], [-10, -82], [12, -80]]) { c.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + time, rr = i % 2 ? 1.5 : 4; c.lineTo(x + ox + Math.cos(a) * rr, y + oy + Math.sin(a) * rr); } c.closePath(); c.fill(); }
+  c.fillStyle = '#05060f'; c.beginPath(); c.moveTo(x - 16, y); c.lineTo(x - 16, y - 34); c.quadraticCurveTo(x, y - 50, x + 16, y - 34); c.lineTo(x + 16, y); c.closePath(); c.fill();
+  const g = 0.35 + Math.sin(time * 2) * 0.15; c.fillStyle = `rgba(159,212,255,${g})`; c.fillRect(x - 12, y - 12, 24, 12);
+}
+function drawStarStone(c, sw, lit) {
+  shadow(c, sw.x, sw.y + 3, 12, 4);
+  c.fillStyle = '#3a3460'; c.beginPath(); c.moveTo(sw.x - 11, sw.y); c.lineTo(sw.x - 8, sw.y - 26); c.lineTo(sw.x + 8, sw.y - 26); c.lineTo(sw.x + 11, sw.y); c.closePath(); c.fill();
+  c.fillStyle = lit ? '#ffe9a8' : '#5a5490'; for (const [ox, oy] of [[-4, -20], [3, -14], [-2, -8], [5, -22]]) circle(c, sw.x + ox, sw.y + oy, lit ? 2 : 1.4);
+  if (lit) { c.strokeStyle = 'rgba(255,233,168,.8)'; c.lineWidth = 1; c.beginPath(); c.moveTo(sw.x - 4, sw.y - 20); c.lineTo(sw.x + 3, sw.y - 14); c.lineTo(sw.x - 2, sw.y - 8); c.moveTo(sw.x + 3, sw.y - 14); c.lineTo(sw.x + 5, sw.y - 22); c.stroke(); c.fillStyle = `rgba(255,233,168,${0.2 + Math.sin(time * 4) * 0.08})`; circle(c, sw.x, sw.y - 16, 20); }
+}
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -6976,7 +7149,7 @@ function drawTent(c, o) {
   c.fillStyle = 'rgba(242,248,255,.85)'; c.beginPath(); c.moveTo(o.x - 10, o.y - 40); c.lineTo(o.x, o.y - 52); c.lineTo(o.x + 10, o.y - 40); c.closePath(); c.fill();
   c.fillStyle = '#c0392b'; c.fillRect(o.x - 1, o.y - 66, 2, 16); c.fillRect(o.x + 1, o.y - 66, 10, 6);
 }
-function drawBossAny(c, B) { ({ knight2: drawKnight2, clock: drawClock, siren: drawSiren, kraken: drawKraken, elderfox: drawElderFox, koidragon: drawKoiDragon, chameleon: drawChameleon, serpent: drawSerpent, mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
+function drawBossAny(c, B) { ({ lion: drawLion, weaver: drawWeaver, knight2: drawKnight2, clock: drawClock, siren: drawSiren, kraken: drawKraken, elderfox: drawElderFox, koidragon: drawKoiDragon, chameleon: drawChameleon, serpent: drawSerpent, mole: drawMole, hydra: drawHydra, shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
 function drawJarl(c, B) {
   let sx = 1, sy = 1, ox = 0;
   if (B.state === 'stride') { const k = Math.abs(Math.sin(B.anim * 7)); sy = 1 - k * 0.05; sx = 1 + k * 0.03; }
@@ -7490,8 +7663,8 @@ function render() {
     else if (kind === 1) drawEnemy(ctx, o);
     else if (kind === 7) drawBossAny(ctx, o);
     else if (kind === 8) drawChest(ctx, o);
-    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : o.id === 'shrine' ? drawShrineGate : o.id === 'palace' ? drawPalaceGate : o.id === 'tower' ? drawClockTower : drawCryptDoor)(ctx);
-    else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : dungeonAt(o.x) === SHRINE_D ? drawBell : dungeonAt(o.x) === PALACE_D ? drawClam : dungeonAt(o.x) === TOWER_D ? drawLever : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
+    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : o.id === 'vault' ? drawVaultGate : o.id === 'serpent' ? drawSerpentTemple : o.id === 'shrine' ? drawShrineGate : o.id === 'palace' ? drawPalaceGate : o.id === 'tower' ? drawClockTower : o.id === 'sanctum' ? drawSanctumGate : drawCryptDoor)(ctx);
+    else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : dungeonAt(o.x) === SHRINE_D ? drawBell : dungeonAt(o.x) === PALACE_D ? drawClam : dungeonAt(o.x) === TOWER_D ? drawLever : dungeonAt(o.x) === SANCT_D ? drawStarStone : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) { if (P.ride) drawCart(ctx, P.x, P.y + 6); drawPlayer(ctx); if (P.ride) drawCartFront(ctx, P.x, P.y + 6); }
     else if (kind === 4) drawHouse(ctx, o);
