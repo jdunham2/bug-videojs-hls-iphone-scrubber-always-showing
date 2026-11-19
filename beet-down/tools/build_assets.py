@@ -259,6 +259,33 @@ compose('e_rhino', 'body_darkC.png', [
     ('eye_human_red.png', -30, -40, .7, 0, False), ('eye_human_red.png', 30, -40, .7, 0, False),
     ('nose_brown.png', 0, 4, .7, 0, False), ('mouthI.png', 0, 52, 1.0, 0, False)], maxpx=170)
 
+compose('e_webber', 'body_whiteA.png', [
+    ('leg_whiteB.png', -120, 30, .5, -60, False, L), ('leg_whiteB.png', 120, 30, .5, 60, True, L),
+    ('leg_whiteB.png', -105, 95, .5, -30, False, L), ('leg_whiteB.png', 105, 95, .5, 30, True, L),
+    ('eye_red.png', -40, -40, .5, 0, False), ('eye_red.png', 40, -40, .5, 0, True), ('eye_red.png', -16, -70, .38, 0, False), ('eye_red.png', 16, -70, .38, 0, True),
+    ('mouth_closed_fangs.png', 0, 40, .9, 0, False)], bscale=.85, maxpx=160)
+compose('e_thief', 'body_yellowD.png', [
+    ('detail_yellow_ear.png', -70, -100, 1.0, 20, False, L), ('detail_yellow_ear.png', 70, -100, 1.0, -20, True, L),
+    ('arm_yellowC.png', -100, 40, .45, -35, False, L), ('arm_yellowC.png', 100, 40, .45, 35, True, L),
+    ('eyebrowA.png', -36, -66, .8, 15, False), ('eyebrowA.png', 36, -66, .8, -15, True),
+    ('eye_cute_dark.png', -36, -36, .7, 0, False), ('eye_cute_dark.png', 36, -36, .7, 0, True), ('mouthB.png', 0, 46, .8, 0, False)], bscale=.8, maxpx=140)
+compose('e_sentry', 'body_darkE.png', [
+    ('detail_dark_antenna_large.png', 0, -195, 1.3, 0, False, L),
+    ('leg_darkB.png', -45, 170, .55, 0, False, L), ('leg_darkB.png', 45, 170, .55, 0, True, L),
+    ('eye_red.png', 0, -110, 1.25, 0, False), ('mouth_closed_teeth.png', 0, 50, .9, 0, False)], bscale=.7, maxpx=160)
+compose('e_roller', 'body_greenC.png', [
+    ('detail_green_horn_small.png', -45, -125, 1.0, 20, False, L), ('detail_green_horn_small.png', 0, -140, 1.0, 0, False, L), ('detail_green_horn_small.png', 45, -125, 1.0, -20, True, L),
+    ('eye_human_green.png', -38, -50, .7, 0, False), ('eye_human_green.png', 38, -50, .7, 0, False), ('mouthD.png', 0, 50, .9, 0, False)], bscale=.85, maxpx=150)
+compose('e_shielder', 'body_blueD.png', [
+    ('detail_blue_ear_round.png', -95, -110, 1.0, 0, False, L), ('detail_blue_ear_round.png', 95, -110, 1.0, 0, True, L),
+    ('arm_blueB.png', -120, 30, .5, -30, False, L), ('arm_blueB.png', 120, 30, .5, 30, True, L),
+    ('eye_human_blue.png', -40, -40, .75, 0, False), ('eye_human_blue.png', 40, -40, .75, 0, False), ('mouth_closed_happy.png', 0, 50, .9, 0, False)], bscale=.85, maxpx=150)
+compose('e_berserker', 'body_redF.png', [
+    ('detail_red_horn_large.png', -60, -145, 1.4, 25, False, L), ('detail_red_horn_large.png', 60, -145, 1.4, -25, True, L),
+    ('arm_redD.png', -128, 30, .6, -40, False, L), ('arm_redD.png', 128, 30, .6, 40, True, L),
+    ('leg_redC.png', -55, 150, .6, 0, False, L), ('leg_redC.png', 55, 150, .6, 0, True, L),
+    ('eye_angry_red.png', -45, -70, .9, 0, False), ('eye_angry_red.png', 45, -70, .9, 0, True), ('mouth_closed_fangs.png', 0, 50, 1.2, 0, False)], bscale=.75, maxpx=170)
+
 # bosses
 compose('e_bking', 'body_darkB.png', [
     ('detail_dark_ear_round.png', -78, -80, 1.2, 0, False, L), ('detail_dark_ear_round.png', 78, -80, 1.2, 0, True, L),
