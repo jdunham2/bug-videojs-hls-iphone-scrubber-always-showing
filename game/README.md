@@ -131,6 +131,15 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Rainy-day fun*: gusts snatch umbrellas out of villagers' hands (they chase after them, and you can grab
     them first), gutters spill onto anyone passing a house's front corner, everyone leaves muddy prints, and
     chittering in a puddle makes a splash that soaks anyone nearby.
+  - *Gale* (autumn, spring, winter): it shoves you along and blows hats off villagers' heads; they chase
+    after them, and you can grab them first.
+  - *Sunshower* (spring, summer): sparkly golden rain in the sunshine, usually followed by a rainbow.
+  - *Sky spectacles*: on clear evenings a shooting star sometimes falls nearby (pick it up to make a wish: bonus
+    shinies, more time, or a burst of speed); in winter the northern lights ripple across the sky at dusk; and in
+    spring and autumn a V of geese flies overhead.
+  - *Moody clouds*: on dry days a little rain cloud may take a liking to you and follow you about (lead it over
+    someone); mist rises off the water early in the day; and on frosty or snowy days the puddles freeze into
+    slides.
   - *Frost* (autumn, winter): icy, slippery paths; villagers chasing you along them may slip and fall.
   - The weather can change partway through the day; the morning card gives the forecast, and a toast tells you
     when it turns. When rain clears up, a rainbow appears with a pot of gold at its end (+3 shinies).
@@ -153,6 +162,12 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Animal favours**: three animals with a "!" over their heads want something. The crow wants something shiny,
   the fox at its den by the forest edge wants an egg, and the mole wants three worms (press B on grass with
   empty paws to dig for them). Drop off what they want for 2 bonus shinies.
+- **Farmyard extras**: a gaggle of geese that honk and chase you (and nip), a peacock that fans its tail if you
+  stand still beside it, a donkey that brays when chittered at (and kicks if you walk behind it), and a turkey
+  that puffs up and gobbles.
+- **Town birds and pests**: pigeons on the plaza that mob anyone standing still with food, a magpie that swoops
+  down to steal shiny things and carry them to its tree (scare it and it drops them), a wasp nest by the
+  picnic table that sends a swarm after anyone carrying something sweet, and moths round the lamps at night.
 - **Rainy-day critters**: snails come out in the rain (or in spring) leaving shiny trails and hide in their
   shells if you get close; worms pop up in wet grass and a blackbird swoops for them (grab one first); spider
   webs on the fences sparkle with dew in the rain, fog, frost and early morning; dragonflies dart over the
@@ -190,7 +205,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 246 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 262 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -277,6 +292,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   `budgieTattle()`, `rummageAction()`, `updateOutskirts()`; map size: `MW` / `MH` / `AREA_K` at the top;
   railway, harbour, marsh and pranks: `buildRailway()` / `updateTrain()`, `buildHarbour()` / `updateHarbour()`,
   `buildMarsh()` / `placeMarsh()` / `inBog()`, `knockAction()`, `signAction()`, `updatePranks()`, `updateRailHarbour()`;
+  farmyard, town birds and sky: `spawnSkyCritters()` / `updateSkyCritter()` / `skyScare()` / `drawSkyCritter()`,
+  `updateSky()` (stars, aurora, migrating geese, rain cloud, gales, wasps, mist, frozen puddles), `drawSkyWorld()`,
+  `drawAurora()`, `placeFrozenPuddles()`;
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),

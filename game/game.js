@@ -2436,6 +2436,17 @@
     if (it.kind === 'ring') completeTask('lockring');
     if (it.woodnuts) completeTask('woodpecker');
     if (it.kind === 'suitcase') completeTask('luggage');
+    if (it.fromMagpie) { completeTask('magpie'); it.fromMagpie = false; }
+    if (it.blownHat) completeTask('gale');
+    if (it.kind === 'stardust') { // make a wish...
+      player.held = null; const i2 = items.indexOf(it); if (i2 >= 0) items.splice(i2, 1);
+      const wish = rpick(['shinies', 'time', 'zoom']);
+      if (wish === 'shinies') { run.earned += 2; toast('+2 \u2726', 'You wished for treasure', true); }
+      else if (wish === 'time') { run.timeLeft += 30; toast('+30 seconds', 'You wished for more time', true); }
+      else { player.sugar = 12; toast('Zoom zoom!', 'You wished to be fast', true); }
+      for (let k = 0; k < 10; k++) sparkle(player.x + rr(-14, 14), player.y, rr(6, 30));
+      sfx('fanfare'); updateRunBar(); completeTask('wish');
+    }
     if (it.catch) completeTask('catch');
     if (it.kind === 'wispgem') completeTask('wisp');
     if (it.stall && L.harbour) completeTask('fishmarket');
@@ -3459,7 +3470,7 @@
       else { ctx.beginPath(); ctx.arc(-2.6, hy + 1, 2, 0, Math.PI * 2); ctx.moveTo(4.6, hy + 1); ctx.arc(2.6, hy + 1, 2, 0, Math.PI * 2); ctx.stroke(); }
     }
     // headwear
-    switch (v.hat) {
+    switch (v.hatOff ? null : v.hat) {
       case 'straw':
         ctx.fillStyle = '#e6c56a'; ellipse(ctx, 0, hy - 4, 11, 3.6);
         ctx.fillStyle = '#d9b552'; roundRect(ctx, -5, hy - 11, 10, 7, 3, true);
@@ -3624,6 +3635,14 @@
     { id: 'stilthut', tier: 'Easy', text: 'Hide in a stilt hut', req: ['huts'] },
     { id: 'toad', tier: 'Easy', text: 'Hear the giant toad croak', req: ['bog'] },
     { id: 'signswap', tier: 'Easy', text: 'Swap the signposts round', hint: 'E at the plaza sign' },
+    { id: 'geese', tier: 'Easy', text: 'Get chased by the geese', req: ['geese'] },
+    { id: 'peacock', tier: 'Easy', text: 'Get the peacock to fan its tail', hint: 'stand still beside it', req: ['peacock'] },
+    { id: 'donkey', tier: 'Easy', text: 'Make the donkey bray', hint: 'chitter at it', req: ['donkey'] },
+    { id: 'turkey', tier: 'Easy', text: 'Make the turkey gobble', req: ['turkey'] },
+    { id: 'pigeons', tier: 'Easy', text: 'Get mobbed by pigeons', hint: 'stand still on the plaza with some food' },
+    { id: 'moth', tier: 'Easy', text: 'Catch a moth by a lamp', hint: 'after dusk', req: ['moths'] },
+    { id: 'mist', tier: 'Easy', text: 'Walk through the dawn mist by the water', hint: 'early in the day', req: ['mist'] },
+    { id: 'puddleslide', tier: 'Easy', text: 'Slide across a frozen puddle', req: ['frozenpuddles'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3728,6 +3747,14 @@
     { id: 'knock', tier: 'Medium', text: 'Knock on a door and hide before they answer', hint: 'E at a door, then run!' },
     { id: 'whoopee', tier: 'Medium', text: 'Catch someone with a whoopee cushion', hint: 'leave it where someone sits' },
     { id: 'paint', tier: 'Medium', text: 'Paint 10 fence panels pink', goal: 10, hint: 'carry the paint pot along a fence' },
+    { id: 'magpie', tier: 'Medium', text: 'Get back something the magpie stole', hint: 'chase it while it’s carrying', req: ['magpie'] },
+    { id: 'wasps', tier: 'Medium', text: 'Stir up the wasps', hint: 'carry something sweet past their nest', req: ['wasps'] },
+    { id: 'wish', tier: 'Medium', text: 'Catch a fallen star and make a wish', hint: 'clear evenings, after dusk', req: ['clearnight'] },
+    { id: 'aurora', tier: 'Medium', text: 'Stop and watch the northern lights', req: ['aurora'] },
+    { id: 'gale', tier: 'Medium', text: 'Catch a hat the gale blew off', req: ['gale'] },
+    { id: 'migrate', tier: 'Medium', text: 'Watch the geese fly overhead', hint: 'stand still and look up when they pass', req: ['migrate'] },
+    { id: 'raincloud', tier: 'Medium', text: 'Lead your little rain cloud over someone', req: ['raincloud'] },
+    { id: 'sunshower', tier: 'Medium', text: 'Splash through a puddle in a sunshower', req: ['sunshower'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3907,6 +3934,16 @@
       if (r === 'tent' && !(L.fair && L.fair.tent)) return false;
       if (r === 'camp' && !L.camp) return false;
       if (r === 'rail' && !L.rail) return false;
+      for (const [rq, ty] of [['geese', 'goose'], ['peacock', 'peacock'], ['donkey', 'donkey'], ['turkey', 'turkey'], ['magpie', 'magpie'], ['moths', 'moth']]) if (r === rq && !critters.some((c) => c.type === ty)) return false;
+      if (r === 'wasps' && !L.waspNest) return false;
+      if (r === 'clearnight' && !planHas(['clear', 'frost', 'windy'])) return false;
+      if (r === 'aurora' && !(isWinter() && planHas(['clear', 'frost']))) return false;
+      if (r === 'gale' && !planHas(['gale'])) return false;
+      if (r === 'migrate' && L.migrateAt === null) return false;
+      if (r === 'raincloud' && L.rcloudAt === null) return false;
+      if (r === 'sunshower' && !planHas(['sunshower'])) return false;
+      if (r === 'mist' && !(!isWinter() && L.kind !== 'seaside' && hasOpenWater() && !WET_SET.includes((L.weatherPlan || [{}])[0].w))) return false;
+      if (r === 'frozenpuddles' && !(L.puddles && L.puddles.some((p) => p.frozen))) return false;
       if (r === 'harbourtown' && !(L.harbour && L.lighthouse)) return false;
       if (r === 'bog' && !L.bog) return false;
       if (r === 'huts' && !(L.huts && L.huts.length)) return false;
@@ -5648,12 +5685,12 @@
   // Each village rolls a weather that suits its season. It changes what villagers can
   // see and hear, brings puddles, lightning, fog, wind, and decides which animals are out.
   const WEATHER_TABLE = {
-    spring: [['clear', 40], ['frograin', 2], ['snowfall', 4], ['sleet', 5], ['rain', 28], ['drizzle', 15], ['downpour', 8], ['storm', 10], ['windy', 15], ['hail', 6]],
-    summer: [['clear', 50], ['frograin', 2], ['rain', 12], ['drizzle', 6], ['downpour', 8], ['storm', 16], ['windy', 10], ['heatwave', 20]],
-    autumn: [['clear', 25], ['snowfall', 5], ['sleet', 7], ['rain', 20], ['drizzle', 12], ['downpour', 8], ['fog', 22], ['windy', 20], ['frost', 15], ['storm', 5], ['hail', 6]],
-    winter: [['clear', 35], ['snowstorm', 24], ['blizzard', 12], ['sleet', 12], ['fog', 22], ['frost', 22]],
+    spring: [['clear', 40], ['sunshower', 6], ['gale', 4], ['frograin', 2], ['snowfall', 4], ['sleet', 5], ['rain', 28], ['drizzle', 15], ['downpour', 8], ['storm', 10], ['windy', 15], ['hail', 6]],
+    summer: [['clear', 50], ['sunshower', 5], ['frograin', 2], ['rain', 12], ['drizzle', 6], ['downpour', 8], ['storm', 16], ['windy', 10], ['heatwave', 20]],
+    autumn: [['clear', 25], ['gale', 8], ['snowfall', 5], ['sleet', 7], ['rain', 20], ['drizzle', 12], ['downpour', 8], ['fog', 22], ['windy', 20], ['frost', 15], ['storm', 5], ['hail', 6]],
+    winter: [['clear', 35], ['gale', 4], ['snowstorm', 24], ['blizzard', 12], ['sleet', 12], ['fog', 22], ['frost', 22]],
   };
-  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', windy: 'Windy', snowstorm: 'Snowstorm', hail: 'Hail', heatwave: 'Heatwave', drizzle: 'Drizzle', downpour: 'Downpour', frost: 'Frost', sleet: 'Sleet', blizzard: 'Blizzard', snowfall: 'Snow', frograin: 'Raining frogs' };
+  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', windy: 'Windy', snowstorm: 'Snowstorm', hail: 'Hail', heatwave: 'Heatwave', drizzle: 'Drizzle', downpour: 'Downpour', frost: 'Frost', sleet: 'Sleet', blizzard: 'Blizzard', snowfall: 'Snow', frograin: 'Raining frogs', gale: 'Gale', sunshower: 'Sunshower' };
   const WEATHER_TIP = {
     rain: 'It’s raining: villagers huddle under umbrellas and can’t see or hear as well. Splash in the puddles.',
     storm: 'Thunderstorm! Every thunderclap makes the villagers jump.',
@@ -5667,6 +5704,8 @@
     sleet: 'Sleet: half rain, half snow. Miserable for villagers, and the paths are slippery.',
     blizzard: 'Blizzard! You can barely see, the wind shoves you along, and drifts pile up to burrow into.',
     frograin: 'It’s raining... frogs?! Catch one, if you can.',
+    gale: 'A howling gale: it shoves you along and blows hats clean off heads.',
+    sunshower: 'A sunshower: sparkly rain in the sunshine. A rainbow’s sure to follow.',
     snowfall: 'Surprise snow! Stand still and look up to catch a snowflake.',
     frost: 'A hard frost: the paths are slippery, and villagers chasing you might go flying.',
     clear: '',
@@ -5678,9 +5717,9 @@
     return 'clear';
   }
   const wet = () => !!L && WET_SET.includes(L.weather);
-  const WIND = () => (L && L.weather === 'windy' ? 70 : L && L.weather === 'blizzard' ? 60 : L && L.weather === 'snowstorm' ? 40 : 0);
+  const WIND = () => (L && L.weather === 'gale' ? 110 : L && L.weather === 'windy' ? 70 : L && L.weather === 'blizzard' ? 60 : L && L.weather === 'snowstorm' ? 40 : 0);
   // How far villagers can see / hear in this weather
-  const visionMul = () => ({ rain: 0.82, storm: 0.75, fog: 0.55, snowstorm: 0.62, hail: 0.85, drizzle: 0.93, downpour: 0.68, sleet: 0.8, blizzard: 0.45, snowfall: 0.9, frograin: 0.85 }[L && L.weather] || 1);
+  const visionMul = () => ({ rain: 0.82, storm: 0.75, fog: 0.55, snowstorm: 0.62, hail: 0.85, drizzle: 0.93, downpour: 0.68, sleet: 0.8, blizzard: 0.45, snowfall: 0.9, frograin: 0.85, gale: 0.9, sunshower: 0.95 }[L && L.weather] || 1);
   const hearingMul = () => ({ rain: 0.75, storm: 0.7, snowstorm: 0.75, hail: 0.65, drizzle: 0.9, downpour: 0.6, sleet: 0.75, blizzard: 0.55 }[L && L.weather] || 1);
 
   const weather = [];
@@ -5692,7 +5731,7 @@
     if (W === 'rain') n = 230; else if (W === 'storm') n = 300; else if (W === 'snowstorm') n = 380; else if (W === 'windy') n = Math.max(n, 70);
     else if (W === 'hail') n = 200; else if (W === 'heatwave') n = 0;
     else if (W === 'drizzle') n = 110; else if (W === 'downpour') n = 440;
-    else if (W === 'frograin') n = 200; else if (W === 'sleet') n = 280; else if (W === 'blizzard') n = 560; else if (W === 'snowfall') n = 170;
+    else if (W === 'frograin') n = 200; else if (W === 'sunshower') n = 160; else if (W === 'gale') n = 160; else if (W === 'sleet') n = 280; else if (W === 'blizzard') n = 560; else if (W === 'snowfall') n = 170;
     for (let i = 0; i < n; i++) weather.push({ x: Math.random(), y: Math.random(), s: Math.random(), ph: Math.random() * 6, col: pick(['#c0392b', '#e07b2a', '#f0a040', '#d9a43a']) });
     fx.flash = 0; fx.nextBolt = rr(6, 12); fx.thunderAt = -1;
     startAmbience();
@@ -5701,7 +5740,7 @@
     const S = L.season, W = L.weather;
     const rainy = WET_SET.includes(W);
     const snowy = S === 'winter' || W === 'snowfall' || W === 'blizzard' || W === 'sleet';
-    const wind = W === 'windy' ? 0.25 : W === 'blizzard' ? 0.4 : W === 'snowstorm' ? 0.12 : W === 'sleet' ? 0.1 : W === 'storm' ? 0.06 : 0;
+    const wind = W === 'gale' ? 0.6 : W === 'windy' ? 0.25 : W === 'blizzard' ? 0.4 : W === 'snowstorm' ? 0.12 : W === 'sleet' ? 0.1 : W === 'storm' ? 0.06 : 0;
     ctx.lineCap = 'round';
     for (const w of weather) {
       if (W === 'hail') { // hailstones pelting down, bouncing
@@ -5720,7 +5759,7 @@
       const x = left + w.x * viewW, y = top + w.y * viewH;
       if (rainy || sleetRain) {
         const len = W === 'drizzle' ? 0.45 : W === 'downpour' ? 1.5 : 1;
-        ctx.strokeStyle = `rgba(200,220,240,${(0.35 + w.s * 0.3) * (W === 'drizzle' ? 0.7 : 1)})`; ctx.lineWidth = W === 'downpour' ? 1.3 : 1;
+        ctx.strokeStyle = W === 'sunshower' ? `rgba(255,236,170,${0.45 + w.s * 0.4})` : `rgba(200,220,240,${(0.35 + w.s * 0.3) * (W === 'drizzle' ? 0.7 : 1)})`; ctx.lineWidth = W === 'downpour' ? 1.3 : 1;
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - (2 + wind * 30) * len, y - (9 + w.s * 5) * len); ctx.stroke();
       } else if (snowy) { ctx.fillStyle = `rgba(255,255,255,${0.55 + w.s * 0.4})`; circle(ctx, x, y, (0.8 + w.s * 1.6) * (W === 'blizzard' ? 1.3 : W === 'sleet' ? 0.8 : 1)); }
       else {
@@ -5733,7 +5772,7 @@
     const W = L && L.weather;
     const tint = W === 'storm' ? 'rgb(168,176,198)' : W === 'rain' ? 'rgb(200,208,222)' : W === 'snowstorm' ? 'rgb(222,230,246)'
       : W === 'hail' ? 'rgb(208,214,228)' : W === 'heatwave' ? 'rgb(255,232,200)'
-      : W === 'sleet' ? 'rgb(198,204,216)' : W === 'blizzard' ? 'rgb(222,228,242)' : W === 'snowfall' ? 'rgb(234,238,250)'
+      : W === 'sunshower' ? 'rgb(255,248,226)' : W === 'gale' ? 'rgb(222,222,214)' : W === 'sleet' ? 'rgb(198,204,216)' : W === 'blizzard' ? 'rgb(222,228,242)' : W === 'snowfall' ? 'rgb(234,238,250)'
       : W === 'drizzle' ? 'rgb(216,222,232)' : W === 'downpour' ? 'rgb(166,176,198)' : W === 'frost' ? 'rgb(230,238,255)'
       : { winter: 'rgb(226,234,252)', autumn: 'rgb(255,238,214)', spring: 'rgb(255,250,248)' }[L && L.season];
     if (tint) {
@@ -5757,7 +5796,7 @@
   // Puddles (rainy days): splash through them, noisily
   function placePuddles() {
     L.puddles = [];
-    if (!wet() || isWinter()) return;
+    if (!wet() || isWinter()) { placeFrozenPuddles(); return; }
     const big = L.weather === 'downpour';
     for (let n = 0; n < 300 && L.puddles.length < (big ? 22 : 14); n++) {
       const tx = Math.floor(rr(4, MW - 4)), ty = Math.floor(rr(4, MH - 4)), t0 = getT(tx, ty);
@@ -5771,6 +5810,7 @@
   function drawPuddles(ctx, t) {
     if (!L.puddles) return;
     for (const p of L.puddles) {
+      if (p.frozen) { ctx.fillStyle = 'rgba(200,225,245,0.85)'; ellipse(ctx, p.x, p.y, p.rx, p.ry); ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(p.x - p.rx * 0.5, p.y - 1); ctx.lineTo(p.x + p.rx * 0.2, p.y + 2); ctx.lineTo(p.x + p.rx * 0.5, p.y - 2); ctx.stroke(); continue; }
       ctx.fillStyle = 'rgba(90,120,150,0.45)'; ellipse(ctx, p.x, p.y, p.rx, p.ry);
       ctx.fillStyle = 'rgba(200,225,245,0.35)'; ellipse(ctx, p.x - p.rx * 0.3, p.y - p.ry * 0.3, p.rx * 0.4, p.ry * 0.3);
       ctx.strokeStyle = 'rgba(230,240,250,0.6)'; ctx.lineWidth = 0.8;
@@ -5785,6 +5825,7 @@
     // Puddle splashes (a downpour makes them spread)
     if (L.weather === 'downpour' && L.puddles) for (const p of L.puddles) { if (p.rx < 44) { p.rx += dt * 0.25; p.ry += dt * 0.1; } }
     if (L.puddles && areaOf(player.x, player.y) === 0) for (const p of L.puddles) {
+      if (p.frozen) continue;
       p.splashT = Math.max(0, p.splashT - dt);
       const dx = (player.x - p.x) / p.rx, dy = (player.y - p.y) / p.ry;
       if (dx * dx + dy * dy < 1 && player.speed > 30 && p.splashT <= 0) {
@@ -5792,6 +5833,7 @@
         for (let k = 0; k < 8; k++) particles.push({ kind: 'drop', x: player.x, y: player.y, z: 1, vx: rr(-50, 50), vy: rr(-25, 25), vz: rr(60, 120), life: 0.6, max: 0.6 });
         sfx('splat');
         run.puddles = (run.puddles || 0) + 1;
+        if (L.weather === 'sunshower') completeTask('sunshower');
         setProgress('puddle', run.puddles);
         if (player.speed > 120) lookTowards(player.x, player.y, 90, () => rpick(['Who’s splashing about?', 'Hm? Splashing?']));
         player.mud = Math.max(0, (player.mud || 0) - 15); // washes the mud off
@@ -5823,17 +5865,17 @@
   function startAmbience() {
     try { if (fx.ambience) { fx.ambience.src.stop(); fx.ambience = null; } } catch (_) { fx.ambience = null; }
     const W = L && L.weather;
-    if (!actx || !(WET_SET.includes(W) || ['windy', 'snowstorm', 'hail', 'sleet', 'blizzard'].includes(W))) return;
+    if (!actx || !(WET_SET.includes(W) || ['windy', 'snowstorm', 'hail', 'sleet', 'blizzard', 'gale'].includes(W))) return;
     const n = actx.sampleRate * 2, buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     const src = actx.createBufferSource(); src.buffer = buf; src.loop = true;
-    const f = actx.createBiquadFilter(); f.type = ['windy', 'snowstorm', 'hail', 'blizzard'].includes(W) ? 'bandpass' : 'lowpass'; f.frequency.value = W === 'hail' ? 2200 : W === 'windy' || W === 'snowstorm' ? 500 : 2500;
+    const f = actx.createBiquadFilter(); f.type = ['windy', 'snowstorm', 'hail', 'blizzard', 'gale'].includes(W) ? 'bandpass' : 'lowpass'; f.frequency.value = W === 'hail' ? 2200 : W === 'windy' || W === 'snowstorm' ? 500 : 2500;
     const g = actx.createGain(); g.gain.value = 0;
     src.connect(f).connect(g).connect(master); src.start();
     fx.ambience = { src, g, level: W === 'storm' || W === 'downpour' || W === 'blizzard' ? 0.08 : W === 'rain' ? 0.05 : W === 'drizzle' ? 0.025 : 0.04 };
   }
   function updateAmbienceLevel() {
-    if (!fx.ambience) { if (actx && actx.state === 'running' && L && ['rain', 'storm', 'drizzle', 'downpour', 'frograin', 'windy', 'snowstorm', 'hail', 'sleet', 'blizzard'].includes(L.weather)) startAmbience(); return; }
+    if (!fx.ambience) { if (actx && actx.state === 'running' && L && ['rain', 'storm', 'drizzle', 'downpour', 'frograin', 'sunshower', 'windy', 'snowstorm', 'hail', 'sleet', 'blizzard', 'gale'].includes(L.weather)) startAmbience(); return; }
     const indoors = areaOf(player.x, player.y) > 0;
     const want = muted || paused ? 0 : fx.ambience.level * (indoors ? 0.35 : 1);
     fx.ambience.g.gain.value += (want - fx.ambience.g.gain.value) * 0.05;
@@ -5906,6 +5948,7 @@
     spawnMoreCritters();
     spawnOutskirtsCritters();
     spawnMarshCritters();
+    spawnSkyCritters();
   }
 
   // Something scary happened near (x, y): birds and frogs bolt (see also farmNightScare)
@@ -5915,6 +5958,7 @@
       if (FN_TYPES.has(c.type)) { farmNightScare(c, x, y, r); continue; }
       if (c.type === 'mgoat') { c.wait = 0; continue; }
       if (OK_TYPES.has(c.type)) { okScare(c, x, y, r); continue; }
+      if (FY_TYPES.has(c.type)) { skyScare(c, x, y, r); continue; }
       if (WD_TYPES.has(c.type)) { wildScare(c, x, y, r); continue; }
       if (SN_TYPES.has(c.type)) { snowScare(c, x, y, r); continue; }
       if (RN_TYPES.has(c.type)) { rainScare(c, x, y, r); continue; }
@@ -5963,6 +6007,7 @@
       if (c.type === 'mgoat') { updateMGoat(c, dt); continue; }
       if (OK_TYPES.has(c.type)) { updateOutskirtsCritter(c, dt, near); continue; }
       if (c.type === 'gtoad' || c.type === 'wisp') { updateMarshCritter(c, dt); continue; }
+      if (FY_TYPES.has(c.type)) { updateSkyCritter(c, dt, near); continue; }
 
       if (c.type === 'duck') {
         c.panic = Math.max(0, c.panic - dt);
@@ -6113,6 +6158,7 @@
     if (c.type === 'mgoat') { drawMGoat(ctx, c); return; }
     if (OK_TYPES.has(c.type)) { drawOutskirtsCritter(ctx, c, t); return; }
     if (c.type === 'gtoad' || c.type === 'wisp') { drawMarshCritter(ctx, c, t); return; }
+    if (FY_TYPES.has(c.type)) { drawSkyCritter(ctx, c, t); return; }
     if (c.type === 'frog' && c.gone > 0) return;
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -6182,7 +6228,7 @@
   }
 
   const onSnow = (x, y) => isWinter() && areaOf(x, y) === 0 && [GRASS, SAND, SOIL].includes(tileAt(x, y));
-  const onIce = (x, y) => tileAt(x, y) === ICE;
+  const onIce = (x, y) => tileAt(x, y) === ICE || onFrozenPuddle(x, y);
   const canScoop = () => onSnow(player.x, player.y) && !player.held && !player.inWardrobe;
   function scoopSnowball() {
     const it = addItem('snowball', player.x, player.y + 1);
@@ -6262,7 +6308,7 @@
     if (rand() < 0.45) {
       const at = 0.3 + rand() * 0.3;
       let next;
-      if (WET_SET.includes(first) || ['fog', 'frost', 'sleet', 'snowfall', 'blizzard'].includes(first)) next = 'clear'; // clears up / the fog lifts / the frost melts
+      if (WET_SET.includes(first) || ['fog', 'frost', 'sleet', 'snowfall', 'blizzard', 'gale'].includes(first)) next = 'clear'; // clears up / the fog lifts / the frost melts
       else if (season === 'winter') next = pick(['snowstorm', 'fog', 'blizzard', 'sleet']);
       else if (season === 'summer') next = pick(['storm', 'rain', 'downpour', first === 'heatwave' ? 'storm' : 'heatwave']);
       else next = pick(['rain', 'hail', 'storm', 'drizzle', 'downpour']);
@@ -6275,11 +6321,11 @@
     return plan;
   }
   const planHas = (names) => !!L && (L.weatherPlan || []).some((s) => names.includes(s.w));
-  const rainbowPossible = () => !!L && (L.weatherPlan || []).some((s, i, a) => i > 0 && s.w === 'clear' && ['rain', 'storm', 'downpour'].includes(a[i - 1].w));
+  const rainbowPossible = () => !!L && (L.weatherPlan || []).some((s, i, a) => i > 0 && s.w === 'clear' && ['rain', 'storm', 'downpour', 'sunshower'].includes(a[i - 1].w));
 
   const WEATHER_NEWS = {
     rain: 'It’s starting to rain', storm: 'A storm is rolling in', hail: 'Hail! Everyone’s running for cover',
-    heatwave: 'Phew, a heatwave', drizzle: 'It’s starting to drizzle', downpour: 'It’s bucketing down!', sleet: 'Ugh, sleet', blizzard: 'A blizzard is blowing in!', snowfall: 'It’s snowing!', frograin: 'It’s raining... FROGS?!', snowstorm: 'A snowstorm is blowing in', fog: 'Fog is rolling in', windy: 'The wind is picking up',
+    heatwave: 'Phew, a heatwave', drizzle: 'It’s starting to drizzle', downpour: 'It’s bucketing down!', sleet: 'Ugh, sleet', blizzard: 'A blizzard is blowing in!', snowfall: 'It’s snowing!', frograin: 'It’s raining... FROGS?!', gale: 'A gale is blowing up!', sunshower: 'A sunshower!', snowstorm: 'A snowstorm is blowing in', fog: 'Fog is rolling in', windy: 'The wind is picking up',
   };
   function setWeather(w) {
     const was = L.weather;
@@ -6288,7 +6334,7 @@
     spawnWeather();
     if (wet() && !isWinter() && !(L.puddles && L.puddles.length)) placePuddles();
     if (w === 'downpour' && L.puddles) for (const p of L.puddles) { p.grow = 1; }
-    if (['rain', 'storm', 'downpour'].includes(was) && !wet()) startRainbow();
+    if (['rain', 'storm', 'downpour', 'sunshower'].includes(was) && !wet()) startRainbow();
     L.whirl = w === 'windy' ? (L.whirl || newWhirl()) : null;
     for (const v of villagers) v.shelter = w === 'hail';
     toast(w === 'clear' ? (was === 'fog' ? 'The fog has lifted' : was === 'frost' ? 'The frost is melting' : 'The sky is clearing') : WEATHER_NEWS[w] || WEATHER_LABEL[w], 'Weather', true);
@@ -6611,7 +6657,7 @@
   // (drizzle, downpours, whirlwinds, frost)
   // ---------------------------------------------------------------------------
   const WD_TYPES = new Set(['fox', 'rabbit', 'badger', 'deer', 'pfish', 'swan', 'swarm', 'parrot', 'pig', 'mouse', 'pup']);
-  const WET_SET = ['rain', 'storm', 'drizzle', 'downpour', 'frograin'];
+  const WET_SET = ['rain', 'storm', 'drizzle', 'downpour', 'frograin', 'sunshower'];
 
   // A walkable grass spot just inside the forest edge, near (nx, ny)
   function edgeSpot(nx, ny) {
@@ -9795,7 +9841,8 @@
       L.gustT = (L.gustT === undefined ? rr(8, 16) : L.gustT) - dt;
       if (L.gustT <= 0) {
         L.gustT = rr(18, 30);
-        const v = pick(villagers.filter((v) => areaOf(v.x, v.y) === 0 && !v.noBrella && v.state !== 'chase' && Math.hypot(v.x - player.x, v.y - player.y) < 420) || []);
+        const v = pick(villagers.filter((v) => areaOf(v.x, v.y) === 0 && !v.noBrella && v.state !== 'chase' && Math.hypot(v.x - player.x, v.y - player.y) < 600) || []);
+        if (!v) L.gustT = 3; // nobody near enough: try again soon
         if (v) {
           v.noBrella = true;
           const a = rr(0, Math.PI * 2), it = addItem('umbrella', v.x, v.y, { owner: v.id });
@@ -9852,6 +9899,7 @@
   function puddleJump() {
     if (!L.puddles || areaOf(player.x, player.y) !== 0) return;
     for (const p of L.puddles) {
+      if (p.frozen) continue;
       const dx = (player.x - p.x) / p.rx, dy = (player.y - p.y) / p.ry;
       if (dx * dx + dy * dy > 1) continue;
       for (let k = 0; k < 18; k++) particles.push({ kind: 'drop', x: player.x, y: player.y, z: 2, vx: rr(-80, 80), vy: rr(-40, 40), vz: rr(80, 160), life: 0.7, max: 0.7 });
@@ -11161,6 +11209,348 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Farmyard extras (geese, a peacock, a donkey, a turkey), town birds and pests
+  // (pigeons, a magpie, wasps, moths), sky spectacles (shooting stars, northern
+  // lights, gales, migrating geese) and moody clouds (a rain cloud that follows
+  // you, sunshowers, dawn mist, frozen puddles).
+  // ---------------------------------------------------------------------------
+  const FY_TYPES = new Set(['goose', 'peacock', 'donkey', 'turkey', 'pigeon', 'magpie', 'moth', 'rcloud']);
+  ITEM.stardust = { name: 'fallen star', h: 8, r: 4, draw(c, it, t) { const g = 0.6 + Math.sin((t || 0) * 6) * 0.4; c.fillStyle = `rgba(255,240,150,${0.25 * g})`; circle(c, 0, -4, 9); c.fillStyle = '#fff3a8'; poly(c, [[0, -10], [1.6, -5.5], [6, -5], [2.5, -2.5], [3.5, 2], [0, -0.5], [-3.5, 2], [-2.5, -2.5], [-6, -5], [-1.6, -5.5]]); c.fill(); } };
+  function makeWaspNest(x, y) {
+    return { kind: 'waspnest', x, y: y + 1, bounds: { l: x - 12, r: x + 12, t: y - 70, b: y + 4 }, draw(ctx, t) {
+      const hy = y - 46; ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, hy - 14); ctx.lineTo(x, hy - 8); ctx.stroke();
+      ctx.fillStyle = '#c9b090'; ellipse(ctx, x, hy, 7, 9); ctx.strokeStyle = '#a08a6a'; for (let k = -6; k <= 6; k += 3) { ctx.beginPath(); ctx.moveTo(x - 6, hy + k * 0.8); ctx.lineTo(x + 6, hy + k * 0.8); ctx.stroke(); }
+      ctx.fillStyle = '#2a1e14'; circle(ctx, x, hy + 6, 1.6);
+      ctx.fillStyle = '#f2c14e'; for (let k = 0; k < 3; k++) { const a = t * 3 + k * 2; circle(ctx, x + Math.cos(a) * 11, hy + Math.sin(a * 1.4) * 8, 0.9); }
+    } };
+  }
+
+  // --- Spawning -------------------------------------------------------------------------------
+  function spawnSkyCritters() {
+    const T = TILE;
+    const mk = (type, x, y, extra) => { const c = Object.assign({ type, x, y, z: 0, dir: 'left', walk: 0, ph: rand() * 6, tx: null, wait: rr(0, 3), cd: 0 }, extra); critters.push(c); return c; };
+    const P = L.paddock, base = P ? { x: (P.gx + 1) * T - 80, y: (P.gateBottom ? P.y + P.h + 2.5 : P.y - 2.5) * T } : (L.coop ? { x: L.coop.x + 90, y: L.coop.y + 50 } : { x: (L.plaza.x + 16) * T, y: (L.plaza.y + 8) * T });
+    const okAt = (x, y) => !navBlockedPt(x, y) && areaOf(x, y) === 0 && !isWaterish(x, y);
+    if (okAt(base.x, base.y)) {
+      for (let k = 0; k < 3; k++) mk('goose', base.x + rr(-30, 30), base.y + rr(-20, 20), { hx: base.x, hy: base.y, chase: 0 });
+      mk('turkey', base.x + 60, base.y + 20, { hx: base.x + 60, hy: base.y + 20, puff: 0 });
+      mk('donkey', base.x - 70, base.y, { hx: base.x - 70, hy: base.y, brayT: rr(8, 16), kickCD: 0, face: 1 });
+    }
+    { const pk = freeSpotNear(L.plaza.x - 4, L.plaza.y + 12, 1, 1, 6); if (pk) mk('peacock', (pk[0] + 0.5) * T, (pk[1] + 0.5) * T, { hx: (pk[0] + 0.5) * T, hy: (pk[1] + 0.5) * T, fan: 0, idleNear: 0 }); }
+    for (let k = 0; k < 8; k++) mk('pigeon', (L.plaza.x + 2 + rand() * 8) * T, (L.plaza.y + 2 + rand() * 8) * T, { flyT: 0 });
+    { const trees = objects.filter((o) => o.kind === 'tree' && o.canopy && o.y < WORLD_H && Math.hypot(o.x - (L.plaza.x + 6) * T, o.y - (L.plaza.y + 6) * T) < 16 * T); if (trees.length) { const tr = pick(trees); mk('magpie', tr.x, tr.y + 1, { nest: { x: tr.x, y: tr.y }, z: 34, flying: true, state: 'perch', carry: null, carrier: true, look: rr(4, 9) }); } }
+    for (const l of (L.lights || []).slice(0, 4)) for (let k = 0; k < 2; k++) mk('moth', l.x, l.y, { lamp: l, flying: true, z: 30 });
+    // wasp nest in a tree near the picnic table
+    L.waspNest = null;
+    if (L.picnic) { const trees = objects.filter((o) => o.kind === 'tree' && o.y < WORLD_H && Math.hypot(o.x - L.picnic.x * T, o.y - L.picnic.y * T) < 9 * T); if (trees.length && !isWinter()) { const tr = pick(trees); L.waspNest = { x: tr.x + 10, y: tr.y, cd: 0 }; objects.push(makeWaspNest(L.waspNest.x, L.waspNest.y)); } }
+    // the sky: a shooting-star timer, migrating geese, a following rain cloud
+    L.starT = rr(4, 10);
+    L.migrateAt = (L.season === 'spring' || L.season === 'autumn') ? 0.25 + rand() * 0.4 : null; L.flock = null;
+    L.rcloudAt = !planHas(WET_SET) && !isWinter() && rand() < 0.5 ? 0.2 + rand() * 0.4 : null;
+    L.hatT = rr(6, 12);
+  }
+
+  // --- Behaviour -------------------------------------------------------------------------------
+  function updateSkyCritter(c, dt, near) {
+    const pd = Math.hypot(player.x - c.x, player.y - c.y), outside = areaOf(player.x, player.y) === 0;
+    const running = player.speed > WALK_SPEED * 1.15;
+    c.cd = Math.max(0, (c.cd || 0) - dt);
+    const wander = (r, sp) => { c.wait -= dt; if (c.wait <= 0) { c.tx = c.hx + rr(-r, r); c.ty = c.hy + rr(-r * 0.6, r * 0.6); c.wait = rr(1.5, 4); } if (c.tx && critterMove(c, c.tx, c.ty, sp, dt)) c.tx = null; };
+    switch (c.type) {
+      case 'goose': {
+        if (c.chase > 0) {
+          c.chase -= dt; if (!outside || player.hidden) { c.chase = 0; break; }
+          critterMove(c, player.x, player.y, 120, dt); c.walk += dt * 6;
+          if (Math.random() < dt * 2) { c.bubble = { text: 'HONK!', t: 0.6 }; if (pd < 300) sfx('honk'); }
+          if (pd < 13 && c.cd <= 0) { c.cd = 4; knockPlayer(c.x, c.y, 160); player.bubble = { text: 'ow! it nipped me!', t: 1.2 }; completeTask('geese'); }
+          break;
+        }
+        if (outside && pd < 60 && !player.hidden && c.cd <= 0) { for (const g of critters) if (g.type === 'goose') { g.chase = 3; g.cd = 0; } c.bubble = { text: 'HONK HONK!', t: 1 }; sfx('honk'); break; }
+        wander(60, 18);
+        break;
+      }
+      case 'peacock': {
+        c.fan = Math.max(0, c.fan - dt);
+        if (outside && pd < 55 && player.speed < 5) { c.idleNear += dt; if (c.idleNear > 2 && c.fan <= 0) { c.fan = 5; c.idleNear = 0; c.bubble = { text: '*shimmer*', t: 1.2 }; completeTask('peacock'); } } else c.idleNear = 0;
+        if (outside && pd < 60 && running && c.cd <= 0) { c.cd = 6; c.bubble = { text: 'EEE-AWWW!', t: 1 }; sfx('squawk'); lookTowards(c.x, c.y, 260, () => 'What a racket!'); }
+        if (c.fan <= 0) wander(50, 14);
+        break;
+      }
+      case 'donkey': {
+        c.brayT -= dt; c.kickCD = Math.max(0, c.kickCD - dt); c.kick = Math.max(0, (c.kick || 0) - dt);
+        if (c.brayT <= 0) { c.brayT = rr(12, 20); donkeyBray(c, false); }
+        const behind = Math.sign(player.x - c.x) === -c.face && Math.abs(player.y - c.y) < 14 && Math.abs(player.x - c.x) < 28;
+        if (outside && behind && player.speed > 15 && c.kickCD <= 0) { c.kickCD = 4; c.kick = 0.4; knockPlayer(c.x, c.y, 240); donkeyBray(c, false); }
+        wander(30, 10); c.face = c.dir === 'right' ? 1 : -1;
+        break;
+      }
+      case 'turkey': {
+        c.puff = Math.max(0, c.puff - dt);
+        if (outside && pd < 70 && running && c.puff <= 0) { c.puff = 3; c.bubble = { text: 'GOBBLE GOBBLE!', t: 1.2 }; tone(300, 500, 0.08, 'square', 0.04); tone(500, 300, 0.08, 'square', 0.04, 0.1); tone(300, 480, 0.08, 'square', 0.04, 0.2); completeTask('turkey'); }
+        if (c.puff <= 0) wander(50, 16);
+        break;
+      }
+      case 'pigeon': {
+        if (c.flyT > 0) { c.flyT -= dt; c.z = Math.min(50, c.z + 80 * dt); c.x += Math.cos(c.fa) * 90 * dt; c.y += Math.sin(c.fa) * 50 * dt; c.walk += dt * 25; if (c.flyT <= 0) { c.z = 0; c.x = (L.plaza.x + 2 + Math.random() * 8) * TILE; c.y = (L.plaza.y + 2 + Math.random() * 8) * TILE; } break; }
+        if (outside && pd < 45 && running) { c.flyT = rr(2, 3.5); c.fa = Math.atan2(c.y - player.y, c.x - player.x) + rr(-0.6, 0.6); if (Math.random() < 0.3) sfx('flutter'); break; }
+        const tempt = outside && player.speed < 5 && (player.eating || isFood(player.held)) && pd < 200;
+        if (tempt) { if (pd > 20) critterMove(c, player.x + Math.cos(c.ph) * 18, player.y + Math.sin(c.ph) * 10, 50, dt); if (Math.random() < dt * 0.6) c.bubble = { text: 'coo?', t: 0.6 }; }
+        else { c.wait -= dt; if (c.wait <= 0) { c.tx = c.x + rr(-30, 30); c.ty = c.y + rr(-20, 20); c.wait = rr(0.6, 2); c.peck = 0.3; } if (c.tx && critterMove(c, c.tx, c.ty, 20, dt)) c.tx = null; }
+        c.peck = Math.max(0, (c.peck || 0) - dt);
+        break;
+      }
+      case 'magpie': {
+        if (c.state === 'perch') {
+          c.look -= dt;
+          if (c.look <= 0) {
+            c.look = rr(5, 9);
+            const it = items.find((i) => SHINY.has(i.kind) && !i.held && !i.air && areaOf(i.x, i.y) === 0 && Math.hypot(i.x - c.x, i.y - c.y) < 320 && !i.museum && Math.hypot(i.x - c.nest.x, i.y - c.nest.y) > 30);
+            if (it) { c.state = 'fetch'; c.target = it; c.bubble = { text: 'chak-chak!', t: 0.8 }; sfx('squawk'); }
+          }
+          break;
+        }
+        c.walk += dt * 25;
+        if (c.state === 'fetch') {
+          const it = c.target;
+          if (!it || it.held || !items.includes(it)) { c.state = 'home'; break; }
+          critterMove(c, it.x, it.y, 150, dt); c.z = Math.max(4, Math.hypot(it.x - c.x, it.y - c.y) * 0.3);
+          if (Math.hypot(it.x - c.x, it.y - c.y) < 6) { Object.assign(it, { held: true, heldBy: c, air: false }); c.carry = it; c.state = 'home'; lookTowards(c.x, c.y, 220, () => 'That magpie’s pinched something!'); }
+          break;
+        }
+        if (c.state === 'home') {
+          critterMove(c, c.nest.x, c.nest.y, 120, dt); c.z = Math.min(34, c.z + 40 * dt);
+          if (c.carry && outside && ((pd < 70 && running) || pd < 30)) { magpieDrop(c); break; }
+          if (Math.hypot(c.nest.x - c.x, c.nest.y - c.y) < 4) { if (c.carry) { const it = c.carry; c.carry = null; Object.assign(it, { held: false, heldBy: null, x: c.nest.x + rr(-10, 10), y: c.nest.y + 12, z: 0, air: false }); } c.state = 'perch'; c.z = 34; }
+        }
+        break;
+      }
+      case 'moth': {
+        if (duskK < 0.4) break;
+        const a = c.ph * 4;
+        c.x = c.lamp.x + Math.cos(a) * 12 + Math.sin(a * 2.3) * 6; c.y = c.lamp.y + 2 + Math.sin(a * 1.3) * 5; c.z = 34 + Math.sin(a * 1.7) * 8;
+        if (outside && Math.hypot(player.x - c.x, player.y - c.y) < 12) { c.caught = true; sparkle(c.x, c.y, c.z); player.bubble = { text: 'fluttery!', t: 1 }; completeTask('moth'); }
+        break;
+      }
+      case 'rcloud': {
+        c.life -= dt;
+        if (c.life <= 0) { c.z += 30 * dt; c.x += 40 * dt; if (c.life < -6) c.dead = true; break; }
+        if (outside) critterMove(c, player.x, player.y - 2, 75, dt);
+        if (Math.random() < dt * 30) particles.push({ kind: 'drop', x: c.x + rr(-16, 16), y: c.y + rr(-4, 4), z: 60, vx: 0, vy: 0, vz: -60, life: 0.5, max: 0.5 });
+        if (outside && pd < 20 && Math.random() < dt * 0.5) player.bubble = { text: rpick(['why me?!', 'brrr...', 'go away, cloud!']), t: 1 };
+        for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - c.x, v.y - c.y) < 26 && (v.cloudCD || 0) < time) { v.cloudCD = time + 15; say(v, rpick(['Why is it only raining on ME?!', 'Where did THAT come from?', 'I’m drenched!']), 2); completeTask('raincloud'); }
+        break;
+      }
+    }
+  }
+  function donkeyBray(c, byPlayer) { c.bubble = { text: 'HEE-HAWWW!', t: 1.4 }; if (Math.hypot(player.x - c.x, player.y - c.y) < 360) { tone(500, 700, 0.3, 'sawtooth', 0.04); tone(700, 300, 0.45, 'sawtooth', 0.04, 0.3); } if (byPlayer) completeTask('donkey'); }
+  function magpieDrop(c) {
+    const it = c.carry; if (!it) return;
+    c.carry = null; Object.assign(it, { held: false, heldBy: null, x: c.x, y: c.y, z: c.z, air: true, vz: 0, vx: rr(-30, 30), vy: rr(-10, 10), fromMagpie: true });
+    c.state = 'home'; c.bubble = { text: 'CHAK!', t: 0.8 }; sfx('flutter');
+  }
+  function skyScare(c, x, y, r) {
+    const real = r < 9999;
+    if (c.type === 'donkey' && real) donkeyBray(c, true);
+    if (c.type === 'magpie' && c.carry && real) magpieDrop(c);
+    if (c.type === 'pigeon' && !(c.flyT > 0)) { c.flyT = rr(2, 3.5); c.fa = Math.atan2(c.y - y, c.x - x); }
+    if (c.type === 'goose' && real && c.cd <= 0) for (const g of critters) if (g.type === 'goose') g.chase = 3;
+    if (c.type === 'turkey' && real && c.puff <= 0) { c.puff = 3; c.bubble = { text: 'GOBBLE!', t: 1 }; completeTask('turkey'); }
+  }
+
+  // --- Drawing ----------------------------------------------------------------------------------
+  function drawSkyCritter(ctx, c, t) {
+    if (c.dead || c.caught) return;
+    if (c.type === 'moth' && duskK < 0.4) return;
+    if (c.type === 'rcloud') {
+      const x = c.x, y = c.y - 70 - (c.life < 0 ? -c.life * 30 : 0);
+      ctx.fillStyle = 'rgba(40,50,70,0.15)'; ellipse(ctx, c.x, c.y, 22, 6);
+      ctx.fillStyle = '#8a929e'; circle(ctx, x - 12, y, 10); circle(ctx, x + 10, y + 1, 11); circle(ctx, x, y - 7, 12);
+      ctx.fillStyle = '#a8b0bc'; circle(ctx, x - 4, y - 9, 7);
+      ctx.strokeStyle = 'rgba(190,215,240,0.7)'; ctx.lineWidth = 1; for (let k = 0; k < 6; k++) { const dx = -16 + k * 6.4, o = (t * 120 + k * 17) % 60; ctx.beginPath(); ctx.moveTo(x + dx, y + 8 + o); ctx.lineTo(x + dx - 1, y + 14 + o); ctx.stroke(); }
+      return;
+    }
+    ctx.save(); ctx.translate(c.x, c.y);
+    if (c.type !== 'moth' && c.type !== 'magpie') { ctx.fillStyle = 'rgba(20,30,10,0.2)'; ellipse(ctx, 0, 0, c.type === 'donkey' ? 14 : c.type === 'pigeon' ? 3.5 : 7, c.type === 'donkey' ? 4 : 2); }
+    ctx.translate(0, -(c.z || 0)); if (c.dir === 'left') ctx.scale(-1, 1);
+    const step = c.moving ? Math.sin(c.walk * 2) * 2 : 0;
+    switch (c.type) {
+      case 'goose': {
+        ctx.fillStyle = '#e8732a'; ctx.fillRect(-2 + step * 0.4, -3, 1.4, 3); ctx.fillRect(1.5 - step * 0.4, -3, 1.4, 3);
+        ctx.fillStyle = '#f8f8f6'; ellipse(ctx, -1, -6, 7, 4.5); poly(ctx, [[-7, -7], [-11, -9], [-7, -4]]); ctx.fill();
+        const neck = c.chase > 0 ? 2 : 0;
+        ctx.strokeStyle = '#f8f8f6'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(4, -8); ctx.quadraticCurveTo(6 + neck, -12, 5 + neck * 2, -16 + neck * 2); ctx.stroke();
+        ctx.fillStyle = '#e8732a'; poly(ctx, [[6 + neck * 2, -17 + neck * 2], [10 + neck * 2, -16 + neck * 2], [6 + neck * 2, -15 + neck * 2]]); ctx.fill();
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 5.5 + neck * 2, -17 + neck * 2, 0.6);
+        break;
+      }
+      case 'peacock': {
+        if (c.fan > 0) { for (let k = 0; k < 11; k++) { const a = Math.PI + (k / 10) * Math.PI; const fx = Math.cos(a) * 20 - 2, fy = -10 + Math.sin(a) * 18; ctx.strokeStyle = '#3f7f6a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-2, -8); ctx.lineTo(fx, fy); ctx.stroke(); ctx.fillStyle = '#3fae5a'; circle(ctx, fx, fy, 3.2); ctx.fillStyle = '#2f5aa8'; circle(ctx, fx, fy, 1.8); ctx.fillStyle = '#f2c14e'; circle(ctx, fx, fy, 0.8); } }
+        else { ctx.fillStyle = '#3f7f6a'; poly(ctx, [[-3, -6], [-18, -3], [-16, 0], [-3, -3]]); ctx.fill(); }
+        ctx.fillStyle = '#6a6e76'; ctx.fillRect(-1 + step * 0.3, -4, 1.2, 4); ctx.fillRect(2 - step * 0.3, -4, 1.2, 4);
+        ctx.fillStyle = '#2f5aa8'; ellipse(ctx, 0, -7, 4, 3.5); ctx.strokeStyle = '#2f5aa8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(2, -9); ctx.lineTo(3.5, -14); ctx.stroke();
+        ctx.fillStyle = '#2f5aa8'; circle(ctx, 4, -15, 2); ctx.fillStyle = '#f2c14e'; poly(ctx, [[5.5, -15.5], [7.5, -15], [5.5, -14.5]]); ctx.fill();
+        ctx.strokeStyle = '#2f5aa8'; ctx.lineWidth = 0.6; for (const dx of [-1, 1, 3]) { ctx.beginPath(); ctx.moveTo(4, -17); ctx.lineTo(4 + dx, -20); ctx.stroke(); }
+        break;
+      }
+      case 'donkey': {
+        const kick = c.kick > 0;
+        ctx.fillStyle = '#8a8580'; for (const lx of [-8, -5, 5, 8]) { if (kick && lx < 0) { ctx.save(); ctx.translate(lx, -10); ctx.rotate(0.9); ctx.fillRect(0, 0, 2.4, 10); ctx.restore(); } else ctx.fillRect(lx, -10, 2.4, 10); }
+        roundRect(ctx, -11, -19, 22, 10, 5, true); poly(ctx, [[7, -17], [11, -17], [15, -26], [11, -27]]); ctx.fill();
+        roundRect(ctx, 12, -30, 9, 6, 2.5, true); ctx.fillStyle = '#f4f2ee'; ellipse(ctx, 19, -26.5, 2.5, 2);
+        ctx.fillStyle = '#8a8580'; poly(ctx, [[13, -30], [11, -38], [15, -30]]); ctx.fill(); poly(ctx, [[15, -30], [15, -38], [17, -30]]); ctx.fill();
+        ctx.fillStyle = '#4a4540'; ctx.fillRect(9, -27, 3, 9); ctx.fillStyle = '#1d1d22'; circle(ctx, 16, -28, 0.8);
+        ctx.strokeStyle = '#4a4540'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-11, -16); ctx.lineTo(-14, -8 + Math.sin(c.ph * 2)); ctx.stroke();
+        break;
+      }
+      case 'turkey': {
+        const pf = c.puff > 0 ? 1.4 : 1;
+        ctx.fillStyle = '#6a6e76'; ctx.fillRect(-1.5 + step * 0.3, -4, 1.4, 4); ctx.fillRect(1.5 - step * 0.3, -4, 1.4, 4);
+        for (let k = 0; k < 7; k++) { const a = Math.PI * 0.6 + k * 0.25; ctx.fillStyle = k % 2 ? '#7a4f2a' : '#a0703f'; poly(ctx, [[-2, -7], [-2 + Math.cos(a) * 12 * pf, -7 - Math.sin(a) * 12 * pf], [-2 + Math.cos(a + 0.25) * 12 * pf, -7 - Math.sin(a + 0.25) * 12 * pf]]); ctx.fill(); }
+        ctx.fillStyle = '#5a3a20'; ellipse(ctx, 0, -7, 5 * pf, 4.5 * pf);
+        ctx.fillStyle = '#c9b0a0'; circle(ctx, 4, -12, 2.2); ctx.fillStyle = '#e8453c'; ellipse(ctx, 5.5, -10, 1, 2.4);
+        ctx.fillStyle = '#1d1d22'; circle(ctx, 4.5, -12.5, 0.5);
+        break;
+      }
+      case 'pigeon': {
+        const f = c.flyT > 0 ? Math.sin(c.walk) * 3 : 0, pk = c.peck > 0 ? 1.5 : 0;
+        ctx.fillStyle = '#8a8e9a'; ellipse(ctx, 0, -3, 3.6, 2.6); circle(ctx, 2.8, -5.5 + pk, 1.8);
+        ctx.fillStyle = '#5a9a8a'; ellipse(ctx, 2, -4, 1.2, 1.2);
+        if (f) { ctx.fillStyle = '#8a8e9a'; poly(ctx, [[-1, -4], [-5, -9 - f], [2, -4]]); ctx.fill(); }
+        ctx.fillStyle = '#f2913a'; circle(ctx, 3.2, -6 + pk, 0.5);
+        break;
+      }
+      case 'magpie': {
+        const f = c.state !== 'perch' ? Math.sin(c.walk) * 3 : 0;
+        ctx.fillStyle = '#1d1d22'; ellipse(ctx, 0, -3, 3.5, 2.6); circle(ctx, 3, -5.5, 2); poly(ctx, [[-3, -3], [-11, -4], [-10, -2], [-3, -2]]); ctx.fill();
+        ctx.fillStyle = '#f4f2ee'; ellipse(ctx, 0, -2.5, 2, 1.4); ctx.fillStyle = '#2f5aa8'; ellipse(ctx, -1, -4, 2, 0.8);
+        if (f) { ctx.fillStyle = '#1d1d22'; poly(ctx, [[-1, -4], [-6, -10 - f], [2, -4]]); ctx.fill(); }
+        ctx.fillStyle = '#1d1d22'; poly(ctx, [[4.5, -6], [7, -5.5], [4.5, -5]]); ctx.fill();
+        break;
+      }
+      case 'moth': { const f = Math.sin(t * 40) * 1.6; ctx.fillStyle = 'rgba(240,235,220,0.9)'; ellipse(ctx, -1.6, -f * 0.3, 2 + f * 0.3, 1.4); ellipse(ctx, 1.6, -f * 0.3, 2 + f * 0.3, 1.4); ctx.fillStyle = '#8a7a6a'; ctx.fillRect(-0.4, -1.5, 0.8, 3); break; }
+    }
+    ctx.restore();
+  }
+
+  // --- Sky spectacles, moody clouds, gales -------------------------------------------------------
+  const auroraOn = () => isWinter() && duskK > 0.5 && ['clear', 'frost'].includes(L.weather);
+  function updateSky(dt) {
+    if (!L || !started || paused) return;
+    const outside = areaOf(player.x, player.y) === 0, prog = 1 - run.timeLeft / run.timeTotal;
+    // shooting stars on clear evenings: one lands nearby as a fallen star
+    if (duskK > 0.6 && ['clear', 'frost', 'windy'].includes(L.weather) && outside) {
+      L.starT -= dt;
+      if (L.starT <= 0) {
+        L.starT = rr(14, 26);
+        for (let n = 0; n < 30; n++) {
+          const x = player.x + rr(-220, 220), y = player.y + rr(-150, 150);
+          if (navBlockedPt(x, y) || areaOf(x, y) !== 0 || isWaterish(x, y) || Math.hypot(x - player.x, y - player.y) < 60) continue;
+          L.streak = { x0: x - 260, y0: y - 320, x1: x, y1: y, t: 0 };
+          setTimeout(() => { if (L) { const it = addItem('stardust', x, y); sparkle(x, y, 6); sfx('ding'); setTimeout(() => { const i = items.indexOf(it); if (i >= 0 && !it.held) items.splice(i, 1); }, 20000); } }, 900);
+          break;
+        }
+      }
+    }
+    if (L.streak) { L.streak.t += dt; if (L.streak.t > 1.2) L.streak = null; }
+    // northern lights
+    if (auroraOn() && outside) {
+      if (!L.auroraSeen) { L.auroraSeen = true; toast('The northern lights!', 'Look up!', true); for (const v of villagers) if (areaOf(v.x, v.y) === 0) say(v, rpick(['Ooh, look at the sky!', 'The northern lights!', 'How beautiful...']), 2); }
+      L.auroraT = player.speed < 5 ? (L.auroraT || 0) + dt : 0;
+      if (L.auroraT > 3) completeTask('aurora');
+    }
+    // migrating geese overhead
+    if (L.migrateAt !== null && prog > L.migrateAt && !L.flock && outside) { L.flock = { t: 0, x: player.x - 400, y: player.y - 160 }; L.migrateAt = null; sfx('honk'); }
+    if (L.flock) {
+      const F = L.flock; F.t += dt; F.x += 110 * dt; F.y += 18 * dt;
+      if (Math.random() < dt * 1.5 && Math.hypot(F.x - player.x, F.y - player.y) < 500) sfx('honk');
+      if (player.dir === 'up' && player.speed < 5 && Math.abs(F.x - player.x) < 220) completeTask('migrate');
+      if (F.t > 9) L.flock = null;
+    }
+    // a little rain cloud that follows you about
+    if (L.rcloudAt !== null && prog > L.rcloudAt && outside && !wet()) {
+      L.rcloudAt = null;
+      critters.push({ type: 'rcloud', x: player.x - 160, y: player.y - 40, z: 0, dir: 'right', walk: 0, ph: 0, tx: null, flying: true, life: 50 });
+      toast('A little rain cloud has taken a liking to you', 'Uh oh', true);
+    }
+    // gales blow hats off heads
+    if (L.weather === 'gale') {
+      if (outside && !player.hidden && !collides(player.x + 28 * dt, player.y)) player.x += 28 * dt;
+      L.hatT -= dt;
+      if (L.hatT <= 0) {
+        L.hatT = rr(14, 24);
+        const v = pick(villagers.filter((v) => areaOf(v.x, v.y) === 0 && !v.hatOff && ['straw', 'cap', 'beanie'].includes(v.hat) && v.state !== 'chase' && Math.hypot(v.x - player.x, v.y - player.y) < 600) || []);
+        if (!v) L.hatT = 3; // nobody near enough: try again soon
+        if (v) {
+          v.hatOff = true;
+          const it = addItem('hat', v.x, v.y, { owner: v.id }); const a = rr(-0.6, 0.6);
+          Object.assign(it, { z: 44, air: true, vz: 160, vx: Math.cos(a) * 180, vy: Math.sin(a) * 60, spin: 8, kicker: 'wind', blownHat: true });
+          startleV(v, rpick(['My hat!', 'Come back, hat!', 'Blasted gale!']), { state: 'fetch', target: it }); v.stateT = 15; sfx('whoosh');
+        }
+      }
+      for (const v of villagers) if (v.hatOff && v.held && v.held.blownHat && v.held.owner === v.id) { v.hatOff = false; }
+    }
+    // wasps go for anyone carrying something sweet near their nest
+    const N = L.waspNest;
+    if (N) {
+      N.cd = Math.max(0, N.cd - dt);
+      const sweet = player.held && FOOD[player.held.kind] && FOOD[player.held.kind].sweet;
+      const hit = items.some((it) => it.air && Math.hypot(it.x - N.x, it.y - N.y) < 16 && it.z > 20);
+      if (N.cd <= 0 && outside && ((sweet && Math.hypot(player.x - N.x, player.y - N.y) < 100) || hit)) {
+        N.cd = 25; critters.push({ type: 'swarm', x: N.x, y: N.y - 40, z: 0, flying: true, dir: 'left', walk: 0, ph: 0, t: 8, wasps: true });
+        sfx('buzz'); player.bubble = { text: 'WASPS!', t: 1.2 }; completeTask('wasps');
+      }
+    }
+    // pigeons mobbing you
+    if (outside && critters.filter((c) => c.type === 'pigeon' && !(c.flyT > 0) && Math.hypot(c.x - player.x, c.y - player.y) < 42).length >= 5) completeTask('pigeons');
+    // dawn mist over the water
+    if (mistOn() && outside && L.pond && Math.hypot((player.x / TILE - L.pond.cx) / (L.pond.rx * 1.8), (player.y / TILE - L.pond.cy) / (L.pond.ry * 1.8)) < 1 && !isWaterish(player.x, player.y)) completeTask('mist');
+    // sliding on frozen puddles
+    if (onFrozenPuddle(player.x, player.y) && player.speed > 80) completeTask('puddleslide');
+  }
+  const mistOn = () => !!L && started && run.timeTotal && (1 - run.timeLeft / run.timeTotal) < 0.2 && !wet() && !isWinter() && L.kind !== 'seaside' && hasOpenWater();
+  const onFrozenPuddle = (x, y) => !!L && L.puddles && L.puddles.some((p) => p.frozen && ((x - p.x) / p.rx) ** 2 + ((y - p.y) / p.ry) ** 2 < 1);
+  function placeFrozenPuddles() {
+    if (!(L.weather === 'frost' || (isWinter() && ['clear', 'fog'].includes(L.weather)))) return;
+    for (let n = 0; n < 300 && L.puddles.length < 10; n++) {
+      const tx = Math.floor(rr(4, MW - 4)), ty = Math.floor(rr(4, MH - 4)), t0 = getT(tx, ty);
+      if (t0 !== PATH && t0 !== STONE) continue;
+      const x = (tx + 0.5) * TILE, y = (ty + 0.5) * TILE;
+      if (L.puddles.some((p) => Math.hypot(p.x - x, p.y - y) < 110)) continue;
+      L.puddles.push({ x, y, rx: rr(18, 28), ry: rr(7, 10), splashT: 0, frozen: true });
+    }
+  }
+  function drawSkyWorld(ctx, left, top, viewW, viewH, t) {
+    // dawn mist drifting over the water
+    if (mistOn() && L.pond) {
+      const k = 1 - (1 - run.timeLeft / run.timeTotal) / 0.2;
+      for (let i = 0; i < 9; i++) { const a = i * 0.7 + t * 0.05, x = (L.pond.cx + Math.cos(a) * L.pond.rx * 1.1) * TILE + Math.sin(t * 0.2 + i) * 20, y = (L.pond.cy + Math.sin(a * 1.3) * L.pond.ry * 0.9) * TILE - 10; ctx.fillStyle = `rgba(240,244,248,${0.28 * k})`; ellipse(ctx, x, y, 70, 18); }
+    }
+    // migrating geese, in a V
+    if (L.flock) {
+      const F = L.flock;
+      ctx.fillStyle = 'rgba(30,30,36,0.85)';
+      for (let k = -4; k <= 4; k++) { const bx = F.x - Math.abs(k) * 18, by = F.y + k * 14, f = Math.sin(t * 8 + k) * 3; poly(ctx, [[bx - 6, by - f], [bx, by], [bx + 6, by - f], [bx, by + 1.5]]); ctx.fill(); }
+      ctx.fillStyle = 'rgba(20,30,10,0.12)'; for (let k = -4; k <= 4; k++) ellipse(ctx, F.x - Math.abs(k) * 18 + 60, F.y + k * 14 + 160, 4, 1.5);
+    }
+    // a shooting star
+    if (L.streak) { const S = L.streak, u = Math.min(1, S.t / 0.9); const x = S.x0 + (S.x1 - S.x0) * u, y = S.y0 + (S.y1 - S.y0) * u; const g = ctx.createLinearGradient(x - 90, y - 110, x, y); g.addColorStop(0, 'rgba(255,250,200,0)'); g.addColorStop(1, 'rgba(255,250,200,0.95)'); ctx.strokeStyle = g; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x - 90, y - 110); ctx.lineTo(x, y); ctx.stroke(); ctx.fillStyle = '#ffffff'; circle(ctx, x, y, 2.4); }
+  }
+  // Drawn over the night overlay, so it glows
+  function drawAurora(ctx, left, top, viewW, viewH, t) {
+    if (!auroraOn() || areaOf(player.x, player.y) !== 0) return;
+    const a = Math.min(1, (duskK - 0.5) * 3);
+    for (let band = 0; band < 3; band++) {
+      ctx.beginPath();
+      for (let i = 0; i <= 24; i++) { const x = left + (i / 24) * viewW, y = top + viewH * (0.08 + band * 0.07) + Math.sin(i * 0.5 + t * (0.4 + band * 0.1) + band) * 14; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+      for (let i = 24; i >= 0; i--) { const x = left + (i / 24) * viewW, y = top + viewH * (0.2 + band * 0.07) + Math.sin(i * 0.45 + t * 0.35 + band * 2) * 18; ctx.lineTo(x, y); }
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, top, 0, top + viewH * 0.4);
+      g.addColorStop(0, `rgba(${band === 1 ? '190,120,255' : '90,255,170'},0)`); g.addColorStop(0.5, `rgba(${band === 1 ? '190,120,255' : '90,255,170'},${0.22 * a})`); g.addColorStop(1, 'rgba(90,255,170,0)');
+      ctx.fillStyle = g; ctx.fill();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -11487,7 +11877,7 @@
       o.draw(ctx, t, fade);
     }
 
-    if (!indoors) { drawBolt(ctx, top); drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); drawLantern(ctx, t); }
+    if (!indoors) { drawSkyWorld(ctx, left, top, viewW, viewH, t); drawBolt(ctx, top); drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); drawLantern(ctx, t); }
     if (player.roof) drawPlayerWithHeld(ctx, t);
     // Indoors: black out everything beyond this room's walls (other rooms share the strip)
     if (indoors) {
@@ -11559,6 +11949,7 @@
     if (!indoors) drawRainbow(ctx, Math.min(0.05, t - (render.lastT || t)));
     render.lastT = t;
     drawDusk(ctx, left, top, viewW, viewH);
+    drawAurora(ctx, left, top, viewW, viewH, t);
 
     // ---- Screen space UI ----
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -11646,6 +12037,7 @@
       updateMore(dt);
       updateOutskirts(dt);
       updateRailHarbour(dt);
+      updateSky(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
