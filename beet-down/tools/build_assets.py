@@ -317,6 +317,26 @@ compose('e_watcher', 'body_blueB.png', [
     ('detail_blue_antenna_large.png', -50, -112, 1.4, 25, False, L), ('detail_blue_antenna_large.png', 0, -128, 1.5, 0, False, L), ('detail_blue_antenna_large.png', 50, -112, 1.4, -25, True, L),
     ('eye_human_red.png', 0, -10, 2.3, 0, False), ('mouth_closed_fangs.png', 0, 70, 1.3, 0, False)], maxpx=300)
 
+compose('e_wmother', 'body_darkF.png', [
+    ('leg_whiteB.png', -95, -34, .75, -80, False, L), ('leg_whiteB.png', 95, -34, .75, 80, True, L),
+    ('leg_whiteB.png', -98, 11, .75, -60, False, L), ('leg_whiteB.png', 98, 11, .75, 60, True, L),
+    ('leg_whiteB.png', -92, 56, .75, -35, False, L), ('leg_whiteB.png', 92, 56, .75, 35, True, L),
+    ('leg_whiteB.png', -67, 95, .75, -12, False, L), ('leg_whiteB.png', 67, 95, .75, 12, True, L),
+    ('eye_red.png', -28, -62, .8, 0, False), ('eye_red.png', 28, -62, .8, 0, True), ('eye_red.png', -12, -90, .55, 0, False), ('eye_red.png', 12, -90, .55, 0, True),
+    ('eye_red.png', -53, -39, .45, 0, False), ('eye_red.png', 53, -39, .45, 0, True),
+    ('mouth_closed_fangs.png', 0, -6, 1.4, 0, False)], maxpx=300)
+compose('e_fortress', 'body_whiteE.png', [
+    ('detail_white_antenna_large.png', -34, -120, 1.3, 25, False, L), ('detail_white_antenna_large.png', 34, -120, 1.3, -25, True, L),
+    ('arm_whiteC.png', -70, 22, .75, -20, False, L), ('arm_whiteC.png', 70, 22, .75, 20, True, L),
+    ('leg_whiteD.png', -31, 120, .7, 0, False, L), ('leg_whiteD.png', 31, 120, .7, 0, True, L),
+    ('eye_red.png', 0, -62, 1.7, 0, False), ('eyebrowC.png', 0, -98, 1.1, 0, False), ('mouth_closed_teeth.png', 0, 34, 1.3, 0, False)], maxpx=300)
+compose('e_rampager', 'body_redA.png', [
+    ('detail_red_horn_large.png', -48, -70, 1.7, 30, False, L), ('detail_red_horn_large.png', 48, -70, 1.7, -30, True, L),
+    ('arm_redE.png', -84, 17, .85, -35, False, L), ('arm_redE.png', 84, 17, .85, 35, True, L),
+    ('leg_redB.png', -34, 84, .8, 0, False, L), ('leg_redB.png', 34, 84, .8, 0, True, L),
+    ('eye_angry_red.png', -31, -22, 1.0, 0, False), ('eye_angry_red.png', 31, -22, 1.0, 0, True),
+    ('eyebrowC.png', -31, -48, 1.0, -15, False), ('eyebrowC.png', 31, -48, 1.0, 15, True), ('mouth_closed_fangs.png', 0, 34, 1.5, 0, False)], maxpx=300)
+
 # ---------- particles ----------
 PART = {'smoke': ('smoke_07.png', 128), 'puff': ('smoke_04.png', 96), 'fire': ('fire_01.png', 96), 'flame': ('flame_05.png', 64),
         'muzzle': ('muzzle_02.png', 64), 'slash': ('slash_03.png', 128), 'scorch': ('scorch_02.png', 128), 'splat': ('dirt_02.png', 128),

@@ -266,6 +266,9 @@ const ENEMIES={
   slord:{hp:6600,spd:120,dmg:9,r:56,mats:60,col:'#45d6e8',dark:'#1d7584',heavy:true,isBoss:true},
   warden:{hp:7000,spd:55,dmg:11,r:64,mats:60,col:'#6b5444',dark:'#2e2219',heavy:true,isBoss:true},
   wraith:{hp:6800,spd:95,dmg:9,r:58,mats:60,col:'#e8e0ff',dark:'#8a8090',heavy:true,isBoss:true},
+  wmother:{hp:7000,spd:85,dmg:10,r:60,mats:60,col:'#6b5444',dark:'#2e2219',heavy:true,isBoss:true},
+  fortress:{hp:7600,spd:45,dmg:10,r:60,mats:60,col:'#f2eef0',dark:'#8a8090',heavy:true,isBoss:true},
+  rampager:{hp:7400,spd:72,dmg:10,r:62,mats:60,col:'#ff4d6d',dark:'#9c1f37',heavy:true,isBoss:true},
   watcher:{hp:7200,spd:45,dmg:10,r:60,mats:60,col:'#45d6e8',dark:'#1d7584',heavy:true,isBoss:true},
 };
 const WAVES=[
@@ -297,7 +300,7 @@ const WAVES_FULL=WAVES.slice(0,9).concat([
   {dur:0,int:2.2,grp:[4,6],mix:{grub:2,dasher:1,spitter:1,hopper:1,brute:.5,bomber:.5},boss:true},
 ]);
 const ENEMY_INFO={webber:['Webber','Lobs sticky webs that slow you down'],thief:['Thief','Steals your materials and runs. Catch it!'],sentry:['Sentry','Plants itself and fires bursts'],roller:['Roller','Curls up and bounces around the arena'],shielder:['Shielder','Gives nearby aliens a bubble that blocks a hit'],berserker:['Berserker','Gets faster the more you hurt it'],bulwark:['Bulwark','Its shield blocks shots from the front. Flank it'],spotter:['Spotter','Aims a red laser, then fires. Sidestep the line'],blinker:['Blinker','Teleports right next to you'],phantom:['Phantom','Turns ghostly and untouchable. Hit it when solid'],pulser:['Pulser','Sends out shockwave rings. Keep your distance'],rhino:['Rhino','Armored and charges. Big hits get through'],gnat:['Gnats','Fast swarmers that arrive in flocks'],oozer:['Oozer',"Leaves acid puddles. Don't stand in them"],mole:['Mole','Tunnels underground, then bursts up under you'],medic:['Medic','Heals nearby aliens. Take it out first'],hive:['Hive','Spawns gnats until you destroy it']};
-const BOSSES={warden:{name:'The Iron Warden',sub:'Flank it, or break its shield'},wraith:{name:'The Wraith',sub:'Watch where it reappears'},watcher:{name:'The Watcher',sub:'Walk around the sweeping beam'},boss:{name:'The Brood Queen',sub:'Bullet rings, charges and summons'},bking:{name:'The Burrow King',sub:'Watch the ground beneath you'},otitan:{name:'The Ooze Titan',sub:'Keep moving. The ground is acid'},slord:{name:'The Swarm Lord',sub:'Dodge the dashes'}};
+const BOSSES={wmother:{name:'The Web Mother',sub:'Stay out of the webs. Watch where she lands'},fortress:{name:'The Fortress',sub:'Slip between the spinning bullet spokes'},rampager:{name:'The Rampager',sub:'It gets angrier as it gets hurt'},warden:{name:'The Iron Warden',sub:'Flank it, or break its shield'},wraith:{name:'The Wraith',sub:'Watch where it reappears'},watcher:{name:'The Watcher',sub:'Walk around the sweeping beam'},boss:{name:'The Brood Queen',sub:'Bullet rings, charges and summons'},bking:{name:'The Burrow King',sub:'Watch the ground beneath you'},otitan:{name:'The Ooze Titan',sub:'Keep moving. The ground is acid'},slord:{name:'The Swarm Lord',sub:'Dodge the dashes'}};
 const bossName=t=>BOSSES[t]?BOSSES[t].name:'Boss';
 const RUN_LENS={10:{name:'Quick',waves:WAVES},20:{name:'Full',waves:WAVES_FULL}};
 
@@ -726,6 +729,9 @@ function updateEnemies(dt){
       case 'warden':{const r=wardenAI(e,dt,nx,ny,d);mx=r[0];my=r[1];break}
       case 'wraith':{const r=wraithAI(e,dt,nx,ny,d);mx=r[0];my=r[1];break}
       case 'watcher':{const r=watcherAI(e,dt,nx,ny,d);mx=r[0];my=r[1];break}
+      case 'wmother':{const r=wmotherAI(e,dt,nx,ny,d);mx=r[0];my=r[1];break}
+      case 'fortress':{const r=fortressAI(e,dt,nx,ny,d);mx=r[0];my=r[1];break}
+      case 'rampager':{const r=rampagerAI(e,dt,nx,ny,d);mx=r[0];my=r[1];break}
       case 'gnat':{const w=Math.sin(e.t*7+e.wob)*.85;mx=(nx-ny*w)*e.spd;my=(ny+nx*w)*e.spd;break}
       case 'oozer':
         mx=nx*e.spd;my=ny*e.spd;e.cool-=dt;
@@ -972,6 +978,73 @@ function wraithAI(e,dt,nx,ny,d){
   }
   return[mx,my];
 }
+function wmotherAI(e,dt,nx,ny,d){
+  const ph2=e.hp<e.maxHp*.5; e.stT-=dt; let mx=0,my=0; const cycle=['weave','pounce','silk','pounce','summon'];
+  switch(e.st){
+    case 'chase':{const sd=e.wob>Math.PI?1:-1;if(d>280){mx=nx*e.spd;my=ny*e.spd}else{mx=-ny*e.spd*.7*sd;my=nx*e.spd*.7*sd}
+      if(e.stT<=0){e.st=cycle[e.phaseIdx++%cycle.length];
+        if(e.st==='weave'){const k=ph2?8:6;for(let i=0;i<k;i++){const x=i?P.x+rand(-200,200):P.x,y=i?P.y+rand(-150,150):P.y;webs.push({dmg:5,x:clamp(x,40,AW-40),y:clamp(y,40,AH-40),sx:e.x,sy:e.y,t:-i*.09,land:.8,life:6.5,r:58,rot:rand(0,TAU)})}e.stT=1.3;e.sq=1;sfx('lob')}
+        else if(e.st==='pounce'){e.n=ph2?2:1;e.ph='crouch';e.stT=.65;e.tx=P.x;e.ty=P.y;fx.push({k:'ring',x:e.tx,y:e.ty,r0:90,r1:25,t:0,life:1.35,c:'#ff3b5c',w:4});sfx('fuse')}
+        else if(e.st==='silk'){e.stT=1.5;e.volT=.1}else e.stT=.9}
+      break}
+    case 'weave': if(e.stT<=0){e.st='chase';e.stT=1.6} break;
+    case 'pounce':
+      if(e.ph==='crouch'){e.shk=1;if(e.stT<=0){e.shk=0;e.ph='air';e.stT=0;e.hx0=e.x;e.hy0=e.y}}
+      else{e.stT+=dt;const p=Math.min(1,e.stT/.7);e.x=lerp(e.hx0,e.tx,p);e.y=lerp(e.hy0,e.ty,p);e.z=Math.sin(p*Math.PI)*120;e.kx=e.ky=0;
+        if(p>=1){e.z=0;e.sq=1;shake=16;sfx('boom');rings.push({x:e.x,y:e.y,r:e.r,max:280,spd:300,w:18,dmg:Math.round(e.dmg*.7),hit:false});fx.push({k:'ring',x:e.x,y:e.y,r0:20,r1:150,t:0,life:.35,c:'#a09080',w:8});
+          parts.push({x:e.x,y:e.y+e.r*.5,vx:0,vy:0,t:0,life:.45,img:'fx_puff',col:'#a09080',s0:40,s1:130,rot:rand(0,TAU),a0:.6});
+          if(state==='wave'&&Math.hypot(P.x-e.x,P.y-e.y)<e.r+P.r+10)hurtPlayer(e.dmg+4,e);
+          if(--e.n>0){e.ph='crouch';e.stT=.5;e.tx=P.x;e.ty=P.y;fx.push({k:'ring',x:e.tx,y:e.ty,r0:90,r1:25,t:0,life:1.2,c:'#ff3b5c',w:4})}else{e.st='chase';e.stT=1.6}}}
+      return[0,0];
+    case 'silk': e.volT-=dt; if(e.volT<=0){e.volT=.38;fan(e,ph2?7:5,.2,300,8,7,'#f4f0ff');sfx('zap');e.sq=1} if(e.stT<=0){e.st='chase';e.stT=1.6} break;
+    case 'summon': if(e.stT<=0){const k=ph2?5:4;for(let i=0;i<k;i++){const a=i/k*TAU;queueSpawn(i%2?'thief':i===4?'grub':'webber',clamp(e.x+Math.cos(a)*140,40,AW-40),clamp(e.y+Math.sin(a)*140,40,AH-40),false,.6)}e.st='chase';e.stT=2;sfx('roar')} break;
+  }
+  return[mx,my];
+}
+function fortressAI(e,dt,nx,ny,d){
+  const ph2=e.hp<e.maxHp*.5; e.stT-=dt; let mx=0,my=0; const cycle=['spokes','mortar','spokes','summon'];
+  switch(e.st){
+    case 'chase': {const cx=AW/2-e.x,cy=AH/2-e.y,cd=Math.hypot(cx,cy)||1;const tx=(nx*.6+cx/cd*.4),ty=(ny*.6+cy/cd*.4);if(d>230){mx=tx*e.spd;my=ty*e.spd}
+      if(e.stT<=0){e.st=cycle[e.phaseIdx++%cycle.length];
+        if(e.st==='spokes'){e.stT=ph2?5:4.2;e.volT=.6;e.spA=Math.atan2(ny,nx)+.4;e.sdir=Math.random()<.5?1:-1;e.sq=1;sfx('fuse')}
+        else if(e.st==='mortar'){const k=ph2?9:6;for(let i=0;i<k;i++){const x=i?P.x+rand(-180,180):P.x,y=i?P.y+rand(-140,140):P.y;marks.push({x:clamp(x,30,AW-30),y:clamp(y,30,AH-30),r:55,t:-i*.15,life:1.2,dmg:9,noPool:true})}e.stT=1.8;e.sq=1;sfx('lob')}
+        else e.stT=.9}
+      break}
+    case 'spokes': e.kx=e.ky=0;e.spA+=dt*e.sdir*(ph2?1.0:.75);e.volT-=dt;
+      if(e.volT<=0){e.volT=.14;const k=ph2?6:4;for(let i=0;i<k;i++){const a=e.spA+i/k*TAU;ebullets.push({x:e.x+Math.cos(a)*e.r*.8,y:e.y+Math.sin(a)*e.r*.8,vx:Math.cos(a)*250,vy:Math.sin(a)*250,r:8,dmg:6,t:0,c:'#ff9a3d'})}if(Math.random()<.3)sfx('shoot')}
+      if(e.stT<=0){e.st='chase';e.stT=1.5}
+      return[0,0];
+    case 'mortar': if(e.stT<=0){e.st='chase';e.stT=1.4} break;
+    case 'summon': if(e.stT<=0){const k=ph2?4:3;for(let i=0;i<k;i++){const a=i/k*TAU;queueSpawn(i===0?'shielder':'sentry',clamp(e.x+Math.cos(a)*150,40,AW-40),clamp(e.y+Math.sin(a)*150,40,AH-40),false,.6)}e.st='chase';e.stT=2;sfx('roar')} break;
+  }
+  return[mx,my];
+}
+function rampagerAI(e,dt,nx,ny,d){
+  const ph2=e.hp<e.maxHp*.5, rage=1+(1-Math.max(0,e.hp)/e.maxHp)*.8; e.stT-=dt*rage; let mx=0,my=0; const cycle=['rampage','rocks','stomp','rampage','summon'];
+  if(rage>1.4&&Math.random()<.2)parts.push({x:e.x+rand(-30,30),y:e.y-e.r*.8,vx:rand(-20,20),vy:rand(-90,-50),t:0,life:.5,img:'fx_puff',col:'#ff6a6a',s0:10,s1:26,a0:.5});
+  switch(e.st){
+    case 'chase': mx=nx*e.spd*rage;my=ny*e.spd*rage;
+      if(e.stT<=0){e.st=cycle[e.phaseIdx++%cycle.length];
+        if(e.st==='rampage'){e.n=ph2?4:3;e.ph='wind';e.stT=.6;e.da=Math.atan2(ny,nx)}
+        else if(e.st==='rocks'){e.stT=1.4;e.volT=.1}
+        else if(e.st==='stomp'){e.n=ph2?3:2;e.stT=.75}
+        else e.stT=.9}
+      break;
+    case 'rampage':
+      if(e.ph==='wind'){e.shk=1;e.da=angLerp(e.da,Math.atan2(ny,nx),dt*3);if(e.stT<=0){e.shk=0;e.ph='dash';e.stT=.95}}
+      else{const sp=620*rage;mx=Math.cos(e.da)*sp;my=Math.sin(e.da)*sp;e.kx=e.ky=0;if(Math.random()<.6)parts.push({x:e.x,y:e.y+e.r*.6,vx:0,vy:0,t:0,life:.35,img:'fx_puff',col:'#a09080',s0:20,s1:50,a0:.45});
+        const wall=e.x<=e.r+2||e.x>=AW-e.r-2||e.y<=e.r+2||e.y>=AH-e.r-2;
+        if(e.stT<=0||wall){if(wall){shake=12;sfx('boom');if(ph2)ring(e,10,170,9,6,'#c09070',rand(0,1))}
+          if(--e.n>0){e.ph='wind';e.stT=.45;e.da=Math.atan2(ny,nx)}else{e.st='chase';e.stT=1.7}}}
+      break;
+    case 'rocks': e.volT-=dt; if(e.volT<=0){e.volT=.45;fan(e,5,.22,340,11,8,'#a07850');sfx('lob');e.sq=1} if(e.stT<=0){e.st='chase';e.stT=1.5} break;
+    case 'stomp': e.swell=Math.max(.001,e.stT*.5);
+      if(e.stT<=0){e.swell=0;rings.push({x:e.x,y:e.y,r:e.r,max:320,spd:270,w:20,dmg:Math.round(e.dmg*.7),hit:false});shake=14;sfx('boom');e.sq=1;fx.push({k:'ring',x:e.x,y:e.y,r0:20,r1:130,t:0,life:.35,c:'#a09080',w:8});if(--e.n>0)e.stT=.5;else{e.st='chase';e.stT=1.7}}
+      break;
+    case 'summon': if(e.stT<=0){const k=ph2?4:3;for(let i=0;i<k;i++){const a=i/k*TAU;queueSpawn(i===0||(ph2&&i===2)?'berserker':'roller',clamp(e.x+Math.cos(a)*140,40,AW-40),clamp(e.y+Math.sin(a)*140,40,AH-40),false,.6)}e.st='chase';e.stT=2;sfx('roar')} break;
+  }
+  return[mx,my];
+}
 const watcherBeams=e=>e.hp<e.maxHp*.5?[e.beamA,e.beamA+Math.PI]:[e.beamA];
 function watcherAI(e,dt,nx,ny,d){
   const ph2=e.hp<e.maxHp*.5; e.stT-=dt; let mx=0,my=0; const cycle=['sweep','volley','sweep','summon'];
@@ -1104,7 +1177,8 @@ function update(dt){
       else{run.crates++;sfx('crate');texts.push({x:P.x,y:P.y-44,vy:-60,t:0,life:1,s:22,txt:'+CRATE',c:'#ffcc4d'});fx.push({k:'ring',x:P.x,y:P.y,r0:10,r1:90,t:0,life:.4,c:'#ffcc4d',w:5})}}}
   if(run.comboT>0){run.comboT-=dt;if(run.comboT<=0)run.combo=0}
   for(let i=marks.length-1;i>=0;i--){const m=marks[i];m.t+=dt;if(m.t<m.life)continue;marks.splice(i,1);
-    pools.push({x:m.x,y:m.y,r:m.r*.8,t:0,life:4,dmg:5,rot:rand(0,TAU)});
+    if(m.noPool){fx.push({k:'ring',x:m.x,y:m.y,r0:10,r1:m.r*1.3,t:0,life:.3,c:'#ff9a3d',w:6});parts.push({x:m.x,y:m.y,vx:0,vy:0,t:0,life:.35,img:'fx_puff',col:'#a09080',s0:m.r*.6,s1:m.r*1.8,rot:rand(0,TAU),a0:.6});shake=Math.max(shake,4);sfx('boom')}
+    else pools.push({x:m.x,y:m.y,r:m.r*.8,t:0,life:4,dmg:5,rot:rand(0,TAU)});
     for(let k=0;k<10;k++){const a=rand(0,TAU),v=rand(80,220);parts.push({x:m.x,y:m.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-60,t:0,life:.5,c:pick(['#7dff4a','#3cd46f','#c8ffb0']),s:rand(3,6),g:400})}
     if(state==='wave'&&Math.hypot(P.x-m.x,(P.y-m.y)*1.3)<m.r+P.r*.5)hurtPlayer(m.dmg,{type:'acid',dead:true})}
   for(let i=pools.length-1;i>=0;i--){const q=pools[i];q.t+=dt;if(q.t>=q.life){pools.splice(i,1);continue}
