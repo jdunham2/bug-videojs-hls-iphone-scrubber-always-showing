@@ -52,12 +52,12 @@ const WEAPONS={
   rail:{name:'Railgun',sets:['precise','heavy'],rail:true,dmg:50,cd:2.6,range:720,knock:30,crit:10,critMul:2.5,price:44,len:54,pv:.32,desc:'Slow, huge piercing beam across the arena.'},
   mines:{name:'Mine Layer',sets:['explosive'],mine:true,dmg:40,cd:1.1,range:260,blast:80,knock:22,crit:3,critMul:2,price:34,len:48,pv:.32,desc:'Drops mines that explode when aliens step on them.'},
   guzi:{name:'Golden Uzi',sets:['rapid'],gold:true,dmg:4,cd:.16,range:340,speed:980,spread:.2,knock:3,crit:3,critMul:2,price:44,len:40,pv:.35,desc:'Kills have a 30% chance to drop 2 extra materials.'},
-  pizza:{name:'Pizza Cutter',sets:['kitchen','blade'],disc:true,dmg:8,cd:1.05,range:380,speed:600,knock:5,crit:8,critMul:2,price:32,len:40,pv:.5,desc:'Throws a spinning blade that bounces off the walls and slices through aliens.'},
+  pizza:{name:'Pizza Cutter',sets:['kitchen','blade'],disc:true,dmg:10,cd:1.05,range:380,speed:600,knock:5,crit:8,critMul:2,price:32,len:40,pv:.5,desc:'Throws a spinning blade that bounces off the walls and slices through aliens.'},
   pick:{name:'Pickaxe',sets:['blunt','heavy'],melee:true,quake:true,dmg:20,cd:1.25,range:115,hitR:36,knock:26,crit:12,critMul:3,price:32,len:48,pv:.14,desc:'Slow, brutal swings. Crits deal 3x and crack the ground around the target.'},
   cane:{name:'Candy Cane',sets:['blunt'],melee:true,sweep:.95,dmg:11,cd:.85,range:150,knock:-9,crit:5,critMul:2,price:28,len:50,pv:.14,desc:'Hooking swing that pulls aliens in toward you.'},
-  scythe:{name:'Scythe',sets:['blade'],melee:true,sweep:3.15,dmg:13,cd:1.3,range:125,knock:14,crit:6,critMul:2.2,price:36,len:54,pv:.16,desc:'Spins all the way around, cutting every alien nearby.'},
-  silencer:{name:'Silenced Pistol',sets:['precise'],exec:.25,dmg:12,cd:.8,range:420,speed:1100,knock:6,crit:8,critMul:2,price:32,len:40,pv:.32,desc:'Instantly finishes any non-boss alien below 25% health.'},
-  cluster:{name:'Cluster Launcher',sets:['explosive','heavy'],cluster:4,dmg:14,cd:2,range:420,speed:480,blast:70,knock:18,crit:3,critMul:2,price:42,len:56,pv:.36,desc:'Rockets burst into 4 extra bomblets.'},
+  scythe:{name:'Scythe',sets:['blade'],melee:true,sweep:3.15,dmg:15,cd:1.2,range:125,knock:14,crit:6,critMul:2.2,price:36,len:54,pv:.16,desc:'Spins all the way around, cutting every alien nearby.'},
+  silencer:{name:'Silenced Pistol',sets:['precise'],exec:.25,dmg:13,cd:.75,range:420,speed:1100,pierce:1,knock:6,crit:8,critMul:2,price:32,len:40,pv:.32,desc:'Pierces 1. Instantly finishes any non-boss alien below 25% health.'},
+  cluster:{name:'Cluster Launcher',sets:['explosive','heavy'],cluster:4,dmg:14,cd:2.2,range:420,speed:480,blast:70,knock:18,crit:3,critMul:2,price:42,len:56,pv:.36,desc:'Rockets burst into 4 extra bomblets.'},
 };
 /* Weapon sets: bonuses unlock at 2, 4 and 6 weapons of a set (duplicates count). Each tier replaces the one before. */
 const SETS={
@@ -579,7 +579,7 @@ function killEnemy(e,drops){
 }
 function stamp(name,col,x,y,size,alpha,rot){const im=tinted(name,col);dctx.save();dctx.globalAlpha=alpha;dctx.translate(x,y);dctx.rotate(rot);dctx.drawImage(im,-size/2,-size/2*im.height/im.width,size,size*im.height/im.width);dctx.restore()}
 function splat(x,y,r,col){stamp('fx_splat',col,x,y,r*rand(3,4),.6,rand(0,TAU))}
-function clusterPop(b){if(!b.cluster)return;for(let k=0;k<b.cluster;k++){const a=k/b.cluster*TAU+rand(-.4,.4),d=rand(55,85);booms.push({x:b.x+Math.cos(a)*d,y:b.y+Math.sin(a)*d,t:.12+k*.06,r:48,dmg:Math.round(b.dmg*.55),knock:10,safe:true,def:b.def})}}
+function clusterPop(b){if(!b.cluster)return;for(let k=0;k<b.cluster;k++){const a=k/b.cluster*TAU+rand(-.4,.4),d=rand(55,85);booms.push({x:b.x+Math.cos(a)*d,y:b.y+Math.sin(a)*d,t:.12+k*.06,r:48,dmg:Math.round(b.dmg*.35),knock:10,safe:true,def:b.def})}}
 function explode(x,y,R,dmg,knock,hurtsPlayer,def){
   if(!hurtsPlayer)R*=1+(S.blast||0)/100;
   for(const e of enemies){if(e.dead||e.under)continue;const dd=Math.sqrt(d2(x,y,e.x,e.y));if(dd<R+e.r){const crit=Math.random()*100<S.crit+3;const was=!e.dead;hurtEnemy(e,Math.max(1,Math.round(dmg*(crit?2:1))),crit,Math.atan2(e.y-y,e.x-x),knock);if(was&&e.dead&&dmg>0){PROF.boomK++;if(def)creditKill(def)}}}
