@@ -86,6 +86,10 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Catching little birds**: sparrows scatter if you walk or run up to them, but sneak (hold C, or push the
   stick gently) and you can creep right up and pounce (E). Robins, pigeons and blackbirds can be caught
   the same way. The bird sits in your paws for a moment, then flutters off unharmed.
+- **Pond and river life** (any village with open water, not in winter): a kingfisher that perches on the
+  bank and dives for fish (sneak close to watch it), a beaver who hauls sticks to build up its dam (steal
+  one and it slaps its tail at you), newts by the water's edge to sneak up on and catch, and a shy water
+  vole that only pops out if you sit still near its bank.
 - **Disguises and tricks**:
   - *Disguises*: hold a hat, bucket, pot, shirt, sock or the museum crown and press G to wear it. Villagers
     won't notice what you're carrying unless they get close ("Morning, stranger!"), but whoever owns the
@@ -117,6 +121,10 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     gold medal on the podium.
   - *Funfair* (spring to autumn): a carousel and a big wheel to ride (E), a coconut shy (knock all three off for
     a prize teddy), a candyfloss stand, and a hall of mirrors whose reflections confuse anyone chasing you.
+  - *Zoo escape* (spring to autumn): the City Zoo van has broken down by the green and its animals are loose.
+    Help the frantic zookeeper by sneaking up and pouncing (E): a monkey that swings between trees and pinches
+    things (catch it when it comes down), a waddling penguin, a zebra that bolts if you don't sneak, and a
+    kangaroo that boxes you if you come at it from the front.
   - Every village also has a hen house: hens panic and squawk when chased (loud enough to make villagers look)
     and their eggs can be stolen, eaten or smashed.
 - **Weather**: each village also rolls weather that suits its season.
@@ -155,6 +163,14 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     someone); mist rises off the water early in the day; and on frosty or snowy days the puddles freeze into
     slides.
   - *Frost* (autumn, winter): icy, slippery paths; villagers chasing you along them may slip and fall.
+  - *Ice storm* (autumn, winter): freezing rain glazes the whole village, not just the paths, so everyone
+    skids about, you included.
+  - *Tornado* (spring, summer): a huge dark funnel that wanders the village, sucking in anything loose and
+    throwing anyone (raccoon included) who gets too close.
+  - *Cloudburst* (spring, summer): torrential rain that floods the roads; wading down them slows you (and
+    everyone else) and sends up splashes.
+  - *Breezy days*: in windy weather kites fly when you carry them, washing blows off the lines to be caught,
+    and in spring and summer dandelion clocks grow in the grass (hold one and chitter to blow it).
   - The weather can change partway through the day; the morning card gives the forecast, and a toast tells you
     when it turns. When rain clears up, a rainbow appears with a pot of gold at its end (+3 shinies).
 - **Animals**: ducks on the pond and river (they quack and flee, and eat any food dropped near them),
@@ -219,7 +235,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 280 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 295 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -313,6 +329,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   `buildSpringsEarly()` / `placeSprings()`, `buildClifftop()`, `placeSports()` / `tugCheck()`, `playAction()` /
   `updatePlayRide()` (swing, slide, roundabout, zipline), `updateSchoolEtc()`;
   catching birds: `SNEAK_SPEED`, `birdInReach()`, `pounceAction()`, `holdBird()`;
+  pond life, zoo escape, storms and breezes: `spawnPondLife()`, `spawnZoo()` / `returnZooAnimal()`, `updatePondZoo()`
+  / `pzScare()` / `drawPondZoo()`, `updateStormsBreeze()` (ice skids, flooded roads, kites, blowing washing),
+  `drawCloudburst()`, `drawKite()`, `blowDandelion()`, `placeBreezyItems()`;
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
