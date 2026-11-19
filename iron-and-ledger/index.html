@@ -127,6 +127,7 @@ footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-
   <div class="wrap">
     <p class="sub" id="resZone"></p>
     <h1 class="big" id="resTitle"></h1>
+    <div id="podWrap" hidden style="margin:10px 0 18px"><canvas id="podium" style="width:100%;height:300px;display:block;border:1px solid var(--line);background:linear-gradient(#1c2230,#0f1218)"></canvas><div id="podLines" class="lines" style="margin-top:8px"></div></div>
     <div class="lines" id="resLines"></div>
     <div><button class="b primary" id="resBack">Back to safehouse</button></div>
   </div>
@@ -3265,7 +3266,7 @@ function endPvp(winner){
   const lines=[[won?'good':'',won?(ts?'Your team won the match!':'You won the match!'):`${winner||'Nobody'} won the match`],...(ts?[['',`Red ${ts.r} · Blue ${ts.b}`]]:[]),...board.map((b,i)=>[b.me?'good':'',`${i+1}. ${b.team?(b.team==='r'?'[Red] ':'[Blue] '):''}${b.nick}${b.me?' (you)':''}: ${b.k} KOs, ${b.d} times KO'd`]),['good',`Prize: ${money(prize)} (${money(50)} per KO${won?' + '+money(300)+' for the win':''})`],['','No gear is lost in PvP.']];
   logMsg(`PvP match on ${R.z.n.replace('PvP · ','')}: ${R.pvKills} KOs, prize ${money(prize)}.`,'good');save();
   const z=R.z;
-  setTimeout(()=>{gameEl.hidden=true;$('#result').hidden=false;$('#resZone').textContent=z.n;const t=$('#resTitle');t.textContent=won?'VICTORY':'MATCH OVER';t.className='big '+(won?'good':'bad');
+  setTimeout(()=>{gameEl.hidden=true;$('#result').hidden=false;$('#podWrap').hidden=true;$('#resZone').textContent=z.n;const t=$('#resTitle');t.textContent=won?'VICTORY':'MATCH OVER';t.className='big '+(won?'good':'bad');
     $('#resLines').innerHTML=lines.map(([c,txt])=>`<div class="${c}">${esc(txt)}</div>`).join('');for(const d of R.disp)try{d.dispose()}catch(e){}R=null;netSend()},400);
 }
 function pvpBoard(){
@@ -4110,7 +4111,7 @@ function netSend(){
   const td=NET.tradeDone&&Date.now()<NET.tradeDone.until?NET.tradeDone:null;
   const P={nick:NET.nick,color:NET.color,ch:S.char,pvpEnd:NET.pvpEnd||null,trade:R?null:NET.trade?{w:NET.trade.with,t:NET.trade.tid,it:myTradeItems().map(tradeItemPub),c:NET.trade.cash,ok:NET.trade.ok||''}:td?{w:td.w,t:td.t,ok:td.ok,done:td.done,it:[],c:0}:null,gifts:(S.outbox||[]).map(g=>({g:g.gid,to:g.to,w:g.w,c:g.cash})),acks:(S.claimed||[]).slice(-10),go:NET.go||null,rev:NET.rev||null,raid:null,net:null,hits:[]};
   if(R&&R.net&&!R.over){const p=R.player,w=curW();
-    P.raid={e:R.net.epoch,z:R.zi,pvp:R.pvp?1:0,tm:R.team||null,pv:R.pvp?[R.pvKills,R.deaths]:null,ko:R.pvp?R.lastKO||null:null,rs:R.respawnT>0?1:0,drops:(R.myDrops||[]).filter(it=>R.items.includes(it)).map(it=>({d:it.dropId,x:Math.round(it.x),y:Math.round(it.y),w:{base:it.w.base,model:it.w.model|0,rar:it.w.rar,cond:Math.round(it.w.cond),mods:it.w.mods,appraised:it.w.appraised}})),took:R.took||[],rp:R.lastRepair||null,veh:R.driving?[R.vehicles.indexOf(R.driving),Math.round(R.driving.x),Math.round(R.driving.y),Math.round(R.driving.a*100)/100,Math.round(R.driving.spd),Math.round(R.driving.hp),Math.round((R.driving.alt||0)*10)/10]:null,wr:R.vehicles?R.vehicles.map((v,i)=>v.wrecked?i:-1).filter(i=>i>=0):[],h:Math.round((p.z||0)*10)/10,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
+    P.raid={e:R.net.epoch,z:R.zi,pvp:R.pvp?1:0,tm:R.team||null,pv:R.pvp?[R.pvKills,R.deaths]:null,ko:R.pvp?R.lastKO||null:null,rs:R.respawnT>0?1:0,drops:(R.myDrops||[]).filter(it=>R.items.includes(it)).map(it=>({d:it.dropId,x:Math.round(it.x),y:Math.round(it.y),w:{base:it.w.base,model:it.w.model|0,rar:it.w.rar,cond:Math.round(it.w.cond),mods:it.w.mods,appraised:it.w.appraised}})),took:R.took||[],k:R.kills|0,rp:R.lastRepair||null,veh:R.driving?[R.vehicles.indexOf(R.driving),Math.round(R.driving.x),Math.round(R.driving.y),Math.round(R.driving.a*100)/100,Math.round(R.driving.spd),Math.round(R.driving.hp),Math.round((R.driving.alt||0)*10)/10]:null,wr:R.vehicles?R.vehicles.map((v,i)=>v.wrecked?i:-1).filter(i=>i>=0):[],h:Math.round((p.z||0)*10)/10,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
     for(const [k,v] of Object.entries(NET.pend)){const [kd,ix]=k.split(':'),kind=+kd,idx=kind===2?ix:+ix;NET.seq++;NET.hitQ.push([NET.seq,kind,idx,Math.round(v.d*10)/10,v.f])}NET.pend={};
     while(NET.hitQ.length>16)NET.hitQ.shift();P.hits=NET.hitQ;
     if(R.net.isHost)P.net=snapshot();
@@ -4190,7 +4191,7 @@ function netTick(dt){
     const ang=Math.atan2(-Math.cos(r.yaw),-Math.sin(r.yaw));r.mesh.position.set(r.x*K,0,r.y*K);r.mesh.rotation.y=-ang;
     const s=Math.sin(r.walkT*4.5);for(const L of r.legs)L.hip.rotation.z=r.dn?0:L.sd*s*.5;
     r.mesh.rotation.order='YXZ';r.mesh.rotation.x+=((r.dn?1.4:0)-r.mesh.rotation.x)*Math.min(1,dt*6);r.h=(r.h||0)+((+rd.h||0)-(r.h||0))*Math.min(1,dt*12);r.mesh.position.y=r.h+(r.dn?.25:0);
-    r.rs=!!rd.rs;r.mesh.visible=!r.rs;if(Array.isArray(rd.pv)){r.pk=rd.pv[0]|0;r.pd=rd.pv[1]|0}
+    r.k=Math.max(0,Math.min(9999,+rd.k||0));r.rs=!!rd.rs;r.mesh.visible=!r.rs;if(Array.isArray(rd.pv)){r.pk=rd.pv[0]|0;r.pd=rd.pv[1]|0}
     if(R.pvp){ // hits on me, and KOs announced by others
       const hits=Array.isArray(P.hits)?P.hits:[];let seen=R.pvSeen[q.peer];
       if(seen===undefined)R.pvSeen[q.peer]=hits.reduce((m,h)=>Math.max(m,h[0]|0),0);
@@ -4268,9 +4269,9 @@ function endRaid(ok,reason){
   if(R.critterKO)lines.push(['',`Coin critters caught: ${R.critterKO}`]);
   lines.push(...marketCycle());
   save();
-  const z=R.z;
+  const z=R.z,podList=R.pvp?[]:podiumEntries();
   setTimeout(()=>{
-    gameEl.hidden=true;$('#result').hidden=false;
+    gameEl.hidden=true;$('#result').hidden=false;try{showPodium(podList)}catch(e){$('#podWrap').hidden=true}
     $('#resZone').textContent=`${z.n} · raid ${S.raids}`;
     const t=$('#resTitle');t.textContent=ok?'EXTRACTED':(reason.startsWith('Missing')?'MIA':'KO');t.className='big '+(ok?'good':'bad');
     $('#resLines').innerHTML=lines.map(([c,txt])=>`<div class="${c}">${txt}</div>`).join('');
@@ -4278,7 +4279,36 @@ function endRaid(ok,reason){
     R=null;netSend();
   },ok?300:900);
 }
-$('#resBack').addEventListener('click',()=>{$('#result').hidden=true;$('#hub').hidden=false;tab='loadout';renderHub()});
+// ---------- end-of-raid podium: 1st / 2nd / 3rd and MBK (Most Bears Knocked out) ----------
+const POD={};
+function podiumEntries(){const list=[{nick:NET.nick||'You',color:NET.color||'#86d4ff',ch:S.char,k:R.kills|0,me:true}];
+  if(R.net&&R.remotes)for(const r of Object.values(R.remotes))list.push({nick:String(r.nick||'Ranger').slice(0,16),color:safeColor(r.color),ch:CHARS[r.ch]?r.ch:'ranger',k:r.k|0,me:false});
+  list.sort((a,b)=>b.k-a.k||(a.me?-1:1));return list.slice(0,3)}
+function showPodium(list){const wrap=$('#podWrap'),cv=$('#podium');if(!wrap||!cv||!window.THREE||!list.length){if(wrap)wrap.hidden=true;return}
+  wrap.hidden=false;cancelAnimationFrame(POD.raf||0);
+  try{if(!POD.rd){POD.rd=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});POD.rd.outputEncoding=THREE.sRGBEncoding}}catch(e){wrap.hidden=true;return}
+  const W=cv.clientWidth||600,H=cv.clientHeight||300;POD.rd.setPixelRatio(Math.min(2,window.devicePixelRatio||1));POD.rd.setSize(W,H,false);
+  if(POD.disp)for(const d of POD.disp)try{d.dispose()}catch(e){}
+  const sc=new THREE.Scene(),disp=[];POD.disp=disp;const cam=new THREE.PerspectiveCamera(38,W/H,.1,100);cam.position.set(0,3.6,9.6);cam.lookAt(0,1.9,0);
+  sc.add(new THREE.HemisphereLight(0xdfe8ff,0x2a2018,1.1));const dl=new THREE.DirectionalLight(0xffffff,1.6);dl.position.set(3,6,5);sc.add(dl);const sp=new THREE.PointLight(0xffd070,1.5,12);sp.position.set(0,5,2);sc.add(sp);
+  const fl=new THREE.Mesh(new THREE.CircleGeometry(7,40),new THREE.MeshStandardMaterial({color:0x2a3040,roughness:.9}));fl.rotation.x=-Math.PI/2;sc.add(fl);disp.push(fl.geometry,fl.material);
+  const slots=[{x:0,h:1.3,c:0xf2c14a,t:'1st'},{x:-2.1,h:.85,c:0xc8ccd4,t:'2nd'},{x:2.1,h:.5,c:0xc8834a,t:'3rd'}];POD.figs=[];
+  const oldR=R;
+  list.forEach((e,i)=>{const s0=slots[i];const blk=new THREE.Mesh(new THREE.BoxGeometry(1.7,s0.h,1.4),new THREE.MeshStandardMaterial({color:s0.c,roughness:.35,metalness:.6}));blk.position.set(s0.x,s0.h/2,0);sc.add(blk);disp.push(blk.geometry,blk.material);
+    const cvs=document.createElement('canvas');cvs.width=128;cvs.height=64;const c2=cvs.getContext('2d');c2.fillStyle='#14121a';c2.font='bold 44px sans-serif';c2.textAlign='center';c2.textBaseline='middle';c2.fillText(String(i+1),64,34);
+    const tx=new THREE.CanvasTexture(cvs);const nm=new THREE.Mesh(new THREE.PlaneGeometry(.8,.4),new THREE.MeshBasicMaterial({map:tx,transparent:true}));nm.position.set(s0.x,s0.h/2,.71);sc.add(nm);disp.push(tx,nm.geometry,nm.material);
+    const fake={nick:e.nick,color:e.color,ch:e.ch,peer:'pod'+i};R={scene:sc,disp};try{mkRemoteMesh(fake)}catch(err){}R=oldR;
+    const g=fake.mesh;if(!g)return;g.position.set(s0.x,s0.h,0);g.rotation.y=-Math.PI/2;if(i===0){g.scale.setScalar(1.15);
+      const crown=new THREE.Group();const gm=new THREE.MeshStandardMaterial({color:0xf2c14a,metalness:1,roughness:.2,emissive:0x4a3200,emissiveIntensity:.6});disp.push(gm);
+      const ring=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.08,16,1,true),gm);crown.add(ring);disp.push(ring.geometry);for(let k=0;k<5;k++){const sp2=new THREE.Mesh(new THREE.ConeGeometry(.04,.14,6),gm);const an=k/5*Math.PI*2;sp2.position.set(Math.cos(an)*.18,.1,Math.sin(an)*.18);crown.add(sp2);disp.push(sp2.geometry)}
+      crown.position.y=1.98;g.add(crown);if(fake.label)fake.label.position.y=2.32;
+      const lc2=document.createElement('canvas');lc2.width=256;lc2.height=64;const x2=lc2.getContext('2d');x2.fillStyle='#f2c14a';x2.font='bold 40px sans-serif';x2.textAlign='center';x2.textBaseline='middle';x2.fillText('👑 MBK',128,34);
+      const lt=new THREE.CanvasTexture(lc2);const lb=new THREE.Sprite(new THREE.SpriteMaterial({map:lt,transparent:true,depthTest:false}));lb.scale.set(1.6,.4,1);lb.position.y=2.6;g.add(lb);disp.push(lt,lb.material)}
+    POD.figs.push({g,base:s0.h,i})});
+  POD.sc=sc;POD.cam=cam;const t0=performance.now();
+  const tick=now=>{if($('#result').hidden)return;const t=(now-t0)/1000;for(const f of POD.figs){f.g.rotation.y=-Math.PI/2+Math.sin(t*.8+f.i)*.5;f.g.position.y=f.base+(f.i===0?Math.abs(Math.sin(t*3))*.18:0)}POD.rd.render(sc,cam);POD.raf=requestAnimationFrame(tick)};POD.raf=requestAnimationFrame(tick);
+  const medals=['🥇','🥈','🥉'];$('#podLines').innerHTML=list.map((e,i)=>`<div class="${i===0?'good':''}">${medals[i]} ${i===0?'1st':i===1?'2nd':'3rd'} · <span style="color:${safeColor(e.color)}">●</span> ${esc(e.nick)}${e.me?' (you)':''} · ${e.k} bear${e.k===1?'':'s'} knocked out${i===0?' · 👑 MBK: Most Bears Knocked out':''}</div>`).join('')}
+$('#resBack').addEventListener('click',()=>{cancelAnimationFrame(POD.raf||0);$('#result').hidden=true;$('#hub').hidden=false;tab='loadout';renderHub()});
 
 // ---------- loop ----------
 let last=performance.now();
