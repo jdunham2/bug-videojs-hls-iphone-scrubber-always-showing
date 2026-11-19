@@ -58,7 +58,7 @@ def put(name, im, q=82, **meta):
 
 # ---------- 3D renders ----------
 HUE = {'w_rail': 62, 'i_core': -92, 'i_crown': 92, 'i_chrono': -50}
-TINT = {'i_urn': ((90, 50, 0), (240, 170, 30), (255, 236, 150)), 'i_fshield': ((10, 40, 80), (70, 190, 255), (220, 248, 255))}  # colourise grey models  # hue shift (0-255 scale): purple crystal -> alien green, blue jewel -> ruby red
+TINT = {'i_glassball': ((10, 50, 80), (110, 220, 255), (235, 252, 255)), 'i_candle': ((30, 30, 90), (150, 170, 255), (240, 244, 255)), 'i_urn': ((90, 50, 0), (240, 170, 30), (255, 236, 150)), 'i_fshield': ((10, 40, 80), (70, 190, 255), (220, 248, 255))}  # colourise grey models  # hue shift (0-255 scale): purple crystal -> alien green, blue jewel -> ruby red
 ROT = {'veg_banana': 58, 'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90}
 FLIP = {'w_tender', 'w_laser', 'w_rail', 'w_mines', 'w_guzi', 'w_knife', 'w_pistol', 'w_smg', 'w_shotgun', 'w_rocket', 'w_zapper', 'w_sniper', 'w_minigun', 'w_bouncer', 'w_lobber', 'w_flamer'}
 for f in sorted(os.listdir(RAW)):
@@ -98,6 +98,25 @@ for f in sorted(os.listdir(RAW)):
     else:
         im = outline(im, 6); im, _ = fit(im, 96, 96)
     put(n, im)
+
+# ---------- drawn icons (no Kenney model fits) ----------
+def draw_saw(size=300):
+    from PIL import ImageDraw
+    import math
+    im = Image.new('RGBA', (size, size), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    c = size / 2; R = size * .46; r = size * .36; teeth = 14; pts = []
+    for i in range(teeth * 2):
+        a = i / (teeth * 2) * math.tau
+        rad = R if i % 2 == 0 else r
+        a2 = a + (math.tau / (teeth * 2)) * .35 * (1 if i % 2 == 0 else 0)
+        pts.append((c + math.cos(a2) * rad, c + math.sin(a2) * rad))
+    d.polygon(pts, fill=(168, 176, 196, 255))
+    d.ellipse([c - r * .92, c - r * .92, c + r * .92, c + r * .92], fill=(196, 204, 222, 255))
+    d.ellipse([c - r * .55, c - r * .55, c + r * .55, c + r * .55], fill=(150, 158, 178, 255))
+    d.ellipse([c - r * .2, c - r * .2, c + r * .2, c + r * .2], fill=(70, 74, 90, 255))
+    d.pieslice([c - r * .85, c - r * .85, c + r * .85, c + r * .85], 200, 250, fill=(235, 240, 250, 255))
+    return im
+im = outline(draw_saw(), 6); im, _ = fit(im, 96, 96); put('i_saws', im)
 
 # ---------- Monster Builder aliens ----------
 def mb(n):
