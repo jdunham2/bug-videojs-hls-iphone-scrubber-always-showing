@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 30, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 31, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -82,7 +82,7 @@ const REGION_TINT = [null, 'rgba(96,44,160,.34)', 'rgba(128,110,84,.38)', 'rgba(
 const tiles = new Uint8Array(W * H), region = new Uint8Array(W * H);
 const cx = OW / 2, cy = H / 2;
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? DEEP : tiles[y * W + x];
-const isLand = t => t >= LAND && t !== 20 && t !== 24 && t !== 25 && t !== 27 && t !== WALL && t !== GATE && t !== LOCK && t !== BDOOR && t !== POOL;
+const isLand = t => t >= LAND && t !== 20 && t !== 24 && t !== 25 && t !== 27 && t !== 29 && t !== WALL && t !== GATE && t !== LOCK && t !== BDOOR && t !== POOL;
 const inDungeon = x => x >= (OW + 2) * T;
 function regionOf(x, y) {
   const dx = x - cx, dy = y - cy;
@@ -928,6 +928,32 @@ const CITADEL_D = makeDungeon('citadel', 'The Frozen Citadel', 29, CITADEL, { ti
   for (const [i, x, y] of [[1, 5, 27], [2, 34, 27], [3, 20, 31]]) D.switches.push({ id: 'c' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
   for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
 }
+// ---------- Mangrove Shoals: a misty estuary where the tide comes and goes ----------
+const SANDBAR = 28, FLOODBAR = 29;
+const MANG_D = makeDungeon('mangrove', 'Mangrove Shoals', 30, null, { outdoor: true, theme: 'mangrove',
+  objective: g => 'Fisher Odo\'s stilt hut stands by the punt. At low tide, sandbars rise from the water and lead out to the far islets. Get back before the tide comes in!' });
+const TIDE = { high: false, t: 0, warned: false, cells: [] };
+{
+  const D = MANG_D, X = D.x0;
+  for (let y = 0; y < H; y++) for (let lx = 0; lx < DW; lx++) {
+    const x = X + lx, dx = (lx - 19.5) / 18.5, dy = (y - 22) / 21;
+    const d = Math.hypot(dx, dy) + (vnoise(x / 6 + 3000, y / 6) - 0.5) * 0.26;
+    const shore = 15 + Math.round((vnoise(x / 4 + 3100, 7) - 0.5) * 3);
+    tiles[y * W + x] = y < 44 && d < 0.95 && y <= shore ? LAND : DEEP; region[y * W + x] = 21;
+  }
+  for (let y = 2; y < 13; y++) for (let lx = 15; lx <= 25; lx++) tiles[y * W + X + lx] = LAND;
+  D.islets = [[10, 22, 2.2], [28, 24, 2.4], [18, 31, 2.2], [30, 36, 2], [11, 39, 2.2]];
+  for (const [ix, iy, r] of D.islets) for (let y = Math.floor(iy - r - 1); y <= iy + r + 1; y++) for (let lx = Math.floor(ix - r - 1); lx <= ix + r + 1; lx++) if (Math.hypot(lx - ix, (y - iy) * 1.1) <= r) tiles[y * W + X + lx] = LAND;
+  // winding sandbars, two tiles wide, bared at low tide
+  const bar = (ax, ay, bx, by, wob) => { const n = Math.ceil(Math.hypot(bx - ax, by - ay) * 2); for (let i = 0; i <= n; i++) { const k = i / n, px = ax + (bx - ax) * k + Math.sin(k * Math.PI * 2) * wob, py = ay + (by - ay) * k; for (const [ox, oy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const tx = Math.round(px) + ox, ty = Math.round(py) + oy, kk = ty * W + X + tx; if (tx > 0 && tx < DW - 1 && ty < 44 && tiles[kk] === DEEP) tiles[kk] = SANDBAR; } } };
+  bar(11, 13, 10, 21, 1.5); bar(10, 23, 17, 30, 2); bar(28, 13, 28, 23, -1.5); bar(27, 25, 19, 30, -1.5); bar(19, 32, 29, 35, 2); bar(29, 37, 12, 39, -2.5);
+  for (let y = 14; y < 44; y++) for (let lx = 0; lx < DW; lx++) if (tiles[y * W + X + lx] === SANDBAR) TIDE.cells.push(y * W + X + lx);
+  pathLine(X + 20, 4, X + 20, 11); pathLine(X + 20, 11, X + 11, 14); pathLine(X + 20, 11, X + 28, 14);
+  D.camp = { x: (X + 20) * T, y: 8 * T };
+  D.start = { x: (X + 20) * T, y: 4 * T + 8 };
+  D.shell = { x: (X + 11) * T + 16, y: 39 * T + 16 };
+}
+const nearMangSite = (tx, ty, d) => Math.hypot(tx - MANG_D.camp.x / T, ty - MANG_D.camp.y / T) < d || Math.hypot(tx - MANG_D.x0 - 20, ty - 4) < 3 || Math.hypot(tx - MANG_D.x0 - 11, ty - 39) < 2.5;
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -1063,6 +1089,7 @@ function drawOutdoorTile(c, x, y, px, py, t) {
   if (dungeonAt(px).theme === 'star') { drawStarTile(c, x, y, px, py, t); return; }
   if (dungeonAt(px).theme === 'autumn') { drawAutumnTile(c, x, y, px, py, t); return; }
   if (dungeonAt(px).theme === 'glacier') { drawGlacierTile(c, x, y, px, py, t); return; }
+  if (dungeonAt(px).theme === 'mangrove') { drawMangroveTile(c, x, y, px, py, t); return; }
   if (t === BOG) {
     const hb = hash(x, y); c.fillStyle = '#2e3a1e'; c.fillRect(px, py, T, T); c.fillStyle = '#3d4a26'; c.fillRect(px + 2, py + 2, T - 4, T - 4);
     c.fillStyle = 'rgba(120,140,60,.35)'; ellipse(c, px + 8 + hb * 16, py + 10 + hb * 10, 4, 2); ellipse(c, px + 22 - hb * 10, py + 22, 3, 1.5);
@@ -1243,6 +1270,7 @@ const ITEMS = {
   starshard: { name: 'Star Shard', price: 14 },
   corn: { name: 'Golden Corn', price: 9 },
   glacial: { name: 'Glacial Shard', price: 13 },
+  driftwood: { name: 'Driftwood', price: 12 },
   sunstone: { name: 'Sunstone', price: 450 },
 };
 // Weapons and armor: craft them at the workbench, then equip one of each.
@@ -1257,6 +1285,7 @@ const WEAPONS = {
   sun:     { name: 'Sunblade', dmg: 4, col: '#ffd65a', cost: { sunstone: 1, crystal: 8 }, beam: true, beamAlways: true, desc: 'Forged from the Sunstone. Quadruple damage, and every swing fires a beam of sunlight.' },
   aurorablade: { name: 'Aurora Blade', dmg: 5, col: '#8cf0d0', cost: { aurorastone: 1, glacial: 8 }, reach: 8, freeze: true, desc: 'Set with the Aurora Stone, it shimmers green and violet. Five times damage, long reach, and it freezes foes.' },
   gourdbane: { name: 'Gourdbane', dmg: 5, col: '#e8803a', cost: { harvestcrown: 1, corn: 8 }, heavy: true, poison: true, desc: 'Topped with the Harvest Crown. Five times damage in a wide sweep, and it poisons what it cuts.' },
+  heronspear: { name: 'Heron Spear', dmg: 4, col: '#c8d0d8', cost: { driftwood: 8, crystal: 4 }, reach: 14, desc: 'A long driftwood spear tipped like a heron\'s beak. Quadruple damage and the longest reach of any blade.' },
   glaive:  { name: 'Glacier Glaive', dmg: 4, col: '#bfe8ff', cost: { glacial: 8, crystal: 4 }, reach: 8, freeze: true, desc: 'A long blade of never-melting ice. Quadruple damage, extra reach, and freezes foes so they move at a crawl.' },
   scythe:  { name: 'Harvest Scythe', dmg: 4, col: '#c8c0b0', cost: { corn: 8, stone: 6 }, heavy: true, desc: 'A great farm scythe. Quadruple damage in a wide sweep, but slower swings.' },
   comet:   { name: 'Comet Edge', dmg: 4, col: '#9fd4ff', cost: { starshard: 8, crystal: 6 }, beam: true, desc: 'Forged from star shards. Quadruple damage, and fires a beam of starlight while your hearts are full.' },
@@ -1288,6 +1317,7 @@ const ARMORS = {
   abyssal: { name: 'Abyssal Plate', hearts: 8, tint: ['#1a1030', '#6a3a8a', '#9fe8ff'], cost: { krakenbeak: 1, coral: 8 }, sturdy: true, breath: 3, desc: 'Forged from the Kraken\'s beak. +8 hearts, the most of any armor, barely knocked back, and triple air underwater.' },
   serpentscale: { name: 'Serpent Scale Armor', hearts: 7, tint: ['#1a3a1a', '#4a8a3a', '#ffd65a'], cost: { serpenteye: 1, jade: 8 }, sturdy: true, regen: true, desc: 'Scales of the Serpent Queen. +7 hearts, the most of any armor, barely knocked back, and slowly heals you.' },
   prismplate: { name: 'Prismatic Plate', hearts: 6, tint: ['#2a2050', '#a593ff', '#9fe8ff'], cost: { prismheart: 1, glimmer: 6 }, speed: 1.15, sturdy: true, desc: 'Grown from the Hydra\'s heart. +6 hearts, 15% faster, and hits barely knock you back.' },
+  mangrovemantle: { name: 'Mangrove Mantle', hearts: 5, tint: ['#3a4a2a', '#6a8a4a', '#c4ae82'], cost: { driftwood: 8, herb: 6 }, regen: true, desc: 'Woven from mangrove fibre. +5 hearts, and slowly heals you over time.' },
   yeticloak: { name: 'Yeti Fur Cloak', hearts: 5, tint: ['#8a9fb8', '#e6eef5', '#5ab0d8'], cost: { glacial: 8, herb: 6 }, warm: true, desc: 'Shaggy and snug. +5 hearts, and keeps out the cold: frost and bogs no longer slow you.' },
   harvestcoat: { name: 'Harvest Coat', hearts: 5, tint: ['#5a3a1a', '#c8602a', '#e8c060'], cost: { corn: 8, herb: 6 }, speed: 1.1, desc: 'A warm autumn coat. +5 hearts and 10% faster movement.' },
   stargazer: { name: 'Stargazer Robe', hearts: 5, tint: ['#1a1840', '#5a4a9a', '#ffe9a8'], cost: { starshard: 8, goo: 6 }, regen: true, desc: 'Embroidered with star shards. +5 hearts, and slowly heals you anywhere.' },
@@ -1350,6 +1380,15 @@ const QUESTS = [
   { id: 'mill', giver: 'bram', name: 'The Old Mill', req: 'scare', goal: { boss: ['scareking', 'pumpking'] }, reward: { gold: 640, items: { crystal: 18 } },
     offer: ['The old windmill north of the river has been creaking all night. Something lives in there now.', 'They say a Scarecrow King rules it, and the biggest pumpkin you ever saw grew a mouth. Smash it, would you?'],
     done: ['The mill\'s turning peaceful again! Take that crown. A blade topped with it will cut through anything.'] },
+  { id: 'mosquitoes', giver: 'odo', name: 'Bite Back', goal: { kill: [['mosquito', 8]] }, reward: { gold: 170, items: { driftwood: 4 } },
+    offer: ['Ah, a visitor! Odo, at your service. Slap that one on your arm. No? Too late.', 'The mosquitoes are worse than ever. Swat eight of them: they buzz around, then dart in for a bite.'],
+    done: ['Peace and quiet at last. Here, some driftwood. Good for crafting, and it floats!'] },
+  { id: 'moonshell', giver: 'odo', name: 'The Moon Shell', req: 'mosquitoes', hint: 'Cross the sandbars at low tide to the far southwest islet', foundText: 'Found it! Bring it to Odo.', goal: { find: 'moonshell' }, reward: { gold: 200, items: { potion: 3 } },
+    offer: ['My lucky moon shell is out on the farthest islet, southwest across the shoals. I left it there when the tide caught me.', 'At low tide the sandbars rise and you can walk out. Rest on the islets along the way, and watch the tide meter: the sea comes back fast!'],
+    done: ['My moon shell! The fish will bite again. Take these tonics for your trouble.'] },
+  { id: 'shoalfoes', giver: 'odo', name: 'Trouble in the Shoals', req: 'moonshell', goal: { kill: [['mudskipper', 3], ['heron', 3], ['clam', 2]] }, reward: { gold: 300, items: { crystal: 6, driftwood: 5 } },
+    offer: ['Mudskippers spit mud at my boat, herons stab at anything that moves, and the giant clams have started spitting bubbles.', 'Three mudskippers, three herons and two clams. A heron marks its target first: step out of the red ring. A clam is only soft when it opens.'],
+    done: ['The shoals are calm again. You\'re welcome at my landing anytime, friend.'] },
   { id: 'penguins', giver: 'sena', name: 'Penguin Pests', goal: { kill: [['penguin', 5]] }, reward: { gold: 170, items: { glacial: 4 } },
     offer: ['Welcome to the Rift! I\'m Sena, I guide travelers over the ice. Or I would, if the penguins would let them pass.', 'They belly-slide straight at you. Five of them, please. Step aside as they whoosh past, then strike.'],
     done: ['Ha! Now they\'ll think twice. Take these glacial shards: they never melt.'] },
@@ -1552,9 +1591,10 @@ function spawnFind(item, rg, x0, w) {
   if (S.found[item] || pickups.some(p => p.item === item)) return;
   for (let i = 0; i < 4000; i++) {
     const x = x0 + 2 + Math.floor(hash(i, 131) * (w - 4)), y = 2 + Math.floor(hash(131, i) * 40);
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 20 && nearGlacSite(x, y, 7)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 20 && nearGlacSite(x, y, 7)) && !(rg === 21 && nearMangSite(x, y, 7)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
   }
 }
+function spawnShell() { if (S.found.moonshell || pickups.some(p => p.item === 'moonshell')) return; pickups.push({ x: MANG_D.shell.x, y: MANG_D.shell.y, vx: 0, vy: 0, item: 'moonshell', t: 0.4, keep: true }); }
 function spawnLily() { if (S.found.snowlily || pickups.some(p => p.item === 'snowlily')) return; pickups.push({ x: GLAC_D.lily.x, y: GLAC_D.lily.y, vx: 0, vy: 0, item: 'snowlily', t: 0.4, keep: true }); }
 function spawnSeed() { if (S.found.goldenseed || pickups.some(p => p.item === 'goldenseed')) return; pickups.push({ x: HARV_D.mazeCenter.x, y: HARV_D.mazeCenter.y, vx: 0, vy: 0, item: 'goldenseed', t: 0.4, keep: true }); }
 function spawnComb() { if (S.found.comb || pickups.some(p => p.item === 'comb')) return; pickups.push({ x: VALE_D.islet.x, y: VALE_D.islet.y, vx: 0, vy: 0, item: 'comb', t: 0.4, keep: true }); }
@@ -1572,6 +1612,7 @@ function acceptQuest(q) {
   if (q.goal.find === 'bloom') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (q.goal.find === 'chime') spawnFind('chime', 11, SKY_D.x0, DW);
   if (q.goal.find === 'comb') spawnComb();
+  if (q.goal.find === 'moonshell') spawnShell();
   if (q.goal.find === 'snowlily') spawnLily();
   if (q.goal.find === 'goldenseed') spawnSeed();
   if (q.goal.find === 'lens') spawnFind('lens', 18, STAR_D.x0, DW);
@@ -1605,7 +1646,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0, harvestcrown: 0, glacial: 0, aurorastone: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0, harvestcrown: 0, glacial: 0, aurorastone: 0, driftwood: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1621,7 +1662,7 @@ const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const resources = [], enemies = [], pickups = [], particles = [], floats = [], decor = [], animals = [], ambient = [];
 const SOLID = { tree: 11, rock: 12, crystal: 11, pot: 8, crate: 11, vine: 15, obsidian: 12, tallgrass: 0, pumpkin: 9 };
 const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5, pot: 1, crate: 2, vine: 2, obsidian: 5, tallgrass: 1, pumpkin: 1 };
-const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round'], ['blossom', 'blossom', 'tree_round'], ['kelp'], ['tree_dead'], ['tree_fir', 'tree_pine'], ['tree_orange', 'tree_autumn', 'tree_orange'], ['tree_snow', 'tree_snow', 'tree_fir']];
+const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round'], ['blossom', 'blossom', 'tree_round'], ['kelp'], ['tree_dead'], ['tree_fir', 'tree_pine'], ['tree_orange', 'tree_autumn', 'tree_orange'], ['tree_snow', 'tree_snow', 'tree_fir'], ['tree_swamp', 'tree_swamp', 'tree_round']];
 function addRes(type, tx, ty) {
   const r = { type, x: tx * T + 16 + (rng() - 0.5) * 10, y: ty * T + 20 + (rng() - 0.5) * 6, hp: RES_HP[type], max: RES_HP[type], alive: true, respawn: 0, shake: 0, seed: rng() };
   if (type === 'tree') { const k = TREE_KINDS[region[ty * W + tx]] || TREE_KINDS[4]; r.key = k[Math.floor(r.seed * k.length)]; }
@@ -1748,10 +1789,16 @@ for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
   const r = rng();
   if (r < 0.1) addRes('tree', x, y); else if (r < 0.135) { addRes('crystal', x, y); const c2 = resources[resources.length - 1]; c2.ice = true; c2.glacial = true; } else if (r < 0.15) addRes('rock', x, y); else if (r < 0.16) addRes('herb', x, y);
 }
+for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
+  const x = MANG_D.x0 + lx, t = tiles[y * W + x];
+  if (t !== LAND || nearMangSite(x, y, 5) || !isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1)) || tileAt(x, y + 1) === SANDBAR || tileAt(x, y - 1) === SANDBAR || tileAt(x - 1, y) === SANDBAR || tileAt(x + 1, y) === SANDBAR) continue;
+  const r = rng();
+  if (r < 0.13) addRes('tree', x, y); else if (r < 0.17) addRes('tallgrass', x, y); else if (r < 0.185) addRes('herb', x, y); else if (r < 0.195) addRes('rock', x, y);
+}
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
-    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 15 ? VALE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 16 ? REEF_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 17 ? COG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 18 ? STAR_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 19 ? HARV_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 20 ? GLAC_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 20 && nearGlacSite(x, y, 7)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
+    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 15 ? VALE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 16 ? REEF_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 17 ? COG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 18 ? STAR_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 19 ? HARV_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 20 ? GLAC_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 21 ? MANG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 20 && nearGlacSite(x, y, 7)) && !(rg === 21 && nearMangSite(x, y, 7)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
   }
   return [cx * T + 300, cy * T];
 }
@@ -1825,6 +1872,10 @@ const ENEMY = {
   penguin: { name: 'Penguin', proc: 'penguin', ai: 'penguin', hp: 2, sp: 60, dmg: 1, aggro: 220, drops: [['glacial', 1], ['gold', 2]], col: '#1a1a2a' },
   frostbat: { name: 'Frost Bat', proc: 'frostbat', ai: 'frostbat', hp: 2, sp: 110, dmg: 1, aggro: 240, drops: [['glacial', 1]], col: '#9fd4f0', flyer: true },
   snowball: { name: 'Rolling Snowball', proc: 'snowball', ai: 'snowball', hp: 4, sp: 0, dmg: 1, aggro: 230, drops: [['glacial', 1], ['gold', 2]], col: '#f0f6ff' },
+  mudskipper: { name: 'Mudskipper', proc: 'mudskipper', ai: 'mudskipper', hp: 3, sp: 0, dmg: 1, aggro: 230, drops: [['driftwood', 1], ['gold', 2]], col: '#7a7a54' },
+  heron:   { name: 'Stalking Heron', proc: 'heron', ai: 'heron', hp: 4, sp: 50, dmg: 2, aggro: 250, drops: [['driftwood', 1], ['gold', 3]], col: '#8a98a8' },
+  mosquito: { name: 'Mosquito', proc: 'mosquito', ai: 'mosquito', hp: 1, sp: 150, dmg: 1, aggro: 220, drops: [['herb', 1]], col: '#3a3a2a', flyer: true },
+  clam:    { name: 'Giant Clam', proc: 'clam', ai: 'clam', hp: 5, sp: 0, dmg: 1, aggro: 220, drops: [['driftwood', 2], ['gold', 4]], col: '#8aaab8', rooted: true },
   icemage: { name: 'Ice Mage', sprite: 'mage_ice', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 2], ['gold', 3]], col: '#9fe8ff' },
   mage:    { name: 'Cultist', sprite: 'mage', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 1], ['gold', 3]], col: '#e08a3c' },
 };
@@ -1844,9 +1895,11 @@ for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['bandit', 4, 2], [
   ['soldier', 17, 4], ['sparkbot', 17, 4], ['beetle', 17, 3], ['turret', 17, 4], ['sparkbot', 2, 2], ['beetle', 8, 2],
   ['starsprite', 18, 5], ['voidorb', 18, 3], ['mgolem', 18, 3], ['hopper', 18, 3], ['starsprite', 12, 2], ['voidorb', 13, 2],
   ['stalker', 19, 4], ['jack', 19, 4], ['cornwraith', 19, 3], ['stalker', 3, 1],
-  ['yeti', 20, 3], ['penguin', 20, 5], ['frostbat', 20, 4], ['snowball', 20, 4], ['penguin', 6, 3], ['yeti', 6, 1]])
+  ['yeti', 20, 3], ['penguin', 20, 5], ['frostbat', 20, 4], ['snowball', 20, 4], ['penguin', 6, 3], ['yeti', 6, 1],
+  ['mudskipper', 21, 5], ['heron', 21, 4], ['clam', 21, 4], ['heron', 3, 1], ['mudskipper', 9, 2]])
   for (let i = 0; i < n; i++) addEnemy(kind, rg);
 { let n = 0; for (let i = 0; i < 5000 && n < 6; i++) { const x = REEF_D.x0 + 3 + Math.floor(hash(i, 77) * (DW - 6)), y = 14 + Math.floor(hash(77, i) * 27); if (tiles[y * W + x] === LAND && tiles[(y - 1) * W + x] === DEEP && !nearReefSite(x, y, 6)) { enemies.push(makeEnemy('eel', x * T + 16, y * T + 16)); n++; } } }
+for (const rg of [21, 21, 21, 9]) { const [x, y] = randomTileIn(rg, 9); for (let i = 0; i < 3; i++) enemies.push(makeEnemy('mosquito', x + (i - 1) * 20, y + (i % 2) * 14)); }
 for (const rg of [19, 19, 19, 3]) { const [x, y] = randomTileIn(rg, 9); for (let i = 0; i < 3; i++) enemies.push(makeEnemy('crow', x + (i - 1) * 24, y + (i % 2) * 16)); }
 for (const [x, y] of KOI_SPOTS) enemies.push(makeEnemy('koi', x * T + 16, y * T + 16));
 for (const rg of [14, 14, 14, 3]) { const [x, y] = randomTileIn(rg, 9); for (let i = 0; i < 2; i++) enemies.push(makeEnemy('raptor', x + i * 30, y)); }
@@ -2111,6 +2164,7 @@ const NPCS = [
   { id: 'zahir', name: 'Zahir', x: SUN_D.mirra.x - 70, y: SUN_D.mirra.y + 36, sheet: 'zahir_idle', walk: 'zahir_walk', verb: 'Trade with', path: [[SUN_D.mirra.x - 70, SUN_D.mirra.y + 36], [SUN_D.mirra.x - 110, SUN_D.mirra.y + 40]] },
   { id: 'amara', name: 'Amara', x: SUN_D.mirra.x + 80, y: SUN_D.mirra.y + 40, sheet: 'amara_idle', walk: 'amara_walk', verb: 'Talk to', path: [[SUN_D.mirra.x + 80, SUN_D.mirra.y + 40], [SUN_D.mirra.x + 120, SUN_D.mirra.y + 50]] },
   { id: 'rosa', name: 'Captain Rosa', x: SUN_D.cove.x - 40, y: SUN_D.cove.y - 10, sheet: 'rosa_idle', walk: 'rosa_walk', verb: 'Talk to', path: [[SUN_D.cove.x - 40, SUN_D.cove.y - 10], [SUN_D.cove.x + 10, SUN_D.cove.y + 20]] },
+  { id: 'odo', name: 'Fisher Odo', x: MANG_D.camp.x + 80, y: MANG_D.camp.y + 50, sheet: 'odo_idle', walk: 'odo_walk', verb: 'Talk to', path: [[MANG_D.camp.x + 80, MANG_D.camp.y + 50], [MANG_D.camp.x + 110, MANG_D.camp.y + 70]] },
   { id: 'sena', name: 'Iceguide Sena', x: GLAC_D.camp.x + 70, y: GLAC_D.camp.y + 40, sheet: 'sena_idle', walk: 'sena_walk', verb: 'Talk to', path: [[GLAC_D.camp.x + 70, GLAC_D.camp.y + 40], [GLAC_D.camp.x + 100, GLAC_D.camp.y + 60]] },
   { id: 'bram', name: 'Farmer Bram', x: HARV_D.camp.x + 60, y: HARV_D.camp.y + 30, sheet: 'bram_idle', walk: 'bram_walk', verb: 'Talk to', path: [[HARV_D.camp.x + 60, HARV_D.camp.y + 30], [HARV_D.camp.x + 90, HARV_D.camp.y + 50]] },
   { id: 'lio', name: 'Astronomer Lio', x: STAR_D.camp.x + 60, y: STAR_D.camp.y + 30, sheet: 'lio_idle', walk: 'lio_walk', verb: 'Talk to', path: [[STAR_D.camp.x + 60, STAR_D.camp.y + 30], [STAR_D.camp.x + 90, STAR_D.camp.y + 50]] },
@@ -2312,6 +2366,17 @@ if (HAMLET) {
   for (const [ox, oy, k] of [[120, 10, 'barrel'], [134, 26, 'crate']]) decor.push({ key: k, x: GLAC_D.camp.x + ox, y: GLAC_D.camp.y + oy, s: 2, solid: 10 });
   addSign('Rift Camp', 'Rift Camp. The lake is frozen solid, and slippery! You slide until you bump into something.', GLAC_D.camp.x - 60, GLAC_D.camp.y + 100);
 }
+// the punt at the Mirewood camp, to Mangrove Shoals
+{
+  const MX = Math.round(MIRE_D.camp.x / T), MY = Math.round(MIRE_D.camp.y / T);
+  const PT = findSpot(range(MX - 5, MX - 10), range(MY - 1, MY + 4), 9) || findSpot(range(MX + 6, MX + 11), range(MY + 3, MY + 8), 9) || { x: (MX - 6) * T, y: (MY + 1) * T + 4 };
+  addFerry('punt_out', 'Fisher\'s Punt', PT.x, PT.y + 8); NPCS[NPCS.length - 1].verb = 'Board';
+  addFerry('punt_home', 'Punt to the Mirewood', (MANG_D.x0 + 24) * T, 4 * T + 8); NPCS[NPCS.length - 1].verb = 'Board';
+  addSign('Punt sign', 'Punt to Mangrove Shoals. Mind the tide out there, and the mosquitoes.', PT.x + 40, PT.y - 50);
+  decor.push({ fire: true, x: MANG_D.camp.x + 10, y: MANG_D.camp.y + 70, solid: 12 }, { stilthut: true, x: MANG_D.camp.x - 100, y: MANG_D.camp.y + 30, solid: 34 });
+  for (const [ox, oy, k] of [[130, 10, 'barrel'], [144, 26, 'crate']]) decor.push({ key: k, x: MANG_D.camp.x + ox, y: MANG_D.camp.y + oy, s: 2, solid: 10 });
+  addSign('Odo\'s Landing', 'Odo\'s Landing. The tide turns every half minute or so: watch the tide meter, and never get caught out on the sandbars!', MANG_D.camp.x - 60, MANG_D.camp.y + 110);
+}
 addFerry('ferry_home', 'Boat to Saltmarsh', (SUN_D.x0 + 21) * T + 6, 3 * T + 16);
 addSign('Mirra Oasis', 'Mirra Oasis. Shade, cool water and Zahir\'s bazaar. Corsair\'s Cove lies down the east path, the Sunken Ruins to the southwest.', SUN_D.mirra.x + 40, SUN_D.mirra.y - 20);
 addSign('Corsair\'s Cove', 'Corsair\'s Cove. No questions asked, no gold returned.', SUN_D.cove.x - 90, SUN_D.cove.y - 40);
@@ -2372,6 +2437,8 @@ const ICON_DRAW = {
   sunstone: c => { c.fillStyle = '#b8862a'; diamond(c, 16, 18, 11, 14); c.fillStyle = '#f4b740'; diamond(c, 16, 18, 9, 11); c.fillStyle = '#ffe9a8'; diamond(c, 14, 15, 3, 5); c.strokeStyle = 'rgba(255,214,90,.8)'; c.lineWidth = 2; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; c.beginPath(); c.moveTo(16 + Math.cos(a) * 12, 16 + Math.sin(a) * 12); c.lineTo(16 + Math.cos(a) * 15, 16 + Math.sin(a) * 15); c.stroke(); } },
   idol: c => { c.fillStyle = '#7a5a14'; c.fillRect(9, 6, 14, 22); c.fillStyle = '#f4b740'; c.fillRect(10, 7, 12, 20); c.fillStyle = '#7a5a14'; c.fillRect(12, 11, 3, 3); c.fillRect(17, 11, 3, 3); c.fillRect(13, 18, 6, 2); c.fillStyle = '#ec5257'; c.fillRect(15, 3, 2, 4); c.fillStyle = '#ffe9a8'; c.fillRect(11, 8, 2, 6); },
   obsidian: c => { c.fillStyle = '#16121c'; c.beginPath(); c.moveTo(6, 28); c.lineTo(10, 10); c.lineTo(16, 3); c.lineTo(21, 12); c.lineTo(26, 28); c.closePath(); c.fill(); c.fillStyle = '#4a3a62'; c.beginPath(); c.moveTo(11, 26); c.lineTo(13, 12); c.lineTo(16, 7); c.lineTo(17, 22); c.closePath(); c.fill(); c.fillStyle = '#c8b8ff'; c.fillRect(14, 9, 2, 6); },
+  driftwood: c => { c.save(); c.translate(16, 17); c.rotate(-0.5); c.fillStyle = '#a89878'; c.beginPath(); c.ellipse(0, 0, 13, 5, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c8b898'; c.fillRect(-11, -3, 20, 2); c.strokeStyle = '#7a6a50'; c.lineWidth = 1; c.beginPath(); c.moveTo(-8, 1); c.lineTo(6, 1); c.moveTo(-4, -1); c.lineTo(9, -1); c.stroke(); c.fillStyle = '#8a7a5a'; c.beginPath(); c.ellipse(12, 0, 2, 4, 0, 0, Math.PI * 2); c.fill(); c.restore(); },
+  moonshell: c => { c.fillStyle = 'rgba(220,230,255,.45)'; circle(c, 16, 16, 13); c.fillStyle = '#e8e0f8'; c.beginPath(); c.moveTo(16, 27); c.lineTo(5, 12); c.quadraticCurveTo(16, 2, 27, 12); c.closePath(); c.fill(); c.strokeStyle = '#a898c8'; c.lineWidth = 1; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(16, 26); c.lineTo(16 + i * 5, 8 + Math.abs(i) * 2); c.stroke(); } c.fillStyle = '#ffffff'; circle(c, 20, 10, 2); },
   glacial: c => { c.fillStyle = 'rgba(160,220,255,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#5ab0d8'; c.beginPath(); c.moveTo(16, 3); c.lineTo(25, 13); c.lineTo(20, 29); c.lineTo(11, 29); c.lineTo(7, 13); c.closePath(); c.fill(); c.fillStyle = '#bfe8ff'; c.beginPath(); c.moveTo(16, 3); c.lineTo(20, 14); c.lineTo(16, 28); c.lineTo(11, 14); c.closePath(); c.fill(); c.fillStyle = '#ffffff'; c.fillRect(13, 9, 2, 8); },
   snowlily: c => { c.fillStyle = 'rgba(200,240,255,.45)'; circle(c, 16, 16, 13); c.fillStyle = '#4a7a5a'; c.fillRect(15, 18, 2, 11); c.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 14 + Math.sin(a) * 6, 5, 2.5, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#9fe8ff'; circle(c, 16, 14, 3); },
   corn: c => { c.fillStyle = '#7a8a3a'; c.beginPath(); c.moveTo(10, 28); c.quadraticCurveTo(6, 16, 12, 6); c.lineTo(14, 26); c.closePath(); c.fill(); c.beginPath(); c.moveTo(22, 28); c.quadraticCurveTo(26, 16, 20, 6); c.lineTo(18, 26); c.closePath(); c.fill(); c.fillStyle = '#e8c060'; c.beginPath(); c.ellipse(16, 15, 5, 11, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c8a040'; for (let y = 7; y < 24; y += 3) for (let x = 13; x < 20; x += 3) c.fillRect(x, y, 1.5, 1.5); },
@@ -2426,7 +2493,7 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'glacial', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'glacial', 'driftwood', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone'];
 const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
@@ -2547,6 +2614,13 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">Mangrove Shoals</div>
+      <dl class="controls">
+      <dt>Getting there</dt><dd>Board Fisher's Punt near the Mirewood camp. The punt at Odo's Landing brings you back.</dd>
+      <dt>The tide</dt><dd>The tide turns every half minute or so: a meter in the corner shows how long until it changes. At low tide sandbars rise from the water and lead out to the islets. At high tide they flood, and anyone caught on them is swept to the nearest dry land and takes a hit.</dd>
+      <dt>Creatures</dt><dd>Mudskippers hop about and spit mud that slows you. Herons mark a spot with a red ring, then stab: step out of the ring. Mosquitoes swarm and dart in to bite. Giant clams spit bubbles when they open, and can only be hurt while open.</dd>
+      <dt>Driftwood</dt><dd>Fresh driftwood washes up on the sandbars at every low tide, and shoal creatures drop it too. It crafts the long-reaching Heron Spear and the healing Mangrove Mantle.</dd>
+      <dt>Elsewhere</dt><dd>Mosquitoes now swarm in the Mirewood, mudskippers hop through its bogs, and a heron wades in the meadow.</dd></dl>
       <div class="label">The Frozen Citadel</div>
       <dl class="controls">
       <dt>Getting in</dt><dd>The ice palace on the south shore of Glacier Rift's frozen lake.</dd>
@@ -2981,6 +3055,9 @@ function interact(n) {
   }
   if (n.sign) { say(n.name, [n.text]); return; }
   if (n.id === 'ysolde') { shopName = 'Ysolde\'s Trading Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
+  if (n.boat && n.id === 'punt_out') { const first = !S.found.mangrove; S.found.mangrove = true; travel(MANG_D.start.x, MANG_D.start.y, 0, 1, 'Mangrove Shoals'); if (first) setTimeout(() => toast('Misty water and twisted roots. Odo\'s Landing is just south of the punt.', 4500), 1200); return; }
+  if (n.boat && n.id === 'punt_home') { const Pn = NPCS.find(m => m.id === 'punt_out'); travel(Pn.x + 50, Pn.y + 10, 1, 0, 'The Mirewood'); return; }
+  if (n.id === 'odo') { shopName = 'Odo\'s Bait & Tackle'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
   if (n.boat && n.id === 'sled_out') { const first = !S.found.glacier; S.found.glacier = true; travel(GLAC_D.start.x, GLAC_D.start.y, 0, 1, 'Glacier Rift'); if (first) setTimeout(() => toast('Shimmering lights over a frozen valley. Rift Camp is just south of the sled.', 4500), 1200); return; }
   if (n.boat && n.id === 'sled_home') { const Sd = NPCS.find(m => m.id === 'sled_out'); travel(Sd.x, Sd.y + 50, 0, 1, 'The Frostmoor'); return; }
   if (n.id === 'sena') { shopName = 'Sena\'s Trading Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
@@ -3070,6 +3147,7 @@ function damageEnemy(e, dmg, kx, ky) {
   if (e.kind === 'tanuki' && e.mode === 'disguise') { e.mode = 'chase'; e.cd = 0.6; burst(e.x, e.y - 14, '#e6e2d6', 16); floatText(e.x, e.y - 60, 'It\'s a tanuki!', '#ffe08a'); }
   if (gearW().chain && !chainLock && rng() < 0.5) { const o = enemies.filter(q => q !== e && q.alive && Math.hypot(q.x - e.x, q.y - e.y) < 100).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0]; if (o) { chainLock = true; for (let i = 0; i < 6; i++) particles.push({ x: e.x + (o.x - e.x) * i / 6, y: e.y - 14 + (o.y - e.y) * i / 6, vx: 0, vy: 0, life: 0.25, color: '#fff6a8', size: 3 }); damageEnemy(o, 1, 0, 0); chainLock = false; } }
   if (gearW().bloom && rng() < 0.15 && S.hp > 0 && S.hp < maxHp()) { S.hp++; updateHUD(); floatText(P.x, P.y - 60, '+♥', '#f2a0c8'); }
+  if (e.kind === 'clam' && !e.open) { floatText(e.x, e.y - 30, 'Clink! Wait for it to open', '#c8d8e0'); SFX.play('mine'); return false; }
   if (e.kind === 'snowball') { e.sz = Math.max(0.6, (e.sz || 0.6) - 0.35); burst(e.x, e.y - 10, '#ffffff', 10); }
   if (e.kind === 'burrower' && e.state === 'under') { floatText(e.x, e.y - 20, 'It\'s underground!', '#c8b89a'); return false; }
   if (e.kind === 'shardback' && !(e.shardT > time)) { e.shardT = time + 0.9; shardBurst(e); }
@@ -3304,7 +3382,7 @@ function update(dt) {
   P.inv = Math.max(0, P.inv - dt); P.slow = Math.max(0, (P.slow || 0) - dt); P.hex = Math.max(0, (P.hex || 0) - dt);
   if (!P.dash && dungeonAt(P.x) === TOMB_D) for (const tr of TRAPS) if (trapState(tr) === 2 && P.x > tr.x + 2 && P.x < tr.x + 30 && P.y > tr.y + 4 && P.y < tr.y + 34) { damagePlayer(1, { x: tr.x + 16, y: tr.y + 40 }); break; }
   if (gearA().regen && S.hp > 0 && S.hp < maxHp()) { P.regenT = (P.regenT || 0) + dt; if (P.regenT > 8) { P.regenT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#7fe0f0'); } }
-  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - VALE_D.camp.x - 10, P.y - VALE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - REEF_D.camp.x, P.y - REEF_D.camp.y - 30) < 3 * T || Math.hypot(P.x - COG_D.camp.x, P.y - COG_D.camp.y - 30) < 3 * T || Math.hypot(P.x - STAR_D.camp.x - 10, P.y - STAR_D.camp.y - 60) < 3 * T || Math.hypot(P.x - HARV_D.camp.x - 10, P.y - HARV_D.camp.y - 60) < 3 * T || Math.hypot(P.x - GLAC_D.camp.x - 10, P.y - GLAC_D.camp.y - 70) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
+  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - VALE_D.camp.x - 10, P.y - VALE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - REEF_D.camp.x, P.y - REEF_D.camp.y - 30) < 3 * T || Math.hypot(P.x - COG_D.camp.x, P.y - COG_D.camp.y - 30) < 3 * T || Math.hypot(P.x - STAR_D.camp.x - 10, P.y - STAR_D.camp.y - 60) < 3 * T || Math.hypot(P.x - HARV_D.camp.x - 10, P.y - HARV_D.camp.y - 60) < 3 * T || Math.hypot(P.x - GLAC_D.camp.x - 10, P.y - GLAC_D.camp.y - 70) < 3 * T || Math.hypot(P.x - MANG_D.camp.x - 10, P.y - MANG_D.camp.y - 70) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
   if (S.bridge && !edgeToast && P.y > (H - 6) * T && !inDungeon(P.x)) { edgeToast = true; toast('The mainland lies at the end of the bridge. Keep walking south.', 3500); }
   for (const r of resources) {
     r.shake = Math.max(0, r.shake - dt);
@@ -3315,7 +3393,7 @@ function update(dt) {
   for (const e of enemies) updateEnemy(e, dt, fainted);
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].remove) enemies.splice(i, 1);
   updateProjectiles(dt, fainted);
-  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); updateAir(dt, fainted); updateTelepads(fainted); updateMeteors(dt); updateBouncers(dt, fainted); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D || dungeonAt(P.x) === TOWER_D) updateJets(dt);
+  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); updateAir(dt, fainted); updateTelepads(fainted); updateMeteors(dt); updateBouncers(dt, fainted); updateTide(dt, fainted); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D || dungeonAt(P.x) === TOWER_D) updateJets(dt);
   updateBosses(dt, fainted);
   updateWorldLinks(dt);
   for (let i = pickups.length - 1; i >= 0; i--) {
@@ -3327,6 +3405,7 @@ function update(dt) {
       pickups.splice(i, 1);
       if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
       else if (p.item === 'idol') { S.found.idol = true; banner('Found the golden idol!', '#ffe08a'); SFX.play('lucky'); questTick(); }
+      else if (p.item === 'moonshell') { S.found.moonshell = true; banner('Found the moon shell!', '#e8e0f8'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'snowlily') { S.found.snowlily = true; banner('Found the snow lily!', '#bfe8ff'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'goldenseed') { S.found.goldenseed = true; banner('Found the golden seed!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'lens') { S.found.lens = true; banner('Found the telescope lens!', '#ffe08a'); SFX.play('lucky'); questTick(); }
@@ -3685,7 +3764,7 @@ function updateProjectiles(dt, fainted) {
         if (p.kind === 'dart') { P.poison = 2.2; P.poisonT = 1; floatText(P.x, P.y - 60, 'Poison dart!', '#7fd17a'); }
         if (p.kind === 'venom') { P.poison = 3.2; P.poisonT = 1; floatText(P.x, P.y - 60, 'Poisoned!', '#7fd17a'); }
         if (p.kind === 'hex') { P.hex = 1.6; floatText(P.x, P.y - 60, 'Hexed! Controls reversed', '#d6b8ff'); }
-        if ((p.kind === 'web' || p.kind === 'ice') && !gearA().warm) { P.slow = 2.2; floatText(P.x, P.y - 60, p.kind === 'ice' ? 'Chilled!' : 'Webbed!', '#ffffff'); }
+        if ((p.kind === 'web' || p.kind === 'ice' || p.kind === 'mud') && !gearA().warm) { P.slow = 2.2; floatText(P.x, P.y - 60, p.kind === 'ice' ? 'Chilled!' : p.kind === 'mud' ? 'Muddy!' : 'Webbed!', '#ffffff'); }
       }
       if (p.t > p.life) p.dead = true;
     }
@@ -7542,7 +7621,7 @@ function updateGlacFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
     if (!fainted && P.inv <= 0 && d < 12 + 12 * e.sz) damagePlayer(1, e);
     return true;
   }
-  return false;
+  return updateMangFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander);
 }
 Object.assign(PROC_DRAW, {
   yeti(c, e, k) {
@@ -7721,6 +7800,171 @@ function drawCitadelGate(c) {
   c.fillStyle = '#16304a'; c.beginPath(); c.moveTo(x - 15, y); c.lineTo(x - 15, y - 34); c.quadraticCurveTo(x, y - 52, x + 15, y - 34); c.lineTo(x + 15, y); c.closePath(); c.fill();
   c.fillStyle = 'rgba(255,255,255,.6)'; for (let i = -2; i <= 2; i++) c.fillRect(x + i * 12 - 1, y - 76, 2, 8 + (i % 2 ? 4 : 0));
 }
+// ---------- the tide: sandbars bare at low tide and flood at high tide ----------
+const TIDE_LOW = 26, TIDE_HIGH = 16;
+let tideSweepHint = false;
+function setTide(high) {
+  TIDE.high = high;
+  for (const k of TIDE.cells) tiles[k] = high ? FLOODBAR : SANDBAR;
+  redrawArea(MANG_D.x0, 12, MANG_D.x0 + DW - 1, 43);
+  const here = dungeonAt(P.x) === MANG_D;
+  if (high) {
+    for (let i = pickups.length - 1; i >= 0; i--) { const q = pickups[i]; if (q.item === 'driftwood' && tileAt(Math.floor(q.x / T), Math.floor(q.y / T)) === FLOODBAR) pickups.splice(i, 1); }
+    for (const e of enemies) if (e.alive && !ENEMY[e.kind].flyer && dungeonAt(e.x) === MANG_D && tileAt(Math.floor(e.x / T), Math.floor(e.y / T)) === FLOODBAR) { e.x = e.hx; e.y = e.hy; }
+    if (here) { toast('High tide! The sandbars are under water.', 3000); SFX.play('slime'); }
+  } else {
+    const n = pickups.filter(q => q.item === 'driftwood').length;
+    for (let i = n; i < 6; i++) { const k = TIDE.cells[Math.floor(rng() * TIDE.cells.length)]; pickups.push({ x: (k % W) * T + 16, y: Math.floor(k / W) * T + 16, vx: 0, vy: 0, item: 'driftwood', t: 0.4, keep: true }); }
+    if (here) toast('Low tide. The sandbars are bare: driftwood has washed up!', 3000);
+  }
+}
+function updateTide(dt, fainted) {
+  TIDE.t += dt;
+  const dur = TIDE.high ? TIDE_HIGH : TIDE_LOW, here = dungeonAt(P.x) === MANG_D;
+  if (!TIDE.high && !TIDE.warned && TIDE.t > dur - 5) { TIDE.warned = true; if (here) { toast('The tide is coming in! Get to an islet or the shore.', 3500); SFX.play('wisp'); } }
+  if (TIDE.t >= dur) { TIDE.t = 0; TIDE.warned = false; setTide(!TIDE.high); }
+  if (!here || fainted || P.ride) return;
+  const tx = Math.floor(P.x / T), ty = Math.floor(P.y / T);
+  if (tileAt(tx, ty) !== FLOODBAR) return;
+  let best = null, bd = 1e9;
+  for (let yy = ty - 14; yy <= ty + 14; yy++) for (let xx = tx - 14; xx <= tx + 14; xx++) { const t = tileAt(xx, yy); if (!isLand(t) || t === FLOODBAR || dungeonAt(xx * T + 16) !== MANG_D) continue; const dd = Math.hypot(xx - tx, yy - ty); if (dd < bd) { bd = dd; best = [xx, yy]; } }
+  burst(P.x, P.y - 10, '#bfe8ff', 16); SFX.play('slime');
+  if (best) { P.x = best[0] * T + 16; P.y = best[1] * T + 16; } else { P.x = MANG_D.start.x; P.y = MANG_D.start.y; }
+  P.slideV = null; P.kx = P.ky = 0; damagePlayer(1, { x: P.x, y: P.y - 20 }); floatText(P.x, P.y - 60, 'Swept away!', '#bfe8ff');
+  if (!tideSweepHint) { tideSweepHint = true; toast('The tide swept you to the nearest dry land. Watch the tide meter in the corner!', 4500); }
+}
+function drawMangroveHUD(c) {
+  // drifting mist
+  c.save(); for (let i = 0; i < 4; i++) { const y = cvs.height * (0.2 + i * 0.2) + Math.sin(time * 0.3 + i) * 20, x = ((time * (12 + i * 5) + i * 300) % (cvs.width + 600)) - 300; const g = c.createRadialGradient(x, y, 10, x, y, 260); g.addColorStop(0, 'rgba(230,245,240,.12)'); g.addColorStop(1, 'rgba(230,245,240,0)'); c.fillStyle = g; c.fillRect(x - 260, y - 260, 520, 520); } c.restore();
+  if (TIDE.high) { c.fillStyle = 'rgba(30,70,110,.08)'; c.fillRect(0, 0, cvs.width, cvs.height); }
+  // tide meter
+  const dur = TIDE.high ? TIDE_HIGH : TIDE_LOW, left = Math.max(0, Math.ceil(dur - TIDE.t)), x = 16, y = cvs.height - 120, w = 170, h = 30, warn = !TIDE.high && left <= 5;
+  c.fillStyle = 'rgba(14,28,30,.72)'; c.beginPath(); c.roundRect ? c.roundRect(x, y, w, h, 10) : c.rect(x, y, w, h); c.fill();
+  c.fillStyle = TIDE.high ? '#5aa8d8' : '#d8c08a'; c.fillRect(x + 8, y + h - 7, (w - 16) * (1 - TIDE.t / dur), 3);
+  for (let i = 0; i < 3; i++) { c.strokeStyle = TIDE.high ? '#9fd8f0' : '#c8b48a'; c.lineWidth = 2; c.beginPath(); for (let k = 0; k <= 14; k++) c.lineTo(x + 10 + k, y + 8 + i * 5 + Math.sin(k * 0.9 + time * 3) * 1.5); c.stroke(); }
+  c.fillStyle = warn && Math.sin(time * 10) > 0 ? '#ff9a9a' : '#eef3e6'; c.font = '700 13px "Atkinson Hyperlegible", sans-serif'; c.textBaseline = 'middle'; c.textAlign = 'left';
+  c.fillText((TIDE.high ? 'High tide' : warn ? 'Tide rising!' : 'Low tide') + '  ' + left + 's', x + 38, y + 13);
+}
+function drawMangroveTile(c, x, y, px, py, t) {
+  const h = hash(x, y), dry = (xx, yy) => isLand(tileAt(xx, yy));
+  if (t === SANDBAR) {
+    c.fillStyle = '#c4ae82'; c.fillRect(px, py, T, T); c.fillStyle = 'rgba(150,125,85,.5)';
+    for (let i = 0; i < 3; i++) c.fillRect(px + 3 + ((h * 40 + i * 9) % 20), py + 6 + i * 9, 10, 2);
+    if (h > 0.75) { c.fillStyle = '#f2e6d0'; c.beginPath(); c.ellipse(px + 8 + h * 14, py + 20, 3, 2, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#d88a7a'; c.fillRect(px + 7 + h * 14, py + 19, 2, 1); }
+    c.fillStyle = 'rgba(60,110,100,.45)'; if (!dry(x, y - 1)) c.fillRect(px, py, T, 3); if (!dry(x, y + 1)) c.fillRect(px, py + T - 3, T, 3); if (!dry(x - 1, y)) c.fillRect(px, py, 3, T); if (!dry(x + 1, y)) c.fillRect(px + T - 3, py, 3, T);
+    return;
+  }
+  if (t === FLOODBAR) {
+    spr(c, edgeKey('w_', (xx, yy) => isLand(tileAt(xx, yy)), x, y), px, py); c.fillStyle = 'rgba(28,76,66,.5)'; c.fillRect(px, py, T, T); c.fillStyle = 'rgba(196,174,130,.2)'; c.fillRect(px, py, T, T);
+    c.strokeStyle = 'rgba(220,245,240,.45)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 4 + h * 8, py + 10); c.quadraticCurveTo(px + 12 + h * 8, py + 7, px + 20 + h * 8, py + 10); c.stroke();
+    return;
+  }
+  if (t === DEEP) {
+    spr(c, edgeKey('w_', (xx, yy) => isLand(tileAt(xx, yy)), x, y), px, py);
+    c.fillStyle = 'rgba(28,76,66,.5)'; c.fillRect(px, py, T, T);
+    if (h > 0.95) { c.strokeStyle = 'rgba(80,60,40,.7)'; c.lineWidth = 2; c.beginPath(); c.arc(px + 16, py + 22, 8 + h * 4, Math.PI, 0); c.stroke(); }
+    else if (h < 0.06) { c.fillStyle = '#4f8a3a'; c.beginPath(); c.ellipse(px + 14, py + 16, 6, 3, 0, 0, Math.PI * 2); c.fill(); }
+    return;
+  }
+  spr(c, h < 0.35 ? 'grass1' : 'grass0', px, py);
+  if (t === PATH) { c.fillStyle = '#6a4a30'; c.fillRect(px, py, T, T); c.fillStyle = '#8a6440'; for (let i = 0; i < 4; i++) c.fillRect(px + 1, py + i * 8 + 1, T - 2, 6); c.fillStyle = 'rgba(40,30,20,.5)'; c.fillRect(px + 4, py, 2, T); c.fillRect(px + T - 6, py, 2, T); return; }
+  c.fillStyle = 'rgba(70,90,40,.34)'; c.fillRect(px, py, T, T);
+  if (h > 0.8) { c.fillStyle = 'rgba(90,70,40,.45)'; c.beginPath(); c.ellipse(px + h * 20 + 6, py + 12 + h * 10, 6, 3, 0, 0, Math.PI * 2); c.fill(); }
+  if (h < 0.08) { c.strokeStyle = '#5a7a34'; c.lineWidth = 2; for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(px + 10 + i * 5, py + 26); c.lineTo(px + 8 + i * 6, py + 10 + i * 2); c.stroke(); } }
+}
+function drawStiltHut(c, o) {
+  const x = o.x, y = o.y;
+  shadow(c, x, y + 4, 46, 9);
+  c.fillStyle = '#4a3220'; for (const ox of [-34, -12, 12, 34]) c.fillRect(x + ox - 3, y - 30, 6, 34);
+  c.fillStyle = '#7a5a34'; c.fillRect(x - 42, y - 38, 84, 10); c.fillStyle = '#9a7444'; c.fillRect(x - 40, y - 76, 80, 40);
+  c.fillStyle = '#6a4a2a'; for (let i = 0; i < 8; i++) c.fillRect(x - 40 + i * 10, y - 76, 2, 40);
+  c.fillStyle = '#2a1a10'; c.fillRect(x - 8, y - 64, 16, 28); c.fillStyle = '#ffd68a'; c.fillRect(x + 18, y - 66, 12, 10);
+  c.fillStyle = '#b8a060'; c.beginPath(); c.moveTo(x - 52, y - 72); c.lineTo(x, y - 110); c.lineTo(x + 52, y - 72); c.closePath(); c.fill();
+  c.strokeStyle = '#8a7440'; c.lineWidth = 1; for (let i = -4; i <= 4; i++) { c.beginPath(); c.moveTo(x + i * 6, y - 104 + Math.abs(i) * 4); c.lineTo(x + i * 12, y - 74); c.stroke(); }
+  c.strokeStyle = '#c8b48a'; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 46, y - 60); c.lineTo(x + 70, y - 20); c.stroke(); c.fillStyle = '#5a8aa0'; c.beginPath(); c.ellipse(x + 70, y - 14, 6, 3, 0.4, 0, Math.PI * 2); c.fill();
+}
+function drawPunt(c, x, y) {
+  shadow(c, x, y + 4, 34, 6);
+  c.fillStyle = '#5a3a22'; c.beginPath(); c.moveTo(x - 36, y - 14); c.lineTo(x + 36, y - 14); c.lineTo(x + 30, y); c.lineTo(x - 30, y); c.closePath(); c.fill();
+  c.fillStyle = '#8a5a32'; c.fillRect(x - 32, y - 14, 64, 4); c.fillStyle = '#6a4424'; for (let i = -2; i <= 2; i++) c.fillRect(x + i * 12 - 1, y - 12, 2, 10);
+  c.strokeStyle = '#a07a4a'; c.lineWidth = 3; c.beginPath(); c.moveTo(x + 20, y - 4); c.lineTo(x + 34, y - 60); c.stroke();
+  c.fillStyle = '#ffd68a'; c.fillRect(x - 30, y - 30, 6, 8); c.strokeStyle = '#3a2414'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 27, y - 14); c.lineTo(x - 27, y - 30); c.stroke();
+}
+// ---------- Mangrove creatures: mudskippers, herons, mosquitoes, giant clams ----------
+function updateMangFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
+  const ai = AI(e.kind);
+  if (ai === 'mudskipper') {
+    if (e.state === 'leap') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); e.lift = Math.sin(Math.PI * Math.max(0, 1 - e.st / 0.45)) * 16; if (e.st <= 0) { e.state = 'move'; e.lift = 0; e.wt = 0.5 + rng() * 0.6; burst(e.x, e.y, '#6a5034', 5); } return true; }
+    if (e.state === 'spit') { e.st -= dt; if (e.st <= 0) { projectiles.push({ kind: 'mud', x: e.x, y: e.y - 12, vx: dx / d * 170, vy: dy / d * 170, t: 0, life: 1.6 }); SFX.play('swing'); e.state = 'move'; e.cd = 2 + rng(); } return true; }
+    e.wt = (e.wt || 0) - dt;
+    if (chase && d < 210 && e.cd <= 0) { e.state = 'spit'; e.st = 0.4; return true; }
+    if (e.wt <= 0) { const a = chase ? Math.atan2(dy, dx) + (rng() - 0.5) * 0.9 : rng() * Math.PI * 2; e.state = 'leap'; e.st = 0.45; e.lx = Math.cos(a) * 140; e.ly = Math.sin(a) * 140; }
+    touch(D.dmg); return true;
+  }
+  if (ai === 'heron') {
+    if (e.state === 'aim') { e.st -= dt; if (e.st <= 0) { e.state = 'stab'; e.st = 0.2; SFX.play('dash'); } return true; }
+    if (e.state === 'stab') { e.st -= dt; const ex = e.tx - e.x, ey = e.ty - e.y, el = Math.hypot(ex, ey); if (el > 22) moveEnemy(e, ex / el * Math.min(el - 20, 600 * dt), ey / el * Math.min(el - 20, 600 * dt)); if (e.st <= 0) { if (!fainted && Math.hypot(P.x - e.tx, P.y - e.ty) < 28) damagePlayer(D.dmg, e); burst(e.tx, e.ty, '#bfe8ff', 6); e.state = 'recover'; e.st = 0.7; } return true; }
+    if (e.state === 'recover') { e.st -= dt; if (e.st <= 0) { e.state = 'move'; e.cd = 1.6 + rng(); } return true; }
+    if (chase) { if (d < 140 && e.cd <= 0) { e.state = 'aim'; e.st = 0.6; e.tx = P.x; e.ty = P.y; return true; } if (d > 90) moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); }
+    else wander(D.sp);
+    return true;
+  }
+  if (ai === 'mosquito') {
+    if (e.state === 'dart') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); if (!e.hit && d < 16 && !fainted) { e.hit = true; damagePlayer(D.dmg, e); } if (e.st <= 0) { e.state = 'move'; e.cd = 1.2 + rng(); } return true; }
+    if (chase) { const a = e.anim * 4 + e.hx, tx = P.x + Math.cos(a) * 50 + (Math.random() - 0.5) * 40, ty = P.y - 16 + Math.sin(a * 1.3) * 36, ex = tx - e.x, ey = ty - e.y, el = Math.hypot(ex, ey) || 1; moveEnemy(e, ex / el * Math.min(el, D.sp * dt), ey / el * Math.min(el, D.sp * dt)); if (e.cd <= 0 && d < 120) { e.state = 'dart'; e.st = 0.25; e.lx = dx / d * 320; e.ly = dy / d * 320; e.hit = false; } }
+    else moveEnemy(e, Math.cos(e.anim * 3) * 40 * dt + (e.hx - e.x) * 0.4 * dt, Math.sin(e.anim * 2.3) * 30 * dt + (e.hy - e.y) * 0.4 * dt);
+    return true;
+  }
+  if (ai === 'clam') {
+    e.st -= dt;
+    if (e.st <= 0) {
+      e.open = !e.open; e.st = e.open ? 1.6 : 2.4 + rng();
+      if (e.open && chase) { const base = Math.atan2(dy, dx); for (let i = -1; i <= 1; i++) projectiles.push({ kind: 'bubble', x: e.x, y: e.y - 12, vx: Math.cos(base + i * 0.35) * 95, vy: Math.sin(base + i * 0.35) * 95, t: 0, life: 3, ph: rng() * 6 }); SFX.play('wisp'); }
+    }
+    touch(D.dmg, 18); return true;
+  }
+  return false;
+}
+Object.assign(PROC_DRAW, {
+  mudskipper(c, e, k) {
+    const lift = e.lift || 0, y = e.y - 6 - lift, f = (e.state === 'leap' ? e.lx : P.x - e.x) < 0 ? -1 : 1, sp = e.state === 'spit';
+    shadow(c, e.x, e.y + 2, 11 * k, 4 * k);
+    c.fillStyle = '#6a6a4a'; c.beginPath(); c.moveTo(e.x - f * 16, y + 2); c.lineTo(e.x - f * 10, y - 4); c.lineTo(e.x - f * 10, y + 4); c.closePath(); c.fill();
+    c.fillStyle = '#7a7a54'; ellipse(c, e.x, y, 11 * k, 6 * k); c.fillStyle = '#b8b088'; ellipse(c, e.x, y + 3, 8 * k, 2.5 * k);
+    c.fillStyle = '#5a6a8a'; for (let i = 0; i < 4; i++) c.fillRect(e.x - 6 + i * 3, y - 4, 1, 1);
+    c.fillStyle = '#4a4a34'; c.beginPath(); c.moveTo(e.x - 4, y - 5); c.lineTo(e.x + 2, y - 11); c.lineTo(e.x + 5, y - 5); c.fill();
+    c.fillStyle = '#e8e0c0'; circle(c, e.x + f * 6, y - 6, 3); c.fillStyle = '#1a1a10'; circle(c, e.x + f * 7, y - 6, 1.5);
+    if (sp) { c.fillStyle = '#5a4024'; circle(c, e.x + f * 12, y, 3); }
+    c.fillStyle = '#6a6a4a'; c.fillRect(e.x - 3, y + 4, 3, 3); c.fillRect(e.x + 2, y + 4, 3, 3);
+  },
+  heron(c, e, k) {
+    const f = (e.state === 'aim' || e.state === 'stab' ? e.tx - e.x : P.x - e.x) < 0 ? -1 : 1, stab = e.state === 'stab', aim = e.state === 'aim', step = e.state === 'move' ? Math.sin(e.anim * 6) * 3 : 0;
+    if (aim) { const pulse = 0.5 + Math.sin(time * 18) * 0.3; c.strokeStyle = `rgba(236,82,87,${pulse})`; c.lineWidth = 2; c.beginPath(); c.ellipse(e.tx, e.ty, 22, 10, 0, 0, Math.PI * 2); c.stroke(); }
+    shadow(c, e.x, e.y + 2, 12 * k, 4 * k);
+    c.strokeStyle = '#d8a040'; c.lineWidth = 2; c.beginPath(); c.moveTo(e.x - 3, e.y); c.lineTo(e.x - 2 + step, e.y - 22); c.moveTo(e.x + 3, e.y); c.lineTo(e.x + 2 - step, e.y - 22); c.stroke();
+    c.fillStyle = '#8a98a8'; ellipse(c, e.x, e.y - 30, 13 * k, 9 * k); c.fillStyle = '#5a6878'; c.beginPath(); c.moveTo(e.x - f * 6, e.y - 34); c.lineTo(e.x - f * 22, e.y - 26); c.lineTo(e.x - f * 4, e.y - 24); c.closePath(); c.fill();
+    const nx = e.x + f * (stab ? 22 : aim ? 2 : 8), ny = e.y - (stab ? 34 : aim ? 52 : 50);
+    c.strokeStyle = '#c8d0d8'; c.lineWidth = 4; c.beginPath(); c.moveTo(e.x + f * 8, e.y - 34); c.quadraticCurveTo(e.x + f * (aim ? -6 : 14), e.y - 46, nx, ny); c.stroke();
+    c.fillStyle = '#e6eef5'; circle(c, nx, ny, 5); c.fillStyle = '#1a1a24'; c.fillRect(nx - 5, ny - 4, 10, 2); c.fillStyle = '#e8c060'; c.fillRect(nx + f * 2 - (f < 0 ? 1 : 0), ny - 1, 1, 1);
+    c.fillStyle = '#d8a040'; c.beginPath(); c.moveTo(nx + f * 4, ny - 1); c.lineTo(nx + f * (stab ? 22 : 16), ny + 1); c.lineTo(nx + f * 4, ny + 2); c.closePath(); c.fill();
+  },
+  mosquito(c, e, k) {
+    const y = e.y - 30 + Math.sin(e.anim * 9) * 3, buzz = Math.sin(time * 60 + e.hx) * 2;
+    shadow(c, e.x, e.y + 2, 4 * k, 2 * k);
+    c.fillStyle = 'rgba(220,235,240,.55)'; ellipse(c, e.x - 4, y - 4 + buzz, 5, 2.5); ellipse(c, e.x + 4, y - 4 - buzz, 5, 2.5);
+    c.fillStyle = '#3a3a2a'; ellipse(c, e.x, y, 3 * k, 5 * k); c.fillStyle = '#5a4a3a'; ellipse(c, e.x, y + 4, 2, 3);
+    c.strokeStyle = '#2a2a1a'; c.lineWidth = 1; c.beginPath(); c.moveTo(e.x, y - 3); c.lineTo(e.x + (P.x < e.x ? -7 : 7), y + 1); c.stroke();
+    c.fillStyle = '#c84a3a'; c.fillRect(e.x - 2, y - 4, 1, 1); c.fillRect(e.x + 1, y - 4, 1, 1);
+  },
+  clam(c, e, k) {
+    const open = e.open, gape = open ? 9 : (e.st < 0.4 ? 3 : 0), y = e.y - 4;
+    shadow(c, e.x, e.y + 2, 16 * k, 5 * k);
+    c.fillStyle = '#6a8a9a'; c.beginPath(); c.ellipse(e.x, y, 16 * k, 8 * k, 0, 0, Math.PI); c.fill();
+    if (gape) { c.fillStyle = '#e8a8a8'; c.beginPath(); c.ellipse(e.x, y - 1, 13 * k, gape * 0.8, 0, Math.PI, 0); c.fill(); if (open) { c.fillStyle = 'rgba(255,250,240,.5)'; circle(c, e.x, y - 4, 7); c.fillStyle = '#fff8ee'; circle(c, e.x, y - 4, 4); } }
+    c.fillStyle = '#8aaab8'; c.beginPath(); c.ellipse(e.x, y - gape, 16 * k, 10 * k, 0, Math.PI, 0); c.fill();
+    c.strokeStyle = '#5a7a8a'; c.lineWidth = 1; for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(e.x, y - gape); c.lineTo(e.x + i * 5 * k, y - gape - 9 * k + Math.abs(i) * 1.5); c.stroke(); }
+  },
+});
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -7729,6 +7973,7 @@ function updateAmbient(dt) {
     const tx = Math.floor(x / T), ty = Math.floor(y / T), rg = region[ty * W + tx];
     if (isLand(tileAt(tx, ty))) {
       if (rg === 4) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: Math.random() < 0.5 ? '#5aa65c' : '#d9a23c' });
+      else if (rg === 21) ambient.push({ kind: 'glow', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12 });
       else if (rg === 19) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: ['#e8703a', '#c8402a', '#e8c060'][Math.floor(Math.random() * 3)] });
       else if (rg === 18) ambient.push({ kind: 'glow', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10 });
       else if (rg === 17) ambient.push({ kind: 'mote', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 6, vy: -4 - Math.random() * 4 });
@@ -7967,6 +8212,8 @@ function drawProjectiles(c) {
     } else if (p.kind === 'fire') {
       const pu = 1 + Math.sin(time * 20) * 0.15;
       c.fillStyle = 'rgba(255,140,60,.35)'; circle(c, p.x, p.y, 12 * pu); c.fillStyle = '#ffb347'; circle(c, p.x, p.y, 7 * pu); c.fillStyle = '#fff2c4'; circle(c, p.x - 1, p.y - 1, 3);
+    } else if (p.kind === 'mud') {
+      c.fillStyle = 'rgba(90,64,36,.4)'; circle(c, p.x, p.y, 9); c.fillStyle = '#5a4024'; circle(c, p.x, p.y, 6); c.fillStyle = '#8a6a44'; circle(c, p.x - 2, p.y - 2, 2);
     } else if (p.kind === 'web') {
       c.strokeStyle = '#f2f2f2'; c.lineWidth = 1.5;
       for (let i = 0; i < 4; i++) { const a = i * Math.PI / 4 + p.t * 3; c.beginPath(); c.moveTo(p.x - Math.cos(a) * 8, p.y - Math.sin(a) * 8); c.lineTo(p.x + Math.cos(a) * 8, p.y + Math.sin(a) * 8); c.stroke(); }
@@ -8417,7 +8664,7 @@ function drawProp(c, o) {
 
 function drawNPC(c, n) {
   const near = Math.hypot(n.x - P.x, n.y - P.y) < 50;
-  if (n.boat) { if (n.id.startsWith('sled_')) drawDogSled(c, n.x, n.y, n.id === 'sled_home'); else if (n.id.startsWith('wagon_')) drawHayWagon(c, n.x, n.y, n.id === 'wagon_home'); else if (n.id.startsWith('beam_')) drawMoonbeam(c, n.x, n.y, n.id === 'beam_home'); else if (n.id.startsWith('cogpad')) drawBigPad(c, n.x, n.y); else if (n.id.startsWith('bell_')) drawDivingBell(c, n.x, n.y, n.id === 'bell_home'); else if (n.id.startsWith('pass_')) drawPass(c, n.x, n.y, n.id === 'pass_home'); else if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
+  if (n.boat) { if (n.id.startsWith('punt_')) drawPunt(c, n.x, n.y); else if (n.id.startsWith('sled_')) drawDogSled(c, n.x, n.y, n.id === 'sled_home'); else if (n.id.startsWith('wagon_')) drawHayWagon(c, n.x, n.y, n.id === 'wagon_home'); else if (n.id.startsWith('beam_')) drawMoonbeam(c, n.x, n.y, n.id === 'beam_home'); else if (n.id.startsWith('cogpad')) drawBigPad(c, n.x, n.y); else if (n.id.startsWith('bell_')) drawDivingBell(c, n.x, n.y, n.id === 'bell_home'); else if (n.id.startsWith('pass_')) drawPass(c, n.x, n.y, n.id === 'pass_home'); else if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bed) { drawBed(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText('Bed').width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText('Bed', n.x, n.y + 17); } return; }
   if (n.sign) { drawSign(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bench) {
@@ -8526,6 +8773,7 @@ function render() {
     else if (kind === 5 && o.telescope) drawTelescope(ctx, o);
     else if (kind === 5 && o.scareprop) drawScarecrowProp(ctx, o);
     else if (kind === 5 && o.igloo) drawIgloo(ctx, o);
+    else if (kind === 5 && o.stilthut) drawStiltHut(ctx, o);
     else if (kind === 5 && o.crater) drawCrater(ctx, o);
     else if (kind === 5 && o.biggear) drawBigGear(ctx, o);
     else if (kind === 5 && o.templeIdol) drawTempleIdol(ctx, o);
@@ -8573,6 +8821,7 @@ function render() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (CD === REEF_D || CD === PALACE_D) drawReefOverlay(ctx, k);
     if (CD === GLAC_D) drawAurora(ctx);
+    if (CD === MANG_D) drawMangroveHUD(ctx);
     if (CD === STAR_D) { ctx.fillStyle = 'rgba(10,12,44,.22)'; ctx.fillRect(0, 0, cvs.width, cvs.height); const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(10,10,40,0)'); g.addColorStop(1, 'rgba(8,8,30,.45)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === COG_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(140,90,30,0)'); g.addColorStop(1, 'rgba(90,60,20,.3)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === CINDER_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(255,90,30,0)'); g.addColorStop(1, `rgba(140,40,20,${0.36 + Math.sin(time * 0.8) * 0.05})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
@@ -8639,6 +8888,7 @@ async function start(hot) {
   if (qState('bloom') && qState('bloom').state === 'active') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (qState('chime') && qState('chime').state === 'active') spawnFind('chime', 11, SKY_D.x0, DW);
   if (qState('comb') && qState('comb').state === 'active') spawnComb();
+  if (qState('moonshell') && qState('moonshell').state === 'active') spawnShell();
   if (qState('snowlily') && qState('snowlily').state === 'active') spawnLily();
   if (qState('seed') && qState('seed').state === 'active') spawnSeed();
   if (qState('lens') && qState('lens').state === 'active') spawnFind('lens', 18, STAR_D.x0, DW);
