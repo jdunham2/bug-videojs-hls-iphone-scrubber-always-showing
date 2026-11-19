@@ -10,6 +10,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | --- | --- | --- |
 | Walk | WASD / Arrow keys | Drag anywhere |
 | Run | Hold Shift | Drag far |
+| Sneak (slow, quiet) | Hold C | Drag gently |
 | Grab / drop / pet an animal | E | "grab" / "drop" button |
 | Throw (from a roof or treehouse: drop) | F | "throw" button |
 | Eat what you're carrying | Q | "eat" button |
@@ -21,7 +22,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Mute sound | N | — |
 
 ## What's in the game
-- **Seasons and village kinds**: every daily village rolls one of four seasons and one of fourteen kinds.
+- **Seasons and village kinds**: every daily village rolls one of four seasons and one of seventeen kinds.
   - *Spring*: blossom trees, drifting petals, Mrs. Fennick's tulip beds to trample, painted eggs hidden by bushes.
   - *Summer*: washing drying on lines (steal it), Rosa's lemonade on the picnic table.
   - *Autumn*: orange and red trees, falling leaves, chimney smoke, leaf piles to jump in (noisy) or hide in.
@@ -61,6 +62,13 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Marsh*: a bog of sucking mud (slow and very muddy) with pools, boardwalks across it, stilt huts to hide
     in, a giant toad whose croak makes the whole village jump (and whose tongue snatches snacks), and a
     will-o'-the-wisp at dusk that leads you to a glowing pebble if you keep following it.
+  - *School*: a schoolhouse with children out at playtime (they spot you and follow you about), a bell
+    rope by the door that sends them all running inside, and a playground with swings, a slide and a
+    roundabout (E to play).
+  - *Hot springs*: steaming pools to soak in (swim into one), a bathhouse with fluffy towels on the rail,
+    and a geyser that rumbles and then erupts, launching anything (or anyone) standing on it.
+  - *Clifftop*: a seaside village with cliffs over the beach, a zipline from the clifftop down to the sand,
+    a telescope, and a smugglers' cave in the cliff face with gold inside.
 - **Shops**: Rosa's house is the bakery, Granny Mabel's the sweet shop and Percy's the post office. Each has a
   sign and awning outside, a doorbell that rings when you walk in, a counter of goods inside, and the
   shopkeeper spends part of the day behind it.
@@ -75,6 +83,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Pranks** (every village): E at a front door knocks, so run and hide before they answer; E at the plaza
   signpost swaps it round and confuses passers-by; whoopee cushions go where someone sits down; and a pot
   of pink paint turns any fence you walk along pink.
+- **Catching little birds**: sparrows scatter if you walk or run up to them, but sneak (hold C, or push the
+  stick gently) and you can creep right up and pounce (E). Robins, pigeons and blackbirds can be caught
+  the same way. The bird sits in your paws for a moment, then flutters off unharmed.
 - **Disguises and tricks**:
   - *Disguises*: hold a hat, bucket, pot, shirt, sock or the museum crown and press G to wear it. Villagers
     won't notice what you're carrying unless they get close ("Morning, stranger!"), but whoever owns the
@@ -101,6 +112,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - *Bonfire night* (autumn, winter): a bonfire, toffee apples, a box of rockets (throw one in the fire to set
     it off; every villager nearby jumps), and fireworks once dusk falls.
   - *Scarecrow festival* (summer, autumn): prize scarecrows around the village, waiting to be knocked over.
+  - *Sports day* (spring, summer): a race lane with an egg-and-spoon race (run and the egg falls off) and a
+    sack race (wear the sack with G and hop to the finish), a tug of war to sabotage with a chitter, and a
+    gold medal on the podium.
   - *Funfair* (spring to autumn): a carousel and a big wheel to ride (E), a coconut shy (knock all three off for
     a prize teddy), a candyfloss stand, and a hall of mirrors whose reflections confuse anyone chasing you.
   - Every village also has a hen house: hens panic and squawk when chased (loud enough to make villagers look)
@@ -205,7 +219,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 262 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 280 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -295,6 +309,10 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   farmyard, town birds and sky: `spawnSkyCritters()` / `updateSkyCritter()` / `skyScare()` / `drawSkyCritter()`,
   `updateSky()` (stars, aurora, migrating geese, rain cloud, gales, wasps, mist, frozen puddles), `drawSkyWorld()`,
   `drawAurora()`, `placeFrozenPuddles()`;
+  school, springs, clifftop and sports day: `buildSchoolEarly()` / `placeSchool()` / `updateKid()`,
+  `buildSpringsEarly()` / `placeSprings()`, `buildClifftop()`, `placeSports()` / `tugCheck()`, `playAction()` /
+  `updatePlayRide()` (swing, slide, roundabout, zipline), `updateSchoolEtc()`;
+  catching birds: `SNEAK_SPEED`, `birdInReach()`, `pounceAction()`, `holdBird()`;
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
