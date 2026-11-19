@@ -779,7 +779,7 @@ function updateEnemies(dt){
         break;
       case 'webber':{
         const sd=e.wob>Math.PI?1:-1; if(d>400){mx=nx*e.spd;my=ny*e.spd}else if(d<260){mx=-nx*e.spd;my=-ny*e.spd}else{mx=-ny*e.spd*.6*sd;my=nx*e.spd*.6*sd}
-        e.cool-=dt; if(e.cool<=0&&d<540){e.cool=rand(3,4);e.sq=1;webs.push({x:clamp(P.x+P.vx*.4,30,AW-30),y:clamp(P.y+P.vy*.4,30,AH-30),sx:e.x,sy:e.y,t:0,land:.7,life:6,r:54,rot:rand(0,TAU)});sfx('lob')}
+        e.cool-=dt; if(e.cool<=0&&d<540){e.cool=rand(3.8,4.8);e.sq=1;webs.push({dmg:Math.max(1,Math.round(e.dmg*.5)),x:clamp(P.x+P.vx*.4,30,AW-30),y:clamp(P.y+P.vy*.4,30,AH-30),sx:e.x,sy:e.y,t:0,land:.7,life:6,r:54,rot:rand(0,TAU)});sfx('lob')}
         break}
       case 'thief':
         if(e.loot){e.flee-=dt;mx=-nx*e.spd*1.05;my=-ny*e.spd*1.05;if(e.x<90)mx+=140;if(e.x>AW-90)mx-=140;if(e.y<90)my+=140;if(e.y>AH-90)my-=140;
@@ -792,7 +792,7 @@ function updateEnemies(dt){
           if(e.stT<=0&&d<560){e.st='plant';e.stT=6;e.cool=.6;e.burst=0;e.sq=1;sfx('hop');parts.push({x:e.x,y:e.y+e.r*.6,vx:0,vy:0,t:0,life:.3,img:'fx_puff',col:'#a09080',s0:e.r,s1:e.r*2.4,a0:.45})}}
         else{e.kx=e.ky=0;e.stT-=dt;e.cool-=dt;e.bT=(e.bT||0)-dt;
           if(e.cool<=0){e.cool=2.2;e.burst=3}
-          if(e.burst>0&&e.bT<=0){e.burst--;e.bT=.14;const a=Math.atan2(dy,dx)+rand(-.06,.06);ebullets.push({x:e.x+Math.cos(a)*e.r,y:e.y+Math.sin(a)*e.r,vx:Math.cos(a)*330,vy:Math.sin(a)*330,r:7,dmg:e.dmg,t:0,c:'#ff9a3d'});sfx('shoot');e.sq=.6}
+          if(e.burst>0&&e.bT<=0){e.burst--;e.bT=.14;const a=Math.atan2(dy,dx)+rand(-.06,.06);ebullets.push({x:e.x+Math.cos(a)*e.r,y:e.y+Math.sin(a)*e.r,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:7,dmg:e.dmg,t:0,c:'#ff9a3d'});sfx('shoot');e.sq=.6}
           if(e.stT<=0){e.st='move';e.stT=rand(1.5,2.5)}}
         break;
       case 'roller':
@@ -1077,7 +1077,7 @@ function update(dt){
     if(gone){if(b.rocket&&b.trav>b.range){explode(b.x,b.y,b.def.blast,b.dmg,b.def.knock,0,b.def);clusterPop(b)}bullets.splice(i,1)}
     else if(b.rocket&&Math.random()<.7)parts.push({x:b.x,y:b.y,vx:rand(-20,20),vy:rand(-20,20),t:0,life:.4,img:'fx_puff',col:'#9a8a9a',s0:6,s1:18,rot:rand(0,TAU),a0:.5});
   }
-  for(let i=webs.length-1;i>=0;i--){const w=webs[i];w.t+=dt;if(w.t>=w.life)webs.splice(i,1);else if(!w.landed&&w.t>=w.land){w.landed=1;sfx('click');parts.push({x:w.x,y:w.y,vx:0,vy:0,t:0,life:.3,img:'fx_puff',col:'#ffffff',s0:20,s1:60,a0:.5})}}
+  for(let i=webs.length-1;i>=0;i--){const w=webs[i];w.t+=dt;if(w.t>=w.life)webs.splice(i,1);else if(!w.landed&&w.t>=w.land){w.landed=1;sfx('click');if(state==='wave'&&Math.hypot(P.x-w.x,(P.y-w.y)*1.3)<w.r)hurtPlayer(w.dmg,{type:'webber',dead:true});parts.push({x:w.x,y:w.y,vx:0,vy:0,t:0,life:.3,img:'fx_puff',col:'#ffffff',s0:20,s1:60,a0:.5})}}
   for(let i=kpools.length-1;i>=0;i--){kpools[i].t+=dt;if(kpools[i].t>=kpools[i].life)kpools.splice(i,1)}
   for(let i=rings.length-1;i>=0;i--){const g=rings[i];g.r+=g.spd*dt;if(g.r>=g.max){rings.splice(i,1);continue}
     if(!g.hit&&state==='wave'){const dd=Math.hypot(P.x-g.x,P.y-g.y);if(Math.abs(dd-g.r)<g.w*.5+P.r*.45){g.hit=true;hurtPlayer(g.dmg,{type:'pulser',dead:true})}}}
