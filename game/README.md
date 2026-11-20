@@ -69,6 +69,16 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     and a geyser that rumbles and then erupts, launching anything (or anyone) standing on it.
   - *Clifftop*: a seaside village with cliffs over the beach, a zipline from the clifftop down to the sand,
     a telescope, and a smugglers' cave in the cliff face with gold inside.
+  - *Ski village* (always winter unless you pick a season): a piste with slalom flags, a chairlift to ride up
+    (E at the bottom station) and a ski run back down (E at the top), skiers to knock over (bump into them or
+    chitter as they pass), and a chalet whose counter has mugs of hot chocolate.
+  - *Vineyard*: rows of vines heavy with grapes in summer and autumn, a grape-treading tub to hop about in
+    (you leave purple pawprints after), a farm shop with jam and an honesty box, and a tractor that trundles
+    up and down the road (hop on its trailer with E, but don't stand in front of it).
+  - *Pleasure pier*: a seaside village with an arcade (keep trying the claw machine for a plushie, and nudge
+    the penny falls for a bonus shiny, though the tilt alarm goes off), an ice-cream van with chimes, deckchairs
+    with snoozing sunbathers (barge into one, or fiddle with it), and a Punch and Judy show to heckle (chitter)
+    and to pinch Mr Punch's sausages from.
 - **Shops**: Rosa's house is the bakery, Granny Mabel's the sweet shop and Percy's the post office. Each has a
   sign and awning outside, a doorbell that rings when you walk in, a counter of goods inside, and the
   shopkeeper spends part of the day behind it.
@@ -121,6 +131,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     gold medal on the podium.
   - *Funfair* (spring to autumn): a carousel and a big wheel to ride (E), a coconut shy (knock all three off for
     a prize teddy), a candyfloss stand, and a hall of mirrors whose reflections confuse anyone chasing you.
+  - *Lantern festival* (spring, autumn, winter): strings of lanterns over the plaza that glow at dusk, dumpling
+    and noodle stalls, a dragon dance winding round the plaza (follow close behind its tail to join in), and a
+    table of sky lanterns: pick one up and let go, and it floats off into the sky.
   - *Zoo escape* (spring to autumn): the City Zoo van has broken down by the green and its animals are loose.
     Help the frantic zookeeper by sneaking up and pouncing (E): a monkey that swings between trees and pinches
     things (catch it when it comes down), a waddling penguin, a zebra that bolts if you don't sneak, and a
@@ -235,7 +248,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 295 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 314 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -332,6 +345,11 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   pond life, zoo escape, storms and breezes: `spawnPondLife()`, `spawnZoo()` / `returnZooAnimal()`, `updatePondZoo()`
   / `pzScare()` / `drawPondZoo()`, `updateStormsBreeze()` (ice skids, flooded roads, kites, blowing washing),
   `drawCloudburst()`, `drawKite()`, `blowDandelion()`, `placeBreezyItems()`;
+  ski, vineyard, pleasure pier and lantern festival: `buildSkiEarly()` / `placeSki()` / `drawPiste()`,
+  `buildVineyardEarly()` / `placeVineyard()`, `buildFunPier()`, `placeLanterns()` / `spawnDragon()`, `placeFestItems()`,
+  `festAction()` / `festNear()` / `updateFestRide()` (ski lift, ski run, tractor, claw, penny falls, deckchairs),
+  `updateFestCritter()` / `fsScare()` / `drawFestCritter()` (skiers, sunbathers, dragon), `festChitter()`,
+  `festPickUp()`, `festLights()`, `updateFestivals()` (treading tub, tractor, chimes, claw, sky lanterns);
   `spawnSnowAnimals()` / `updateSnowAnimals()` / `snowScare()` / `drawSnowAnimal()`, `updateSnowWorld()`
   (blizzard drifts, roof snow, sledging, snowmen, Toby's snowballs, tortoise, llama spit), `sledAction()`; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
