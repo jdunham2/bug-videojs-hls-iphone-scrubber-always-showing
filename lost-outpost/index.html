@@ -17,7 +17,7 @@
   --warn:#ffd36b;
   --bad:#ff5d7a;
   --wood:#c27a3e; --stone:#9a86e0; --ore:#ff9a3c; --crystal:#5ff3ff; --frost:#8fb8ff; --coin:#ffd23a;
-  --ice:#bfe6ff;
+  --ice:#bfe6ff; --magma:#ff5a2a;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 html,body{height:100%;overflow:hidden;background:#1b2350;color:var(--text);font-family:'Fredoka',system-ui,sans-serif}
@@ -32,6 +32,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 .ic{display:inline-block;width:16px;height:16px;border-radius:4px;transform:rotate(45deg) scale(.85);box-shadow:inset -3px -3px 0 rgba(0,0,0,.25),inset 2px 2px 0 rgba(255,255,255,.35);flex:none}
 .ic.wood{background:var(--wood)}.ic.stone{background:var(--stone)}.ic.ore{background:var(--ore)}.ic.crystal{background:var(--crystal)}
 .ic.frost{background:linear-gradient(135deg,#dfe9ff,var(--frost) 45%,#4f6fe0);border-radius:3px 9px 3px 9px}
+.ic.magma{background:radial-gradient(circle at 40% 35%,#ffe08a,#ff6a2a 45%,#8a1a0a);border-radius:5px}
 .ic.coins{background:radial-gradient(circle at 35% 35%,#fff3a8,var(--coin) 45%,#c98a12);border-radius:50%;transform:none;box-shadow:inset -2px -2px 0 rgba(0,0,0,.2)}
 #bag{padding:6px 10px;min-width:170px;font-size:13px;font-weight:700}
 #bag .bar{height:8px;border-radius:5px;background:rgba(255,255,255,.15);margin-top:4px;overflow:hidden}
@@ -70,6 +71,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 .toast{padding:9px 16px;font-weight:700;font-size:16px;text-align:center;animation:tin .3s ease-out}
 .toast.big{font-size:22px;background:linear-gradient(135deg,rgba(255,180,60,.9),rgba(255,100,140,.9));border-color:rgba(255,255,255,.5)}
 .toast.ice{font-size:20px;background:linear-gradient(135deg,rgba(80,170,255,.9),rgba(150,110,255,.9));border-color:rgba(255,255,255,.5)}
+.toast.fire{font-size:20px;background:linear-gradient(135deg,rgba(150,30,20,.94),rgba(215,90,30,.94));border-color:rgba(255,220,160,.5)}
 .toast.danger{background:rgba(120,20,60,.85)}
 .toast.out{opacity:0;transform:translateY(-10px);transition:all .4s}
 @keyframes tin{from{opacity:0;transform:scale(.8)}}
@@ -82,6 +84,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 .label .costs .ic{width:11px;height:11px}
 .label.active{border-color:var(--warn);box-shadow:0 0 0 2px rgba(255,211,107,.4)}
 .label.sell{border-color:rgba(125,255,138,.4)}
+.label.ui{border-color:rgba(127,216,255,.55)}
 .label.dim{opacity:.75}
 .label .dots{letter-spacing:2px;color:var(--warn);font-size:11px}
 .float{position:absolute;left:0;top:0;font-weight:700;font-size:18px;display:flex;align-items:center;gap:5px;text-shadow:0 2px 0 rgba(0,0,0,.45);pointer-events:none;will-change:transform}
@@ -102,7 +105,53 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 .btn:focus-visible,#mute:focus-visible{outline:3px solid #fff;outline-offset:2px}
 .btn.ghost{background:rgba(255,255,255,.12);color:#fff;box-shadow:none;font-size:14px;padding:8px 16px;margin-top:10px}
 #mute{position:absolute;right:12px;bottom:12px;pointer-events:auto;font-family:inherit;font-size:13px;font-weight:700;color:#fff;padding:7px 11px;cursor:pointer}
+#heat{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(255,90,30,0) 30%,rgba(255,70,20,.5));opacity:0}
+#boss.fire .nm{color:#ffb36b}
+#boss.fire .fill{background:linear-gradient(90deg,#ff3a1a,#ff8a3a,#ffd36b)}
+#trophyBtn{position:absolute;right:12px;bottom:54px;pointer-events:auto;font-family:inherit;font-size:15px;font-weight:700;color:#fff;padding:6px 11px;cursor:pointer}
+#trophyBadge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--bad);font-size:12px;margin-left:2px}
+#trophyBadge[hidden]{display:none}
+#modal{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(5,6,20,.6);padding:16px}
+#modal[hidden]{display:none}
+.mcard{position:relative;width:min(100%,680px);max-height:86vh;overflow:auto;padding:20px;background:rgba(22,24,52,.96)}
+.mcard h2{font-size:24px;margin-bottom:4px;padding-right:40px}
+.mcard .lead{color:var(--muted);font-size:14px;margin-bottom:14px;display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.mcard h3{font-size:13px;letter-spacing:.12em;color:var(--warn);margin:14px 0 8px}
+.x{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:10px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:18px;cursor:pointer;font-family:inherit}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.item{border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);padding:10px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center}
+.item.on{border-color:var(--good);box-shadow:0 0 0 2px rgba(125,255,138,.3)}
+.sw{width:44px;height:44px;border-radius:50%;box-shadow:inset -6px -6px 0 rgba(0,0,0,.2),inset 4px 4px 0 rgba(255,255,255,.3)}
+.hat{font-size:32px;line-height:44px;height:44px}
+.item .nm{font-weight:700;font-size:13px}
+.item .pr{font-size:12px;color:var(--muted)}
+.sbtn{font-family:inherit;font-weight:700;font-size:13px;border:0;border-radius:9px;padding:6px 12px;cursor:pointer;background:linear-gradient(180deg,#ffe08a,#ffb340);color:#2a1a00;display:inline-flex;gap:4px;align-items:center}
+.sbtn:disabled{opacity:.45;cursor:default}
+.sbtn.alt{background:rgba(255,255,255,.15);color:#fff}
+.sbtn:focus-visible,.x:focus-visible,#trophyBtn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.planets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.planet{border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);padding:14px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+.planet.here{border-color:var(--warn)}
+.orb{width:84px;height:84px;border-radius:50%;flex:none;box-shadow:inset -12px -10px 0 rgba(0,0,0,.25),inset 6px 6px 0 rgba(255,255,255,.25)}
+.planet .nm{font-weight:700;font-size:17px}
+.planet .st{font-size:12px;color:var(--muted);line-height:1.4}
+.ach{display:flex;gap:12px;align-items:center;padding:10px;border-radius:12px;background:rgba(255,255,255,.05);margin-bottom:8px}
+.ach .ico{font-size:26px;width:36px;text-align:center;flex:none}
+.ach .info{flex:1;min-width:0}
+.ach .nm{font-weight:700;font-size:15px}
+.ach .ds{font-size:12px;color:var(--muted)}
+.ach .bar{height:6px;border-radius:4px;background:rgba(255,255,255,.12);margin-top:5px;overflow:hidden}
+.ach .bar i{display:block;height:100%;background:var(--good)}
+.ach.locked{opacity:.72}
+.ach .rw{font-size:12px;color:var(--warn);margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ach .rw span{display:inline-flex;gap:3px;align-items:center}
+.ach .rw .ic{width:10px;height:10px}
 @media (max-width:600px){
+  .planets{grid-template-columns:1fr}
+  .planet{flex-direction:row;text-align:left}
+  .orb{width:56px;height:56px}
+  #trophyBtn{bottom:50px}
+  .mcard{padding:16px}
   .chip{font-size:14px;padding:4px 8px 4px 6px}
   #bag{min-width:140px}
   #quest .t{font-size:13px}
@@ -110,7 +159,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
   #title h1{font-size:38px}
   #toasts{top:30%}
   .toast{font-size:14px;padding:7px 12px}
-  .toast.big,.toast.ice{font-size:17px}
+  .toast.big,.toast.ice,.toast.fire{font-size:17px}
   .label{font-size:11px;padding:4px 7px}
   .label .nm{font-size:12px}
   #tools .chip{font-size:11px;padding:4px 6px}
@@ -122,6 +171,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 <body>
 <canvas id="c"></canvas>
 <div id="blizzard"></div>
+<div id="heat"></div>
 <div id="vignette"></div>
 <div id="hud">
   <div id="labels"></div>
@@ -131,7 +181,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
     <div id="hp" class="panel"><div class="lbl" id="hpLbl">HEALTH</div><div class="bar"><div class="fill" id="hpFill"></div></div></div>
     <div id="quest" class="panel"><div class="h">★ GOAL</div><div class="t" id="qT"></div><div class="p" id="qP"></div></div>
   </div>
-  <div id="boss" class="panel"><div class="nm">❄ ICE GOLEM</div><div class="bar"><div class="fill" id="bossFill"></div></div></div>
+  <div id="boss" class="panel"><div class="nm" id="bossName">❄ ICE GOLEM</div><div class="bar"><div class="fill" id="bossFill"></div></div></div>
   <div id="res">
     <div class="row">
       <div class="chip panel" id="r-coins"><i class="ic coins"></i><b>0</b></div>
@@ -140,22 +190,25 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
       <div class="chip panel" id="r-ore"><i class="ic ore"></i><b>0</b></div>
       <div class="chip panel" id="r-crystal"><i class="ic crystal"></i><b>0</b></div>
       <div class="chip panel" id="r-frost"><i class="ic frost"></i><b>0</b></div>
+      <div class="chip panel" id="r-magma"><i class="ic magma"></i><b>0</b></div>
     </div>
     <div id="bag" class="panel"><div>🎒 BAG <span id="bagTxt">0/20</span></div><div class="bar"><div class="fill" id="bagFill"></div></div><div class="contents" id="bagC"></div></div>
   </div>
   <div id="tools"></div>
   <div id="toasts"></div>
   <button id="mute" class="panel">🔊 Sound</button>
+  <button id="trophyBtn" class="panel" title="Trophies">🏆<span id="trophyBadge" hidden>0</span></button>
 </div>
 <div id="joy"><div class="k"></div></div>
 <div id="fade"></div>
+<div id="modal" hidden><div class="mcard panel" role="dialog" aria-modal="true"><button id="mclose" class="x" aria-label="Close">✕</button><div id="mbody"></div></div></div>
 <div id="title">
   <div class="card panel">
     <h1>Lost Outpost</h1>
     <p>Your ship crash-landed on a forgotten planet. Gather wood, stone, ore and crystals, rebuild the abandoned outpost, and survive the Gloomers that crawl out at night.</p>
     <button class="btn" id="play">Play</button><br>
     <button class="btn ghost" id="newgame" style="display:none">Start over</button><br>
-    <span class="new">NEW: the frozen world of Frostveil</span>
+    <span class="new">NEW: Emberfall, the volcano world</span>
     <div class="keys">Move: <b>WASD</b> / arrows · drag on phone · <b>Q</b> switch weapon<br>Walk up to trees &amp; rocks to harvest · stand on glowing pads to build</div>
   </div>
 </div>
@@ -177,10 +230,10 @@ const lerp = (a, b, t) => a + (b - a) * t;
 let seed = 1337;
 const srand = () => (seed = (seed * 16807) % 2147483647, (seed - 1) / 2147483646);
 const sr = (a, b) => a + srand() * (b - a);
-const RES = ['wood', 'stone', 'ore', 'crystal', 'frost'];
+const RES = ['wood', 'stone', 'ore', 'crystal', 'frost', 'magma'];
 const COST_KEYS = ['coins', ...RES];
-const RES_NAME = { wood: 'Wood', stone: 'Stone', ore: 'Ore', crystal: 'Crystal', frost: 'Frost Gems', coins: 'Coins' };
-const RES_COL = { wood: 0xc27a3e, stone: 0x9a86e0, ore: 0xff9a3c, crystal: 0x5ff3ff, frost: 0x8fb8ff, coins: 0xffd23a };
+const RES_NAME = { wood: 'Wood', stone: 'Stone', ore: 'Ore', crystal: 'Crystal', frost: 'Frost Gems', magma: 'Magma Cores', coins: 'Coins' };
+const RES_COL = { wood: 0xc27a3e, stone: 0x9a86e0, ore: 0xff9a3c, crystal: 0x5ff3ff, frost: 0x8fb8ff, magma: 0xff5a2a, coins: 0xffd23a };
 const ic = r => `<i class="ic ${r}"></i>`;
 const dist2 = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -193,15 +246,17 @@ const SAVE_KEY = 'lost-outpost-save-v1';
 const OLD_Q = ['trees', 'rocks', 'deposit', 'workshop', 'pick2', 'mine', 'ore', 'generator', 'turret', 'house', 'pick3', 'crystals', 'portal'];
 function freshState() {
   return {
-    store: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0 },
-    bag: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0 },
+    store: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0 },
+    bag: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0 },
     tools: { axe: 1, pick: 1, sword: 1, bag: 1 },
     built: {}, paid: {},
-    stats: { trees: 0, rocks: 0, ore: 0, crystal: 0, kills: 0, deposits: 0, frostTrees: 0, frost: 0, golem: 0, sold: 0, iceVisits: 0 },
+    stats: { trees: 0, rocks: 0, ore: 0, crystal: 0, kills: 0, deposits: 0, frostTrees: 0, frost: 0, golem: 0, sold: 0, iceVisits: 0, obsTrees: 0, magma: 0, serpent: 0, crossed: 0, emberVisits: 0, goblins: 0, meteors: 0, flights: 0, cosBought: 0, hatched: 0 },
     day: 1, time: 0.08, hp: 100, maxHp: 100,
     coins: 0, weapons: { sword: true }, weapon: 'sword',
     daily: { last: null, streak: 0, claims: 0 },
     qdone: {}, zone: 'home', core: 0, bossDay: 0,
+    egg: 0, serpentDay: 0, ach: { done: {}, claimed: {} },
+    cos: { owned: { suit_orange: true, hat_none: true }, suit: 'orange', hat: 'none' },
   };
 }
 let S = freshState();
@@ -236,6 +291,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const SKY_DAY = new THREE.Color(0x1d2a63), SKY_NIGHT = new THREE.Color(0x060818), SKY_MINE = new THREE.Color(0x07040d);
 const ICE_DAY = new THREE.Color(0x3c6fae), ICE_NIGHT = new THREE.Color(0x0a1534), ICE_STORM = new THREE.Color(0xcfe3f5);
+const EMB_DAY = new THREE.Color(0x5a1e2a), EMB_NIGHT = new THREE.Color(0x14060c), EMB_ERUPT = new THREE.Color(0x8a2a10);
 scene.background = SKY_DAY.clone();
 scene.fog = new THREE.Fog(0x1d2a63, 70, 150);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 800);
@@ -329,7 +385,26 @@ const ICE_STORE_POS = iv(3.8, 12.6).setY(1);
 const ARENA = iv(0, -32);
 const CORE_POS = iv(0, -43);
 const LAKES = [[-22, 2, 8], [20, -8, 9], [-17, -19, 6], [22, 26, 6], [-6, 32, 5]].map(([x, z, r]) => ({ x: ICE_C.x + x, z: ICE_C.z + z, r }));
-const zoneOf = (x, z) => z > 300 ? 'mine' : x > 700 ? 'ice' : 'home';
+// Emberfall, the volcano planet
+const EMB_C = V(-1000, 0, 0);
+const EMB_R = 54;
+const ev = (x, z) => V(EMB_C.x + x, 0, EMB_C.z + z);
+const ECAMP = ev(0, 12);
+const EMB_PORTAL_T = ev(0, 5.4);
+const EMB_ARRIVE = ev(0, 8.8);
+const EMB_STORE_POS = ev(3.8, 12.6).setY(1);
+const LAVA_LAKE = ev(0, -38), LAKE_R = 8;
+const RIVERS = [{ z0: -9, z1: -4, rows: [-8.15, -6.5, -4.85], xs: [-18, 12] }, { z0: -25, z1: -20, rows: [-24.15, -22.5, -20.85], xs: [-20, 6, 24] }];
+const BRIDGE_X = -6;
+const EP_ON_ICE = iv(20, 8);
+const EP_ICE_T = iv(20, 10.2);
+const ICE_FROM_EMB = iv(20, 13.4);
+const SHIP_SPOTS = { home: { pad: V(-.6, 0, 14), arrive: V(1.6, 0, 11.4) }, ice: { pad: iv(6.8, 20.3), arrive: iv(4.4, 18.2) }, ember: { pad: ev(8, 13.5), arrive: ev(5.6, 11.2) } };
+const SHOP_POS = V(5, 0, 16.5);
+const ORIGIN = V(0, 0, 0);
+const zoneOf = (x, z) => z > 300 ? 'mine' : x > 700 ? 'ice' : x < -700 ? 'ember' : 'home';
+const zoneCenter = z => z === 'mine' ? MINE_C : z === 'ice' ? ICE_C : z === 'ember' ? EMB_C : ORIGIN;
+const zoneRadius = z => z === 'mine' ? 25 : z === 'ice' ? ICE_R - 3 : z === 'ember' ? EMB_R - 3 : ISLAND_R - 3;
 
 const colliders = [];
 function addCol(x, z, r) { const c = { x, z, r, on: true }; colliders.push(c); return c; }
@@ -538,6 +613,15 @@ const SFX = {
   day: () => [262, 330, 392, 523].forEach((f, i) => tone(f, .4, 'sine', .08, 0, i * .14)),
   storm: () => { noise(1.2, .2, 600); noise(1.2, .15, 300, .4); },
   deny: () => tone(160, .15, 'square', .05),
+  launch: () => { noise(1.2, .35, 300); tone(80, 1.2, 'sawtooth', .1, 400); },
+  rumble: () => { noise(1.5, .35, 90); tone(45, 1.5, 'sine', .2, -10); },
+  roar2: () => { tone(160, 1, 'sawtooth', .14, -100); noise(.9, .3, 500); tone(90, 1, 'square', .06, -40, .1); },
+  splash: () => { noise(.5, .3, 700); tone(200, .3, 'sine', .08, -120); },
+  goblin: () => [880, 1100, 990, 1320].forEach((f, i) => tone(f, .1, 'square', .05, 0, i * .07)),
+  meteor: () => { noise(.6, .25, 2000); tone(1200, .6, 'sine', .05, -1000); },
+  trophy: () => [659, 880, 1047, 1319].forEach((f, i) => tone(f, .25, 'triangle', .1, 0, i * .08)),
+  buy: () => { tone(988, .08, 'square', .05); tone(1319, .15, 'square', .05, 0, .08); },
+  hatch: () => { noise(.2, .3, 3000); [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .3, 'sine', .1, 0, .2 + i * .08)); },
   victory: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, .35, 'triangle', .12, 0, i * .12)),
 };
 
@@ -545,7 +629,7 @@ const SFX = {
    PLAYER
    ================================================================ */
 const player = new THREE.Group();
-const P = { vel: new THREE.Vector3(), face: 0, swing: 0, swingT: 0, walk: 0, hurtT: 0, lastHurt: -99, zone: 'home', get inMine() { return this.zone === 'mine'; }, tool: 'none', tpCool: 0, chill: 0, depT: 0, spawnT: 0, curNode: null, onLake: false };
+const P = { vel: new THREE.Vector3(), face: 0, swing: 0, swingT: 0, walk: 0, hurtT: 0, lastHurt: -99, zone: 'home', get inMine() { return this.zone === 'mine'; }, tool: 'none', tpCool: 0, chill: 0, depT: 0, spawnT: 0, curNode: null, onLake: false, burn: 0, burnTick: 0, safePos: new THREE.Vector3(), uiLock: {}, onStone: false, hat: null };
 const ORANGE = 0xff8a2a;
 const WEAPONS = {
   sword:  { name: 'Star Sword',   emoji: '🗡️', base: 0, rate: 1,    desc: 'Your trusty blade' },
@@ -565,7 +649,7 @@ const weaponDmg = () => S.tools.sword + WEAPONS[S.weapon].base;
   const ant = new THREE.Mesh(new THREE.CylinderGeometry(.02, .02, .3), new THREE.MeshLambertMaterial({ color: 0xdddddd })); ant.position.set(.18, 2.02, -.05);
   const tip = new THREE.Mesh(new THREE.SphereGeometry(.06, 8, 6), emis(0x7dff8a, 1.2)); tip.position.set(.18, 2.18, -.05);
   player.add(body, head, visor, shine, pack, ant, tip);
-  P.suit = suit;
+  P.suit = suit; P.ant = ant; P.tip = tip;
   const limb = (x, y, len) => { const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.CapsuleGeometry(.11, len, 3, 6), suit); m.position.y = -len / 2 - .05; m.castShadow = true; g.add(m); g.position.set(x, y, 0); player.add(g); return g; };
   P.armL = limb(-.45, 1.25, .38); P.armR = limb(.45, 1.25, .38);
   P.legL = limb(-.17, .55, .32); P.legR = limb(.17, .55, .32);
@@ -614,6 +698,9 @@ const NODE_DEF = {
   ftree:   { res: 'wood', hp: 4, yield: 3, tool: 'axe', req: 1, respawn: 30, r: .7, sfx: 'icechop', chip: 0x9fe8ff },
   icerock: { res: 'stone', hp: 5, yield: 3, tool: 'pick', req: 1, respawn: 30, r: 1.1, sfx: 'mine', chip: 0xd6ecff },
   frost:   { res: 'frost', hp: 9, yield: 2, tool: 'pick', req: 3, respawn: 50, r: 1.0, sfx: 'crystal', chip: 0x8fb8ff },
+  otree:   { res: 'wood', hp: 5, yield: 4, tool: 'axe', req: 1, respawn: 30, r: .7, sfx: 'chop', chip: 0x6a4a9a },
+  basalt:  { res: 'stone', hp: 5, yield: 3, tool: 'pick', req: 1, respawn: 30, r: 1.1, sfx: 'mine', chip: 0x6a5a62 },
+  magma:   { res: 'magma', hp: 10, yield: 2, tool: 'pick', req: 4, respawn: 55, r: 1.0, sfx: 'crystal', chip: 0xff5a2a },
 };
 const TOOL_NAME = { axe: 'Axe', pick: 'Pickaxe', sword: 'Sword', bag: 'Backpack' };
 
@@ -656,6 +743,9 @@ function makeRock(big = 1) {
 const ORE_MAT = emis(0xff9a3c, .55), CRYSTAL_MAT = new THREE.MeshLambertMaterial({ color: 0x5ff3ff, emissive: 0x22b8e0, emissiveIntensity: .9, flatShading: true, transparent: true, opacity: .92 });
 const FROST_MAT = new THREE.MeshLambertMaterial({ color: 0x9fc0ff, emissive: 0x3a6cff, emissiveIntensity: .9, flatShading: true });
 const FTIP_MAT = new THREE.MeshLambertMaterial({ color: 0xdff6ff, emissive: 0x6fd8ff, emissiveIntensity: 1.1, flatShading: true });
+const LAVA_MAT = new THREE.MeshLambertMaterial({ color: 0xff6a1a, emissive: 0xff4a0a, emissiveIntensity: 1.1, flatShading: true });
+const EMBER_MAT = emis(0xff8a3a, 1.4);
+const MAGMA_MAT = new THREE.MeshLambertMaterial({ color: 0xff6a3a, emissive: 0xff3a0a, emissiveIntensity: 1.3, flatShading: true });
 function makeOre() {
   const g = new THREE.Group();
   g.add(mesh([part(jitter(G.dode, .35), 0x4c4166, 0, .6, 0, 0, sr(0, 3), 0, 1.15, .9, 1.1), part(jitter(G.dode, .3), 0x3d3456, .8, .3, .2, 0, 1, 0, .5)]));
@@ -710,16 +800,43 @@ function makeFrostGem() {
   g.add(crystalCluster(FROST_MAT, 5, .65, .7, 1.3, .45, .32));
   return g;
 }
+function makeObsTree() {
+  const g = new THREE.Group(), parts = [], h = sr(1.8, 2.6);
+  parts.push(part(G.cyl6, 0x2a2030, 0, h / 2, 0, 0, 0, sr(-.1, .1), .2, h, .2));
+  const cols = [0x4a3868, 0x3a2a55, 0x5a4580];
+  for (let i = 0; i < 7; i++) {
+    const a = i * .9 + sr(0, .5), r = i === 0 ? 0 : sr(.4, .9), hh = i === 0 ? 1.8 : sr(.9, 1.5);
+    parts.push(part(G.oct, cols[i % 3], Math.cos(a) * r, h + .2 + hh * .4, Math.sin(a) * r, Math.cos(a) * r * .5, 0, -Math.sin(a) * r * .5, .38, hh * .8, .38));
+  }
+  g.add(mesh(parts));
+  const em = [];
+  for (let i = 0; i < 6; i++) { const a = srand() * 6.28, r = sr(.3, .9); em.push(part(G.box, 0xffffff, Math.cos(a) * r, h + sr(.1, 1.3), Math.sin(a) * r, sr(0, 3), sr(0, 3), 0, .13)); }
+  g.add(new THREE.Mesh(mergeGeometries(em), EMBER_MAT));
+  return g;
+}
+function makeBasalt() {
+  const g = new THREE.Group();
+  g.add(mesh([part(jitter(G.dode, .35), [0x5a4a55, 0x4e404b, 0x64545e][Math.floor(srand() * 3)], 0, .55, 0, 0, sr(0, 3), 0, 1.15, .85, 1.1), part(jitter(G.dode, .3), 0x403440, sr(.5, .9), .3, sr(-.4, .4), 0, sr(0, 3), 0, .5)]));
+  g.add(new THREE.Mesh(mergeGeometries([0, 1, 2].map(() => part(G.box, 0xffffff, sr(-.6, .6), sr(.3, .9), sr(-.6, .6), 0, sr(0, 3), sr(-.5, .5), .06, .5, .06))), EMBER_MAT));
+  return g;
+}
+function makeMagma() {
+  const g = new THREE.Group();
+  g.add(mesh([part(jitter(G.dode, .3), 0x241a20, 0, .4, 0, 0, 0, 0, 1.1, .65, 1.05), part(jitter(G.dode, .25), 0x352a33, .7, .3, .3, 0, 0, 0, .45)]));
+  g.add(crystalCluster(MAGMA_MAT, 5, .6, .6, 1.1, .5, .36));
+  return g;
+}
+const OSTUMP_GEO = mergeGeometries([part(G.cyl6, 0x2a2030, 0, .2, 0, 0, 0, 0, .25, .4, .25), part(G.cyl6, 0xff8a3a, 0, .41, 0, 0, 0, 0, .2, .03, .2)]);
 const STUMP_GEO = mergeGeometries([part(G.cyl6, 0x7a4c32, 0, .2, 0, 0, 0, 0, .3, .4, .3), part(G.cyl6, 0xd9a46a, 0, .41, 0, 0, 0, 0, .26, .02, .26)]);
 const ISTUMP_GEO = mergeGeometries([part(G.cyl6, 0x4a5a8a, 0, .2, 0, 0, 0, 0, .25, .4, .25), part(G.cyl6, 0xdff6ff, 0, .41, 0, 0, 0, 0, .22, .03, .22)]);
-const MAKERS = { tree: () => srand() < .72 ? makePalm() : makePuff(), rock: () => makeRock(sr(.85, 1.15)), ore: makeOre, crystal: makeCrystal, ftree: makeFrostTree, icerock: makeIceRock, frost: makeFrostGem };
+const MAKERS = { tree: () => srand() < .72 ? makePalm() : makePuff(), rock: () => makeRock(sr(.85, 1.15)), ore: makeOre, crystal: makeCrystal, ftree: makeFrostTree, icerock: makeIceRock, frost: makeFrostGem, otree: makeObsTree, basalt: makeBasalt, magma: makeMagma };
 function addNode(type, x, z) {
   const m = MAKERS[type]();
   const def = NODE_DEF[type];
   const g = new THREE.Group(); g.add(m); g.position.set(x, 0, z); g.rotation.y = sr(0, 6.28);
   scene.add(g);
   let stump = null;
-  if (type === 'tree' || type === 'ftree') { stump = new THREE.Mesh(type === 'tree' ? STUMP_GEO : ISTUMP_GEO, VCMAT); stump.castShadow = true; stump.position.set(x, 0, z); stump.visible = false; scene.add(stump); }
+  if (type === 'tree' || type === 'ftree' || type === 'otree') { stump = new THREE.Mesh(type === 'tree' ? STUMP_GEO : type === 'ftree' ? ISTUMP_GEO : OSTUMP_GEO, VCMAT); stump.castShadow = true; stump.position.set(x, 0, z); stump.visible = false; scene.add(stump); }
   const zone = zoneOf(x, z);
   const n = { type, def, x, z, g, m, stump, hp: def.hp, alive: true, respawn: 0, shake: 0, grow: 1, col: addCol(x, z, def.r), zone, mine: zone === 'mine' };
   nodes.push(n);
@@ -766,6 +883,7 @@ for (let i = 0; i < 6; i++) {
   lampBulbs.push(b); scene.add(m); addCol(x, z, .3);
 }
 const plazaLight = new THREE.PointLight(0xffd59a, 0, 34, 1.2); plazaLight.position.set(0, 6, 0); scene.add(plazaLight);
+let crashedShip;
 {
   const parts = [
     part(G.cyl8, 0xe9e9f4, 0, 1.1, 0, 0, 0, Math.PI / 2 - .25, 1.1, 4.2, 1.1),
@@ -775,7 +893,7 @@ const plazaLight = new THREE.PointLight(0xffd59a, 0, 34, 1.2); plazaLight.positi
     part(G.cyl8, 0x3a3a50, -2.4, .65, 0, 0, 0, Math.PI / 2 - .25, .7, .6, .7),
     part(jitter(G.dode, .3, Math.random), 0x8a6a4a, 2.9, .2, .4, 0, 0, 0, 1.4, .4, 1.6),
   ];
-  const ship = mesh(parts); ship.position.set(-4, 0, 17); ship.rotation.y = .9; scene.add(ship);
+  const ship = mesh(parts); ship.position.set(-4, 0, 17); ship.rotation.y = .9; scene.add(ship); crashedShip = ship;
   const win = new THREE.Mesh(new THREE.SphereGeometry(.45, 10, 8), new THREE.MeshLambertMaterial({ color: 0x1f2a55, emissive: 0x4fa8ff, emissiveIntensity: .6 }));
   win.position.set(.9, 1.4, .85); ship.add(win);
   addCol(-4, 17, 2.6); addCol(-5.5, 18.5, 1.6); addCol(-2.4, 15.4, 1.6);
@@ -827,15 +945,15 @@ function house(w, d, h, wallC, roofC) {
 const buildings = {};
 function placeBuilding(id, type, x, z, rotY, r, opts = {}) {
   const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY; scene.add(g);
-  buildings[id] = { g, x, z, type, scaleAnim: 1, ...opts };
-  if (r) addCol(x, z, r);
+  buildings[id] = { g, x, z, type, scaleAnim: 1, id, ...opts };
+  if (r) buildings[id].col = addCol(x, z, r);
   refreshBuilding(id, false);
 }
 const genParts = {};
 const FORGE_GLOW = emis(0xff7a2a, 1.6), HEAT_FLAME = emis(0xbfeeff, 1.8), HEAT_CORE = emis(0xffffff, 2);
 function refreshBuilding(id, anim = true) {
-  const b = buildings[id], L = b.fixed ?? lvl(id);
-  b.g.clear(); b.head = null; b.disc = null; b.flame = null;
+  const b = buildings[id], L = b.fixed ?? lvl(b.linked || id);
+  b.g.clear(); b.head = null; b.disc = null; b.flame = null; b.egg = null;
   if (b.type === 'workshop') {
     if (!L) b.g.add(ruin(4.2, 3.6));
     else {
@@ -877,21 +995,21 @@ function refreshBuilding(id, anim = true) {
       b.g.add(head); b.head = head;
     }
   } else if (b.type === 'portal') {
-    const ice = !!b.fixed;
-    const SC = ice ? [0xb8c8e8, 0xa8b8dc, 0xc8d8f0] : STONE_C;
-    b.g.add(mesh([0, 1, 2].map(i => part(G.box, SC[i], 0, .15 + i * .3, 1.8 - i * .6, 0, 0, 0, 3 - i * .3, .3, .7)).concat([part(G.box, ice ? 0x8898c0 : 0x6e6888, 0, .5, 0, 0, 0, 0, 4.2, 1, 2.4)])));
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.4, .42, 6, 18), new THREE.MeshLambertMaterial({ color: ice ? 0xc8d8f0 : 0x8e86a8, flatShading: true }));
+    const pk = b.pal || (b.fixed ? 'ice' : 'home'), ice = pk !== 'home', emb = pk === 'ember';
+    const SC = emb ? [0x3a2e36, 0x4a3e48, 0x2e242c] : ice ? [0xb8c8e8, 0xa8b8dc, 0xc8d8f0] : STONE_C;
+    b.g.add(mesh([0, 1, 2].map(i => part(G.box, SC[i], 0, .15 + i * .3, 1.8 - i * .6, 0, 0, 0, 3 - i * .3, .3, .7)).concat([part(G.box, emb ? 0x2a2030 : ice ? 0x8898c0 : 0x6e6888, 0, .5, 0, 0, 0, 0, 4.2, 1, 2.4)])));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.4, .42, 6, 18), new THREE.MeshLambertMaterial({ color: emb ? 0x3a2e36 : ice ? 0xc8d8f0 : 0x8e86a8, flatShading: true }));
     ring.position.y = 3.6; ring.castShadow = true; b.g.add(ring);
     for (let i = 0; i < 11; i++) {
       const a = Math.PI * .1 + i / 10 * Math.PI * .8;
       const on = L > 0 || i % 3 === 0;
-      const pal = ice ? [0x8fb8ff, 0xdff6ff, 0x5ff3ff, 0xb9a0ff] : [0x5ff3ff, 0xff5fa8, 0x7dff8a, 0xffd36b];
+      const pal = emb ? [0xff6a2a, 0xffd23a, 0xff3a5a, 0xffa040] : ice ? [0x8fb8ff, 0xdff6ff, 0x5ff3ff, 0xb9a0ff] : [0x5ff3ff, 0xff5fa8, 0x7dff8a, 0xffd36b];
       const c = new THREE.Mesh(G.oct, on ? emis(pal[i % 4], .9) : new THREE.MeshLambertMaterial({ color: 0x55506a, flatShading: true }));
       c.scale.set(.3, .75, .3); c.position.set(Math.cos(a) * 2.75, 3.6 + Math.sin(a) * 2.75, 0); c.rotation.z = a - Math.PI / 2;
       b.g.add(c);
     }
     if (L) {
-      const disc = new THREE.Mesh(new THREE.CircleGeometry(2.1, 32), new THREE.MeshBasicMaterial({ color: ice ? 0xa8f07a : 0x7fe8ff, transparent: true, opacity: .75, side: THREE.DoubleSide }));
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(2.1, 32), new THREE.MeshBasicMaterial({ color: b.discCol || (ice ? 0xa8f07a : 0x7fe8ff), transparent: true, opacity: .75, side: THREE.DoubleSide }));
       disc.position.y = 3.6; b.g.add(disc); b.disc = disc;
       const swirl = new THREE.Mesh(new THREE.RingGeometry(.6, 1.6, 5, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .35, side: THREE.DoubleSide }));
       swirl.position.set(0, 3.6, .02); b.g.add(swirl); b.swirl = swirl;
@@ -951,7 +1069,45 @@ function refreshBuilding(id, anim = true) {
       b.flame = flame;
     }
   }
+  if (b.type === 'rocket') {
+    if (b.id === 'ship' && crashedShip) crashedShip.visible = !L;
+    if (b.col) b.col.on = !!L;
+    if (L) b.g.add(makeRocket());
+  } else if (b.type === 'shop') {
+    if (!L) b.g.add(ruin(3.6, 3.2));
+    else {
+      b.g.add(house(3.6, 3.2, 2.3, 0xffe0ef, 0x3fc0b0));
+      const parts = [];
+      for (let i = 0; i < 6; i++) parts.push(part(G.box, i % 2 ? 0xffffff : 0x9a6bff, -1.5 + i * .6, 2.3, 2.05, -.4, 0, 0, .6, .1, .9));
+      b.g.add(mesh(parts));
+      const man = new THREE.Mesh(new THREE.CapsuleGeometry(.25, .4, 3, 8), new THREE.MeshLambertMaterial({ color: 0xff7ac0, flatShading: true })); man.position.set(-1.1, .95, 2.1); b.g.add(man);
+      const hat = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, .3, 10), new THREE.MeshLambertMaterial({ color: 0x1a1a2a })); hat.position.set(-1.1, 1.65, 2.1); b.g.add(hat);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .03, 12), new THREE.MeshLambertMaterial({ color: 0x1a1a2a })); brim.position.set(-1.1, 1.5, 2.1); b.g.add(brim);
+    }
+  } else if (b.type === 'nest') {
+    b.g.add(mesh([...Array.from({ length: 12 }, (_, i) => { const a = i / 12 * 6.28; return part(G.box, i % 2 ? 0x5a3a2a : 0x3a2a22, Math.cos(a) * 1.1, .3, Math.sin(a) * 1.1, 0, -a, .3, .9, .25, .25); }), part(G.cyl8, 0x2a1e24, 0, .12, 0, 0, 0, 0, 1.3, .24, 1.3)]));
+    if (S.egg && !L) {
+      const egg = new THREE.Group();
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(.45, 12, 10), new THREE.MeshLambertMaterial({ color: 0xff7a3a, emissive: 0xff3a0a, emissiveIntensity: .35, flatShading: true }));
+      shell.scale.set(1, 1.3, 1); egg.add(shell);
+      for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(new THREE.SphereGeometry(.08, 6, 4), emis(0xffd23a, .8)); const a = i * 1.1; sp.position.set(Math.cos(a) * .4, (i % 3 - 1) * .3, Math.sin(a) * .4); egg.add(sp); }
+      egg.position.y = .75; b.g.add(egg); b.egg = egg;
+    }
+  }
   if (anim) b.scaleAnim = 0;
+}
+function makeRocket() {
+  const g = new THREE.Group();
+  g.add(mesh([
+    part(G.cyl8, 0x6e6a88, 0, .15, 0, 0, 0, 0, 2.2, .3, 2.2),
+    part(G.cyl8, 0xe9e9f4, 0, 2.4, 0, 0, 0, 0, .9, 3.6, .9),
+    part(G.cone6, 0xff6a5a, 0, 4.9, 0, 0, 0, 0, .9, 1.4, .9),
+    part(G.cyl8, 0xff6a5a, 0, 1.1, 0, 0, 0, 0, .95, .5, .95),
+    ...[0, 1, 2].map(i => { const a = i * 2.09; return part(G.box, 0xff6a5a, Math.cos(a), 1.2, Math.sin(a), 0, -a, 0, .9, 1.4, .12); }),
+    part(G.cyl8, 0x3a3a50, 0, .55, 0, 0, 0, 0, .6, .5, .6),
+  ]));
+  const win = new THREE.Mesh(new THREE.SphereGeometry(.32, 10, 8), new THREE.MeshLambertMaterial({ color: 0x1f2a55, emissive: 0x4fa8ff, emissiveIntensity: .8 })); win.position.set(0, 3.2, .8); g.add(win);
+  return g;
 }
 placeBuilding('workshop', 'workshop', -11, -3.5, .35, 2.8);
 placeBuilding('generator', 'generator', 11, -3.5, -.35, 2.3);
@@ -963,6 +1119,8 @@ placeBuilding('portal', 'portal', 0, -14.5, 0, 0);
 addCol(-2.8, -14.2, 1.1); addCol(2.8, -14.2, 1.1); addCol(0, -15, 1.4); addCol(-1.4, -15, 1.2); addCol(1.4, -15, 1.2);
 placeBuilding('trading', 'trading', 15, -12, -.5, 2.4);
 placeBuilding('petden', 'petden', -7, -13, .4, 1.6);
+placeBuilding('shop', 'shop', SHOP_POS.x, SHOP_POS.z, Math.PI, 2.2);
+placeBuilding('ship', 'rocket', -4, 17, .9, 0);
 
 // mine entrance (overworld)
 const mineEnt = { g: new THREE.Group() };
@@ -1122,6 +1280,90 @@ for (const [x, z, r] of [[-2.8, .3, 1.1], [2.8, .3, 1.1], [0, -.5, 1.4], [-1.4, 
 placeBuilding('forge', 'forge', CAMP.x - 9, CAMP.z + 1, .4, 2.8, { snowy: true });
 placeBuilding('heater', 'heater', CAMP.x + 9, CAMP.z + 1, 0, 1.9);
 
+/* ================================================================
+   EMBERFALL — THE VOLCANO PLANET
+   ================================================================ */
+const stones = [], crusts = [], smokes = [];
+const SMOKE_GEO = new THREE.IcosahedronGeometry(1, 0);
+const VOLCANO_TOP = V(EMB_C.x + 30, 30, EMB_C.z - 110);
+let bridgeMesh, volcanoGlow;
+const lavaRel = (x, z) => (z > -10 && z < -3) || (z > -26 && z < -19) || Math.hypot(x, z + 38) < LAKE_R + 1;
+{
+  island(EMB_C, EMB_R, 0x4a3438, 0x3a2a30, 0x5a3e3e, 0x2a1a1e, 0x5a2a1a);
+  floatingRocks(EMB_C, 0x3a2a33, 0x5a3e3e);
+  cliffRing(EMB_C, EMB_R, 38, [0x2e2238, 0x3a2a44, 0x251c2e]);
+  const bankMat = new THREE.MeshLambertMaterial({ color: 0x2a1e24, flatShading: true });
+  RIVERS.forEach(r => {
+    const zc = (r.z0 + r.z1) / 2, half = Math.sqrt(EMB_R * EMB_R - zc * zc) - 1;
+    r.half = half;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(half * 2, r.z1 - r.z0), LAVA_MAT);
+    m.rotation.x = -Math.PI / 2; m.position.set(EMB_C.x, .04, EMB_C.z + zc); scene.add(m);
+    for (const s2 of [r.z0, r.z1]) { const bank = new THREE.Mesh(new THREE.BoxGeometry(half * 2, .22, .35), bankMat); bank.position.set(EMB_C.x, .09, EMB_C.z + s2); bank.receiveShadow = true; scene.add(bank); }
+    for (let i = 0; i < 16; i++) {
+      const c = mesh([part(jitter(G.dode, .3), 0x3a1a14, 0, 0, 0, 0, 0, 0, sr(.4, .9), .08, sr(.3, .7))], VCMAT, false);
+      c.position.set(EMB_C.x + sr(-half, half), .08, EMB_C.z + sr(r.z0 + .6, r.z1 - .6));
+      c.userData.v = sr(.4, 1.2) * (srand() < .5 ? -1 : 1); c.userData.half = half;
+      scene.add(c); crusts.push(c);
+    }
+    r.xs.forEach((cx, ci) => r.rows.forEach((rz, ri) => {
+      const m2 = mesh([part(G.cyl6, 0x3a2e36, 0, 0, 0, 0, Math.PI / 6, 0, 1.05, .32, 1.05), part(G.cyl6, 0x5a4a55, 0, .17, 0, 0, Math.PI / 6, 0, .9, .04, .9)]);
+      const glow = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.15, 6), new THREE.MeshBasicMaterial({ color: 0xffb36b, transparent: true, opacity: .75, side: THREE.DoubleSide }));
+      glow.rotation.x = -Math.PI / 2; glow.rotation.z = Math.PI / 6; glow.position.y = .2; m2.add(glow);
+      const st = { m: m2, cx: EMB_C.x + cx, x: EMB_C.x + cx, z: EMB_C.z + rz, dx: 0, amp: 2.4, sp: .75 + ((ci + ri) % 3) * .18, ph: ri * 2.1 + ci * 1.3 };
+      m2.position.set(st.x, .1, st.z); scene.add(m2); stones.push(st);
+    }));
+  });
+  bridgeMesh = mesh([
+    part(G.box, 0x2a2030, 0, .2, 0, 0, 0, 0, 2.6, .25, 6.6),
+    ...[-1, 1].map(s2 => part(G.box, 0x4a3868, s2 * 1.25, .55, 0, 0, 0, 0, .15, .5, 6.6)),
+    ...[0, 1, 2, 3].map(i => part(G.oct, 0x9a7ad0, (i % 2 ? 1 : -1) * 1.25, 1, -2.6 + i * 1.73, 0, 0, 0, .14, .3, .14)),
+  ]);
+  bridgeMesh.position.set(EMB_C.x + BRIDGE_X, 0, EMB_C.z + (RIVERS[0].z0 + RIVERS[0].z1) / 2); bridgeMesh.visible = false; scene.add(bridgeMesh);
+  const lake = new THREE.Mesh(new THREE.CircleGeometry(LAKE_R + .3, 14), LAVA_MAT); lake.rotation.x = -Math.PI / 2; lake.position.set(LAVA_LAKE.x, .05, LAVA_LAKE.z); scene.add(lake);
+  const shore = [];
+  for (let i = 0; i < 22; i++) { const a = i / 22 * Math.PI * 2; if (Math.sin(a) > -.3) continue; const s2 = sr(.9, 1.8); shore.push(part(jitter(G.dode, .3), [0x2e2238, 0x3a2a44][i % 2], Math.cos(a) * (LAKE_R + 2), s2 * .5, Math.sin(a) * (LAKE_R + 2), 0, sr(0, 3), 0, s2, s2 * sr(1, 2), s2)); }
+  const sm = mesh(shore); sm.position.copy(LAVA_LAKE); scene.add(sm);
+  // volcano on the horizon
+  const vol = new THREE.Group();
+  const vm = new THREE.MeshLambertMaterial({ color: 0x2a1a22, flatShading: true, fog: false });
+  vol.add(new THREE.Mesh(jitter(new THREE.CylinderGeometry(8, 48, 70, 10, 3, true), 4, Math.random), vm));
+  volcanoGlow = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 7.6, 1, 10), new THREE.MeshBasicMaterial({ color: 0xff6a1a, fog: false }));
+  volcanoGlow.position.y = 35; vol.add(volcanoGlow);
+  const streakMat = new THREE.MeshBasicMaterial({ color: 0xff5a1a, fog: false });
+  for (let i = 0; i < 6; i++) {
+    const a = i * 1.05 + .3, top = V(Math.cos(a) * 8.5, 35, Math.sin(a) * 8.5), bot = V(Math.cos(a) * 30, -9 - (i % 3) * 6, Math.sin(a) * 30);
+    const len = top.distanceTo(bot), m3 = new THREE.Mesh(new THREE.BoxGeometry(1.1, .5, len), streakMat);
+    m3.position.copy(top).add(bot).multiplyScalar(.5); m3.lookAt(bot); vol.add(m3);
+  }
+  vol.position.set(VOLCANO_TOP.x, -5, VOLCANO_TOP.z); scene.add(vol);
+  // glowing ground cracks
+  const cracks = new THREE.InstancedMesh(G.box, EMBER_MAT, 160);
+  const d = new THREE.Object3D(); let k = 0, tries = 0;
+  while (k < 160 && tries++ < 3000) {
+    const a = srand() * 6.28, r = Math.sqrt(srand()) * (EMB_R - 3), x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (dist2(x, z, 0, 12) < 7 || lavaRel(x, z)) continue;
+    d.position.set(EMB_C.x + x, .02, EMB_C.z + z); d.rotation.set(0, srand() * 6, 0); d.scale.set(.07, .03, sr(.5, 1.6)); d.updateMatrix(); cracks.setMatrixAt(k++, d.matrix);
+  }
+  cracks.count = k; scene.add(cracks);
+  // camp: cargo pod & stones
+  const pod = mesh([
+    part(G.cyl8, 0xe9e9f4, 0, .9, 0, 0, 0, 0, .9, 1.8, .9), part(G.cone6, 0xff6a5a, 0, 2.1, 0, 0, 0, 0, .9, .7, .9),
+    part(G.box, 0xff6a5a, 0, .25, 0, 0, 0, 0, 2, .12, .3), part(G.box, 0xff6a5a, 0, .25, 0, 0, Math.PI / 2, 0, 2, .12, .3),
+  ]);
+  pod.position.set(EMB_STORE_POS.x, 0, EMB_STORE_POS.z); scene.add(pod); addCol(EMB_STORE_POS.x, EMB_STORE_POS.z, 1.1);
+  const pw = new THREE.Mesh(new THREE.SphereGeometry(.3, 8, 6), emis(0x7dff8a, 1)); pw.position.set(0, 1.3, .8); pod.add(pw);
+  const cp = [];
+  for (let i = 0; i < 24; i++) { const a = srand() * 6.28, r = Math.sqrt(srand()) * 6; cp.push(part(G.cyl6, [0x4a3e48, 0x3e333e, 0x54464f][i % 3], Math.cos(a) * r, .05, 12 + Math.sin(a) * r, 0, sr(0, 1), 0, sr(.5, .7), .12, sr(.5, .7))); }
+  const cpm = mesh(cp); cpm.castShadow = false; cpm.position.set(EMB_C.x, 0, EMB_C.z); scene.add(cpm);
+}
+placeBuilding('emberret', 'portal', EMB_C.x, EMB_C.z + 3.2, 0, 0, { fixed: 1, pal: 'ember', discCol: 0xbfe6ff });
+for (const [x, z, r] of [[-2.8, .3, 1.1], [2.8, .3, 1.1], [0, -.5, 1.4], [-1.4, -.5, 1.2], [1.4, -.5, 1.2]]) addCol(EMB_C.x + x, EMB_C.z + 3.2 + z, r);
+placeBuilding('emberportal', 'portal', EP_ON_ICE.x, EP_ON_ICE.z, 0, 0, { pal: 'ember', discCol: 0xff8a3a });
+for (const [x, z, r] of [[-2.8, .3, 1.1], [2.8, .3, 1.1], [0, -.5, 1.4], [-1.4, -.5, 1.2], [1.4, -.5, 1.2]]) addCol(EP_ON_ICE.x + x, EP_ON_ICE.z + z, r);
+placeBuilding('nest', 'nest', ECAMP.x - 9, ECAMP.z + 1, .3, 1.5);
+placeBuilding('ship_r_ice', 'rocket', ICE_C.x + 9.5, ICE_C.z + 23.5, -.4, 1.4, { linked: 'ship' });
+placeBuilding('ship_r_emb', 'rocket', EMB_C.x + 10.8, EMB_C.z + 16.6, -.4, 1.4, { linked: 'ship' });
+
 // snow particles
 const SNOW_N = 1500;
 const snowGeo = new THREE.BufferGeometry();
@@ -1141,15 +1383,17 @@ const PAD_RING = new THREE.RingGeometry(1.25, 1.45, 4, 1);
 function addPad(o) {
   const g = new THREE.Group(); g.position.set(o.x, .03, o.z);
   const sell = o.kind === 'sell';
-  const col = sell ? 0x7dff8a : 0xffd36b;
+  const ui = o.kind === 'ui';
+  const col = sell ? 0x7dff8a : ui ? 0x7fd8ff : 0xffd36b;
   const base = new THREE.Mesh(PAD_GEO, new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: .3, emissive: col, emissiveIntensity: .25 }));
   const ring = new THREE.Mesh(PAD_RING, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .9, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.rotation.z = Math.PI / 4; ring.position.y = .06;
   const fill = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0x7dff8a, transparent: true, opacity: .55 }));
   fill.rotation.x = -Math.PI / 2; fill.position.y = .07;
   g.add(base, ring, fill); scene.add(g);
+  if (ui) fill.visible = false;
   if (sell) { fill.visible = false; const c = new THREE.Mesh(new THREE.CylinderGeometry(.35, .35, .08, 14), emis(0xffd23a, .6)); c.position.y = .12; g.add(c); }
-  const el = document.createElement('div'); el.className = 'label panel' + (sell ? ' sell' : ''); $('labels').appendChild(el);
+  const el = document.createElement('div'); el.className = 'label panel' + (sell ? ' sell' : ui ? ' ui' : ''); $('labels').appendChild(el);
   const p = Object.assign({ g, ring, fill, el, dirty: true, drainT: 0, labelY: 2.4, shown: false, zone: zoneOf(o.x, o.z), kind: 'build' }, o);
   pads.push(p); return p;
 }
@@ -1163,8 +1407,8 @@ function toolPad(tool, x, z, desc) {
     visible: () => lvl('workshop') > 0,
     cost: l => {
       if (tool === 'axe') return { wood: 10 * l, stone: 6 * l, ore: l >= 2 ? 5 * (l - 1) : 0, crystal: l >= 4 ? 4 * (l - 3) : 0 };
-      if (tool === 'pick') return { wood: 8 * l, stone: 10 * l, ore: l >= 2 ? 6 * (l - 1) : 0, crystal: l >= 3 ? 5 * (l - 2) : 0, frost: l >= 4 ? 6 * (l - 3) : 0 };
-      if (tool === 'sword') return { wood: 6 * l, stone: 8 * l, ore: 4 * l, crystal: l >= 3 ? 4 * (l - 2) : 0, frost: l >= 4 ? 5 * (l - 3) : 0 };
+      if (tool === 'pick') return { wood: 8 * l, stone: 10 * l, ore: l >= 2 ? 6 * (l - 1) : 0, crystal: l >= 3 ? 5 * (l - 2) : 0, frost: l >= 4 ? 6 * (l - 3) : 0, magma: l >= 5 ? 6 : 0 };
+      if (tool === 'sword') return { wood: 6 * l, stone: 8 * l, ore: 4 * l, crystal: l >= 3 ? 4 * (l - 2) : 0, frost: l >= 4 ? 5 * (l - 3) : 0, magma: l >= 5 ? 5 : 0 };
       return { wood: 14 * l, stone: 8 * l, ore: l >= 2 ? 4 * (l - 1) : 0, crystal: l >= 4 ? 3 * (l - 3) : 0, frost: l >= 5 ? 6 : 0 };
     },
     done: () => {
@@ -1172,6 +1416,7 @@ function toolPad(tool, x, z, desc) {
       toast(`⬆ ${TOOL_NAME[tool]} upgraded to Lv ${S.tools[tool]}!`, 'big');
       if (tool === 'pick' && S.tools.pick === 2) toast('You can now mine <b style="color:var(--ore)">ore</b> in the mine!');
       if (tool === 'pick' && S.tools.pick === 3) toast('You can now mine <b style="color:var(--crystal)">crystals</b> and <b style="color:var(--frost)">frost gems</b>!');
+      if (tool === 'pick' && S.tools.pick === 4) toast('You can now mine <b style="color:var(--magma)">magma cores</b> on Emberfall!');
       renderTools();
     },
   });
@@ -1189,7 +1434,7 @@ const safeR = l => [0, 15, 19, 24][l] || 0;
 const heatR = l => [0, 11, 15, 19][l] || 0;
 buildPad({ id: 'workshop', x: -10, z: .6, name: l => l ? 'Workshop' : 'Restore Workshop', sub: () => 'Unlocks tool upgrades', max: 1, cost: () => ({ wood: 10, stone: 6 }), visible: () => true, after: () => { refreshBuilding('workshop'); toast('🔨 Workshop restored! Upgrade your tools on the pads.', 'big'); } });
 toolPad('axe', -15.2, -.8, l => `Chop faster · +${l - 1} wood`);
-toolPad('pick', -13.6, 1.6, l => l === 2 ? 'Mine ORE' : l === 3 ? 'Mine CRYSTALS + FROST GEMS' : `Mine faster · +${l - 1} yield`);
+toolPad('pick', -13.6, 1.6, l => l === 2 ? 'Mine ORE' : l === 3 ? 'Mine CRYSTALS + FROST GEMS' : l === 4 ? 'Mine MAGMA CORES' : `Mine faster · +${l - 1} yield`);
 toolPad('sword', -7.6, 3.2, l => `+1 damage on every weapon`);
 toolPad('bag', -5.3, 1.2, l => `Carry ${20 + (l - 1) * 15} items`);
 buildPad({ id: 'mine', x: MINE_DOOR.x + 2.2, z: MINE_DOOR.z + 2.6, name: 'Repair Mine Elevator', sub: () => 'Opens the deep mine', max: 1, cost: () => ({ wood: 20, stone: 12 }), visible: () => lvl('workshop') > 0, after: () => { refreshMineEntrance(); toast('⛏ The mine is open! Walk into the entrance.', 'big'); } });
@@ -1200,10 +1445,10 @@ buildPad({ id: 'portal', x: 0, z: -10.2, name: 'Awaken Ancient Portal', sub: () 
 buildPad({ id: 'trading', x: 14.2, z: -8.6, name: 'Restore Trading Post', sub: () => 'Sell extra resources for coins', max: 1, cost: () => ({ wood: 30, stone: 20 }), visible: () => lvl('workshop') > 0, after: () => { refreshBuilding('trading'); toast('🪙 Trading Post open! Stand on a green pad to sell.', 'big'); } });
 buildPad({ id: 'petden', x: -5.4, z: -9.6, name: l => l ? `Pet Lv ${l + 1}` : 'Adopt a Pet', sub: l => l === 1 ? 'Bloop follows you & gathers' : l === 2 ? 'Faster + zaps enemies' : 'Super Bloop!', max: 3, cost: l => [null, { coins: 80 }, { coins: 250, crystal: 8 }, { coins: 500, frost: 12 }][l], visible: () => lvl('trading') > 0, after: l => { refreshBuilding('petden'); makePet(); toast(l === 1 ? '🐾 Bloop joined you! It gathers nearby stuff.' : '🐾 Bloop leveled up!', 'big'); } });
 // sell pads at the trading post
-const SELL = { wood: { per: 2, coin: 1, keep: 20 }, stone: { per: 2, coin: 1, keep: 20 }, ore: { per: 1, coin: 1, keep: 10 }, crystal: { per: 1, coin: 3, keep: 10 }, frost: { per: 1, coin: 5, keep: 5 } };
+const SELL = { wood: { per: 2, coin: 1, keep: 20 }, stone: { per: 2, coin: 1, keep: 20 }, ore: { per: 1, coin: 1, keep: 10 }, crystal: { per: 1, coin: 3, keep: 10 }, frost: { per: 1, coin: 5, keep: 5 }, magma: { per: 1, coin: 8, keep: 5 } };
 RES.forEach((r, i) => addPad({
   id: 'sell_' + r, kind: 'sell', res: r, x: 9.4 + i * 2.5, z: -7.4 + Math.abs(i - 2) * .5, labelY: 1.6, max: 1, level: () => 0, cost: () => ({}),
-  visible: () => lvl('trading') > 0 && (r !== 'crystal' || S.tools.pick >= 3) && (r !== 'frost' || S.stats.iceVisits > 0) && (r !== 'ore' || lvl('mine') > 0),
+  visible: () => lvl('trading') > 0 && (r !== 'crystal' || S.tools.pick >= 3) && (r !== 'frost' || S.stats.iceVisits > 0) && (r !== 'ore' || lvl('mine') > 0) && (r !== 'magma' || S.stats.emberVisits > 0),
 }));
 // Frostveil pads
 buildPad({ id: 'heater', x: CAMP.x + 9, z: CAMP.z + 5.2, name: l => l ? `Heater Lv ${l + 1}` : 'Light the Heater', sub: l => `Safe from blizzards (${heatR(l)}m)`, max: 3, cost: l => [null, { wood: 20, stone: 20, ore: 5 }, { wood: 40, stone: 40, ore: 10, frost: 8 }, { wood: 60, stone: 60, ore: 15, frost: 16 }][l], visible: () => true, after: l => { refreshBuilding('heater'); toast(l === 1 ? '🔥 The Heater blazes! Frost Shards can\'t enter its warmth.' : '🔥 Heater upgraded — warm zone grows!', 'ice'); } });
@@ -1217,6 +1462,15 @@ buildPad({ id: 'forge', x: CAMP.x - 9, z: CAMP.z + 5.6, name: 'Restore the Forge
 }));
 addPad({ id: 'core', x: CORE_POS.x, z: CORE_POS.z + 3.2, name: () => 'Claim the Planet Core', sub: () => '+30 max health forever', level: () => S.core, max: 1, cost: () => ({}), visible: () => S.stats.golem > 0 && !S.core, done: () => claimCore() });
 
+buildPad({ id: 'emberportal', x: EP_ON_ICE.x, z: EP_ON_ICE.z + 4.6, name: 'Ignite the Ember Portal', sub: () => 'Opens the way to Emberfall', max: 1, cost: () => ({ coins: 200, frost: 25, crystal: 15, ore: 30 }), visible: () => S.stats.golem > 0, after: () => { refreshBuilding('emberportal'); toast('🌋 The Ember Portal blazes open! Step in to reach Emberfall.', 'big', 4500); } });
+buildPad({ id: 'ship', x: SHIP_SPOTS.home.pad.x, z: SHIP_SPOTS.home.pad.z, name: 'Repair the Space Ship', sub: () => 'Fly between planets', max: 1, cost: () => ({ wood: 80, stone: 60, ore: 40, crystal: 20, frost: 15, coins: 300 }), visible: () => S.stats.iceVisits > 0, after: () => { ['ship', 'ship_r_ice', 'ship_r_emb'].forEach(id => refreshBuilding(id)); toast('🚀 Your ship is fixed! Stand on its pad to open the Star Map.', 'big', 4500); } });
+buildPad({ id: 'shop', x: SHOP_POS.x, z: SHOP_POS.z - 3.4, name: 'Restore the Suit Shop', sub: () => 'New suit colors & hats', max: 1, cost: () => ({ wood: 35, stone: 25, coins: 40 }), visible: () => lvl('trading') > 0, after: () => { refreshBuilding('shop'); toast('👕 The Suit Shop is open! Stand on its pad to browse.', 'big'); } });
+buildPad({ id: 'bridge', x: EMB_C.x + BRIDGE_X, z: EMB_C.z - 1.8, name: 'Build Obsidian Bridge', sub: () => 'A safe path over the lava', max: 1, cost: () => ({ stone: 60, wood: 30, magma: 6 }), visible: () => true, after: () => { bridgeMesh.visible = true; toast('🌉 Obsidian Bridge built! No more lava hopping here.', 'big'); } });
+buildPad({ id: 'nest', x: ECAMP.x - 9, z: ECAMP.z + 5.2, name: l => l ? `Dragon Lv ${l + 1}` : 'Hatch the Dragon Egg', sub: l => l === 1 ? 'A baby dragon that breathes fire!' : 'Hotter fire, faster breath', max: 3, cost: l => [null, { magma: 8, coins: 250 }, { magma: 15, coins: 500 }, { magma: 25, coins: 900, frost: 20 }][l], visible: () => S.egg > 0, after: l => hatchOrLevel(l) });
+const uiPad = (id, x, z, html, ui, visible) => addPad({ id, kind: 'ui', ui, x, z, labelY: 1.8, html, max: 1, level: () => 0, cost: () => ({}), visible });
+uiPad('shopui', SHOP_POS.x, SHOP_POS.z - 3.4, '<div class="nm">👕 Suit Shop</div><div class="sub">Stand here to browse</div>', 'shop', () => lvl('shop') > 0);
+for (const z of ['home', 'ice', 'ember']) uiPad('ship_' + z, SHIP_SPOTS[z].pad.x, SHIP_SPOTS[z].pad.z, '<div class="nm">🚀 Space Ship</div><div class="sub">Stand here for the Star Map</div>', 'map', () => lvl('ship') > 0);
+
 const portalHint = document.createElement('div'); portalHint.className = 'label panel dim'; portalHint.innerHTML = '<div class="nm">Ancient Portal</div><div class="sub">Dormant… needs crystals</div>'; $('labels').appendChild(portalHint);
 
 /* ================================================================
@@ -1227,7 +1481,8 @@ const portalHint = document.createElement('div'); portalHint.className = 'label 
     if (Math.hypot(x, z) < 19) return true;
     if (dist2(x, z, MINE_ENTRANCE.x, MINE_ENTRANCE.z) < 8) return true;
     if (dist2(x, z, -4, 17) < 5) return true;
-    if (dist2(x, z, 15, -10) < 7.5) return true;
+    if (dist2(x, z, 15, -10) < 9.5) return true;
+    if (dist2(x, z, SHOP_POS.x, SHOP_POS.z) < 5) return true;
     for (const n of nodes) if (dist2(x, z, n.x, n.z) < 3.2) return true;
     const t = clamp(((x + 6) * (MINE_ENTRANCE.x + 9) + (z + 5) * (MINE_ENTRANCE.z + 9)) / ((MINE_ENTRANCE.x + 9) ** 2 + (MINE_ENTRANCE.z + 9) ** 2), 0, 1);
     if (dist2(x, z, -6 + t * (MINE_ENTRANCE.x + 9), -5 + t * (MINE_ENTRANCE.z + 9)) < 2.5) return true;
@@ -1259,6 +1514,7 @@ const portalHint = document.createElement('div'); portalHint.className = 'label 
     if (dist2(x, z, 0, 3) < 6) return true;
     if (dist2(wx, wz, ARENA.x, ARENA.z) < 16) return true;
     if (Math.abs(x) < 2.5 && z < 2 && z > -18) return true;
+    if (dist2(x, z, 20, 8) < 7 || dist2(x, z, 9.5, 23.5) < 4 || dist2(x, z, 6.8, 20.3) < 3) return true;
     for (const l of LAKES) if (dist2(wx, wz, l.x, l.z) < l.r + 1.8) return true;
     for (const n of nodes) if (n.zone === 'ice' && dist2(wx, wz, n.x, n.z) < 3.2) return true;
     return false;
@@ -1274,6 +1530,26 @@ const portalHint = document.createElement('div'); portalHint.className = 'label 
     else if (ir < 18 && roll < .55) { addNode('icerock', ICE_C.x + x, ICE_C.z + z); ir++; }
     else if (ft < 46) { addNode('ftree', ICE_C.x + x, ICE_C.z + z); ft++; }
   }
+  // Emberfall
+  const ebad = (x, z) => {
+    if (dist2(x, z, 0, 12) < 15) return true;
+    if (dist2(x, z, 0, -38) < 13) return true;
+    for (const r of RIVERS) if (z > r.z0 - 2 && z < r.z1 + 2) return true;
+    if (Math.abs(x - BRIDGE_X) < 2.5 && z > -12 && z < 0) return true;
+    for (const n of nodes) if (n.zone === 'ember' && dist2(EMB_C.x + x, EMB_C.z + z, n.x, n.z) < 3.2) return true;
+    return false;
+  };
+  let ot = 0, bs = 0, mg = 0; tries = 0;
+  for (const [x, z] of [[-14, 22], [13, 26], [-20, 6], [18, 4]]) { addNode('otree', EMB_C.x + x, EMB_C.z + z); ot++; }
+  for (const [x, z] of [[-17, 15], [18, 12]]) { addNode('basalt', EMB_C.x + x, EMB_C.z + z); bs++; }
+  while ((ot < 40 || bs < 16 || mg < 14) && tries++ < 6000) {
+    const a = srand() * Math.PI * 2, r = sr(9, EMB_R - 5), x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (ebad(x, z)) continue;
+    const roll = srand();
+    if (mg < 14 && z < -10 && roll < .35) { addNode('magma', EMB_C.x + x, EMB_C.z + z); mg++; }
+    else if (bs < 16 && roll < .55) { addNode('basalt', EMB_C.x + x, EMB_C.z + z); bs++; }
+    else if (ot < 40) { addNode('otree', EMB_C.x + x, EMB_C.z + z); ot++; }
+  }
 }
 
 /* ================================================================
@@ -1285,12 +1561,19 @@ const CRAWL_BODY = new THREE.MeshLambertMaterial({ color: 0x6a2a3a, flatShading:
 const SHARD_BODY = new THREE.MeshLambertMaterial({ color: 0x7fc4ff, emissive: 0x1f4aa8, emissiveIntensity: .45, flatShading: true });
 const EYE_G = emis(0xff4fd8, 2), EYE_C = emis(0xffd23a, 2), EYE_S = emis(0xffffff, 2.5);
 const FLASH = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1 });
-const BODY_MAT = { gloom: GLOOM_BODY, crawl: CRAWL_BODY, shard: SHARD_BODY };
-const ENEMY_ZONE = { gloom: 'home', crawl: 'mine', shard: 'ice' };
+const MAGMA_BODY = new THREE.MeshLambertMaterial({ color: 0x3a1a14, emissive: 0xff3a0a, emissiveIntensity: .45, flatShading: true });
+const GOBLIN_BODY = new THREE.MeshLambertMaterial({ color: 0x6bd04a, flatShading: true });
+const SACK_MAT = new THREE.MeshLambertMaterial({ color: 0xa0703a, flatShading: true });
+const BODY_MAT = { gloom: GLOOM_BODY, crawl: CRAWL_BODY, shard: SHARD_BODY, magma: MAGMA_BODY, goblin: GOBLIN_BODY };
 function spawnEnemy(kind, x, z) {
   const g = new THREE.Group();
   let body;
-  if (kind === 'shard') {
+  if (kind === 'goblin') {
+    body = new THREE.Mesh(G.ico1, GOBLIN_BODY); body.scale.set(.42, .45, .42); body.position.y = .55; body.castShadow = true; g.add(body);
+    const sack = new THREE.Mesh(G.ico1, SACK_MAT); sack.scale.setScalar(.42); sack.position.set(0, .85, -.42); sack.castShadow = true; g.add(sack);
+    const knot = new THREE.Mesh(G.ico, emis(0xffd23a, 1)); knot.scale.setScalar(.12); knot.position.set(0, 1.25, -.42); g.add(knot);
+    for (const sx of [-1, 1]) { const ear = new THREE.Mesh(G.cone4, GOBLIN_BODY); ear.scale.set(.08, .3, .08); ear.position.set(sx * .42, .75, 0); ear.rotation.z = -sx * 1.1; g.add(ear); const e2 = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), EYE_C); e2.position.set(sx * .14, .66, .36); g.add(e2); }
+  } else if (kind === 'shard') {
     body = new THREE.Mesh(G.oct, SHARD_BODY); body.scale.set(.42, .7, .42); body.position.y = 1; body.castShadow = true; g.add(body);
     for (let i = 0; i < 4; i++) { const s = new THREE.Mesh(G.oct, SHARD_BODY); s.scale.set(.12, .38, .12); const a = i * 1.57; s.position.set(Math.cos(a) * .45, 1 + (i % 2) * .2, Math.sin(a) * .45); s.rotation.set(Math.sin(a) * .7, 0, -Math.cos(a) * .7); g.add(s); }
     for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(.08, 8, 6), EYE_S); e.position.set(sx * .14, 1.12, .3); g.add(e); }
@@ -1301,12 +1584,14 @@ function spawnEnemy(kind, x, z) {
     g.add(body);
     for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(.11, 8, 6), isG ? EYE_G : EYE_C); e.position.set(sx * .22, .75, .58); g.add(e); }
     if (isG) for (let i = 0; i < 4; i++) { const s = new THREE.Mesh(G.cone4, GLOOM_BODY); s.scale.set(.12, .4, .12); s.position.set(Math.cos(i * 1.6) * .3, 1.05, Math.sin(i * 1.6) * .3 - .1); s.rotation.set(Math.sin(i * 1.6) * -.6, 0, Math.cos(i * 1.6) * .6); g.add(s); }
+    else if (kind === 'magma') for (let i = 0; i < 5; i++) { const c = new THREE.Mesh(G.box, EMBER_MAT); c.scale.set(.07, .3, .07); const a = i * 1.26; c.position.set(Math.cos(a) * .5, .7, Math.sin(a) * .5); c.rotation.set(Math.sin(a) * .8, 0, -Math.cos(a) * .8); g.add(c); }
     else for (const sx of [-1, 1]) for (let j = 0; j < 3; j++) { const l = new THREE.Mesh(G.box, CRAWL_BODY); l.scale.set(.5, .07, .07); l.position.set(sx * .65, .3, -.2 + j * .25); l.rotation.z = sx * -.5; g.add(l); }
   }
   g.position.set(x, 0, z); g.scale.setScalar(.01);
   scene.add(g);
-  const hp = kind === 'gloom' ? 2 + Math.floor((S.day - 1) * .8) : kind === 'crawl' ? 3 + S.tools.pick : 5 + Math.floor(S.day * .6);
-  const e = { g, body, kind, hp, max: hp, speed: kind === 'gloom' ? rand(3, 3.8) : kind === 'crawl' ? rand(3.4, 4.2) : rand(3.8, 4.6), cd: 0, hop: Math.random() * 6, flash: 0, kx: 0, kz: 0, spawn: 0, dying: 0, dmg: kind === 'gloom' ? 8 + S.day : kind === 'crawl' ? 10 : 9, burn: 0, slow: 0 };
+  const hp = { gloom: 2 + Math.floor((S.day - 1) * .8), crawl: 3 + S.tools.pick, shard: 5 + Math.floor(S.day * .6), magma: 7 + Math.floor(S.day * .6), goblin: 8 + S.day }[kind];
+  const speed = { gloom: rand(3, 3.8), crawl: rand(3.4, 4.2), shard: rand(3.8, 4.6), magma: rand(3.2, 4), goblin: 5.6 }[kind];
+  const e = { g, body, kind, hp, max: hp, speed, cd: 0, hop: Math.random() * 6, flash: 0, kx: 0, kz: 0, spawn: 0, dying: 0, dmg: { gloom: 8 + S.day, crawl: 10, shard: 9, magma: 11, goblin: 0 }[kind], burn: 0, slow: 0, life: 25, zone: zoneOf(x, z) };
   enemies.push(e);
   return e;
 }
@@ -1378,6 +1663,139 @@ function initBoss() {
 }
 
 /* ================================================================
+   BOSS: MAGMAW, THE LAVA SERPENT
+   ================================================================ */
+const SERP_MAT = new THREE.MeshLambertMaterial({ color: 0x5a1a14, emissive: 0xff3a0a, emissiveIntensity: .3, flatShading: true });
+const serp = { g: new THREE.Group(), isBoss: true, r: 1.7, textY: 5.5, state: 'sleep', mode: 'up', hp: 1, max: 1, rise: 0, theta: Math.PI / 2, atk: null, atkT: 2, burn: 0, slow: 0, flash: 0, flashing: false, kx: 0, kz: 0, segs: [], attacks: 0, modeT: 0, deadT: 0 };
+serp.targetable = () => serp.state === 'fight' && serp.mode === 'up';
+serp.kill = () => killSerpent();
+boss.targetable = () => boss.state === 'fight';
+boss.kill = () => killBoss();
+{
+  const N = 10;
+  const spikeMat = new THREE.MeshLambertMaterial({ color: 0x241414, flatShading: true });
+  for (let i = 0; i < N; i++) {
+    const s = 1 - i / N;
+    const m = new THREE.Mesh(jitter(G.ico1, .15, Math.random), SERP_MAT);
+    m.scale.setScalar(.6 + s * .45); m.castShadow = true;
+    if (i % 2 === 0) { const sp = new THREE.Mesh(G.cone4, spikeMat); sp.scale.set(.25, .6, .25); sp.position.y = .95; m.add(sp); }
+    serp.g.add(m); serp.segs.push(m);
+  }
+  const head = new THREE.Group();
+  head.add(mesh([part(jitter(G.box, .15), 0x5a1a14, 0, .25, .3, 0, 0, 0, 1.3, .8, 1.6), part(G.box, 0x3a1210, 0, .55, .1, 0, 0, 0, 1.4, .3, 1.2)], SERP_MAT));
+  const jaw = new THREE.Group(); jaw.position.set(0, -.05, -.3);
+  jaw.add(mesh([part(jitter(G.box, .1), 0x4a1410, 0, -.15, .75, 0, 0, 0, 1.1, .3, 1.4)], SERP_MAT));
+  head.add(jaw);
+  const bone = new THREE.MeshLambertMaterial({ color: 0xe8d8b8, flatShading: true });
+  for (const sx of [-1, 1]) {
+    const horn = new THREE.Mesh(G.cone4, bone); horn.scale.set(.15, .7, .15); horn.position.set(sx * .5, .85, -.3); horn.rotation.set(-.6, 0, -sx * .4); head.add(horn);
+    const eye = new THREE.Mesh(G.box, emis(0xffd23a, 2.5)); eye.scale.set(.22, .12, .1); eye.position.set(sx * .4, .45, 1.1); head.add(eye);
+    const tooth = new THREE.Mesh(G.cone4, bone); tooth.scale.set(.06, .18, .06); tooth.rotation.x = Math.PI; tooth.position.set(sx * .35, -.08, .95); head.add(tooth);
+  }
+  serp.mouth = new THREE.Mesh(G.box, emis(0xff6a1a, 2)); serp.mouth.scale.set(.8, .12, .9); serp.mouth.position.set(0, .02, .5); head.add(serp.mouth);
+  serp.head = head; serp.jaw = jaw; serp.g.add(head);
+  serp.g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.mat = o.material; } });
+  serp.g.visible = false;
+  scene.add(serp.g);
+}
+const serpMaxHp = () => Math.round(320 * (1 + .35 * S.stats.serpent));
+const serpRoot = th => V(LAVA_LAKE.x + Math.cos(th) * (LAKE_R - .8), 0, LAVA_LAKE.z + Math.sin(th) * (LAKE_R - .8));
+function resetSerpent() {
+  serp.max = serp.hp = serpMaxHp(); serp.rise = 0; serp.mode = 'up'; serp.atk = null; serp.atkT = 2.2; serp.burn = 0; serp.slow = 0; serp.theta = Math.PI / 2; serp.attacks = 0;
+  serp.g.position.copy(serpRoot(serp.theta)); serp.g.visible = false;
+}
+function initSerpent() { resetSerpent(); serp.state = (S.stats.serpent > 0 && S.day <= S.serpentDay) ? 'gone' : 'sleep'; }
+function poseSerpent(t) {
+  serp.g.rotation.y = Math.atan2(Math.cos(serp.theta), Math.sin(serp.theta));
+  const N = serp.segs.length, R = serp.rise;
+  serp.segs.forEach((m, i) => {
+    const s = i / N;
+    m.position.set(Math.sin(t * 2 + s * 5) * .45 * (1 - s), R * (-1.4 + 6.2 * Math.sin(s * Math.PI * .62)), -5.5 + 6 * s);
+  });
+  serp.head.position.set(0, R * (-1.4 + 6.2 * Math.sin(Math.PI * .62)) + .1, .7);
+  serp.g.visible = R > .02;
+}
+
+/* ---------------- falling things: lava bombs, serpent spit, meteors ---------------- */
+const EV = { t: 80, golden: 0, meteor: 0, meteorT: 0 };
+const ERU = { on: false, t: 60, warn: false, k: 0, bombT: 0 };
+const arcs = [];
+const RING_GEO = new THREE.RingGeometry(.85, 1, 28), DISC_GEO = new THREE.CircleGeometry(1, 28), ROCK_GEO = new THREE.DodecahedronGeometry(.45, 0);
+function arcDrop(from, to, dur, kind) {
+  const met = kind === 'meteor';
+  const col = met ? 0xc8a8ff : 0xff4f2a;
+  const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .85, side: THREE.DoubleSide }));
+  const fill = new THREE.Mesh(DISC_GEO, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .2, side: THREE.DoubleSide }));
+  for (const m of [ring, fill]) { m.rotation.x = -Math.PI / 2; m.position.set(to.x, .08, to.z); scene.add(m); }
+  const rock = new THREE.Mesh(ROCK_GEO, met ? emis(0xc8a8ff, 1.5) : MAGMA_MAT);
+  rock.position.copy(from); scene.add(rock);
+  arcs.push({ from: from.clone(), to: to.clone(), t: 0, dur, kind, ring, fill, rock, R: met ? 1.5 : 1.8 });
+}
+function updateArcs(dt) {
+  for (let i = arcs.length - 1; i >= 0; i--) {
+    const a = arcs[i]; a.t += dt;
+    const k = Math.min(1, a.t / a.dur), met = a.kind === 'meteor';
+    a.rock.position.lerpVectors(a.from, a.to, k);
+    if (a.kind === 'lava') a.rock.position.y += Math.sin(k * Math.PI) * 5;
+    a.rock.rotation.x += dt * 6; a.rock.rotation.z += dt * 4;
+    a.ring.scale.setScalar(a.R * (.3 + .7 * k)); a.fill.scale.setScalar(a.R * k);
+    if (Math.random() < dt * 30) burst(a.rock.position.x, a.rock.position.y, a.rock.position.z, met ? 0xc8a8ff : 0xff8a3a, 1, .5, .4, .7, 0);
+    const gone = zoneOf(a.to.x, a.to.z) !== P.zone;
+    if (k >= 1 || gone) {
+      if (k >= 1 && !gone) {
+        burst(a.to.x, .3, a.to.z, met ? 0xc8a8ff : 0xff6a1a, 16, 5, .7);
+        const d = dist2(a.to.x, a.to.z, player.position.x, player.position.z);
+        if (met) { SFX.meteor(); spawnLoot(a.to); if (d < a.R) damagePlayer(5, a.to.x, a.to.z); }
+        else { SFX.boom(); camShake = Math.max(camShake, .25); if (d < a.R + .3) damagePlayer(13, a.to.x, a.to.z, 0, 2); }
+      }
+      scene.remove(a.ring); scene.remove(a.fill); scene.remove(a.rock);
+      a.ring.material.dispose(); a.fill.material.dispose(); if (met) a.rock.material.dispose();
+      arcs.splice(i, 1);
+    }
+  }
+}
+const loot = [];
+function spawnLoot(pos) {
+  const g = new THREE.Group();
+  g.add(mesh([part(jitter(G.dode, .3), 0x3a3048, 0, .3, 0, 0, 0, 0, .6, .45, .6)]));
+  const c = new THREE.Mesh(G.oct, emis(0xd8b8ff, 1.6)); c.scale.set(.25, .45, .25); c.position.y = .75; g.add(c);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, 8, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xd8b8ff, transparent: true, opacity: .3, depthWrite: false }));
+  beam.position.y = 4; g.add(beam);
+  g.position.set(pos.x, 0, pos.z); scene.add(g);
+  loot.push({ g, c, x: pos.x, z: pos.z, life: 45 });
+}
+function collectLoot(l) {
+  const coins = 15 + (Math.random() * 26 | 0);
+  S.coins += coins;
+  const opts = [['crystal', 2 + (Math.random() * 3 | 0)], ['ore', 4 + (Math.random() * 3 | 0)]];
+  if (S.stats.iceVisits) opts.push(['frost', 2 + (Math.random() * 2 | 0)]);
+  if (S.stats.emberVisits) opts.push(['magma', 1 + (Math.random() * 2 | 0)]);
+  const [r, n] = opts[Math.random() * opts.length | 0];
+  S.store[r] += n; S.stats.meteors++;
+  burst(l.x, 1, l.z, 0xd8b8ff, 18, 5, .9); SFX.crystal(); SFX.coin();
+  floatText(V(l.x, 2.2, l.z), `☄ +${coins} ${ic('coins')} +${n} ${ic(r)}`, '#e8d8ff');
+  renderRes();
+}
+function updateLoot(dt, t) {
+  for (let i = loot.length - 1; i >= 0; i--) {
+    const l = loot[i]; l.life -= dt;
+    l.c.rotation.y += dt * 3; l.c.position.y = .75 + Math.sin(t * 3 + i) * .1;
+    const near = zoneOf(l.x, l.z) === P.zone && dist2(l.x, l.z, player.position.x, player.position.z) < 1.6 && S.hp > 0;
+    if (near) collectLoot(l);
+    if (near || l.life <= 0) { scene.remove(l.g); loot.splice(i, 1); }
+  }
+}
+function fireStream(from, to, n = 3, spd = 12) {
+  const dir = to.clone().sub(from).normalize();
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(PGEO, pmat(Math.random() < .5 ? 0xff8a2a : 0xffd23a));
+    m.position.copy(from); m.scale.setScalar(rand(1, 2.2)); scene.add(m);
+    const s = spd * rand(.8, 1.1);
+    particles.push({ m, vx: dir.x * s + rand(-1.5, 1.5), vy: dir.y * s + rand(-.5, 1.5), vz: dir.z * s + rand(-1.5, 1.5), life: .55, max: .55, grav: -1 });
+  }
+}
+
+/* ================================================================
    PET: BLOOP
    ================================================================ */
 const pet = { g: null, lvl: 0, target: null, hitT: 0, scanT: 0, zapT: 0, bob: 0 };
@@ -1424,6 +1842,7 @@ function renderRes() {
     if (r === 'ore') hide = !S.stats.ore && !S.store.ore && !lvl('mine');
     if (r === 'crystal') hide = !S.stats.crystal && !S.store.crystal && S.tools.pick < 3;
     if (r === 'frost') hide = !S.stats.frost && !S.store.frost && !S.stats.iceVisits;
+    if (r === 'magma') hide = !S.stats.magma && !S.store.magma && !S.stats.emberVisits;
     if (r === 'coins') hide = !S.coins && !S.daily.claims && !lvl('trading');
     resEls[r].style.display = hide ? 'none' : '';
   }
@@ -1469,6 +1888,210 @@ function padLabel(p) {
 }
 
 /* ================================================================
+   DRAGON PET: SPARKY
+   ================================================================ */
+const dragon = { g: null, lvl: 0, breathT: 1, flap: 0, fireT: 0, aim: null, tick: 0 };
+function makeDragon() {
+  const L = lvl('nest'); if (!L) return;
+  if (dragon.g) scene.remove(dragon.g);
+  const col = [0, 0xff5a3a, 0xc85aff, 0xffa020][L];
+  const mat = new THREE.MeshLambertMaterial({ color: col, flatShading: true });
+  const belly = new THREE.MeshLambertMaterial({ color: 0xffd36b, flatShading: true });
+  const g = new THREE.Group(), b = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.28, 10, 8), mat); body.scale.set(1, .9, 1.35); body.castShadow = true;
+  const bel = new THREE.Mesh(new THREE.SphereGeometry(.2, 8, 6), belly); bel.position.set(0, -.1, .08); bel.scale.set(1, .7, 1.3);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), mat); head.position.set(0, .2, .38);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(.18, .12, .2), mat); snout.position.set(0, .15, .58);
+  const horns = [-1, 1].map(s => { const h = new THREE.Mesh(new THREE.ConeGeometry(.04, .18 + L * .04, 4), belly); h.position.set(s * .1, .4, .32); h.rotation.x = -.5; return h; });
+  const eyes = [-1, 1].map(s => { const e = new THREE.Mesh(new THREE.SphereGeometry(.045, 6, 5), new THREE.MeshBasicMaterial({ color: 0x1a1030 })); e.position.set(s * .1, .27, .53); return e; });
+  const wingGeo = new THREE.BufferGeometry();
+  wingGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, -.15, .75, .1, -.1, 0, 0, .2, .75, .1, -.1, .5, -.05, -.4, 0, 0, -.15]), 3));
+  wingGeo.computeVertexNormals();
+  const wmat = new THREE.MeshLambertMaterial({ color: L === 2 ? 0xe0a0ff : 0xffa070, side: THREE.DoubleSide, flatShading: true });
+  const wings = [-1, 1].map(s => { const w = new THREE.Group(); const m = new THREE.Mesh(wingGeo, wmat); m.scale.x = s; w.add(m); w.position.set(s * .15, .12, 0); return w; });
+  const tail = [0, 1, 2].map(i => { const t = new THREE.Mesh(new THREE.SphereGeometry(.13 - i * .03, 6, 5), mat); t.position.set(0, -.02 - i * .03, -.35 - i * .17); return t; });
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(.07, .16, 4), belly); tip.position.set(0, -.1, -.9); tip.rotation.x = -Math.PI / 2;
+  b.add(body, bel, head, snout, ...horns, ...eyes, ...wings, ...tail, tip);
+  g.add(b); dragon.wings = wings; dragon.body = b; dragon.mouth = snout;
+  g.position.set(player.position.x + 1, 2.4, player.position.z);
+  scene.add(g); dragon.g = g; dragon.lvl = L;
+}
+function hatchOrLevel(l) {
+  const b = buildings.nest;
+  if (l === 1) { burst(b.x, 1, b.z, 0xffd36b, 30, 6, 1.2); burst(b.x, 1, b.z, 0xff6a3a, 20, 5, 1); SFX.hatch(); S.stats.hatched = 1; toast('🐉 The egg hatched! Sparky the baby dragon joins you!', 'big', 4500); }
+  else toast('🐉 Sparky leveled up — hotter fire!', 'big');
+  refreshBuilding('nest'); makeDragon();
+}
+
+/* ================================================================
+   COSMETICS
+   ================================================================ */
+const SUITS = [
+  { id: 'orange', name: 'Classic Orange', col: 0xff8a2a, price: 0 },
+  { id: 'mint', name: 'Mint', col: 0x5fe0b0, price: 50 },
+  { id: 'sky', name: 'Sky Blue', col: 0x5fb8ff, price: 50 },
+  { id: 'bubble', name: 'Bubblegum', col: 0xff7ac0, price: 80 },
+  { id: 'lime', name: 'Lime', col: 0xa8e03a, price: 80 },
+  { id: 'purple', name: 'Royal Purple', col: 0x9a6bff, price: 120 },
+  { id: 'midnight', name: 'Midnight', col: 0x34407a, price: 150 },
+  { id: 'white', name: 'Snow White', col: 0xf0f2ff, price: 150 },
+  { id: 'gold', name: 'Solid Gold', col: 0xffc23a, price: 400 },
+  { id: 'frost', name: 'Frost Armor', col: 0xbfe6ff, trophy: 'Golem Breaker' },
+  { id: 'lava', name: 'Lava Armor', col: 0xff4a2a, trophy: 'Serpent Slayer' },
+];
+const HATS = [
+  { id: 'none', name: 'No Hat', emoji: '🚫', price: 0 },
+  { id: 'cap', name: 'Ball Cap', emoji: '🧢', price: 60 },
+  { id: 'party', name: 'Party Hat', emoji: '🥳', price: 80 },
+  { id: 'cowboy', name: 'Cowboy Hat', emoji: '🤠', price: 120 },
+  { id: 'top', name: 'Top Hat', emoji: '🎩', price: 150 },
+  { id: 'wizard', name: 'Wizard Hat', emoji: '🧙', price: 200 },
+  { id: 'halo', name: 'Halo', emoji: '😇', price: 250 },
+  { id: 'crown', name: 'Ice Crown', emoji: '👑', trophy: 'Golem Breaker' },
+  { id: 'horns', name: 'Flame Horns', emoji: '😈', trophy: 'Serpent Slayer' },
+];
+function makeHat(id) {
+  const g = new THREE.Group();
+  const L = c => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+  const add = (geo, mat, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; g.add(m); return m; };
+  if (id === 'cap') { add(new THREE.SphereGeometry(.38, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), L(0xff4a5a), 0, 0, 0); add(new THREE.BoxGeometry(.42, .04, .3), L(0xff4a5a), 0, .03, .42); add(new THREE.SphereGeometry(.05, 6, 4), L(0xffffff), 0, .38, 0); }
+  else if (id === 'party') { add(new THREE.ConeGeometry(.22, .6, 10), L(0xff7ac0), 0, .38, 0, -.15); add(new THREE.SphereGeometry(.08, 8, 6), L(0xffe08a), 0, .7, -.05); add(new THREE.TorusGeometry(.2, .03, 5, 14), L(0x7fd8ff), 0, .16, 0, Math.PI / 2 - .15); }
+  else if (id === 'cowboy') { add(new THREE.CylinderGeometry(.62, .62, .04, 16), L(0xa0703a), 0, .12, 0); add(new THREE.CylinderGeometry(.26, .32, .32, 10), L(0xa0703a), 0, .3, 0); add(new THREE.CylinderGeometry(.33, .33, .07, 10), L(0x5a3a1a), 0, .2, 0); }
+  else if (id === 'top') { add(new THREE.CylinderGeometry(.5, .5, .04, 16), L(0x1a1a2a), 0, .1, 0); add(new THREE.CylinderGeometry(.27, .27, .55, 14), L(0x1a1a2a), 0, .38, 0); add(new THREE.CylinderGeometry(.28, .28, .1, 14), L(0xff4a5a), 0, .18, 0); }
+  else if (id === 'wizard') { add(new THREE.CylinderGeometry(.55, .55, .04, 16), L(0x5a3aaa), 0, .1, 0); add(new THREE.ConeGeometry(.3, .8, 10), L(0x6a4acc), 0, .5, -.05, -.2); add(new THREE.OctahedronGeometry(.08), emis(0xffd23a, 1.2), .1, .45, .25); }
+  else if (id === 'halo') { add(new THREE.TorusGeometry(.3, .045, 6, 20), emis(0xffe08a, 1.5), 0, .45, 0, Math.PI / 2); }
+  else if (id === 'crown') { add(new THREE.CylinderGeometry(.3, .3, .1, 10, 1, true), emis(0xbfe6ff, .6), 0, .2, 0); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; add(new THREE.OctahedronGeometry(.08), emis(0xdff6ff, 1.3), Math.cos(a) * .3, .32, Math.sin(a) * .3).scale.y = 1.8; } }
+  else if (id === 'horns') { for (const s of [-1, 1]) add(new THREE.ConeGeometry(.08, .45, 6), emis(0xff6a2a, 1.2), s * .24, .2, 0, 0, -s * .5); }
+  g.position.y = id === 'cap' ? 1.64 : 1.82;
+  return g;
+}
+function applyCosmetics() {
+  const s = SUITS.find(x => x.id === S.cos.suit) || SUITS[0];
+  P.suit.color.setHex(s.col);
+  if (P.hat) player.remove(P.hat);
+  P.hat = null;
+  if (S.cos.hat && S.cos.hat !== 'none') { P.hat = makeHat(S.cos.hat); player.add(P.hat); }
+  P.ant.visible = P.tip.visible = !P.hat;
+}
+
+/* ================================================================
+   TROPHIES
+   ================================================================ */
+const totalTrees = () => S.stats.trees + S.stats.frostTrees + S.stats.obsTrees;
+const builtCount = () => Object.values(S.built).filter(v => v > 0).length;
+const ACH = [
+  { id: 'trees10', ico: '🌴', name: 'First Steps', ds: 'Chop 10 trees', cur: totalTrees, goal: 10, rw: { coins: 20 } },
+  { id: 'trees100', ico: '🪓', name: 'Lumberjack', ds: 'Chop 100 trees', cur: totalTrees, goal: 100, rw: { coins: 120 } },
+  { id: 'rocks50', ico: '🪨', name: 'Rock Breaker', ds: 'Break 50 rocks', cur: () => S.stats.rocks, goal: 50, rw: { coins: 80 } },
+  { id: 'ore30', ico: '⛏️', name: 'Deep Digger', ds: 'Dig 30 ore', cur: () => S.stats.ore, goal: 30, rw: { coins: 80 } },
+  { id: 'crys25', ico: '💎', name: 'Crystal Collector', ds: 'Mine 25 crystals', cur: () => S.stats.crystal, goal: 25, rw: { coins: 100 } },
+  { id: 'frost20', ico: '❄️', name: 'Frost Finder', ds: 'Mine 20 frost gems', cur: () => S.stats.frost, goal: 20, rw: { coins: 120 } },
+  { id: 'magma15', ico: '🌋', name: 'Magma Miner', ds: 'Mine 15 magma cores', cur: () => S.stats.magma, goal: 15, rw: { coins: 150 } },
+  { id: 'kills25', ico: '⚔️', name: 'Monster Hunter', ds: 'Defeat 25 monsters', cur: () => S.stats.kills, goal: 25, rw: { coins: 80 } },
+  { id: 'kills150', ico: '💀', name: 'Exterminator', ds: 'Defeat 150 monsters', cur: () => S.stats.kills, goal: 150, rw: { coins: 250 } },
+  { id: 'build10', ico: '🏗️', name: 'Master Builder', ds: 'Build or restore 10 things', cur: builtCount, goal: 10, rw: { coins: 150 } },
+  { id: 'day10', ico: '🌙', name: 'Survivor', ds: 'Reach day 10', cur: () => S.day, goal: 10, rw: { coins: 150 } },
+  { id: 'golem', ico: '🧊', name: 'Golem Breaker', ds: 'Defeat the Ice Golem', cur: () => S.stats.golem, goal: 1, rw: { coins: 200, cos: ['suit_frost', 'hat_crown'] } },
+  { id: 'serpent', ico: '🐍', name: 'Serpent Slayer', ds: 'Defeat Magmaw', cur: () => S.stats.serpent, goal: 1, rw: { coins: 300, cos: ['suit_lava', 'hat_horns'] } },
+  { id: 'dragon', ico: '🐉', name: 'Dragon Tamer', ds: 'Hatch the dragon egg', cur: () => lvl('nest') ? 1 : 0, goal: 1, rw: { coins: 200 } },
+  { id: 'goblin', ico: '💰', name: 'Goblin Catcher', ds: 'Catch a treasure goblin', cur: () => S.stats.goblins, goal: 1, rw: { coins: 100 } },
+  { id: 'meteor', ico: '☄️', name: 'Stargazer', ds: 'Collect 3 meteorites', cur: () => S.stats.meteors, goal: 3, rw: { coins: 100 } },
+  { id: 'fly', ico: '🚀', name: 'Space Cadet', ds: 'Fly your ship to another planet', cur: () => S.stats.flights, goal: 1, rw: { coins: 100 } },
+  { id: 'style', ico: '👕', name: 'Fashionista', ds: 'Buy 3 cosmetics', cur: () => S.stats.cosBought, goal: 3, rw: { coins: 100 } },
+  { id: 'rich', ico: '🪙', name: 'Treasure Hoarder', ds: 'Have 1,000 coins at once', cur: () => S.coins, goal: 1000, rw: { magma: 5 } },
+];
+function checkAch() {
+  let n = 0;
+  for (const a of ACH) {
+    if (!S.ach.done[a.id] && a.cur() >= a.goal) { S.ach.done[a.id] = true; toast(`🏆 Trophy unlocked: <b>${a.name}</b>! Tap 🏆 to claim.`, 'big', 4000); SFX.trophy(); }
+    if (S.ach.done[a.id] && !S.ach.claimed[a.id]) n++;
+  }
+  const b = $('trophyBadge'); b.hidden = !n; b.textContent = n;
+}
+function claimAch(id) {
+  const a = ACH.find(x => x.id === id); if (!a || !S.ach.done[id] || S.ach.claimed[id]) return;
+  S.ach.claimed[id] = true;
+  for (const r in a.rw) {
+    if (r === 'coins') S.coins += a.rw[r];
+    else if (r === 'cos') { a.rw.cos.forEach(c => S.cos.owned[c] = true); toast('👕 New looks unlocked — wear them at the Suit Shop!', 'big'); }
+    else S.store[r] += a.rw[r];
+  }
+  SFX.chest(); renderRes(); checkAch(); save();
+}
+
+/* ================================================================
+   MODAL SCREENS: trophies, suit shop, star map
+   ================================================================ */
+let modalKind = null, paused = false;
+function openModal(kind) {
+  if (kind === 'trophies') checkAch();
+  modalKind = kind; paused = true;
+  for (const k in keys) keys[k] = false;
+  jEnd();
+  $('modal').hidden = false; renderModal();
+  $('mclose').focus();
+}
+function closeModal() { $('modal').hidden = true; modalKind = null; paused = false; clock.getDelta(); }
+$('mclose').addEventListener('click', closeModal);
+$('modal').addEventListener('click', e => { if (e.target.id === 'modal') { closeModal(); return; } const b = e.target.closest('[data-act]'); if (b && !b.disabled) modalAction(b.dataset.act, b.dataset.id); });
+$('trophyBtn').addEventListener('click', () => { if (started) openModal('trophies'); });
+const rwHTML = rw => Object.entries(rw).map(([r, v]) => r === 'cos' ? '<span>👕 new suit + hat</span>' : `<span>${ic(r)}+${v}</span>`).join('');
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+function renderModal() {
+  const body = $('mbody');
+  if (modalKind === 'trophies') {
+    const done = ACH.filter(a => S.ach.done[a.id]).length;
+    body.innerHTML = `<h2>🏆 Trophies</h2><div class="lead">${done}/${ACH.length} unlocked. Claim a reward for every trophy you earn.</div>` + ACH.map(a => {
+      const c = Math.min(a.cur(), a.goal), d = S.ach.done[a.id], cl = S.ach.claimed[a.id];
+      const btn = cl ? '<span style="color:var(--good);font-weight:700">✓</span>' : d ? `<button class="sbtn" data-act="claim" data-id="${a.id}">Claim</button>` : '';
+      return `<div class="ach ${d ? '' : 'locked'}"><div class="ico">${d ? a.ico : '🔒'}</div><div class="info"><div class="nm">${a.name}</div><div class="ds">${a.ds} · ${fmt(Math.floor(c))}/${fmt(a.goal)}</div><div class="bar"><i style="width:${c / a.goal * 100}%"></i></div><div class="rw">Reward: ${rwHTML(a.rw)}</div></div>${btn}</div>`;
+    }).join('');
+  } else if (modalKind === 'shop') {
+    const card = (kind, it) => {
+      const key = kind + '_' + it.id, owned = it.price === 0 || S.cos.owned[key], on = S.cos[kind] === it.id;
+      const art = kind === 'suit' ? `<div class="sw" style="background:${hex(it.col)}"></div>` : `<div class="hat">${it.emoji}</div>`;
+      let btn;
+      if (on) btn = '<button class="sbtn alt" disabled>Wearing</button>';
+      else if (owned) btn = `<button class="sbtn alt" data-act="equip" data-id="${key}">Wear</button>`;
+      else if (it.trophy) btn = `<span class="pr">🏆 ${it.trophy} trophy</span>`;
+      else btn = `<button class="sbtn" data-act="buy" data-id="${key}" ${S.coins < it.price ? 'disabled' : ''}>${ic('coins')} ${it.price}</button>`;
+      return `<div class="item ${on ? 'on' : ''}">${art}<div class="nm">${it.name}</div>${btn}</div>`;
+    };
+    body.innerHTML = `<h2>👕 Suit Shop</h2><div class="lead">You have ${ic('coins')} <b>${S.coins}</b> coins. Boss trophies unlock special armor.</div><h3>SUIT COLORS</h3><div class="grid">${SUITS.map(s => card('suit', s)).join('')}</div><h3>HATS</h3><div class="grid">${HATS.map(h => card('hat', h)).join('')}</div>`;
+  } else if (modalKind === 'map') {
+    const PL = [
+      { z: 'home', name: 'Outpost', emoji: '🌴', orb: 'radial-gradient(circle at 35% 35%,#c8ff8a,#7fc23a 50%,#4a3a8a)', open: true, st: 'Your home base' },
+      { z: 'ice', name: 'Frostveil', emoji: '❄', orb: 'radial-gradient(circle at 35% 35%,#ffffff,#9fd4ff 50%,#3a5aa8)', open: S.stats.iceVisits > 0, st: S.stats.golem ? 'Ice Golem defeated ✓' : 'The Ice Golem guards the core' },
+      { z: 'ember', name: 'Emberfall', emoji: '🌋', orb: 'radial-gradient(circle at 35% 35%,#ffd36b,#ff5a2a 50%,#3a1020)', open: S.stats.emberVisits > 0, st: S.stats.serpent ? 'Magmaw defeated ✓' : 'Magmaw lurks in the lava lake' },
+    ];
+    body.innerHTML = `<h2>🚀 Star Map</h2><div class="lead">Pick a planet to fly to. A planet unlocks after you first reach it through a portal.</div><div class="planets">${PL.map(p => {
+      const here = P.zone === p.z || (p.z === 'home' && P.zone === 'mine');
+      const btn = here ? '<button class="sbtn alt" disabled>You are here</button>' : p.open ? `<button class="sbtn" data-act="fly" data-id="${p.z}">Fly here</button>` : '<button class="sbtn alt" disabled>🔒 Locked</button>';
+      return `<div class="planet ${here ? 'here' : ''}"><div class="orb" style="background:${p.orb}"></div><div><div class="nm">${p.emoji} ${p.name}</div><div class="st">${p.open ? p.st : 'Find its portal to unlock'}</div><div style="margin-top:8px">${btn}</div></div></div>`;
+    }).join('')}</div>`;
+  }
+}
+function modalAction(act, id) {
+  if (act === 'claim') { claimAch(id); renderModal(); }
+  else if (act === 'buy') {
+    const [kind, iid] = id.split('_'); const it = (kind === 'suit' ? SUITS : HATS).find(x => x.id === iid);
+    if (!it || it.trophy || S.coins < it.price || S.cos.owned[id]) return;
+    S.coins -= it.price; S.cos.owned[id] = true; S.cos[kind] = iid; S.stats.cosBought++;
+    applyCosmetics(); SFX.buy(); renderRes(); checkQuest(); checkAch(); save(); renderModal();
+    burst(player.position.x, 1.2, player.position.z, 0xff7ac0, 16, 4, .8);
+  } else if (act === 'equip') { const [kind, iid] = id.split('_'); S.cos[kind] = iid; applyCosmetics(); SFX.pick(); save(); renderModal(); }
+  else if (act === 'fly') {
+    closeModal();
+    S.stats.flights++;
+    toast('🚀 Blast off!', 'big');
+    const b = P.zone === 'ice' ? buildings.ship_r_ice : P.zone === 'ember' ? buildings.ship_r_emb : buildings.ship;
+    for (let i = 0; i < 5; i++) setTimeout(() => burst(b.x, .5, b.z, i % 2 ? 0xff8a3a : 0xffd23a, 16, 5, .8), i * 70);
+    teleport(SHIP_SPOTS[id].arrive, id, 'launch');
+    checkQuest(); checkAch(); save();
+  }
+}
+
+/* ================================================================
    DAILY CHEST
    ================================================================ */
 const dayStr = (off = 0) => { const d = new Date(Date.now() - off * 864e5); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
@@ -1511,10 +2134,11 @@ const padPos = id => { const p = padById(id); return V(p.x, 0, p.z); };
 function route(zone, fn) {
   if (P.zone === zone) return fn();
   if (P.zone === 'mine') return MINE_EXIT;
-  if (P.zone === 'ice') return ICE_PORTAL_T;
+  if (P.zone === 'ember') return EMB_PORTAL_T;
+  if (P.zone === 'ice') return zone === 'ember' ? EP_ICE_T : ICE_PORTAL_T;
   return zone === 'mine' ? MINE_DOOR : HOME_PORTAL_T;
 }
-const home = fn => () => route('home', fn), mineQ = fn => () => route('mine', fn), ice = fn => () => route('ice', fn);
+const home = fn => () => route('home', fn), mineQ = fn => () => route('mine', fn), ice = fn => () => route('ice', fn), emb = fn => () => route('ember', fn);
 const QUESTS = [
   { id: 'trees', t: 'Chop down 3 trees', p: () => `${Math.min(S.stats.trees, 3)}/3 · walk up to a tree`, done: () => S.stats.trees >= 3, target: home(() => nearestNode('tree', 'home')), reward: { wood: 4 } },
   { id: 'rocks', t: 'Mine 3 purple rocks', p: () => `${Math.min(S.stats.rocks, 3)}/3`, done: () => S.stats.rocks >= 3, target: home(() => nearestNode('rock', 'home')), reward: { stone: 4 } },
@@ -1530,6 +2154,7 @@ const QUESTS = [
   { id: 'trading', t: 'Restore the Trading Post', p: () => 'Turn extra resources into coins', done: () => lvl('trading') >= 1, target: home(() => padPos('trading')), reward: { coins: 20 } },
   { id: 'sell', t: 'Sell extra resources for coins', p: () => 'Stand on a green sell pad', done: () => S.stats.sold > 0, target: home(() => padPos('sell_wood')), reward: { coins: 15 } },
   { id: 'pet', t: 'Adopt a pet companion', p: () => `${Math.min(S.coins, 80)}/80 coins · pet den by the portal`, done: () => lvl('petden') >= 1, target: home(() => padPos('petden')), reward: { wood: 10 } },
+  { id: 'shop', t: 'Get a new look at the Suit Shop', p: () => 'Restore the shop south of town, then buy something', done: () => S.stats.cosBought > 0, target: home(() => padPos(lvl('shop') ? 'shopui' : 'shop')), reward: { coins: 30 } },
   { id: 'pick3', t: 'Upgrade your Pickaxe to Lv 3', p: () => 'Lv 3 can break crystals', done: () => S.tools.pick >= 3, target: home(() => padPos('tool_pick')), reward: { ore: 8 } },
   { id: 'crystals', t: 'Mine 5 crystals deep in the mine', p: () => `${Math.min(S.stats.crystal, 5)}/5`, done: () => S.stats.crystal >= 5, target: mineQ(() => nearestNode('crystal', 'mine')), reward: { crystal: 3 } },
   { id: 'portal', t: 'Awaken the Ancient Portal', p: () => 'The final secret of this planet…', done: () => lvl('portal') >= 1, target: home(() => padPos('portal')) },
@@ -1541,7 +2166,18 @@ const QUESTS = [
   { id: 'firesword', t: 'Craft the Fire Sword', p: () => 'Sell resources at home for coins', done: () => !!S.weapons.fire, target: ice(() => padPos('craft_fire')), reward: { ore: 10 } },
   { id: 'golem', t: 'Defeat the Ice Golem', p: () => 'It guards the planet core up north. Dodge the red circles!', done: () => S.stats.golem > 0, target: ice(() => ARENA) },
   { id: 'core', t: 'Claim the Planet Core', p: () => 'Its power is yours', done: () => S.core > 0, target: ice(() => padPos('core')) },
-  { id: 'end', t: 'Frostveil conquered! 🎉', p: () => 'Craft every weapon, max your gear — a new planet is coming in the next update!', done: () => false, target: () => null },
+  { id: 'ship', t: 'Repair your Space Ship', p: () => 'At the outpost, next to the old crash site', done: () => lvl('ship') > 0, target: home(() => SHIP_SPOTS.home.pad), reward: { coins: 60 } },
+  { id: 'fly', t: 'Fly your ship to another planet', p: () => 'Stand on the ship pad to open the Star Map', done: () => S.stats.flights > 0, target: () => SHIP_SPOTS[P.zone === 'mine' ? 'home' : P.zone].pad, reward: { coins: 40 } },
+  { id: 'emberportal', t: 'Ignite the Ember Portal', p: () => 'On Frostveil, east of camp', done: () => lvl('emberportal') > 0, target: ice(() => padPos('emberportal')), reward: { frost: 5 } },
+  { id: 'embertravel', t: 'Travel to Emberfall', p: () => 'Step into the fiery portal', done: () => S.stats.emberVisits > 0, target: ice(() => EP_ICE_T), reward: { coins: 50 } },
+  { id: 'otrees', t: 'Chop 3 obsidian trees', p: () => `${Math.min(S.stats.obsTrees, 3)}/3 · they sometimes drop magma`, done: () => S.stats.obsTrees >= 3, target: emb(() => nearestNode('otree', 'ember')), reward: { wood: 15 } },
+  { id: 'cross', t: 'Cross the lava river', p: () => 'Ride the moving stones. Don\'t touch the lava!', done: () => S.stats.crossed > 0, target: emb(() => V(EMB_C.x + 12, 0, EMB_C.z - 2.6)), reward: { coins: 40 } },
+  { id: 'pick4', t: 'Upgrade your Pickaxe to Lv 4', p: () => 'Lv 4 breaks magma cores (outpost Workshop)', done: () => S.tools.pick >= 4, target: home(() => padPos('tool_pick')), reward: { frost: 4 } },
+  { id: 'magma', t: 'Mine 5 magma cores', p: () => `${Math.min(S.stats.magma, 5)}/5 · glowing red rocks across the river`, done: () => S.stats.magma >= 5, target: emb(() => nearestNode('magma', 'ember')), reward: { magma: 3 } },
+  { id: 'bridge', t: 'Build the Obsidian Bridge', p: () => 'A safe way over the first lava river', done: () => lvl('bridge') > 0, target: emb(() => padPos('bridge')), reward: { coins: 60 } },
+  { id: 'serpent', t: 'Defeat Magmaw, the Lava Serpent', p: () => 'Lava lake, far north. Dodge the fire breath & lava balls!', done: () => S.stats.serpent > 0, target: emb(() => V(LAVA_LAKE.x, 0, LAVA_LAKE.z + LAKE_R + 3)) },
+  { id: 'hatch', t: 'Hatch the Dragon Egg', p: () => 'Bring magma & coins to the nest at camp', done: () => lvl('nest') > 0, target: emb(() => padPos('nest')), reward: { coins: 100 } },
+  { id: 'end', t: 'Emberfall conquered! 🎉', p: () => 'Collect every trophy, outfit and weapon. More worlds are coming in the next update!', done: () => false, target: () => null },
 ];
 const curQuest = () => QUESTS.find(q => !S.qdone[q.id]) || QUESTS[QUESTS.length - 1];
 function renderQuest() { const q = curQuest(); $('qT').textContent = q.t; $('qP').textContent = q.p(); }
@@ -1581,7 +2217,8 @@ const keys = {};
 addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
-  if (e.code === 'KeyQ' && started) cycleWeapon();
+  if (e.code === 'Escape' && modalKind) closeModal();
+  if (e.code === 'KeyQ' && started && !modalKind) cycleWeapon();
   if ((e.code === 'Enter' || e.code === 'Space') && document.activeElement?.id === 'wbtn') cycleWeapon();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
@@ -1621,9 +2258,8 @@ function resolveCollisions(pos, rad) {
     const d = Math.hypot(dx, dz), m = c.r + rad;
     if (d < m && d > 0.0001) { pos.x = c.x + dx / d * m; pos.z = c.z + dz / d * m; }
   }
-  const z = zoneOf(pos.x, pos.z);
-  const C = z === 'mine' ? MINE_C : z === 'ice' ? ICE_C : null, R = z === 'mine' ? 25 : z === 'ice' ? ICE_R - 3 : ISLAND_R - 3;
-  const cx = C ? C.x : 0, cz = C ? C.z : 0;
+  const z = zoneOf(pos.x, pos.z), C = zoneCenter(z), R = zoneRadius(z);
+  const cx = C.x, cz = C.z;
   const dx = pos.x - cx, dz = pos.z - cz, d = Math.hypot(dx, dz);
   if (d > R) { pos.x = cx + dx / d * R; pos.z = cz + dz / d * R; }
 }
@@ -1631,6 +2267,7 @@ function resolveCollisions(pos, rad) {
 const ZONE_ENTER = {
   mine: '⛏ The Deep Mine — look for glowing <b style="color:var(--ore)">ore</b> &amp; <b style="color:var(--crystal)">crystals</b>. Watch out for crawlers!',
   ice: '❄ Welcome to <b style="color:var(--ice)">Frostveil</b>! Chop crystal trees, mine <b style="color:var(--frost)">frost gems</b>, and beware the blizzards…',
+  ember: '🌋 Welcome to <b style="color:#ffe08a">Emberfall</b>! Ride the moving stones over the lava, mine <b style="color:#ffe08a">magma cores</b>, and watch for eruptions…',
 };
 function teleport(to, zone, sound = 'whoosh') {
   fading = 1; SFX[sound]();
@@ -1641,29 +2278,32 @@ function teleport(to, zone, sound = 'whoosh') {
     camPos.set(to.x, to.y + 10, to.z + 12.5);
     if (zone === 'ice') { S.stats.iceVisits++; if (S.stats.iceVisits === 1) toast(ZONE_ENTER.ice, 'ice', 5500); else toastOnce('ice', '❄ Back on Frostveil', '', 10); }
     if (zone === 'mine') toastOnce('mine', ZONE_ENTER.mine, '', 30);
-    for (const e of enemies) if (ENEMY_ZONE[e.kind] !== zone) e.dying = e.dying || .01;
+    if (zone === 'ember') { S.stats.emberVisits++; if (S.stats.emberVisits === 1) toast(ZONE_ENTER.ember, 'fire', 5500); else toastOnce('emb', '🌋 Back on Emberfall', '', 10); }
+    P.safePos.copy(to);
+    for (const e of enemies) if (e.zone !== zone) e.dying = e.dying || .01;
     if (pet.g) pet.g.position.set(to.x - 1, 0, to.z + .8), pet.target = null;
     checkQuest();
     setTimeout(() => { $('fade').style.opacity = 0; fading = 0; }, 120);
   }, 350);
 }
 
-function damagePlayer(dmg, fromX, fromZ, chill = 0) {
+function damagePlayer(dmg, fromX, fromZ, chill = 0, burn = 0) {
   if (S.hp <= 0 || fading) return;
   S.hp -= dmg; P.lastHurt = clock.elapsedTime; P.hurtT = .3;
   if (chill) { P.chill = Math.max(P.chill, chill); SFX.freeze(); }
+  if (burn) P.burn = Math.max(P.burn, burn);
   SFX.hurt();
   const dx = player.position.x - fromX, dz = player.position.z - fromZ, d = Math.hypot(dx, dz) || 1;
   P.vel.x += dx / d * 9; P.vel.z += dz / d * 9;
-  $('vignette').style.boxShadow = chill ? 'inset 0 0 160px rgba(90,170,255,.8)' : 'inset 0 0 160px rgba(255,30,70,.75)';
+  $('vignette').style.boxShadow = chill ? 'inset 0 0 160px rgba(90,170,255,.8)' : burn ? 'inset 0 0 160px rgba(255,120,20,.8)' : 'inset 0 0 160px rgba(255,30,70,.75)';
   setTimeout(() => $('vignette').style.boxShadow = '', 180);
   if (S.hp <= 0) {
     S.hp = 0;
     toast('💫 You fainted! Your bag was lost…', 'danger', 4000);
     for (const r of RES) S.bag[r] = 0;
     renderRes();
-    const z = P.zone === 'ice' ? 'ice' : 'home';
-    setTimeout(() => { S.hp = S.maxHp; P.chill = 0; teleport(z === 'ice' ? ICE_ARRIVE.clone() : V(0, 0, 4), z); }, 900);
+    const z = P.zone === 'mine' ? 'home' : P.zone;
+    setTimeout(() => { S.hp = S.maxHp; P.chill = 0; P.burn = 0; teleport(z === 'ice' ? ICE_ARRIVE.clone() : z === 'ember' ? EMB_ARRIVE.clone() : V(0, 0, 4), z); }, 900);
   }
 }
 
@@ -1671,9 +2311,9 @@ function addBag(r, n) { const got = Math.min(n, bagCap() - bagCount()); if (got 
 function breakNode(n) {
   n.alive = false; n.col.on = false; n.respawn = n.def.respawn;
   const def = n.def, lv = S.tools[def.tool];
-  const amt = def.yield + (lv - def.req);
+  const amt = (def.yield + (lv - def.req)) * (EV.golden > 0 ? 2 : 1);
   const got = addBag(def.res, amt);
-  const st = { tree: 'trees', rock: 'rocks', icerock: 'rocks', ftree: 'frostTrees', ore: 'ore', crystal: 'crystal', frost: 'frost' }[n.type];
+  const st = { tree: 'trees', rock: 'rocks', icerock: 'rocks', ftree: 'frostTrees', ore: 'ore', crystal: 'crystal', frost: 'frost', otree: 'obsTrees', basalt: 'rocks', magma: 'magma' }[n.type];
   S.stats[st]++;
   burst(n.x, 1.2, n.z, def.chip, 14, 5, .9);
   for (let i = 0; i < got; i++) fly(V(n.x + rand(-.5, .5), 1 + rand(0, 1), n.z + rand(-.5, .5)), () => tmpV.copy(player.position).setY(1.2), RES_COL[def.res], () => SFX.pick(), i * .06);
@@ -1682,22 +2322,28 @@ function breakNode(n) {
     html += ` +1 ${ic('frost')}`;
     fly(V(n.x, 2.5, n.z), () => tmpV.copy(player.position).setY(1.2), RES_COL.frost, () => SFX.crystal(), .3);
   }
+  if (n.type === 'otree' && Math.random() < .15 && addBag('magma', 1)) {
+    html += ` +1 ${ic('magma')}`;
+    fly(V(n.x, 2.5, n.z), () => tmpV.copy(player.position).setY(1.2), RES_COL.magma, () => SFX.crystal(), .3);
+  }
+  if (EV.golden > 0) html += ' ✨';
   floatText(V(n.x, 2.5, n.z), html);
   if (got < amt) toastOnce('bagfull', '🎒 Bag full! Head back to base to store it.', 'danger');
   renderRes(); checkQuest();
 }
 
-const foes = () => { const f = enemies.filter(e => !e.dying && e.spawn >= 1); if (boss.state === 'fight') f.push(boss); return f; };
-const foeR = f => f.isBoss ? 1.9 : 0;
+const foes = () => { const f = enemies.filter(e => !e.dying && e.spawn >= 1); if (boss.state === 'fight') f.push(boss); if (serp.targetable()) f.push(serp); return f; };
+const foeR = f => f.isBoss ? (f.r || 1.9) : 0;
 function hitFoe(f, dmg, kb = 8, color = '#ffffff', show = true) {
-  if (f.dying || (f.isBoss && boss.state !== 'fight')) return;
-  f.hp -= dmg; f.flash = .12;
+  if (f.dying || (f.isBoss && !f.targetable())) return;
+  f.hp -= dmg; f.flash = f.isBoss ? .06 : .12;
   if (!f.isBoss) {
     const dx = f.g.position.x - player.position.x, dz = f.g.position.z - player.position.z, d = Math.hypot(dx, dz) || 1;
     f.kx = dx / d * kb; f.kz = dz / d * kb;
   }
-  if (show) floatText(f.g.position.clone().setY(f.isBoss ? 6.5 : 1.8), `${Math.round(dmg)}`, color, 'dmg');
-  if (f.hp <= 0) f.isBoss ? killBoss() : killEnemy(f, true);
+  if (show) floatText(f.g.position.clone().setY(f.isBoss ? (f.textY || 6.5) : 1.8), `${Math.round(dmg)}`, color, 'dmg');
+  if (f.kind === 'goblin' && f.hp > 0) { const c = 2 + (Math.random() * 4 | 0); S.coins += c; floatText(f.g.position.clone().setY(1.4), `+${c} ${ic('coins')}`, '#ffe9a0'); SFX.coin(); renderRes(); }
+  if (f.hp <= 0) f.isBoss ? f.kill() : killEnemy(f, true);
 }
 function attack(target) {
   const w = S.weapon, dmg = weaponDmg();
@@ -1731,14 +2377,22 @@ function killEnemy(e, drop) {
   if (e.dying) return;
   e.dying = .01; S.stats.kills++;
   SFX.kill();
-  burst(e.g.position.x, .8, e.g.position.z, { gloom: 0x8a5aff, crawl: 0xff6a5a, shard: 0xbfe6ff }[e.kind], 16, 5, .8);
+  burst(e.g.position.x, .8, e.g.position.z, { gloom: 0x8a5aff, crawl: 0xff6a5a, shard: 0xbfe6ff, magma: 0xff6a1a, goblin: 0x6bd04a }[e.kind], 16, 5, .8);
   if (!drop) return;
+  if (e.kind === 'goblin') {
+    const c = 80 + (Math.random() * 71 | 0); S.coins += c;
+    const opts = ['crystal', 'ore']; if (S.stats.iceVisits) opts.push('frost'); if (S.stats.emberVisits) opts.push('magma');
+    const r = opts[Math.random() * opts.length | 0], n = r === 'ore' ? 8 : 3; S.store[r] += n; S.stats.goblins++;
+    for (let i = 0; i < 12; i++) fly(e.g.position.clone().setY(1), () => tmpV.copy(player.position).setY(1.2), 0xffd23a, i % 3 ? null : () => SFX.coin(), i * .05);
+    toast(`💰 You caught the goblin! ${ic('coins')}+${c} ${ic(r)}+${n}`, 'big', 4000); SFX.chest(); renderRes();
+    return;
+  }
   const coins = e.kind === 'gloom' ? 1 + (Math.random() * 2 | 0) : e.kind === 'crawl' ? 1 + (Math.random() * 3 | 0) : 2 + (Math.random() * 3 | 0);
   S.coins += coins;
   let html = `+${coins} ${ic('coins')}`;
-  const chance = e.kind === 'gloom' ? .6 : e.kind === 'crawl' ? .8 : .4;
+  const chance = e.kind === 'gloom' ? .6 : e.kind === 'crawl' ? .8 : e.kind === 'magma' ? .3 : .4;
   if (Math.random() < chance) {
-    const r = e.kind === 'shard' ? 'frost' : e.kind === 'gloom' ? (Math.random() < .25 && S.tools.pick >= 3 ? 'crystal' : 'ore') : 'ore';
+    const r = e.kind === 'magma' ? 'magma' : e.kind === 'shard' ? 'frost' : e.kind === 'gloom' ? (Math.random() < .25 && S.tools.pick >= 3 ? 'crystal' : 'ore') : 'ore';
     if (addBag(r, 1)) { fly(e.g.position.clone().setY(1), () => tmpV.copy(player.position).setY(1.2), RES_COL[r], () => SFX.pick()); html += ` +1 ${ic(r)}`; }
   }
   floatText(e.g.position.clone().setY(2), html, '#ffe9a0');
@@ -1766,10 +2420,12 @@ function killBoss() {
 /* ------------------------- update ------------------------- */
 function update(dt) {
   const t = clock.elapsedTime;
+  for (const s2 of stones) { const nx = s2.cx + Math.sin(t * s2.sp + s2.ph) * s2.amp; s2.dx = nx - s2.x; s2.x = nx; s2.m.position.x = nx; }
+  updateEvents(dt, t);
   // ---- day/night
   S.time += dt / CYCLE;
   if (S.time >= 1) { S.time -= 1; S.day++; warned = false; }
-  if (!warned && S.time > .58 && S.time < .66) { warned = true; if (P.zone === 'home') toast('🌙 Night is coming… Gloomers will crawl out!', 'danger'); else if (P.zone === 'ice') toast('🌙 Night falls on Frostveil — Frost Shards will roam.', 'danger'); }
+  if (!warned && S.time > .58 && S.time < .66) { warned = true; if (P.zone === 'home') toast('🌙 Night is coming… Gloomers will crawl out!', 'danger'); else if (P.zone === 'ice') toast('🌙 Night falls on Frostveil — Frost Shards will roam.', 'danger'); else if (P.zone === 'ember') toast('🌙 Night falls on Emberfall — Magma Slimes crawl out.', 'danger'); }
   const night = isNight();
   if (night !== wasNight) {
     wasNight = night;
@@ -1790,6 +2446,24 @@ function update(dt) {
       else toast('🌤 The blizzard passes.', '');
     }
   }
+  if (P.zone === 'ember') {
+    ERU.t -= dt;
+    if (!ERU.on && !ERU.warn && ERU.t < 10) { ERU.warn = true; SFX.rumble(); toast('🌋 The volcano rumbles… an eruption is coming!', 'danger'); }
+    if (ERU.t <= 0) {
+      ERU.on = !ERU.on; ERU.warn = false; ERU.t = ERU.on ? 30 : rand(80, 120);
+      if (ERU.on) { SFX.boom(); camShake = .8; toast('🌋 ERUPTION! Dodge the lava bombs — camp is safe!', 'danger', 4000); }
+      else toast('The eruption calms down.');
+    }
+    if (ERU.on && serp.state !== 'fight' && S.hp > 0) {
+      ERU.bombT -= dt;
+      if (ERU.bombT <= 0) {
+        ERU.bombT = rand(.6, 1.1);
+        const x = player.position.x + rand(-8, 8), z = player.position.z + rand(-8, 8);
+        if (dist2(x, z, ECAMP.x, ECAMP.z) > CAMP_R + 1 && dist2(x, z, EMB_C.x, EMB_C.z) < EMB_R - 3) arcDrop(V(x + rand(-8, 8), 35, z - 18), V(x, 0, z), 1.3, 'bomb');
+      }
+    }
+  }
+  ERU.k = lerp(ERU.k, P.zone === 'ember' && ERU.on ? 1 : 0, 1 - Math.exp(-dt * .8));
   W.k = lerp(W.k, P.zone === 'ice' && W.bliz ? 1 : 0, 1 - Math.exp(-dt * .8));
   W.windA += dt * .1;
 
@@ -1804,6 +2478,11 @@ function update(dt) {
   P.onLake = P.zone === 'ice' && LAKES.some(l => dist2(player.position.x, player.position.z, l.x, l.z) < l.r);
   if (P.onLake && !wasLake) toastOnce('lake', '⛸ Wheee! Frozen lakes are slippery!', '', 60);
   P.chill = Math.max(0, P.chill - dt);
+  if (P.burn > 0) {
+    P.burn -= dt; P.burnTick -= dt;
+    if (Math.random() < dt * 10) burst(player.position.x + rand(-.3, .3), rand(.5, 1.6), player.position.z + rand(-.3, .3), 0xff8a2a, 1, 1, .4, .6, -3);
+    if (P.burnTick <= 0 && S.hp > 0) { P.burnTick = .5; S.hp -= 2; P.lastHurt = clock.elapsedTime; if (S.hp <= 0) { S.hp = .5; damagePlayer(1, player.position.x, player.position.z); } }
+  }
   const SPEED = 7 * (P.chill > 0 ? .55 : 1) * (P.onLake ? 1.3 : 1);
   const accel = P.onLake ? 1.5 : 12;
   const tx = moving ? ix * SPEED : 0, tz = moving ? iz * SPEED : 0;
@@ -1813,6 +2492,20 @@ function update(dt) {
   const inHeat = P.zone === 'ice' && heatL && dist2(player.position.x, player.position.z, CAMP.x, CAMP.z) < heatR(heatL);
   if (W.k > .2 && P.zone === 'ice' && !inHeat) { player.position.x += Math.cos(W.windA) * W.k * 1.6 * dt; player.position.z += Math.sin(W.windA) * W.k * 1.6 * dt; }
   resolveCollisions(player.position, .45);
+  P.onStone = false;
+  if (P.zone === 'ember' && !fading) {
+    const st = stoneUnder(player.position.x, player.position.z);
+    if (st) { player.position.x += st.dx; P.onStone = true; }
+    else if (lavaAt(player.position.x, player.position.z)) {
+      if (S.hp > 0) {
+        burst(player.position.x, .4, player.position.z, 0xff6a1a, 14, 4, .6);
+        damagePlayer(12, player.position.x, player.position.z, 0, 2);
+        P.vel.set(0, 0, 0); player.position.copy(P.safePos);
+        toastOnce('lava', '🔥 Ouch, lava! Ride the moving stones across.', 'danger', 8);
+      }
+    } else P.safePos.copy(player.position);
+    if (player.position.z - EMB_C.z < RIVERS[0].z0 - .5 && !S.stats.crossed) { S.stats.crossed = 1; toast('🎉 You crossed the lava river!', 'big'); checkQuest(); }
+  }
   if (moving) P.face = Math.atan2(ix, iz);
 
   // ---- target: foes first, then nodes
@@ -1863,9 +2556,9 @@ function update(dt) {
   P.armR.rotation.z = sliding && P.swing <= 0 ? 1.1 : 0;
   player.rotation.y = lerpAngle(player.rotation.y, P.face, 1 - Math.exp(-dt * 14));
   player.rotation.z = sliding ? Math.sin(t * 3) * .08 : 0;
-  player.position.y = sliding ? 0 : Math.abs(Math.sin(P.walk)) * .08 * Math.min(1, sp / 4);
+  player.position.y = (sliding ? 0 : Math.abs(Math.sin(P.walk)) * .08 * Math.min(1, sp / 4)) + (P.onStone ? .22 : 0);
   P.hurtT -= dt;
-  P.suit.emissive.setHex(P.hurtT > 0 ? 0xff0000 : P.chill > 0 ? 0x2266aa : 0x000000);
+  P.suit.emissive.setHex(P.hurtT > 0 ? 0xff0000 : P.burn > 0 ? 0x8a2a00 : P.chill > 0 ? 0x2266aa : 0x000000);
   if (sliding && Math.random() < dt * 12) burst(player.position.x, .1, player.position.z, 0xffffff, 1, 1.5, .4, .6);
   if (S.weapon === 'fire' && P.tool === 'fire' && Math.random() < dt * 6) { P.fireBlade.getWorldPosition(tmpV); burst(tmpV.x, tmpV.y + .2, tmpV.z, 0xff9a3c, 1, .8, .4, .5, -2); }
 
@@ -1886,8 +2579,8 @@ function update(dt) {
   }
 
   // ---- deposit at base (outpost or Frostveil cargo pod — both feed the same storage)
-  const inTown = (P.zone === 'home' && Math.hypot(player.position.x, player.position.z) < TOWN_R) || (P.zone === 'ice' && dist2(player.position.x, player.position.z, CAMP.x, CAMP.z) < CAMP_R);
-  const depTo = P.zone === 'ice' ? ICE_STORE_POS : STORE_POS;
+  const inTown = (P.zone === 'home' && Math.hypot(player.position.x, player.position.z) < TOWN_R) || (P.zone === 'ice' && dist2(player.position.x, player.position.z, CAMP.x, CAMP.z) < CAMP_R) || (P.zone === 'ember' && dist2(player.position.x, player.position.z, ECAMP.x, ECAMP.z) < CAMP_R);
+  const depTo = P.zone === 'ice' ? ICE_STORE_POS : P.zone === 'ember' ? EMB_STORE_POS : STORE_POS;
   P.depT -= dt;
   if (inTown && bagCount() > 0 && P.depT <= 0 && S.hp > 0) {
     P.depT = .045;
@@ -1910,6 +2603,12 @@ function update(dt) {
     p.ring.material.opacity = .6 + Math.sin(t * 4) * .3;
     const on = dist2(player.position.x, player.position.z, p.x, p.z) < 1.5 && S.hp > 0;
     p.el.classList.toggle('active', on);
+    if (p.kind === 'ui') {
+      if (on && !P.uiLock[p.id] && !fading) { P.uiLock[p.id] = true; openModal(p.ui); }
+      if (!on) P.uiLock[p.id] = false;
+      if (!p.el.innerHTML) p.el.innerHTML = p.html;
+      continue;
+    }
     if (p.kind === 'sell') {
       if (on) {
         p.drainT -= dt;
@@ -1987,6 +2686,8 @@ function update(dt) {
     else if (P.zone === 'mine' && dist2(px, pz, MINE_EXIT.x, MINE_EXIT.z) < 1.5) teleport(V(MINE_DOOR.x + Math.sin(.9) * 2.5, 0, MINE_DOOR.z + Math.cos(.9) * 2.5), 'home');
     else if (P.zone === 'home' && lvl('portal') && dist2(px, pz, HOME_PORTAL_T.x, HOME_PORTAL_T.z) < 1.25) teleport(ICE_ARRIVE, 'ice', 'portal');
     else if (P.zone === 'ice' && dist2(px, pz, ICE_PORTAL_T.x, ICE_PORTAL_T.z) < 1.25) teleport(HOME_FROM_ICE, 'home', 'portal');
+    else if (P.zone === 'ice' && lvl('emberportal') && dist2(px, pz, EP_ICE_T.x, EP_ICE_T.z) < 1.25) teleport(EMB_ARRIVE, 'ember', 'portal');
+    else if (P.zone === 'ember' && dist2(px, pz, EMB_PORTAL_T.x, EMB_PORTAL_T.z) < 1.25) teleport(ICE_FROM_EMB, 'ice', 'portal');
   }
 
   // ---- enemy spawning
@@ -2027,6 +2728,19 @@ function update(dt) {
           spawnEnemy('shard', x, z); break;
         }
       }
+    } else if (P.zone === 'ember' && (ERU.on || night) && serp.state !== 'fight') {
+      P.spawnT = ERU.on ? 2.4 : 4;
+      const maxN = ERU.on ? 4 + Math.min(5, S.day) : 3;
+      if (living.filter(e => e.kind === 'magma' && !e.summoned).length < maxN) {
+        for (let tries = 0; tries < 8; tries++) {
+          const a = Math.random() * Math.PI * 2, r = rand(12, 18);
+          const x = player.position.x + Math.cos(a) * r, z = player.position.z + Math.sin(a) * r;
+          if (dist2(x, z, EMB_C.x, EMB_C.z) > EMB_R - 5) continue;
+          if (dist2(x, z, ECAMP.x, ECAMP.z) < CAMP_R + 3) continue;
+          if (dist2(x, z, LAVA_LAKE.x, LAVA_LAKE.z) < 14) continue;
+          spawnEnemy('magma', x, z); break;
+        }
+      }
     } else P.spawnT = 1;
   }
 
@@ -2042,6 +2756,8 @@ function update(dt) {
     if (e.spawn < 1) { e.spawn = Math.min(1, e.spawn + dt * 1.5); g.scale.setScalar(easeOutBack(e.spawn)); }
     if (e.kind === 'gloom' && !night) { e.dying = .01; burst(g.position.x, .8, g.position.z, 0x3a2a63, 8, 3, .6); continue; }
     if (e.kind === 'shard' && (e.summoned ? boss.state !== 'fight' : !(W.bliz || night))) { e.dying = .01; burst(g.position.x, 1, g.position.z, 0xffffff, 8, 3, .6); continue; }
+    if (e.kind === 'magma' && (e.summoned ? serp.state !== 'fight' : !(ERU.on || night))) { e.dying = .01; burst(g.position.x, .8, g.position.z, 0xff6a1a, 8, 3, .6); continue; }
+    if (e.kind === 'goblin') { e.life -= dt; if (e.life <= 0) { e.dying = .01; burst(g.position.x, 1, g.position.z, 0x9f7aff, 20, 5, .8); toast('💨 The treasure goblin escaped!'); continue; } }
     // status effects
     if (e.burn > 0) { e.burn -= dt; e.hp -= dt * 1.4; if (Math.random() < dt * 10) burst(g.position.x, .9, g.position.z, 0xff7a2a, 1, 1.2, .4, .7, -3); if (e.hp <= 0) { killEnemy(e, true); continue; } }
     e.slow = Math.max(0, e.slow - dt);
@@ -2049,7 +2765,12 @@ function update(dt) {
     let mx = 0, mz = 0;
     const sz = safeZoneFor(e.kind);
     const playerSafe = sz && dist2(player.position.x, player.position.z, sz.x, sz.z) < sz.r;
-    if (d < 30 && S.hp > 0 && !playerSafe && !fading) { mx = dx / d; mz = dz / d; }
+    if (e.kind === 'goblin') {
+      const side = Math.sin(t * 2.5 + e.hop * .1) * .7;
+      mx = -dx / d - dz / d * side; mz = -dz / d + dx / d * side;
+      const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+      if (d < 2.6 && Math.random() < dt * 1.2) { burst(g.position.x, .8, g.position.z, 0x9f7aff, 10, 3, .5); g.position.x -= dx / d * 5; g.position.z -= dz / d * 5; SFX.goblin(); }
+    } else if (d < 30 && S.hp > 0 && !playerSafe && !fading) { mx = dx / d; mz = dz / d; }
     else { e.wander = (e.wander || Math.random() * 6) + dt * .5; mx = Math.cos(e.wander) * .4; mz = Math.sin(e.wander) * .4; }
     e.hop += dt * 9;
     const hopK = Math.max(0, Math.sin(e.hop));
@@ -2060,8 +2781,8 @@ function update(dt) {
     } else {
       g.position.x += (mx * spd * (.4 + hopK) + e.kx) * dt;
       g.position.z += (mz * spd * (.4 + hopK) + e.kz) * dt;
-      e.body.position.y = .6 + hopK * .35;
-      e.body.scale.set(.75 + (1 - hopK) * .08, .6 - (1 - hopK) * .06, .75 + (1 - hopK) * .08);
+      e.body.position.y = e.kind === 'goblin' ? .5 + hopK * .25 : .6 + hopK * .35;
+      if (e.kind !== 'goblin') e.body.scale.set(.75 + (1 - hopK) * .08, .6 - (1 - hopK) * .06, .75 + (1 - hopK) * .08);
     }
     e.kx *= Math.exp(-dt * 8); e.kz *= Math.exp(-dt * 8);
     g.rotation.y = Math.atan2(mx, mz);
@@ -2072,14 +2793,19 @@ function update(dt) {
     resolveCollisions(g.position, .5);
     for (const o of enemies) if (o !== e && !o.dying) { const ox = g.position.x - o.g.position.x, oz = g.position.z - o.g.position.z, od = Math.hypot(ox, oz); if (od < 1 && od > 0) { g.position.x += ox / od * (1 - od) * .5; g.position.z += oz / od * (1 - od) * .5; } }
     e.cd -= dt;
-    if (d < 1.05 && e.cd <= 0 && S.hp > 0 && e.spawn >= 1) { e.cd = 1; damagePlayer(e.dmg, g.position.x, g.position.z, e.kind === 'shard' ? 1.8 : 0); }
+    if (d < 1.05 && e.cd <= 0 && S.hp > 0 && e.spawn >= 1 && e.dmg > 0) { e.cd = 1; damagePlayer(e.dmg, g.position.x, g.position.z, e.kind === 'shard' ? 1.8 : 0, e.kind === 'magma' ? 2 : 0); }
     const want = e.flash > 0 ? FLASH : e.burn > 0 && Math.sin(t * 20) > 0 ? FORGE_GLOW : BODY_MAT[e.kind];
     if (e.flash > 0) e.flash -= dt;
     if (e.body.material !== want) e.body.material = want;
   }
 
   updateBoss(dt, t);
+  updateSerpent(dt, t);
   updatePet(dt, t);
+  updateDragon(dt, t);
+  updateArcs(dt);
+  updateLoot(dt, t);
+  bossBar();
 
   // ---- turrets
   for (const id of ['turret1', 'turret2']) {
@@ -2123,7 +2849,7 @@ function update(dt) {
   }
 
   // ---- HP regen
-  const safe = (P.zone === 'home' && (inTown || (genL && Math.hypot(player.position.x, player.position.z) < safeR(genL)))) || inHeat || (P.zone === 'ice' && inTown);
+  const safe = (P.zone === 'home' && (inTown || (genL && Math.hypot(player.position.x, player.position.z) < safeR(genL)))) || inHeat || (P.zone !== 'home' && inTown);
   if (S.hp > 0 && S.hp < S.maxHp && t - P.lastHurt > 3) S.hp = Math.min(S.maxHp, S.hp + dt * (safe ? 12 : 3));
 
   // ---- lighting / environment
@@ -2147,6 +2873,16 @@ function update(dt) {
     for (const tl of torchLights) tl.L.intensity = 0;
     if (lvl('forge')) { tf.L.position.set(CAMP.x - 9 + Math.sin(.4) * 2, 2, CAMP.z + 1 + Math.cos(.4) * 2.5); tf.L.intensity = 30 + Math.sin(t * 11) * 6; }
     if (heatL) { th.L.position.set(CAMP.x + 9, 3, CAMP.z + 1); th.L.intensity = 25 + heatL * 12 + Math.sin(t * 9) * 4; th.L.color.setHex(0xbfe6ff); }
+  } else if (P.zone === 'ember') {
+    const k = ERU.k;
+    hemi.intensity = lerp(.75, 1.3, dn); hemi.color.setRGB(1, lerp(.6, .82, dn), lerp(.55, .72, dn)); hemi.groundColor.setHex(0x5a2a1a);
+    sun.intensity = lerp(.5, 1.8, dn) * (1 - k * .4); sun.color.setRGB(1, lerp(.62, .82, dn), lerp(.5, .66, dn));
+    scene.background.copy(EMB_NIGHT).lerp(EMB_DAY, dn).lerp(EMB_ERUPT, k * .7);
+    scene.fog.color.copy(scene.background); scene.fog.near = lerp(55, 18, k); scene.fog.far = lerp(130, 60, k);
+    lantern.intensity = nightK * 7;
+    plazaLight.intensity = 0;
+    const spots = [[-18, -6.5], [12, -6.5], [0, -38], [6, -22.5], [-20, -22.5]];
+    torchLights.forEach((tl, i) => { tl.L.position.set(EMB_C.x + spots[i][0], 2.5, EMB_C.z + spots[i][1]); tl.L.intensity = (i === 2 ? 60 : 32) + Math.sin(t * 5 + i) * 6; tl.L.color.setHex(0xff6a2a); });
   } else {
     torchLights[1].L.color.setHex(0xff9a50);
     hemi.intensity = lerp(.7, 1.6, dn); hemi.color.setRGB(lerp(.3, .81, dn), lerp(.38, .91, dn), lerp(.95, 1, dn)); hemi.groundColor.setHex(0x6a5a9a);
@@ -2177,6 +2913,23 @@ function update(dt) {
     a.material.opacity = .14 + Math.sin(t * .3 + a.userData.ph) * .07 + nightK * .12;
   }
   updateSnow(dt, t);
+  $('heat').style.opacity = P.zone === 'ember' ? (ERU.k * .8).toFixed(3) : 0;
+  if (P.zone === 'ember') {
+    LAVA_MAT.emissiveIntensity = 1 + Math.sin(t * 2) * .15 + ERU.k * .3;
+    for (const c of crusts) { c.position.x += c.userData.v * dt; const h = c.userData.half; if (c.position.x - EMB_C.x > h) c.position.x -= h * 2; else if (c.position.x - EMB_C.x < -h) c.position.x += h * 2; }
+    volcanoGlow.material.color.setHex(ERU.k > .3 ? 0xffb03a : 0xff6a1a);
+    if (Math.random() < dt * (1.2 + ERU.k * 5)) {
+      const m = new THREE.Mesh(SMOKE_GEO, new THREE.MeshBasicMaterial({ color: ERU.k > .5 && Math.random() < .4 ? 0xff7a2a : 0x3a3038, transparent: true, opacity: .7, fog: false, depthWrite: false }));
+      m.position.set(VOLCANO_TOP.x + rand(-3, 3), VOLCANO_TOP.y, VOLCANO_TOP.z + rand(-3, 3)); m.scale.setScalar(rand(3, 5)); scene.add(m);
+      smokes.push({ m, life: 6, vx: rand(-1, 2) });
+    }
+    const nb = buildings.nest; if (nb.egg) { nb.egg.rotation.z = Math.sin(t * 7) * .15 * Math.max(0, Math.sin(t * .9)); }
+  }
+  for (let i = smokes.length - 1; i >= 0; i--) {
+    const s2 = smokes[i]; s2.life -= dt;
+    s2.m.position.y += dt * (5 + ERU.k * 6); s2.m.position.x += s2.vx * dt; s2.m.scale.multiplyScalar(1 + dt * .25); s2.m.material.opacity = Math.max(0, s2.life / 6 * .7);
+    if (s2.life <= 0 || P.zone !== 'ember') { scene.remove(s2.m); s2.m.material.dispose(); smokes.splice(i, 1); }
+  }
   $('blizzard').style.opacity = P.zone === 'ice' ? (W.k * .85).toFixed(3) : 0;
 
   sun.position.set(player.position.x + 18, 30, player.position.z + 12);
@@ -2220,14 +2973,17 @@ function update(dt) {
 }
 
 function safeZoneFor(kind) {
+  if (kind === 'magma') return { x: ECAMP.x, z: ECAMP.z, r: CAMP_R };
   if (kind === 'gloom' && lvl('generator')) return { x: 0, z: 0, r: safeR(lvl('generator')) };
   if (kind === 'shard' && lvl('heater')) return { x: CAMP.x, z: CAMP.z, r: heatR(lvl('heater')) };
   return null;
 }
 
 function updateSnow(dt, t) {
-  snow.visible = P.zone === 'ice';
+  snow.visible = P.zone === 'ice' || P.zone === 'ember';
   if (!snow.visible) return;
+  if (P.zone === 'ember') { updateEmbers(dt, t); return; }
+  snowMat.color.setHex(0xffffff);
   const k = W.k, px = player.position.x, pz = player.position.z;
   const fall = 2 + k * 6, wind = 1 + k * 16, wx = Math.cos(W.windA) * wind, wz = Math.sin(W.windA) * wind;
   snowMat.size = .14 + k * .1;
@@ -2248,20 +3004,17 @@ function updateBoss(dt, t) {
   const g = boss.g;
   if (boss.state === 'gone') {
     if (S.day > S.bossDay) { resetBoss(); boss.state = 'sleep'; if (P.zone === 'ice') toast('❄ The Ice Golem has re-formed… ready for a rematch?', 'ice'); }
-    $('boss').style.display = 'none';
     return;
   }
   if (boss.state === 'dead') {
     boss.deadT += dt;
     g.children.forEach(c => { const v = c.userData.v; if (!v) return; v.y -= 18 * dt; c.position.addScaledVector(v, dt); c.rotation.x += c.userData.av.x * dt; c.rotation.z += c.userData.av.z * dt; if (c.position.y < .5) { c.position.y = .5; v.multiplyScalar(.5); v.y = Math.abs(v.y) * .3; } });
     if (boss.deadT > 2.2) { boss.state = 'gone'; g.visible = false; rubble.visible = true; }
-    $('boss').style.display = 'none';
     return;
   }
   const px = player.position.x, pz = player.position.z;
   const dArena = dist2(px, pz, ARENA.x, ARENA.z);
   if (boss.state === 'sleep') {
-    $('boss').style.display = 'none';
     boss.head.position.y = 4.95 + Math.sin(t * .8) * .05;
     if (P.zone === 'ice' && dArena < 12 && S.hp > 0 && !fading) {
       boss.state = 'fight'; boss.atkT = 2.2;
@@ -2272,8 +3025,6 @@ function updateBoss(dt, t) {
     return;
   }
   // fight
-  $('boss').style.display = 'block';
-  $('bossFill').style.width = Math.max(0, boss.hp / boss.max * 100) + '%';
   if (P.zone !== 'ice' || dArena > 24 || S.hp <= 0) {
     boss.state = 'sleep'; resetBoss();
     for (const e of enemies) if (e.summoned) e.dying = .01;
@@ -2413,6 +3164,227 @@ function updatePet(dt, t) {
   }
 }
 
+function stoneUnder(x, z) { for (const s of stones) if (Math.abs(x - s.x) < 1.05 && Math.abs(z - s.z) < 1.05) return s; return null; }
+function lavaAt(x, z) {
+  const rx = x - EMB_C.x, rz = z - EMB_C.z;
+  if (Math.hypot(rx, rz + 38) < LAKE_R + .1) return true;
+  for (let i = 0; i < RIVERS.length; i++) {
+    const r = RIVERS[i];
+    if (rz > r.z0 && rz < r.z1) return !(i === 0 && lvl('bridge') && Math.abs(rx - BRIDGE_X) < 1.35);
+  }
+  return false;
+}
+function bossBar() {
+  const bf = boss.state === 'fight' ? boss : serp.state === 'fight' ? serp : null;
+  $('boss').style.display = bf ? 'block' : 'none';
+  if (bf) {
+    $('boss').classList.toggle('fire', bf === serp);
+    $('bossName').textContent = bf === boss ? '❄ ICE GOLEM' : '🔥 MAGMAW, THE LAVA SERPENT';
+    $('bossFill').style.width = Math.max(0, bf.hp / bf.max * 100) + '%';
+  }
+}
+function updateEmbers(dt, t) {
+  const k = ERU.k, px = player.position.x, pz = player.position.z, a = snowPos;
+  snowMat.color.setHex(0xff9a4a); snowMat.size = .1 + k * .08;
+  for (let i = 0; i < SNOW_N; i++) {
+    const j = i * 3;
+    a[j + 1] += (.8 + k * 3) * dt * (.5 + (i % 5) * .15);
+    a[j] += Math.sin(t * .8 + i) * .5 * dt; a[j + 2] += Math.cos(t * .6 + i * .7) * .5 * dt;
+    if (a[j + 1] > 20) a[j + 1] -= 20;
+    if (a[j] - px > 30) a[j] -= 60; else if (a[j] - px < -30) a[j] += 60;
+    if (a[j + 2] - pz > 30) a[j + 2] -= 60; else if (a[j + 2] - pz < -30) a[j + 2] += 60;
+  }
+  snowGeo.attributes.position.needsUpdate = true;
+}
+
+function updateEvents(dt, t) {
+  const bossOn = boss.state === 'fight' || serp.state === 'fight';
+  if (P.zone !== 'mine' && !bossOn && !fading && S.hp > 0) EV.t -= dt;
+  if (EV.t <= 0) {
+    EV.t = rand(100, 160);
+    const pick = ['meteor', 'goblin', 'golden'][Math.random() * 3 | 0];
+    if (pick === 'meteor') { EV.meteor = 22; EV.meteorT = 1; SFX.meteor(); toast('☄ METEOR SHOWER! Grab the glowing meteorites for rare loot!', 'ice', 4000); }
+    else if (pick === 'goblin') {
+      const c = zoneCenter(P.zone);
+      for (let k = 0; k < 12; k++) {
+        const a = rand(0, 6.28), r = rand(9, 13), x = player.position.x + Math.cos(a) * r, z = player.position.z + Math.sin(a) * r;
+        if (dist2(x, z, c.x, c.z) > zoneRadius(P.zone) - 5 || (P.zone === 'ember' && lavaAt(x, z))) continue;
+        spawnEnemy('goblin', x, z); SFX.goblin();
+        toast('💰 A TREASURE GOBLIN appeared! Catch it before it escapes!', 'big', 4000);
+        break;
+      }
+    } else { EV.golden = 40; SFX.quest(); toast('✨ GOLDEN HOUR! Double harvest for 40 seconds!', 'big', 4000); }
+  }
+  if (EV.golden > 0) {
+    EV.golden -= dt;
+    if (Math.random() < dt * 8) burst(player.position.x + rand(-.6, .6), rand(.5, 2), player.position.z + rand(-.6, .6), 0xffd23a, 1, .8, .6, .5, -1);
+    if (EV.golden <= 0) toast('Golden Hour is over.');
+  }
+  if (EV.meteor > 0) {
+    EV.meteor -= dt; EV.meteorT -= dt;
+    if (EV.meteorT <= 0 && P.zone !== 'mine') {
+      EV.meteorT = rand(.9, 1.6);
+      const c = zoneCenter(P.zone);
+      for (let k = 0; k < 8; k++) {
+        const a = rand(0, 6.28), r = rand(5, 18), x = player.position.x + Math.cos(a) * r, z = player.position.z + Math.sin(a) * r;
+        if (dist2(x, z, c.x, c.z) > zoneRadius(P.zone) - 4 || (P.zone === 'ember' && lavaAt(x, z))) continue;
+        arcDrop(V(x - 25, 40, z - 15), V(x, 0, z), 1.6, 'meteor');
+        break;
+      }
+    }
+  }
+}
+
+function killSerpent() {
+  if (serp.state !== 'fight') return;
+  serp.state = 'dead'; serp.deadT = 0; serp.atk = null;
+  const first = S.stats.serpent === 0;
+  S.stats.serpent++; S.serpentDay = S.day;
+  const mg = first ? 20 : 10, coins = first ? 500 : 250;
+  S.store.magma += mg; S.coins += coins;
+  SFX.boom(); setTimeout(() => SFX.victory(), 600); camShake = 1;
+  toast(`🏆 Magmaw is defeated! ${ic('magma')}+${mg} ${ic('coins')}+${coins}`, 'big', 5000);
+  if (first) { S.egg = 1; refreshBuilding('nest'); setTimeout(() => toast('🥚 It left behind a DRAGON EGG! It\'s waiting in the nest at camp.', 'ice', 5000), 1500); }
+  else setTimeout(() => toast('Magmaw will return tomorrow for a rematch.'), 1500);
+  for (const e of enemies) if (e.summoned) e.dying = .01;
+  renderRes(); checkQuest(); save();
+}
+function updateSerpent(dt, t) {
+  const g = serp.g;
+  if (serp.state === 'gone') {
+    g.visible = false;
+    if (S.day > S.serpentDay) { resetSerpent(); serp.state = 'sleep'; if (P.zone === 'ember') toast('🔥 Magmaw stirs in the lava lake again…', 'danger'); }
+    return;
+  }
+  if (P.zone === 'ember' && Math.random() < dt * 4) burst(LAVA_LAKE.x + rand(-6, 6), .2, LAVA_LAKE.z + rand(-6, 6), 0xffa040, 2, 1.5, .6, .9);
+  if (serp.state === 'dead') {
+    serp.deadT += dt; serp.rise = Math.max(0, 1 - serp.deadT / 1.8);
+    poseSerpent(t);
+    if (Math.random() < dt * 20) burst(g.position.x + rand(-2, 2), rand(0, 4) * serp.rise + .3, g.position.z + rand(-2, 2), 0xff6a1a, 2, 4, .6);
+    if (serp.deadT > 2) { serp.state = 'gone'; g.visible = false; }
+    return;
+  }
+  const px = player.position.x, pz = player.position.z;
+  const dLake = dist2(px, pz, LAVA_LAKE.x, LAVA_LAKE.z);
+  if (serp.state === 'sleep') {
+    serp.rise = Math.max(0, serp.rise - dt); poseSerpent(t);
+    if (P.zone === 'ember' && dLake < 15 && S.hp > 0 && !fading) {
+      serp.state = 'fight'; serp.mode = 'rising'; serp.modeT = 0;
+      serp.theta = Math.atan2(pz - LAVA_LAKE.z, px - LAVA_LAKE.x);
+      g.position.copy(serpRoot(serp.theta));
+      SFX.roar2(); camShake = .7;
+      toast('⚠ MAGMAW, THE LAVA SERPENT rises!', 'danger', 3500);
+    }
+    return;
+  }
+  // fight
+  if (P.zone !== 'ember' || dLake > 28 || S.hp <= 0) {
+    serp.state = 'sleep'; serp.mode = 'up'; serp.atk = null; serp.hp = serp.max = serpMaxHp(); serp.burn = 0;
+    for (const e of enemies) if (e.summoned && e.kind === 'magma') e.dying = .01;
+    if (P.zone === 'ember' && S.hp > 0) toast('Magmaw sinks back into the lava…');
+    return;
+  }
+  const enraged = serp.hp < serp.max * .5;
+  if (serp.burn > 0) { serp.burn -= dt; serp.hp -= dt * 2.5; if (Math.random() < dt * 10) burst(g.position.x + rand(-1, 1), 1 + rand(0, 3) * serp.rise, g.position.z + rand(-1, 1), 0xffd23a, 1, 1.5, .5, .8, -3); if (serp.hp <= 0) { killSerpent(); return; } }
+  serp.slow = Math.max(0, serp.slow - dt);
+  const tm = serp.slow > 0 ? .6 : 1;
+  serp.modeT += dt * tm;
+  if (serp.mode === 'rising') {
+    serp.rise = Math.min(1, serp.modeT / .8);
+    if (serp.rise >= 1) {
+      serp.mode = 'up'; serp.atkT = 1.3;
+      if (dist2(px, pz, g.position.x, g.position.z) < 3) damagePlayer(10, g.position.x, g.position.z, 0, 1.5);
+      burst(g.position.x, .5, g.position.z, 0xff8a3a, 20, 6, .8); SFX.splash();
+      if (enraged) for (let i = 0; i < 2; i++) { const a = rand(0, 6.28), r = LAKE_R + 2.5; const e = spawnEnemy('magma', LAVA_LAKE.x + Math.cos(a) * r, LAVA_LAKE.z + Math.sin(a) * r); e.summoned = true; }
+    }
+  } else if (serp.mode === 'diving') {
+    serp.rise = Math.max(0, 1 - serp.modeT / .7);
+    if (serp.rise <= 0) { serp.mode = 'under'; serp.modeT = 0; serp.theta = Math.atan2(pz - LAVA_LAKE.z, px - LAVA_LAKE.x) + rand(-.9, .9); g.position.copy(serpRoot(serp.theta)); }
+  } else if (serp.mode === 'under') {
+    if (Math.random() < dt * 25) burst(g.position.x + rand(-1, 1), .2, g.position.z + rand(-1, 1), 0xffc070, 1, 2, .5);
+    if (serp.modeT > 1.1) { serp.mode = 'rising'; serp.modeT = 0; }
+  } else {
+    serp.atkT -= dt * tm * (enraged ? 1.35 : 1);
+    if (!serp.atk && serp.atkT <= 0) {
+      const d = dist2(px, pz, g.position.x, g.position.z);
+      serp.attacks++;
+      if (serp.attacks % 4 === 0) { serp.mode = 'diving'; serp.modeT = 0; SFX.splash(); serp.atkT = 2.6; }
+      else if (d < 10 && Math.random() < .55) { serp.atk = { type: 'breath', t: 0, dir: 0, tick: 0 }; serp.atkT = 2.6; }
+      else {
+        const n = enraged ? 5 : 3; serp.head.getWorldPosition(tmpV); const from = tmpV.clone();
+        for (let i = 0; i < n; i++) arcDrop(from, V(px + (i ? rand(-3, 3) : 0), 0, pz + (i ? rand(-3, 3) : 0)), 1.1 + i * .08, 'lava');
+        SFX.fire(); serp.atkT = 2.4; serp.jaw.rotation.x = .6;
+      }
+    }
+    if (serp.atk) {
+      const a = serp.atk; a.t += dt;
+      if (a.t < .8) { serp.jaw.rotation.x = .7 * a.t / .8; serp.mouth.material.emissiveIntensity = 2 + a.t * 4; a.dir = Math.atan2(px - g.position.x, pz - g.position.z); }
+      else if (a.t < 2.1) {
+        serp.jaw.rotation.x = .8;
+        serp.head.getWorldPosition(tmpV);
+        const from = tmpV.clone(); from.y -= .2;
+        fireStream(from, V(g.position.x + Math.sin(a.dir) * 10, 0, g.position.z + Math.cos(a.dir) * 10), 3, 14);
+        a.tick -= dt;
+        if (a.tick <= 0) {
+          a.tick = .2;
+          const ang = Math.atan2(px - g.position.x, pz - g.position.z), dd = dist2(px, pz, g.position.x, g.position.z);
+          const diff = Math.abs(((ang - a.dir + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+          if (diff < .42 && dd < 10.5) damagePlayer(7, g.position.x, g.position.z, 0, 1.5);
+        }
+        if (Math.random() < dt * 6) SFX.fire();
+      } else { serp.atk = null; serp.mouth.material.emissiveIntensity = 2; }
+    } else serp.jaw.rotation.x = lerp(serp.jaw.rotation.x, 0, .1);
+  }
+  const out = Math.atan2(Math.cos(serp.theta), Math.sin(serp.theta));
+  const want = serp.atk && serp.atk.t >= .8 ? serp.atk.dir : Math.atan2(px - g.position.x, pz - g.position.z);
+  const rel = ((want - out + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  serp.head.rotation.y = lerp(serp.head.rotation.y, clamp(rel, -1.1, 1.1), .15);
+  serp.head.rotation.x = .3;
+  poseSerpent(t);
+  if (serp.flash > 0) serp.flash -= dt;
+  const fl = serp.flash > 0;
+  SERP_MAT.emissiveIntensity = fl ? 1.1 : .3 + (serp.burn > 0 ? .25 : 0);
+}
+
+function updateDragon(dt, t) {
+  const L = lvl('nest'); if (!L) return;
+  if (!dragon.g || dragon.lvl !== L) makeDragon();
+  const g = dragon.g; g.visible = !fading;
+  dragon.flap += dt * 14;
+  dragon.wings.forEach((w, i) => w.rotation.z = (i ? -1 : 1) * Math.sin(dragon.flap) * .7);
+  const ry = player.rotation.y;
+  let gx = player.position.x - Math.cos(ry) * 1.2 - Math.sin(ry) * .4, gz = player.position.z + Math.sin(ry) * 1.2 - Math.cos(ry) * .4, gy = 2.3 + Math.sin(t * 2) * .2;
+  dragon.breathT -= dt;
+  if (dragon.fireT > 0 && dragon.aim) {
+    dragon.fireT -= dt;
+    const f = dragon.aim;
+    if (f.dying || (f.isBoss && !f.targetable())) dragon.fireT = 0;
+    else {
+      const fp = f.g.position;
+      const dx = fp.x - g.position.x, dz = fp.z - g.position.z, d = Math.hypot(dx, dz) || 1;
+      gx = fp.x - dx / d * 3; gz = fp.z - dz / d * 3; gy = f.isBoss ? 3.5 : 2;
+      g.rotation.y = lerpAngle(g.rotation.y, Math.atan2(dx, dz), .25);
+      dragon.mouth.getWorldPosition(tmpV);
+      fireStream(tmpV.clone(), V(fp.x, f.isBoss ? 2 : .5, fp.z), 2, 10);
+      dragon.tick -= dt;
+      if (dragon.tick <= 0) {
+        dragon.tick = .25;
+        for (const o of foes()) if (dist2(o.g.position.x, o.g.position.z, fp.x, fp.z) - foeR(o) < 1.8) { o.burn = Math.max(o.burn || 0, 2); hitFoe(o, 1 + L * .5, 2, '#ffb36b'); }
+      }
+    }
+  } else if (dragon.breathT <= 0) {
+    dragon.breathT = 2.6 - L * .45;
+    let best = null, bd = 8;
+    for (const f of foes()) { const d = dist2(f.g.position.x, f.g.position.z, player.position.x, player.position.z) - foeR(f); if (d < bd) { bd = d; best = f; } }
+    if (best) { dragon.aim = best; dragon.fireT = .9; dragon.tick = 0; SFX.fire(); }
+  }
+  if (!(dragon.fireT > 0)) g.rotation.y = lerpAngle(g.rotation.y, ry, .08);
+  const dx = gx - g.position.x, dy = gy - g.position.y, dz = gz - g.position.z;
+  if (Math.hypot(dx, dz) > 25) g.position.set(gx, gy, gz);
+  else { const k = 1 - Math.exp(-dt * 5); g.position.x += dx * k; g.position.y += dy * k; g.position.z += dz * k; }
+  dragon.body.rotation.z = clamp(-dx * .08, -.4, .4);
+}
+
 const lerpAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI; if (d < -Math.PI) d += Math.PI * 2; return a + d * t; };
 const easeOutBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
 
@@ -2431,7 +3403,7 @@ function project(v, el, yOff = 0) {
 }
 function updateCamera(dt) {
   const portrait = innerWidth < innerHeight;
-  const z = boss.state === 'fight' ? 1.3 : 1;
+  const z = boss.state === 'fight' || serp.state === 'fight' ? 1.35 : 1;
   const off = portrait ? [0, 14 * z, 15 * z] : [0, 10 * z, 12.5 * z];
   const want = tmpV.set(player.position.x + off[0], off[1], player.position.z + off[2]);
   camPos.lerp(want, 1 - Math.exp(-dt * 6));
@@ -2444,7 +3416,7 @@ let chestLabelT = 0;
 function updateLabels(dt) {
   const px = player.position.x, pz = player.position.z;
   for (const p of pads) if (p.shown) {
-    const near = dist2(p.x, p.z, px, pz) < (p.kind === 'sell' ? 3.2 : 17);
+    const near = dist2(p.x, p.z, px, pz) < (p.kind === 'sell' ? 3.2 : p.kind === 'ui' ? 10 : 17);
     p.el.style.display = near ? '' : 'none';
     if (near) project(V(p.x, 0, p.z), p.el, p.labelY);
   }
@@ -2465,10 +3437,10 @@ function updateLabels(dt) {
 }
 function updateHUD() {
   const narrow = innerWidth < 600;
-  const zn = P.zone === 'mine' ? (narrow ? '⛏ ' : '⛏ Mine · ') : P.zone === 'ice' ? (narrow ? '❄ ' : '❄ Frostveil · ') : '';
-  $('dayTxt').textContent = `${zn}Day ${S.day}${P.zone === 'ice' && W.bliz ? ' · 🌨' : ''}`;
+  const zn = P.zone === 'mine' ? (narrow ? '⛏ ' : '⛏ Mine · ') : P.zone === 'ice' ? (narrow ? '❄ ' : '❄ Frostveil · ') : P.zone === 'ember' ? (narrow ? '🌋 ' : '🌋 Emberfall · ') : '';
+  $('dayTxt').textContent = `${zn}Day ${S.day}${P.zone === 'ice' && W.bliz ? ' · 🌨' : ''}${P.zone === 'ember' && ERU.on ? ' · 🔥' : ''}${EV.golden > 0 ? ' · ✨' : ''}`;
   $('day').classList.toggle('night', isNight());
-  $('day').classList.toggle('storm', P.zone === 'ice' && W.bliz);
+  $('day').classList.toggle('storm', (P.zone === 'ice' && W.bliz) || (P.zone === 'ember' && ERU.on));
   $('tfill').style.width = (S.time * 100) + '%';
   $('hpFill').style.width = (S.hp / S.maxHp * 100) + '%';
   $('hp').classList.toggle('chill', P.chill > 0);
@@ -2479,19 +3451,22 @@ function updateHUD() {
    MAIN LOOP
    ================================================================ */
 const clock = new THREE.Clock();
-let saveT = 0, hudT = 0;
+let saveT = 0, hudT = 0, achT = 0;
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 1 / 20);
   if (started) {
-    update(dt);
-    updateBossShots(dt);
-    saveT += dt; if (saveT > 5) { saveT = 0; save(); }
-    hudT += dt; if (hudT > .1) { hudT = 0; updateHUD(); renderQuest(); }
+    if (!paused) {
+      update(dt);
+      updateBossShots(dt);
+      saveT += dt; if (saveT > 5) { saveT = 0; save(); }
+      hudT += dt; if (hudT > .1) { hudT = 0; updateHUD(); renderQuest(); }
+      achT += dt; if (achT > 1) { achT = 0; checkAch(); }
+    }
     updateCamera(dt);
   } else {
     const a = clock.elapsedTime * .1;
-    const c = P.zone === 'ice' ? ICE_C : V(0, 0, 0);
+    const c = zoneCenter(P.zone);
     camera.position.set(c.x + Math.sin(a) * 26, 16, c.z + Math.cos(a) * 26); camera.lookAt(c.x, 1, c.z - 2);
     camPos.copy(camera.position); stars.position.copy(camera.position);
     snow.visible = false;
@@ -2503,12 +3478,18 @@ function frame() {
 // restore saved world
 for (const id of ['house1', 'house2']) if (lvl(id)) spawnDrone(id);
 if (S.zone === 'ice' && lvl('portal')) { P.zone = 'ice'; player.position.copy(ICE_ARRIVE); }
+else if (S.zone === 'ember' && S.stats.emberVisits) { P.zone = 'ember'; player.position.copy(EMB_ARRIVE); }
 else { S.zone = 'home'; player.position.set(0, 0, 4); }
+P.safePos.copy(player.position);
 if (S.core) coreRings.visible = true;
 if (S.hp > S.maxHp || S.hp <= 0) S.hp = S.maxHp;
 if (!S.weapons[S.weapon]) S.weapon = 'sword';
 initBoss();
+initSerpent();
 if (lvl('petden')) makePet();
+if (lvl('nest')) makeDragon();
+if (lvl('bridge')) bridgeMesh.visible = true;
+applyCosmetics();
 renderTools(); renderRes(); renderQuest(); updateHUD();
 if (hasSave) { $('play').textContent = 'Continue'; $('newgame').style.display = ''; }
 $('play').addEventListener('click', () => {
@@ -2519,7 +3500,7 @@ $('play').addEventListener('click', () => {
     setTimeout(() => toast('🚀 Crash landing! This planet looks… abandoned.', 'big', 4000), 300);
     setTimeout(() => toast('Follow the <b style="color:var(--warn)">yellow arrow</b> to your goal.', '', 4500), 2600);
   } else {
-    toast(`Welcome back${P.zone === 'ice' ? ' to Frostveil' : ''}! Day ${S.day}`, 'big');
+    toast(`Welcome back${P.zone === 'ice' ? ' to Frostveil' : P.zone === 'ember' ? ' to Emberfall' : ''}! Day ${S.day}`, 'big');
     if (chestReady()) setTimeout(() => toast('🎁 Your daily chest is ready at the outpost!'), 1500);
   }
   checkQuest();
@@ -2530,7 +3511,7 @@ $('newgame').addEventListener('click', () => {
   try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
   location.reload();
 });
-window.__game = { S, P, W, player, nodes, pads, enemies, buildings, boss, pet, update, teleport, claimChest, initBoss, refreshBuilding, makePet, renderRes, renderTools, ICE_ARRIVE, ARENA, CAMP };
+window.__game = { serp, dragon, EV, ERU, stones, openModal, closeModal, modalAction, arcDrop, spawnEnemy, EMB_ARRIVE, LAVA_LAKE, SHIP_SPOTS, ECAMP, EP_ICE_T, S, P, W, player, nodes, pads, enemies, buildings, boss, pet, update, teleport, claimChest, initBoss, refreshBuilding, makePet, renderRes, renderTools, ICE_ARRIVE, ARENA, CAMP };
 frame();
 </script>
 </body>
