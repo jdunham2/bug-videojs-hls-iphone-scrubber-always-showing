@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 35, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 36, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -82,7 +82,7 @@ const REGION_TINT = [null, 'rgba(96,44,160,.34)', 'rgba(128,110,84,.38)', 'rgba(
 const tiles = new Uint8Array(W * H), region = new Uint8Array(W * H);
 const cx = OW / 2, cy = H / 2;
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? DEEP : tiles[y * W + x];
-const isLand = t => t >= LAND && t !== 20 && t !== 24 && t !== 25 && t !== 27 && t !== 29 && t !== 30 && t !== 32 && t !== 35 && t !== WALL && t !== GATE && t !== LOCK && t !== BDOOR && t !== POOL;
+const isLand = t => t >= LAND && t !== 20 && t !== 24 && t !== 25 && t !== 27 && t !== 29 && t !== 30 && t !== 32 && t !== 35 && t !== 36 && t !== 37 && t !== WALL && t !== GATE && t !== LOCK && t !== BDOOR && t !== POOL;
 const inDungeon = x => x >= (OW + 2) * T;
 function regionOf(x, y) {
   const dx = x - cx, dy = y - cy;
@@ -1072,6 +1072,40 @@ const THUN_D = makeDungeon('thunder', 'Thunder Mesa', 34, THUNDER, { tint: 'rgb(
   for (const [i, x, y] of [[1, 5, 27], [2, 16, 31], [3, 33, 30]]) D.switches.push({ id: 't' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
   for (const [x, y] of [[15, 34], [24, 34], [8, 25], [26, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
 }
+// ---------- Mistmoor Highlands: heather moors where boulders are pushed into pits ----------
+const BOULDER = 36, HOLE = 37, FILLED = 38;
+const MOOR_D = makeDungeon('moor', 'Mistmoor Highlands', 35, null, { outdoor: true, theme: 'moor',
+  objective: g => 'Shepherd Moira\'s croft stands by the pony cart. Walk into a boulder to push it. Push boulders into pits to fill them and reach the islands. Strike a rune stone to reset its puzzle.' });
+const MOOR = { puzzles: [], under: new Map(), pushT: 0 };
+{
+  const D = MOOR_D, X = D.x0;
+  for (let y = 0; y < H; y++) for (let lx = 0; lx < DW; lx++) {
+    const x = X + lx, dx = (lx - 19.5) / 18.5, dy = (y - 22) / 21;
+    const d = Math.hypot(dx, dy) + (vnoise(x / 6 + 5000, y / 6) - 0.5) * 0.26;
+    tiles[y * W + x] = y < 44 && d < 0.95 ? LAND : DEEP; region[y * W + x] = 23;
+  }
+  for (let y = 2; y < 12; y++) for (let lx = 15; lx <= 25; lx++) tiles[y * W + X + lx] = LAND;
+  for (let y = 15; y <= 25; y++) for (let lx = 14; lx <= 24; lx++) if (Math.hypot((lx - 19) / 5, (y - 20) / 4) < 1) tiles[y * W + X + lx] = DEEP; // a small loch
+  const set = (lx, y, t) => { tiles[y * W + X + lx] = t; };
+  // puzzle A: an island in a ring of pits, east of the loch
+  for (let y = 19; y <= 33; y++) for (let lx = 23; lx <= 36; lx++) if (!(lx < 25 && y < 26)) set(lx, y, LAND);
+  for (let y = 25; y <= 31; y++) for (let lx = 27; lx <= 33; lx++) if (y === 25 || y === 31 || lx === 27 || lx === 33) set(lx, y, HOLE);
+  set(25, 22, BOULDER); set(35, 27, BOULDER);
+  // puzzle B: an island inside two rings of pits, in the southwest
+  for (let y = 28; y <= 43; y++) for (let lx = 3; lx <= 17; lx++) set(lx, y, LAND);
+  for (const [a0, b0, a1, b1] of [[7, 35, 13, 41], [6, 34, 14, 42]]) for (let y = b0; y <= b1; y++) for (let lx = a0; lx <= a1; lx++) if (y === b0 || y === b1 || lx === a0 || lx === a1) set(lx, y, HOLE);
+  set(10, 31, BOULDER); set(15, 30, BOULDER);
+  for (const [x0, y0, x1, y1, rx, ry] of [[23, 19, 36, 33, 24, 20], [3, 28, 17, 43, 17, 32]]) {
+    const snap = []; for (let y = y0; y <= y1; y++) for (let lx = x0; lx <= x1; lx++) snap.push(tiles[y * W + X + lx]);
+    MOOR.puzzles.push({ x0: X + x0, y0, x1: X + x1, y1, snap, rune: { x: (X + rx) * T + 16, y: ry * T + 20 } });
+  }
+  pathLine(X + 20, 4, X + 20, 13); pathLine(X + 20, 13, X + 28, 18); pathLine(X + 20, 13, X + 10, 26);
+  D.camp = { x: (X + 20) * T, y: 8 * T };
+  D.start = { x: (X + 20) * T, y: 4 * T + 8 };
+  D.islandA = { x: (X + 30) * T + 16, y: 28 * T + 16 };
+  D.islandB = { x: (X + 10) * T + 16, y: 38 * T + 16 };
+}
+const nearMoorSite = (tx, ty, d) => Math.hypot(tx - MOOR_D.camp.x / T, ty - MOOR_D.camp.y / T) < d || Math.hypot(tx - MOOR_D.x0 - 20, ty - 4) < 3 || MOOR.puzzles.some(q => tx >= q.x0 - 1 && tx <= q.x1 + 1 && ty >= q.y0 - 1 && ty <= q.y1 + 1);
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -1209,6 +1243,7 @@ function drawOutdoorTile(c, x, y, px, py, t) {
   if (dungeonAt(px).theme === 'glacier') { drawGlacierTile(c, x, y, px, py, t); return; }
   if (dungeonAt(px).theme === 'mangrove') { drawMangroveTile(c, x, y, px, py, t); return; }
   if (dungeonAt(px).theme === 'canyon') { drawCanyonTile(c, x, y, px, py, t); return; }
+  if (dungeonAt(px).theme === 'moor') { drawMoorTile(c, x, y, px, py, t); return; }
   if (t === BOG) {
     const hb = hash(x, y); c.fillStyle = '#2e3a1e'; c.fillRect(px, py, T, T); c.fillStyle = '#3d4a26'; c.fillRect(px + 2, py + 2, T - 4, T - 4);
     c.fillStyle = 'rgba(120,140,60,.35)'; ellipse(c, px + 8 + hb * 16, py + 10 + hb * 10, 4, 2); ellipse(c, px + 22 - hb * 10, py + 22, 3, 1.5);
@@ -1429,6 +1464,7 @@ const ITEMS = {
   glacial: { name: 'Glacial Shard', price: 13 },
   driftwood: { name: 'Driftwood', price: 12 },
   ochre: { name: 'Canyon Ochre', price: 13 },
+  runeshard: { name: 'Rune Shard', price: 13 },
   sunstone: { name: 'Sunstone', price: 450 },
 };
 // Weapons and armor: craft them at the workbench, then equip one of each.
@@ -1446,6 +1482,7 @@ const WEAPONS = {
   trident: { name: 'Tidecaller Trident', dmg: 5, col: '#5ab0a0', cost: { abyssaltooth: 1, driftwood: 8 }, reach: 12, desc: 'Tipped with the Abyssal Tooth. Five times damage and long reach: the sea itself answers its call.' },
   aurorablade: { name: 'Aurora Blade', dmg: 5, col: '#8cf0d0', cost: { aurorastone: 1, glacial: 8 }, reach: 8, freeze: true, desc: 'Set with the Aurora Stone, it shimmers green and violet. Five times damage, long reach, and it freezes foes.' },
   gourdbane: { name: 'Gourdbane', dmg: 5, col: '#e8803a', cost: { harvestcrown: 1, corn: 8 }, heavy: true, poison: true, desc: 'Topped with the Harvest Crown. Five times damage in a wide sweep, and it poisons what it cuts.' },
+  claymore: { name: 'Highland Claymore', dmg: 4, col: '#c8d0d0', cost: { runeshard: 8, stone: 6 }, heavy: true, reach: 4, desc: 'A great two-handed sword carved with runes. Quadruple damage in a wide sweep.' },
   rattlefang: { name: 'Rattlefang', dmg: 4, col: '#d8a040', cost: { ochre: 8, crystal: 4 }, poison: true, desc: 'A curved blade set with a rattlesnake fang. Quadruple damage, and its venom poisons what it cuts.' },
   heronspear: { name: 'Heron Spear', dmg: 4, col: '#c8d0d8', cost: { driftwood: 8, crystal: 4 }, reach: 14, desc: 'A long driftwood spear tipped like a heron\'s beak. Quadruple damage and the longest reach of any blade.' },
   glaive:  { name: 'Glacier Glaive', dmg: 4, col: '#bfe8ff', cost: { glacial: 8, crystal: 4 }, reach: 8, freeze: true, desc: 'A long blade of never-melting ice. Quadruple damage, extra reach, and freezes foes so they move at a crawl.' },
@@ -1479,6 +1516,7 @@ const ARMORS = {
   abyssal: { name: 'Abyssal Plate', hearts: 8, tint: ['#1a1030', '#6a3a8a', '#9fe8ff'], cost: { krakenbeak: 1, coral: 8 }, sturdy: true, breath: 3, desc: 'Forged from the Kraken\'s beak. +8 hearts, the most of any armor, barely knocked back, and triple air underwater.' },
   serpentscale: { name: 'Serpent Scale Armor', hearts: 7, tint: ['#1a3a1a', '#4a8a3a', '#ffd65a'], cost: { serpenteye: 1, jade: 8 }, sturdy: true, regen: true, desc: 'Scales of the Serpent Queen. +7 hearts, the most of any armor, barely knocked back, and slowly heals you.' },
   prismplate: { name: 'Prismatic Plate', hearts: 6, tint: ['#2a2050', '#a593ff', '#9fe8ff'], cost: { prismheart: 1, glimmer: 6 }, speed: 1.15, sturdy: true, desc: 'Grown from the Hydra\'s heart. +6 hearts, 15% faster, and hits barely knock you back.' },
+  tartan: { name: 'Tartan Cloak', hearts: 5, tint: ['#2a4a3a', '#7a3a3a', '#c8b060'], cost: { runeshard: 8, herb: 6 }, warm: true, desc: 'Thick highland wool in a bold tartan. +5 hearts, and keeps out the cold: frost and bogs no longer slow you.' },
   duster: { name: 'Ranger\'s Duster', hearts: 5, tint: ['#6a4a2a', '#c8986a', '#d8743a'], cost: { ochre: 8, herb: 6 }, speed: 1.15, desc: 'A long canyon coat. +5 hearts and 15% faster movement: handy on crumbling ledges.' },
   mangrovemantle: { name: 'Mangrove Mantle', hearts: 5, tint: ['#3a4a2a', '#6a8a4a', '#c4ae82'], cost: { driftwood: 8, herb: 6 }, regen: true, desc: 'Woven from mangrove fibre. +5 hearts, and slowly heals you over time.' },
   yeticloak: { name: 'Yeti Fur Cloak', hearts: 5, tint: ['#8a9fb8', '#e6eef5', '#5ab0d8'], cost: { glacial: 8, herb: 6 }, warm: true, desc: 'Shaggy and snug. +5 hearts, and keeps out the cold: frost and bogs no longer slow you.' },
@@ -1564,6 +1602,15 @@ const QUESTS = [
   { id: 'thundermesa', giver: 'kit', name: 'Thunder Mesa', req: 'canyonfoes', goal: { boss: ['rose', 'thunderbird'] }, reward: { gold: 740, items: { crystal: 20, ochre: 6 } },
     offer: ['The big mesa across the rope bridge: Calamity Rose and her gang hole up in the old mine inside.', 'And on its peak roosts the Thunderbird. Rose is fast, but she never turns down a duel. As for the bird... they say lightning strikes copper.'],
     done: ['Rose in custody and the Thunderbird gone? Partner, you\'re a legend. Keep that feather.'] },
+  { id: 'rams', giver: 'moira', name: 'Wild Rams', goal: { kill: [['ram', 4]] }, reward: { gold: 180, items: { runeshard: 4 } },
+    offer: ['Och, a traveler! I\'m Moira. Mind yourself: the wild rams are scaring my flock half to death.', 'A ram paws the ground, then charges in a straight line. Step aside and let it crash into a boulder or a tree. Then it\'s dizzy. Four of them, please.'],
+    done: ['My sheep thank you. Take these rune shards. They turn up all over the moor.'] },
+  { id: 'bluebell', giver: 'moira', name: 'The Fairy Bluebell', req: 'rams', hint: 'Fill both rings of pits around the southwest island', foundText: 'Found it! Bring it to Moira.', goal: { find: 'bluebell' }, reward: { gold: 210, items: { potion: 3 } },
+    offer: ['A fairy bluebell grows on the island in the southwest, ringed by two rows of old pits.', 'Push the boulders into the pits to make a path. You\'ll need both of them, in the same line. If you get one stuck, strike the rune stone and the boulders return.'],
+    done: ['A fairy bluebell! My grandmother said they bring good luck. Have some tonics, dear.'] },
+  { id: 'moorfoes', giver: 'moira', name: 'Folk of the Mist', req: 'bluebell', goal: { kill: [['pixie', 3], ['menhir', 2], ['redcap', 3]] }, reward: { gold: 320, items: { crystal: 6, runeshard: 5 } },
+    offer: ['Pixies muddle travelers\' heads, the standing stones have started walking, and redcaps throw their hats like daggers.', 'Three pixies, two menhirs, three redcaps. A menhir is only soft after it slams the ground and tires.'],
+    done: ['The moor feels friendlier already. You\'re always welcome at my croft.'] },
   { id: 'coyotes', giver: 'kit', name: 'Pack Trouble', goal: { kill: [['coyote', 6]] }, reward: { gold: 180, items: { ochre: 4 } },
     offer: ['Howdy, partner. Ranger Kit. You came at a bad time: the coyote packs are getting bold.', 'They hunt in threes and bite from behind. Keep turning to face them, and they\'ll back off long enough to strike. Six of them, please.'],
     done: ['That\'ll quiet the night. Here, some ochre. Smiths pay well for it.'] },
@@ -1786,9 +1833,11 @@ function spawnFind(item, rg, x0, w) {
   if (S.found[item] || pickups.some(p => p.item === item)) return;
   for (let i = 0; i < 4000; i++) {
     const x = x0 + 2 + Math.floor(hash(i, 131) * (w - 4)), y = 2 + Math.floor(hash(131, i) * 40);
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 20 && nearGlacSite(x, y, 7)) && !(rg === 21 && nearMangSite(x, y, 7)) && !(rg === 22 && nearCanySite(x, y, 7)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 20 && nearGlacSite(x, y, 7)) && !(rg === 21 && nearMangSite(x, y, 7)) && !(rg === 22 && nearCanySite(x, y, 7)) && !(rg === 23 && nearMoorSite(x, y, 7)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
   }
 }
+function spawnBluebell() { if (S.found.bluebell || pickups.some(p => p.item === 'bluebell')) return; pickups.push({ x: MOOR_D.islandB.x, y: MOOR_D.islandB.y, vx: 0, vy: 0, item: 'bluebell', t: 0.4, keep: true }); }
+function spawnCairn() { if (S.found.cairn || pickups.some(p => p.item === 'cairnbox')) return; pickups.push({ x: MOOR_D.islandA.x, y: MOOR_D.islandA.y, vx: 0, vy: 0, item: 'cairnbox', t: 0.4, keep: true }); }
 function spawnPlume() { if (S.found.eagleplume || pickups.some(p => p.item === 'eagleplume')) return; pickups.push({ x: CANY_D.plume.x, y: CANY_D.plume.y, vx: 0, vy: 0, item: 'eagleplume', t: 0.4, keep: true }); }
 function spawnShell() { if (S.found.moonshell || pickups.some(p => p.item === 'moonshell')) return; pickups.push({ x: MANG_D.shell.x, y: MANG_D.shell.y, vx: 0, vy: 0, item: 'moonshell', t: 0.4, keep: true }); }
 function spawnLily() { if (S.found.snowlily || pickups.some(p => p.item === 'snowlily')) return; pickups.push({ x: GLAC_D.lily.x, y: GLAC_D.lily.y, vx: 0, vy: 0, item: 'snowlily', t: 0.4, keep: true }); }
@@ -1808,6 +1857,7 @@ function acceptQuest(q) {
   if (q.goal.find === 'bloom') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (q.goal.find === 'chime') spawnFind('chime', 11, SKY_D.x0, DW);
   if (q.goal.find === 'comb') spawnComb();
+  if (q.goal.find === 'bluebell') spawnBluebell();
   if (q.goal.find === 'eagleplume') spawnPlume();
   if (q.goal.find === 'moonshell') spawnShell();
   if (q.goal.find === 'snowlily') spawnLily();
@@ -1845,7 +1895,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0, harvestcrown: 0, glacial: 0, aurorastone: 0, driftwood: 0, abyssaltooth: 0, baton: 0, minnow: 0, bass: 0, trout: 0, perch: 0, pike: 0, sunfish: 0, angelfish: 0, mudcat: 0, snapper: 0, gar: 0, glowfin: 0, stareel: 0, goldkoi: 0, boot: 0, stew: 0, luckylure: 0, ochre: 0, thunderfeather: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0, harvestcrown: 0, glacial: 0, aurorastone: 0, driftwood: 0, abyssaltooth: 0, baton: 0, minnow: 0, bass: 0, trout: 0, perch: 0, pike: 0, sunfish: 0, angelfish: 0, mudcat: 0, snapper: 0, gar: 0, glowfin: 0, stareel: 0, goldkoi: 0, boot: 0, stew: 0, luckylure: 0, ochre: 0, thunderfeather: 0, runeshard: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false, rod: false }, fishLog: {}, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1861,7 +1911,7 @@ const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const resources = [], enemies = [], pickups = [], particles = [], floats = [], decor = [], animals = [], ambient = [];
 const SOLID = { tree: 11, rock: 12, crystal: 11, pot: 8, crate: 11, vine: 15, obsidian: 12, tallgrass: 0, pumpkin: 9 };
 const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5, pot: 1, crate: 2, vine: 2, obsidian: 5, tallgrass: 1, pumpkin: 1 };
-const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round'], ['blossom', 'blossom', 'tree_round'], ['kelp'], ['tree_dead'], ['tree_fir', 'tree_pine'], ['tree_orange', 'tree_autumn', 'tree_orange'], ['tree_snow', 'tree_snow', 'tree_fir'], ['tree_swamp', 'tree_swamp', 'tree_round'], ['tree_dead']];
+const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead'], ['palm', 'palm', 'tree_round'], ['blossom', 'blossom', 'tree_round'], ['kelp'], ['tree_dead'], ['tree_fir', 'tree_pine'], ['tree_orange', 'tree_autumn', 'tree_orange'], ['tree_snow', 'tree_snow', 'tree_fir'], ['tree_swamp', 'tree_swamp', 'tree_round'], ['tree_dead'], ['tree_pine', 'tree_fir', 'tree_round']];
 function addRes(type, tx, ty) {
   const r = { type, x: tx * T + 16 + (rng() - 0.5) * 10, y: ty * T + 20 + (rng() - 0.5) * 6, hp: RES_HP[type], max: RES_HP[type], alive: true, respawn: 0, shake: 0, seed: rng() };
   if (type === 'tree') { const k = TREE_KINDS[region[ty * W + tx]] || TREE_KINDS[4]; r.key = k[Math.floor(r.seed * k.length)]; }
@@ -2000,10 +2050,16 @@ for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
   const r = rng();
   if (r < 0.05) addRes('tree', x, y); else if (r < 0.1) { addRes('rock', x, y); resources[resources.length - 1].ochre = true; } else if (r < 0.15) decor.push({ prop: 'cactus', x: x * T + 16, y: y * T + 22, solid: 9, v: Math.floor(r * 300) % 3 }); else if (r < 0.16) addRes('herb', x, y);
 }
+for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
+  const x = MOOR_D.x0 + lx, t = tiles[y * W + x];
+  if (t !== LAND || nearMoorSite(x, y, 5) || !isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1))) continue;
+  const r = rng();
+  if (r < 0.08) addRes('tree', x, y); else if (r < 0.1) addRes('rock', x, y); else if (r < 0.12) addRes('herb', x, y); else if (r < 0.135) decor.push({ sheep: true, x: x * T + 16, y: y * T + 20, solid: 9, f: r < 0.128 ? 1 : -1 }); else if (r < 0.145) decor.push({ menhirprop: true, x: x * T + 16, y: y * T + 22, solid: 10 });
+}
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
-    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 15 ? VALE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 16 ? REEF_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 17 ? COG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 18 ? STAR_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 19 ? HARV_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 20 ? GLAC_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 21 ? MANG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 22 ? CANY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 20 && nearGlacSite(x, y, 7)) && !(rg === 21 && nearMangSite(x, y, 7)) && !(rg === 22 && nearCanySite(x, y, 7)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
+    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 14 ? JUNGLE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 15 ? VALE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 16 ? REEF_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 17 ? COG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 18 ? STAR_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 19 ? HARV_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 20 ? GLAC_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 21 ? MANG_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 23 ? MOOR_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 22 ? CANY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !(rg === 14 && nearJungleSite(x, y, 8)) && !(rg === 15 && nearValeSite(x, y, 8)) && !(rg === 16 && nearReefSite(x, y, 8)) && !(rg === 17 && nearCogSite(x, y, 7)) && !(rg === 18 && nearStarSite(x, y, 7)) && !(rg === 19 && nearHarvSite(x, y, 7)) && !(rg === 20 && nearGlacSite(x, y, 7)) && !(rg === 21 && nearMangSite(x, y, 7)) && !(rg === 22 && nearCanySite(x, y, 7)) && !(rg === 23 && nearMoorSite(x, y, 7)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
   }
   return [cx * T + 300, cy * T];
 }
@@ -2085,6 +2141,10 @@ const ENEMY = {
   coyote:  { name: 'Coyote', proc: 'coyote', ai: 'coyote', hp: 3, sp: 125, dmg: 1, aggro: 260, drops: [['ochre', 1], ['gold', 2]], col: '#c8986a' },
   dustdevil: { name: 'Dust Devil', proc: 'dustdevil', ai: 'dustdevil', hp: 3, sp: 45, dmg: 1, aggro: 240, drops: [['ochre', 1]], col: '#d8a868' },
   cactoid: { name: 'Cactoid', proc: 'cactoid', ai: 'cactoid', hp: 5, sp: 25, dmg: 1, aggro: 230, drops: [['ochre', 2], ['herb', 1]], col: '#4a8a3a', heavy: true },
+  ram:     { name: 'Highland Ram', proc: 'ram', ai: 'ram', hp: 4, sp: 55, dmg: 2, aggro: 240, drops: [['runeshard', 1], ['gold', 3]], col: '#e8e2d0', heavy: true },
+  pixie:   { name: 'Pixie', proc: 'pixie', ai: 'pixie', hp: 2, sp: 140, dmg: 1, aggro: 240, drops: [['runeshard', 1]], col: '#f2a8ff', flyer: true },
+  menhir:  { name: 'Menhir', proc: 'menhir', ai: 'menhir', hp: 6, sp: 0, dmg: 2, aggro: 200, drops: [['runeshard', 2], ['stone', 2]], col: '#8a8a80', rooted: true },
+  redcap:  { name: 'Redcap', proc: 'redcap', ai: 'redcap', hp: 3, sp: 0, dmg: 1, aggro: 230, drops: [['runeshard', 1], ['gold', 2]], col: '#c8302a' },
   icemage: { name: 'Ice Mage', sprite: 'mage_ice', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 2], ['gold', 3]], col: '#9fe8ff' },
   mage:    { name: 'Cultist', sprite: 'mage', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 1], ['gold', 3]], col: '#e08a3c' },
 };
@@ -2106,7 +2166,8 @@ for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['bandit', 4, 2], [
   ['stalker', 19, 4], ['jack', 19, 4], ['cornwraith', 19, 3], ['stalker', 3, 1],
   ['yeti', 20, 3], ['penguin', 20, 5], ['frostbat', 20, 4], ['snowball', 20, 4], ['penguin', 6, 3], ['yeti', 6, 1],
   ['mudskipper', 21, 5], ['heron', 21, 4], ['clam', 21, 4], ['heron', 3, 1], ['mudskipper', 9, 2],
-  ['rattlesnake', 22, 5], ['dustdevil', 22, 3], ['cactoid', 22, 4], ['cactoid', 8, 2], ['rattlesnake', 8, 2]])
+  ['rattlesnake', 22, 5], ['dustdevil', 22, 3], ['cactoid', 22, 4], ['cactoid', 8, 2], ['rattlesnake', 8, 2],
+  ['ram', 23, 4], ['pixie', 23, 4], ['menhir', 23, 4], ['redcap', 23, 4], ['ram', 3, 2], ['pixie', 15, 2]])
   for (let i = 0; i < n; i++) addEnemy(kind, rg);
 { let n = 0; for (let i = 0; i < 5000 && n < 6; i++) { const x = REEF_D.x0 + 3 + Math.floor(hash(i, 77) * (DW - 6)), y = 14 + Math.floor(hash(77, i) * 27); if (tiles[y * W + x] === LAND && tiles[(y - 1) * W + x] === DEEP && !nearReefSite(x, y, 6)) { enemies.push(makeEnemy('eel', x * T + 16, y * T + 16)); n++; } } }
 for (const rg of [22, 22, 8]) { const [x, y] = randomTileIn(rg, 9); for (let i = 0; i < 3; i++) enemies.push(makeEnemy('coyote', x + (i - 1) * 24, y + (i % 2) * 14)); }
@@ -2413,6 +2474,7 @@ const NPCS = [
   { id: 'zahir', name: 'Zahir', x: SUN_D.mirra.x - 70, y: SUN_D.mirra.y + 36, sheet: 'zahir_idle', walk: 'zahir_walk', verb: 'Trade with', path: [[SUN_D.mirra.x - 70, SUN_D.mirra.y + 36], [SUN_D.mirra.x - 110, SUN_D.mirra.y + 40]] },
   { id: 'amara', name: 'Amara', x: SUN_D.mirra.x + 80, y: SUN_D.mirra.y + 40, sheet: 'amara_idle', walk: 'amara_walk', verb: 'Talk to', path: [[SUN_D.mirra.x + 80, SUN_D.mirra.y + 40], [SUN_D.mirra.x + 120, SUN_D.mirra.y + 50]] },
   { id: 'rosa', name: 'Captain Rosa', x: SUN_D.cove.x - 40, y: SUN_D.cove.y - 10, sheet: 'rosa_idle', walk: 'rosa_walk', verb: 'Talk to', path: [[SUN_D.cove.x - 40, SUN_D.cove.y - 10], [SUN_D.cove.x + 10, SUN_D.cove.y + 20]] },
+  { id: 'moira', name: 'Shepherd Moira', x: MOOR_D.camp.x + 70, y: MOOR_D.camp.y + 50, sheet: 'moira_idle', walk: 'moira_walk', verb: 'Talk to', path: [[MOOR_D.camp.x + 70, MOOR_D.camp.y + 50], [MOOR_D.camp.x + 100, MOOR_D.camp.y + 70]] },
   { id: 'kit', name: 'Ranger Kit', x: CANY_D.camp.x + 70, y: CANY_D.camp.y + 50, sheet: 'kit_idle', walk: 'kit_walk', verb: 'Talk to', path: [[CANY_D.camp.x + 70, CANY_D.camp.y + 50], [CANY_D.camp.x + 100, CANY_D.camp.y + 70]] },
   { id: 'odo', name: 'Fisher Odo', x: MANG_D.camp.x + 80, y: MANG_D.camp.y + 50, sheet: 'odo_idle', walk: 'odo_walk', verb: 'Talk to', path: [[MANG_D.camp.x + 80, MANG_D.camp.y + 50], [MANG_D.camp.x + 110, MANG_D.camp.y + 70]] },
   { id: 'sena', name: 'Iceguide Sena', x: GLAC_D.camp.x + 70, y: GLAC_D.camp.y + 40, sheet: 'sena_idle', walk: 'sena_walk', verb: 'Talk to', path: [[GLAC_D.camp.x + 70, GLAC_D.camp.y + 40], [GLAC_D.camp.x + 100, GLAC_D.camp.y + 60]] },
@@ -2649,6 +2711,18 @@ addSign('Carnival poster', 'Come one, come all! The Carnival of Masks! See the T
   for (const [ox, oy] of [[-140, 60], [150, 70]]) decor.push({ prop: 'cactus', x: CANY_D.camp.x + ox, y: CANY_D.camp.y + oy, solid: 9, v: 1 });
   addSign('Ranger outpost', 'Redrock Ranger Outpost. Rope bridge east: safe. Cracked ledges west and south: they crumble under your feet. Never stop on them!', CANY_D.camp.x - 60, CANY_D.camp.y + 110);
 }
+// the pony cart at Harvest Farm, to Mistmoor Highlands
+{
+  const HX = Math.round(HARV_D.camp.x / T), HY = Math.round(HARV_D.camp.y / T);
+  const PC = findSpot(range(HX - 6, HX - 11), range(HY - 2, HY + 3), 19) || findSpot(range(HX + 6, HX + 11), range(HY - 2, HY + 3), 19) || { x: (HX - 7) * T, y: HY * T + 4 };
+  addFerry('pony_out', 'Pony Cart', PC.x, PC.y + 8); NPCS[NPCS.length - 1].verb = 'Ride';
+  addFerry('pony_home', 'Pony Cart to Harvest Farm', (MOOR_D.x0 + 24) * T, 4 * T + 8); NPCS[NPCS.length - 1].verb = 'Ride';
+  addSign('Cart sign', 'Pony cart to Mistmoor Highlands. Bring a warm coat: the mist never lifts.', PC.x + 30, PC.y - 50);
+  decor.push({ fire: true, x: MOOR_D.camp.x + 10, y: MOOR_D.camp.y + 70, solid: 12 });
+  for (const [ox, oy, f] of [[-120, 30, 1], [-90, 60, -1], [-140, 80, 1], [130, 80, -1]]) decor.push({ sheep: true, x: MOOR_D.camp.x + ox, y: MOOR_D.camp.y + oy, solid: 9, f });
+  for (const [ox, oy, k] of [[120, 10, 'barrel'], [134, 26, 'crate']]) decor.push({ key: k, x: MOOR_D.camp.x + ox, y: MOOR_D.camp.y + oy, s: 2, solid: 10 });
+  addSign('Moira\'s Croft', 'Moira\'s Croft. Push a boulder by walking into it. Fill the pits to reach the islands. A rune stone resets its puzzle if you get stuck.', MOOR_D.camp.x - 60, MOOR_D.camp.y + 110);
+}
 addFerry('ferry_home', 'Boat to Saltmarsh', (SUN_D.x0 + 21) * T + 6, 3 * T + 16);
 addSign('Mirra Oasis', 'Mirra Oasis. Shade, cool water and Zahir\'s bazaar. Corsair\'s Cove lies down the east path, the Sunken Ruins to the southwest.', SUN_D.mirra.x + 40, SUN_D.mirra.y - 20);
 addSign('Corsair\'s Cove', 'Corsair\'s Cove. No questions asked, no gold returned.', SUN_D.cove.x - 90, SUN_D.cove.y - 40);
@@ -2727,6 +2801,9 @@ const ICON_DRAW = {
   sunstone: c => { c.fillStyle = '#b8862a'; diamond(c, 16, 18, 11, 14); c.fillStyle = '#f4b740'; diamond(c, 16, 18, 9, 11); c.fillStyle = '#ffe9a8'; diamond(c, 14, 15, 3, 5); c.strokeStyle = 'rgba(255,214,90,.8)'; c.lineWidth = 2; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; c.beginPath(); c.moveTo(16 + Math.cos(a) * 12, 16 + Math.sin(a) * 12); c.lineTo(16 + Math.cos(a) * 15, 16 + Math.sin(a) * 15); c.stroke(); } },
   idol: c => { c.fillStyle = '#7a5a14'; c.fillRect(9, 6, 14, 22); c.fillStyle = '#f4b740'; c.fillRect(10, 7, 12, 20); c.fillStyle = '#7a5a14'; c.fillRect(12, 11, 3, 3); c.fillRect(17, 11, 3, 3); c.fillRect(13, 18, 6, 2); c.fillStyle = '#ec5257'; c.fillRect(15, 3, 2, 4); c.fillStyle = '#ffe9a8'; c.fillRect(11, 8, 2, 6); },
   obsidian: c => { c.fillStyle = '#16121c'; c.beginPath(); c.moveTo(6, 28); c.lineTo(10, 10); c.lineTo(16, 3); c.lineTo(21, 12); c.lineTo(26, 28); c.closePath(); c.fill(); c.fillStyle = '#4a3a62'; c.beginPath(); c.moveTo(11, 26); c.lineTo(13, 12); c.lineTo(16, 7); c.lineTo(17, 22); c.closePath(); c.fill(); c.fillStyle = '#c8b8ff'; c.fillRect(14, 9, 2, 6); },
+  runeshard: c => { c.fillStyle = 'rgba(159,232,200,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#6a6a64'; c.beginPath(); c.moveTo(10, 28); c.lineTo(8, 10); c.lineTo(16, 4); c.lineTo(24, 10); c.lineTo(22, 28); c.closePath(); c.fill(); c.fillStyle = '#8a8a80'; c.fillRect(10, 10, 3, 16); c.strokeStyle = '#9fe8c8'; c.lineWidth = 2; c.beginPath(); c.moveTo(16, 9); c.lineTo(16, 24); c.moveTo(12, 13); c.lineTo(20, 19); c.moveTo(20, 13); c.lineTo(12, 19); c.stroke(); },
+  bluebell: c => { c.fillStyle = 'rgba(120,140,255,.3)'; circle(c, 16, 16, 13); c.strokeStyle = '#4a7a3a'; c.lineWidth = 2; c.beginPath(); c.moveTo(16, 29); c.quadraticCurveTo(14, 16, 20, 6); c.stroke(); c.fillStyle = '#5a6ae0'; for (const [x, y] of [[20, 9], [12, 14], [20, 18], [12, 22]]) { c.beginPath(); c.moveTo(x - 4, y - 3); c.lineTo(x + 4, y - 3); c.lineTo(x + 3, y + 3); c.lineTo(x - 3, y + 3); c.closePath(); c.fill(); } c.fillStyle = '#c8d0ff'; c.fillRect(19, 7, 2, 2); },
+  cairnbox: c => { c.fillStyle = 'rgba(255,214,90,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#8a8a80'; for (const [x, y, r] of [[16, 24, 9], [16, 15, 7], [16, 8, 5]]) ellipse(c, x, y, r, 4); c.fillStyle = '#ffd65a'; circle(c, 22, 22, 3); circle(c, 10, 23, 2); },
   ochre: c => { c.fillStyle = 'rgba(200,112,58,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#a84a24'; c.beginPath(); c.moveTo(6, 22); c.lineTo(10, 10); c.lineTo(20, 6); c.lineTo(27, 14); c.lineTo(24, 26); c.lineTo(12, 27); c.closePath(); c.fill(); c.fillStyle = '#d8743a'; c.beginPath(); c.moveTo(10, 12); c.lineTo(19, 8); c.lineTo(24, 14); c.lineTo(14, 17); c.closePath(); c.fill(); c.fillStyle = '#f2a868'; c.fillRect(14, 10, 4, 2); },
   eagleplume: c => { c.fillStyle = 'rgba(255,214,90,.35)'; circle(c, 16, 16, 13); c.save(); c.translate(16, 16); c.rotate(0.6); c.fillStyle = '#d8a040'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#f2dca0'; c.beginPath(); c.ellipse(-1, -4, 2, 8, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#6a4a24'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, -12); c.lineTo(0, 13); c.stroke(); c.restore(); },
   driftwood: c => { c.save(); c.translate(16, 17); c.rotate(-0.5); c.fillStyle = '#a89878'; c.beginPath(); c.ellipse(0, 0, 13, 5, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c8b898'; c.fillRect(-11, -3, 20, 2); c.strokeStyle = '#7a6a50'; c.lineWidth = 1; c.beginPath(); c.moveTo(-8, 1); c.lineTo(6, 1); c.moveTo(-4, -1); c.lineTo(9, -1); c.stroke(); c.fillStyle = '#8a7a5a'; c.beginPath(); c.ellipse(12, 0, 2, 4, 0, 0, Math.PI * 2); c.fill(); c.restore(); },
@@ -2788,7 +2865,7 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'glacial', 'driftwood', 'ochre', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone', 'abyssaltooth', 'baton', 'thunderfeather', 'minnow', 'bass', 'trout', 'perch', 'pike', 'sunfish', 'angelfish', 'mudcat', 'snapper', 'gar', 'glowfin', 'stareel', 'goldkoi', 'boot', 'stew', 'luckylure'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'glacial', 'driftwood', 'ochre', 'runeshard', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone', 'abyssaltooth', 'baton', 'thunderfeather', 'minnow', 'bass', 'trout', 'perch', 'pike', 'sunfish', 'angelfish', 'mudcat', 'snapper', 'gar', 'glowfin', 'stareel', 'goldkoi', 'boot', 'stew', 'luckylure'];
 const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone', 'abyssaltooth', 'baton', 'thunderfeather'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
@@ -2910,6 +2987,13 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">Mistmoor Highlands</div>
+      <dl class="controls">
+      <dt>Getting there</dt><dd>Ride the Pony Cart beside Harvest Farm in Harvest Hollow. The cart at Moira's croft brings you back.</dd>
+      <dt>Boulders</dt><dd>Walk into a boulder and keep pushing to shove it one tile. Push it into a pit and it fills the pit, making a path. Islands ringed by pits hide treasure: the east island holds an old cairn's hoard, and the southwest island needs two boulders in the same line. Stuck? Strike the puzzle's rune stone to put every boulder back.</dd>
+      <dt>Creatures</dt><dd>Highland rams paw the ground, then charge in a straight line: dodge so they crash into something and get dizzy. Pixies blink around you and throw hexes that reverse your controls. Menhirs pose as standing stones, then slam the ground: they're only soft while tired. Redcaps hop about and throw their caps like boomerangs.</dd>
+      <dt>Rune shards</dt><dd>Moorland creatures drop rune shards. They craft the Highland Claymore and the warm Tartan Cloak.</dd>
+      <dt>Elsewhere</dt><dd>Wild rams now roam the meadow, and pixies flit through Petalfall Vale.</dd></dl>
       <div class="label">Thunder Mesa</div>
       <dl class="controls">
       <dt>Getting in</dt><dd>The mine door on the east mesa of Redrock Canyon, across the rope bridge.</dd>
@@ -3355,6 +3439,8 @@ function onAction() {
   if (ls) { face({ x: ls.x, y: ls.y }); doAct('sword', hitEnemies); return true; }
   const py = AB && AB.type === 'weaver' && AB.state !== 'dazed' && AB.pylons && AB.pylons.find(q => q.hp > 0 && Math.hypot(q.x - P.x, q.y - P.y) < 70);
   if (py) { face({ x: py.x, y: py.y }); doAct('sword', hitEnemies); return true; }
+  const rn = dungeonAt(P.x) === MOOR_D && MOOR.puzzles.find(q => Math.hypot(q.rune.x - P.x, q.rune.y - P.y) < 50);
+  if (rn) { face({ x: rn.rune.x, y: rn.rune.y }); doAct('sword', hitEnemies); return true; }
   const tm = AB && AB.type === 'thunderbird' && AB.active && AB.state !== 'dazed' && birdTotems(AB).find(q => Math.hypot(q.x - P.x, q.y - P.y) < 56);
   if (tm) { face({ x: tm.x, y: tm.y }); doAct('sword', hitEnemies); return true; }
   const tg = dungeonAt(P.x) === CARN_D && CARN.toggles.find(g => Math.hypot(g.x - P.x, g.y - P.y) < 50);
@@ -3393,6 +3479,9 @@ function interact(n) {
   }
   if (n.sign) { say(n.name, [n.text]); return; }
   if (n.id === 'ysolde') { shopName = 'Ysolde\'s Trading Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
+  if (n.boat && n.id === 'pony_out') { const first = !S.found.moor; S.found.moor = true; travel(MOOR_D.start.x, MOOR_D.start.y, 0, 1, 'Mistmoor Highlands'); if (first) setTimeout(() => toast('Mist rolls over the heather. Moira\'s croft is just south of the cart.', 4500), 1200); spawnCairn(); return; }
+  if (n.boat && n.id === 'pony_home') { const Pc = NPCS.find(m => m.id === 'pony_out'); travel(Pc.x, Pc.y + 50, 0, 1, 'Harvest Hollow'); return; }
+  if (n.id === 'moira') { shopName = 'Moira\'s Wool & Wares'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
   if (n.boat && n.id === 'coach_out') { const first = !S.found.canyon; S.found.canyon = true; P.safe = null; travel(CANY_D.start.x, CANY_D.start.y, 0, 1, 'Redrock Canyon'); if (first) setTimeout(() => toast('Red cliffs and deep chasms. The ranger outpost is just south of the coach.', 4500), 1200); return; }
   if (n.boat && n.id === 'coach_home') { const Cc = NPCS.find(m => m.id === 'coach_out'); travel(Cc.x, Cc.y + 50, 0, 1, 'The Sunward Isles'); return; }
   if (n.id === 'kit') { shopName = 'Kit\'s Outpost Store'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
@@ -3489,6 +3578,8 @@ function damageEnemy(e, dmg, kx, ky) {
   if (e.kind === 'tanuki' && e.mode === 'disguise') { e.mode = 'chase'; e.cd = 0.6; burst(e.x, e.y - 14, '#e6e2d6', 16); floatText(e.x, e.y - 60, 'It\'s a tanuki!', '#ffe08a'); }
   if (gearW().chain && !chainLock && rng() < 0.5) { const o = enemies.filter(q => q !== e && q.alive && Math.hypot(q.x - e.x, q.y - e.y) < 100).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0]; if (o) { chainLock = true; for (let i = 0; i < 6; i++) particles.push({ x: e.x + (o.x - e.x) * i / 6, y: e.y - 14 + (o.y - e.y) * i / 6, vx: 0, vy: 0, life: 0.25, color: '#fff6a8', size: 3 }); damageEnemy(o, 1, 0, 0); chainLock = false; } }
   if (gearW().bloom && rng() < 0.15 && S.hp > 0 && S.hp < maxHp()) { S.hp++; updateHUD(); floatText(P.x, P.y - 60, '+♥', '#f2a0c8'); }
+  if (e.kind === 'menhir' && e.state !== 'tired') { if (e.state === 'dormant') { e.state = 'rise'; e.st = 0.5; } floatText(e.x, e.y - 50, 'Solid stone! Wait until it tires.', '#c8d0c0'); SFX.play('mine'); return false; }
+  if (e.kind === 'ram' && e.state === 'stunned') dmg *= 2;
   if (e.kind === 'cactoid' && !(e.nb > time)) { e.nb = time + 0.6; needleBurst(e); }
   if (e.kind === 'clam' && !e.open) { floatText(e.x, e.y - 30, 'Clink! Wait for it to open', '#c8d8e0'); SFX.play('mine'); return false; }
   if (e.kind === 'snowball') { e.sz = Math.max(0.6, (e.sz || 0.6) - 0.35); burst(e.x, e.y - 10, '#ffffff', 10); }
@@ -3536,7 +3627,7 @@ function hitEnemies(a) {
   }
   const AB = activeBoss();
   if (AB && AB.decoys) for (const dc of AB.decoys) if (!dc.popped && Math.hypot(dc.x - hx, dc.y - 26 - AB.z - hy) < rad + 26) { dc.popped = true; burst(dc.x, dc.y - 40, '#dff6ff', 16); floatText(dc.x, dc.y - 80, 'Just a reflection!', '#c8e8ff'); SFX.play('mine'); hit = true; }
-  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitGong(AB || {}, hx, hy, rad); hitClockGears(AB || {}, hx, hy, rad); hitLionStars(AB || {}, hx, hy, rad); hitPylons(AB || {}, hx, hy, rad); if (returnBombs(hx, hy, rad)) hit = true; if (hitSmudge(AB || {}, hx, hy, rad)) hit = true; if (hitToggles(hx, hy, rad)) hit = true; if (hitTotems(AB || {}, hx, hy, rad)) hit = true; hitLanterns(hx, hy, rad);
+  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitGong(AB || {}, hx, hy, rad); hitClockGears(AB || {}, hx, hy, rad); hitLionStars(AB || {}, hx, hy, rad); hitPylons(AB || {}, hx, hy, rad); if (returnBombs(hx, hy, rad)) hit = true; if (hitSmudge(AB || {}, hx, hy, rad)) hit = true; if (hitToggles(hx, hy, rad)) hit = true; if (hitTotems(AB || {}, hx, hy, rad)) hit = true; if (hitRunes(hx, hy, rad)) hit = true; hitLanterns(hx, hy, rad);
   for (const e of enemies) if (e.alive && e.decoys && e.decoys.length) for (let i = e.decoys.length - 1; i >= 0; i--) { const q = e.decoys[i]; if (Math.hypot(q.x - hx, q.y - 10 - hy) < rad + 6) { e.decoys.splice(i, 1); burst(q.x, q.y - 16, '#ffb347', 12); floatText(q.x, q.y - 40, 'Just an illusion!', '#ffd6a0'); hit = true; } }
   if (AB && AB.type === 'jesters' && hitTwins(AB, hx, hy, rad, dmg)) hit = true;
   if (AB && AB.type === 'hydra' && hitHydra(AB, hx, hy, rad, dmg)) hit = true;
@@ -3727,7 +3818,7 @@ function update(dt) {
   P.inv = Math.max(0, P.inv - dt); P.slow = Math.max(0, (P.slow || 0) - dt); P.hex = Math.max(0, (P.hex || 0) - dt);
   if (!P.dash && dungeonAt(P.x) === TOMB_D) for (const tr of TRAPS) if (trapState(tr) === 2 && P.x > tr.x + 2 && P.x < tr.x + 30 && P.y > tr.y + 4 && P.y < tr.y + 34) { damagePlayer(1, { x: tr.x + 16, y: tr.y + 40 }); break; }
   if (gearA().regen && S.hp > 0 && S.hp < maxHp()) { P.regenT = (P.regenT || 0) + dt; if (P.regenT > 8) { P.regenT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#7fe0f0'); } }
-  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - VALE_D.camp.x - 10, P.y - VALE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - REEF_D.camp.x, P.y - REEF_D.camp.y - 30) < 3 * T || Math.hypot(P.x - COG_D.camp.x, P.y - COG_D.camp.y - 30) < 3 * T || Math.hypot(P.x - STAR_D.camp.x - 10, P.y - STAR_D.camp.y - 60) < 3 * T || Math.hypot(P.x - HARV_D.camp.x - 10, P.y - HARV_D.camp.y - 60) < 3 * T || Math.hypot(P.x - GLAC_D.camp.x - 10, P.y - GLAC_D.camp.y - 70) < 3 * T || Math.hypot(P.x - MANG_D.camp.x - 10, P.y - MANG_D.camp.y - 70) < 3 * T || Math.hypot(P.x - CANY_D.camp.x - 10, P.y - CANY_D.camp.y - 70) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
+  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - JUNGLE_D.camp.x - 10, P.y - JUNGLE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - VALE_D.camp.x - 10, P.y - VALE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - REEF_D.camp.x, P.y - REEF_D.camp.y - 30) < 3 * T || Math.hypot(P.x - COG_D.camp.x, P.y - COG_D.camp.y - 30) < 3 * T || Math.hypot(P.x - STAR_D.camp.x - 10, P.y - STAR_D.camp.y - 60) < 3 * T || Math.hypot(P.x - HARV_D.camp.x - 10, P.y - HARV_D.camp.y - 60) < 3 * T || Math.hypot(P.x - GLAC_D.camp.x - 10, P.y - GLAC_D.camp.y - 70) < 3 * T || Math.hypot(P.x - MANG_D.camp.x - 10, P.y - MANG_D.camp.y - 70) < 3 * T || Math.hypot(P.x - CANY_D.camp.x - 10, P.y - CANY_D.camp.y - 70) < 3 * T || Math.hypot(P.x - MOOR_D.camp.x - 10, P.y - MOOR_D.camp.y - 70) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
   if (S.bridge && !edgeToast && P.y > (H - 6) * T && !inDungeon(P.x)) { edgeToast = true; toast('The mainland lies at the end of the bridge. Keep walking south.', 3500); }
   for (const r of resources) {
     r.shake = Math.max(0, r.shake - dt);
@@ -3738,7 +3829,7 @@ function update(dt) {
   for (const e of enemies) updateEnemy(e, dt, fainted);
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].remove) enemies.splice(i, 1);
   updateProjectiles(dt, fainted);
-  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); updateAir(dt, fainted); updateTelepads(fainted); updateMeteors(dt); updateBouncers(dt, fainted); updateTide(dt, fainted); updateToggles(dt); updateFishing(dt); updateCrumble(dt, fainted); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D || dungeonAt(P.x) === TOWER_D) updateJets(dt);
+  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); updateAir(dt, fainted); updateTelepads(fainted); updateMeteors(dt); updateBouncers(dt, fainted); updateTide(dt, fainted); updateToggles(dt); updateFishing(dt); updateCrumble(dt, fainted); updateBoulders(dt, fainted); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D || dungeonAt(P.x) === TOWER_D) updateJets(dt);
   updateBosses(dt, fainted);
   updateWorldLinks(dt);
   for (let i = pickups.length - 1; i >= 0; i--) {
@@ -3750,6 +3841,8 @@ function update(dt) {
       pickups.splice(i, 1);
       if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
       else if (p.item === 'idol') { S.found.idol = true; banner('Found the golden idol!', '#ffe08a'); SFX.play('lucky'); questTick(); }
+      else if (p.item === 'bluebell') { S.found.bluebell = true; banner('Found the fairy bluebell!', '#c8d0ff'); SFX.play('lucky'); questTick(); }
+      else if (p.item === 'cairnbox') { S.found.cairn = true; banner('You found the old cairn\'s hoard!', '#ffe08a'); SFX.play('lucky'); drop(P.x, P.y - 20, 'gold', 15, 4); drop(P.x, P.y - 20, 'crystal', 3); drop(P.x, P.y - 20, 'runeshard', 3); }
       else if (p.item === 'eagleplume') { S.found.eagleplume = true; banner('Found the eagle plume!', '#ffd65a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'moonshell') { S.found.moonshell = true; banner('Found the moon shell!', '#e8e0f8'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'snowlily') { S.found.snowlily = true; banner('Found the snow lily!', '#bfe8ff'); SFX.play('lucky'); questTick(); }
@@ -8829,7 +8922,7 @@ function updateCanyFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
     if (chase && d > 60) moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); else if (!chase) wander(D.sp);
     touch(D.dmg); return true;
   }
-  return false;
+  return updateMoorFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander);
 }
 Object.assign(PROC_DRAW, {
   rattlesnake(c, e, k) {
@@ -8998,6 +9091,178 @@ function drawThunderGate(c) {
   c.fillStyle = '#ffd65a'; c.beginPath(); c.moveTo(x + 2, y - 70); c.lineTo(x - 6, y - 58); c.lineTo(x, y - 58); c.lineTo(x - 4, y - 50); c.lineTo(x + 6, y - 62); c.lineTo(x, y - 62); c.closePath(); c.fill();
   c.strokeStyle = '#6a4424'; c.lineWidth = 2; c.beginPath(); c.moveTo(x + 40, y); c.lineTo(x + 40, y - 30); c.stroke(); c.fillStyle = '#c8a870'; c.fillRect(x + 30, y - 40, 22, 12); c.fillStyle = '#5a3a1a'; c.font = '700 7px sans-serif'; c.textAlign = 'center'; c.fillText('KEEP OUT', x + 41, y - 32);
 }
+// ---------- pushable boulders ----------
+let pushHint = false;
+function inputDir() {
+  const mx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0) + joy.dx, my = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0) + joy.dy;
+  if (Math.hypot(mx, my) < 0.3) return null;
+  return Math.abs(mx) >= Math.abs(my) ? [Math.sign(mx), 0] : [0, Math.sign(my)];
+}
+function pushBoulder(bx, by, sx, sy) {
+  const nx = bx + sx, ny = by + sy, kb = by * W + bx, kn = ny * W + nx, t2 = tiles[kn];
+  if (dungeonAt(nx * T + 16) !== MOOR_D) return false;
+  if (t2 === HOLE) { tiles[kb] = MOOR.under.get(kb) || LAND; MOOR.under.delete(kb); tiles[kn] = FILLED; impact(4); SFX.play('slam'); burst(nx * T + 16, ny * T + 16, '#8a8a7a', 16); floatText(nx * T + 16, ny * T - 10, 'Filled!', '#ffe08a'); }
+  else if (t2 === LAND || t2 === PATH || t2 === FILLED) { tiles[kb] = MOOR.under.get(kb) || LAND; MOOR.under.delete(kb); MOOR.under.set(kn, t2); tiles[kn] = BOULDER; SFX.play('crumble'); burst(bx * T + 16, by * T + 26, '#a89a7a', 8); }
+  else { SFX.play('mine'); return false; }
+  redrawArea(Math.min(bx, nx), Math.min(by, ny), Math.max(bx, nx), Math.max(by, ny));
+  return true;
+}
+function updateBoulders(dt, fainted) {
+  if (fainted || P.ride || P.fish || dungeonAt(P.x) !== MOOR_D) { MOOR.pushT = 0; return; }
+  const dir = inputDir(); if (!dir) { MOOR.pushT = 0; return; }
+  const tx = Math.floor(P.x / T), ty = Math.floor(P.y / T), bx = tx + dir[0], by = ty + dir[1];
+  const edge = dir[0] ? Math.abs(P.x - (tx + 0.5 + dir[0] * 0.5) * T) : Math.abs(P.y - (ty + 0.5 + dir[1] * 0.5) * T);
+  if (tileAt(bx, by) !== BOULDER || edge > 18) { MOOR.pushT = 0; return; }
+  MOOR.pushT += dt;
+  if (Math.random() < dt * 10) particles.push({ x: P.x + dir[0] * 10, y: P.y, vx: -dir[0] * 20, vy: -20, life: 0.3, color: '#c8b898', size: 2 });
+  if (MOOR.pushT >= 0.3) { MOOR.pushT = 0; if (pushBoulder(bx, by, dir[0], dir[1]) && !pushHint) { pushHint = true; toast('Heave! Push boulders into the pits to fill them. Stuck? Strike the rune stone to reset the puzzle.', 4500); } }
+}
+function hitRunes(hx, hy, rad) {
+  if (dungeonAt(P.x) !== MOOR_D) return false;
+  for (const q of MOOR.puzzles) {
+    if (Math.hypot(q.rune.x - hx, q.rune.y - 20 - hy) > rad + 12) continue;
+    let i = 0; for (let y = q.y0; y <= q.y1; y++) for (let x = q.x0; x <= q.x1; x++) { tiles[y * W + x] = q.snap[i++]; MOOR.under.delete(y * W + x); }
+    redrawArea(q.x0, q.y0, q.x1, q.y1);
+    if (!isLand(tileAt(Math.floor(P.x / T), Math.floor(P.y / T)))) { P.x = q.rune.x + 30; P.y = q.rune.y; }
+    SFX.play('special'); burst(q.rune.x, q.rune.y - 30, '#9fe8c8', 18); floatText(q.rune.x, q.rune.y - 60, 'The stones return!', '#9fe8c8');
+    return true;
+  }
+  return false;
+}
+function drawRunes(c) {
+  for (const q of MOOR.puzzles) {
+    const r = q.rune; shadow(c, r.x, r.y + 2, 12, 4);
+    c.fillStyle = '#6a6a64'; c.beginPath(); c.moveTo(r.x - 10, r.y); c.lineTo(r.x - 8, r.y - 36); c.quadraticCurveTo(r.x, r.y - 44, r.x + 8, r.y - 36); c.lineTo(r.x + 10, r.y); c.closePath(); c.fill();
+    c.fillStyle = '#8a8a80'; c.fillRect(r.x - 7, r.y - 34, 4, 30);
+    c.strokeStyle = `rgba(159,232,200,${0.6 + Math.sin(time * 3) * 0.3})`; c.lineWidth = 2; c.beginPath(); c.moveTo(r.x, r.y - 32); c.lineTo(r.x, r.y - 10); c.moveTo(r.x - 4, r.y - 26); c.lineTo(r.x + 4, r.y - 20); c.moveTo(r.x + 4, r.y - 26); c.lineTo(r.x - 4, r.y - 20); c.stroke();
+  }
+}
+function drawMoorTile(c, x, y, px, py, t) {
+  const h = hash(x, y);
+  if (t === DEEP) {
+    spr(c, edgeKey('w_', (xx, yy) => isLand(tileAt(xx, yy)) || [BOULDER, HOLE].includes(tileAt(xx, yy)), x, y), px, py);
+    c.fillStyle = 'rgba(30,50,70,.5)'; c.fillRect(px, py, T, T);
+    return;
+  }
+  spr(c, h < 0.35 ? 'grass1' : 'grass0', px, py);
+  if (t === PATH) { spr(c, edgeKey('p_', notPath, x, y), px, py); c.fillStyle = 'rgba(90,70,50,.2)'; c.fillRect(px, py, T, T); return; }
+  c.fillStyle = 'rgba(90,100,80,.32)'; c.fillRect(px, py, T, T);
+  if (t === LAND && h > 0.6) { c.fillStyle = h > 0.85 ? '#a878b8' : '#8a6aa0'; for (let i = 0; i < 3; i++) c.fillRect(px + ((h * 50 + i * 9) % 26) + 2, py + 6 + i * 8, 3, 3); }
+  if (t === HOLE || t === FILLED) {
+    const pit = (xx, yy) => [HOLE, FILLED].includes(tileAt(xx, yy)); c.fillStyle = '#12100e'; c.fillRect(px, py, T, T); c.fillStyle = '#4a6a34';
+    if (!pit(x, y - 1)) { c.fillRect(px, py, T, 3); c.fillStyle = 'rgba(80,60,40,.7)'; c.fillRect(px, py + 3, T, 6); c.fillStyle = '#4a6a34'; } if (!pit(x, y + 1)) c.fillRect(px, py + T - 3, T, 3); if (!pit(x - 1, y)) c.fillRect(px, py, 3, T); if (!pit(x + 1, y)) c.fillRect(px + T - 3, py, 3, T);
+    if (t === FILLED) { c.fillStyle = '#7a7a70'; ellipse(c, px + 16, py + 17, 12, 11); c.fillStyle = '#9a9a90'; ellipse(c, px + 13, py + 13, 7, 5); c.fillStyle = '#5a7a3a'; c.fillRect(px + 18, py + 9, 5, 3); }
+    return;
+  }
+  if (t === BOULDER) {
+    c.fillStyle = 'rgba(0,0,0,.25)'; ellipse(c, px + 16, py + 27, 14, 5);
+    c.fillStyle = '#6a6a64'; ellipse(c, px + 16, py + 16, 14, 13); c.fillStyle = '#8a8a80'; ellipse(c, px + 12, py + 11, 8, 6);
+    c.fillStyle = '#5a7a3a'; c.beginPath(); c.ellipse(px + 20, py + 6, 6, 3, 0.3, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(40,40,36,.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 8, py + 20); c.lineTo(px + 14, py + 24); c.stroke();
+  }
+}
+function drawMoorMist(c) {
+  c.save(); for (let i = 0; i < 5; i++) { const y = cvs.height * (0.15 + i * 0.18) + Math.sin(time * 0.25 + i) * 24, x = ((time * (10 + i * 4) + i * 260) % (cvs.width + 600)) - 300; const g = c.createRadialGradient(x, y, 10, x, y, 280); g.addColorStop(0, 'rgba(235,240,245,.16)'); g.addColorStop(1, 'rgba(235,240,245,0)'); c.fillStyle = g; c.fillRect(x - 280, y - 280, 560, 560); } c.restore();
+  c.fillStyle = 'rgba(200,210,220,.08)'; c.fillRect(0, 0, cvs.width, cvs.height);
+}
+function drawSheep(c, o) {
+  const bob = Math.sin(time * 2 + o.x) * 1, f = o.f || 1;
+  shadow(c, o.x, o.y + 2, 12, 4);
+  c.fillStyle = '#3a3a3a'; c.fillRect(o.x - 7, o.y - 6, 3, 7); c.fillRect(o.x + 4, o.y - 6, 3, 7);
+  c.fillStyle = '#f2f0e8'; for (const [ox, oy] of [[-6, -12], [0, -14], [6, -12], [-3, -9], [3, -9]]) circle(c, o.x + ox, o.y + oy + bob, 6);
+  c.fillStyle = '#2a2a2a'; ellipse(c, o.x + f * 11, o.y - 14 + bob, 4, 5); c.fillStyle = '#ffffff'; c.fillRect(o.x + f * 12, o.y - 15 + bob, 1, 1);
+}
+function drawPonyCart(c, x, y) {
+  shadow(c, x, y + 4, 40, 7);
+  c.fillStyle = '#6a4424'; c.fillRect(x - 28, y - 20, 40, 14); c.fillStyle = '#8a5a32'; c.fillRect(x - 28, y - 20, 40, 3);
+  c.fillStyle = '#c8b088'; c.fillRect(x - 24, y - 28, 14, 8); c.fillStyle = '#a89068'; c.fillRect(x - 8, y - 26, 12, 6);
+  c.fillStyle = '#3a2414'; circle(c, x - 12, y - 4, 8); c.fillStyle = '#8a5a32'; circle(c, x - 12, y - 4, 3);
+  c.strokeStyle = '#3a2414'; c.lineWidth = 2; c.beginPath(); c.moveTo(x + 12, y - 12); c.lineTo(x + 26, y - 14); c.stroke();
+  const hx = x + 36, bob = Math.sin(time * 3) * 1;
+  c.fillStyle = '#c8a070'; ellipse(c, hx, y - 16 + bob, 11, 7); c.fillRect(hx - 8, y - 12, 3, 12); c.fillRect(hx + 6, y - 12, 3, 12);
+  c.beginPath(); c.moveTo(hx + 6, y - 20 + bob); c.lineTo(hx + 12, y - 30 + bob); c.lineTo(hx + 18, y - 26 + bob); c.lineTo(hx + 12, y - 16 + bob); c.closePath(); c.fill();
+  c.fillStyle = '#f2ecd8'; c.fillRect(hx + 7, y - 30 + bob, 4, 8); c.fillStyle = '#1a1210'; c.fillRect(hx + 13, y - 27 + bob, 2, 2);
+}
+// ---------- Moorland creatures: rams, pixies, menhirs, redcaps ----------
+function updateMoorFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
+  const ai = AI(e.kind);
+  if (ai === 'ram') {
+    if (e.state === 'paw') { e.st -= dt; if (Math.random() < dt * 12) particles.push({ x: e.x, y: e.y, vx: (rng() - 0.5) * 40, vy: -20, life: 0.3, color: '#a89a7a', size: 3 }); if (e.st <= 0) { e.state = 'charge'; e.st = 1.4; SFX.play('dash'); } return true; }
+    if (e.state === 'charge') { e.st -= dt; const ox = e.x, oy = e.y; moveEnemy(e, e.lx * 300 * dt, e.ly * 300 * dt); if (!fainted && d < 26 && P.inv <= 0) { damagePlayer(D.dmg, e); P.kx = e.lx * 300; P.ky = e.ly * 300; } if (Math.hypot(e.x - ox, e.y - oy) < 0.5 && e.st < 1.35) { e.state = 'stunned'; e.st = 2.2; impact(3); SFX.play('slam'); floatText(e.x, e.y - 40, 'Thunk!', '#ffe08a'); } else if (e.st <= 0) { e.state = 'move'; e.cd = 1.5; } return true; }
+    if (e.state === 'stunned') { e.st -= dt; if (e.st <= 0) { e.state = 'move'; e.cd = 1.2; } return true; }
+    if (chase && e.cd <= 0 && d < 230 && (Math.abs(dx) < 20 || Math.abs(dy) < 20)) { e.state = 'paw'; e.st = 0.6; if (Math.abs(dx) < 20) { e.lx = 0; e.ly = Math.sign(dy); } else { e.lx = Math.sign(dx); e.ly = 0; } return true; }
+    if (chase) { const ax = Math.abs(dx) < Math.abs(dy) ? dx : 0, ay = ax ? 0 : dy, l = Math.hypot(ax, ay) || 1; moveEnemy(e, ax / l * D.sp * dt, ay / l * D.sp * dt); } else wander(D.sp);
+    touch(1); return true;
+  }
+  if (ai === 'pixie') {
+    if (chase) {
+      const a = e.anim * 3 + e.hx, tx = P.x + Math.cos(a) * 90, ty = P.y - 30 + Math.sin(a * 1.4) * 50, ex = tx - e.x, ey = ty - e.y, el = Math.hypot(ex, ey) || 1;
+      moveEnemy(e, ex / el * Math.min(el, D.sp * dt), ey / el * Math.min(el, D.sp * dt));
+      if (e.cd <= 0) { burst(e.x, e.y - 30, '#f2a8ff', 10); const a2 = rng() * Math.PI * 2; e.x = P.x + Math.cos(a2) * 110; e.y = P.y + Math.sin(a2) * 80; burst(e.x, e.y - 30, '#f2a8ff', 10); const ang = Math.atan2(P.y - 14 - (e.y - 30), P.x - e.x); projectiles.push({ kind: 'hex', x: e.x, y: e.y - 30, vx: Math.cos(ang) * 150, vy: Math.sin(ang) * 150, t: 0, life: 2 }); SFX.play('wisp'); e.cd = 2.4 + rng(); }
+    } else moveEnemy(e, Math.cos(e.anim * 2) * 40 * dt + (e.hx - e.x) * 0.4 * dt, Math.sin(e.anim * 2.6) * 30 * dt + (e.hy - e.y) * 0.4 * dt);
+    return true;
+  }
+  if (ai === 'menhir') {
+    if (!e.state || e.state === 'move') e.state = 'dormant';
+    if (e.state === 'dormant') { if (chase && d < 90) { e.state = 'rise'; e.st = 0.5; SFX.play('crumble'); } return true; }
+    if (e.state === 'rise') { e.st -= dt; if (e.st <= 0) { e.state = 'slamwind'; e.st = 0.7; } return true; }
+    if (e.state === 'slamwind') { e.st -= dt; if (e.st <= 0) { impact(5); SFX.play('slam'); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; particles.push({ x: e.x + Math.cos(a) * 20, y: e.y + Math.sin(a) * 12, vx: Math.cos(a) * 150, vy: Math.sin(a) * 90 - 20, life: 0.45, color: '#8a8a80', size: 4 }); } if (!fainted && d < 78) damagePlayer(D.dmg, e); e.state = 'tired'; e.st = 1.8; } return true; }
+    if (e.state === 'tired') { e.st -= dt; if (e.st <= 0) { e.state = chase && d < 160 ? 'slamwind' : 'dormant'; e.st = 0.7; } return true; }
+    return true;
+  }
+  if (ai === 'redcap') {
+    if (e.cap) {
+      const c = e.cap;
+      if (c.dead) { e.cap = null; e.cd = 1.5; }
+      else { const tx = c.back ? e.x : c.tx, ty = c.back ? e.y - 20 : c.ty, ex = tx - c.x, ey = ty - c.y, el = Math.hypot(ex, ey) || 1; c.x += ex / el * Math.min(el, 280 * dt); c.y += ey / el * Math.min(el, 280 * dt); c.t = 0; if (!c.back && el < 10) c.back = true; if (c.back && el < 16) { c.dead = true; e.cap = null; e.cd = 1.2 + rng(); } }
+    } else if (chase && d < 220 && e.cd <= 0) { e.cap = { kind: 'cap', x: e.x, y: e.y - 20, vx: 0, vy: 0, t: 0, life: 6, tx: P.x, ty: P.y - 14, back: false }; projectiles.push(e.cap); SFX.play('swing'); }
+    if (e.state === 'leap') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); e.lift = Math.sin(Math.PI * Math.max(0, 1 - e.st / 0.35)) * 12; if (e.st <= 0) { e.state = 'move'; e.lift = 0; e.wt = 0.4 + rng() * 0.5; } return true; }
+    e.wt = (e.wt || 0) - dt;
+    if (e.wt <= 0) { const a = chase ? Math.atan2(dy, dx) + (rng() - 0.5) * 1.2 : rng() * Math.PI * 2; e.state = 'leap'; e.st = 0.35; e.lx = Math.cos(a) * 160; e.ly = Math.sin(a) * 160; }
+    touch(D.dmg); return true;
+  }
+  return false;
+}
+Object.assign(PROC_DRAW, {
+  ram(c, e, k) {
+    const f = (e.state === 'charge' || e.state === 'paw' ? e.lx || (P.x - e.x) : P.x - e.x) < 0 ? -1 : 1, st = e.state === 'stunned', leg = e.state === 'charge' ? Math.sin(time * 30) * 3 : 0;
+    shadow(c, e.x, e.y + 2, 15 * k, 5 * k);
+    c.fillStyle = '#3a3a3a'; c.fillRect(e.x - 9 + leg, e.y - 8, 3, 9); c.fillRect(e.x + 6 - leg, e.y - 8, 3, 9);
+    c.fillStyle = '#e8e2d0'; for (const [ox, oy] of [[-8, -16], [0, -18], [8, -16], [-4, -12], [4, -12]]) circle(c, e.x + ox, e.y + oy, 7 * k);
+    c.fillStyle = '#4a4a44'; ellipse(c, e.x + f * 13, e.y - 16, 6, 6);
+    c.strokeStyle = '#a8946a'; c.lineWidth = 4; c.beginPath(); c.arc(e.x + f * 11, e.y - 20, 6, f > 0 ? Math.PI : 0, f > 0 ? Math.PI * 2.6 : -Math.PI * 1.6, f < 0); c.stroke();
+    c.fillStyle = st ? '#ffe08a' : '#1a1a10'; c.fillRect(e.x + f * 15 - 1, e.y - 18, 2, 2);
+    if (st) drawStars(c, e.x, e.y - 34, 10);
+    if (e.state === 'paw') { c.fillStyle = '#ffe08a'; c.font = '700 13px sans-serif'; c.textAlign = 'center'; c.fillText('!', e.x, e.y - 40); }
+  },
+  pixie(c, e, k) {
+    const y = e.y - 34 + Math.sin(e.anim * 8) * 4, w = Math.sin(time * 40 + e.hx) * 4;
+    shadow(c, e.x, e.y + 2, 5 * k, 2 * k);
+    c.fillStyle = 'rgba(242,168,255,.25)'; circle(c, e.x, y, 14);
+    c.fillStyle = 'rgba(220,240,255,.7)'; ellipse(c, e.x - 7, y - 4 + w, 7, 4); ellipse(c, e.x + 7, y - 4 - w, 7, 4);
+    c.fillStyle = '#7ab84a'; ellipse(c, e.x, y + 3, 4, 6); c.fillStyle = '#f2d0c0'; circle(c, e.x, y - 5, 4);
+    c.fillStyle = '#c84ab8'; c.beginPath(); c.moveTo(e.x - 5, y - 7); c.lineTo(e.x, y - 16); c.lineTo(e.x + 5, y - 7); c.closePath(); c.fill();
+    c.fillStyle = '#1a1210'; c.fillRect(e.x - 2, y - 6, 1, 1); c.fillRect(e.x + 1, y - 6, 1, 1);
+  },
+  menhir(c, e, k) {
+    const up = e.state === 'dormant' ? 0 : e.state === 'rise' ? (1 - e.st / 0.5) : 1, lift = e.state === 'slamwind' ? (1 - e.st / 0.7) * 16 : 0, y = e.y - lift;
+    shadow(c, e.x, e.y + 2, 14 * k, 5 * k);
+    c.fillStyle = '#6a6a64'; c.beginPath(); c.moveTo(e.x - 13, y); c.lineTo(e.x - 11, y - 50); c.quadraticCurveTo(e.x, y - 60, e.x + 11, y - 50); c.lineTo(e.x + 13, y); c.closePath(); c.fill();
+    c.fillStyle = '#8a8a80'; c.fillRect(e.x - 9, y - 46, 5, 42); c.fillStyle = '#5a7a3a'; c.beginPath(); c.ellipse(e.x + 4, y - 50, 7, 3, 0.3, 0, Math.PI * 2); c.fill();
+    if (up > 0) { c.fillStyle = `rgba(159,232,200,${up})`; c.fillRect(e.x - 6, y - 36, 4, 3); c.fillRect(e.x + 2, y - 36, 4, 3); c.fillRect(e.x - 4, y - 26, 8, 2); for (const s of [-1, 1]) { c.fillStyle = '#6a6a64'; c.fillRect(e.x + s * 13 - (s < 0 ? 6 : 0), y - 34 + (e.state === 'slamwind' ? -10 : 0) * s * 0, 6, 18 * up); } }
+    if (e.state === 'tired') { c.fillStyle = 'rgba(255,224,138,.8)'; c.font = '700 11px sans-serif'; c.textAlign = 'center'; c.fillText('...', e.x, e.y - 64); }
+  },
+  redcap(c, e, k) {
+    const lift = e.lift || 0, y = e.y - lift, f = P.x < e.x ? -1 : 1;
+    shadow(c, e.x, e.y + 2, 9 * k, 3 * k);
+    c.fillStyle = '#5a4a3a'; c.fillRect(e.x - 5, y - 8, 3, 8); c.fillRect(e.x + 2, y - 8, 3, 8);
+    c.fillStyle = '#6a5a3a'; ellipse(c, e.x, y - 14, 8, 8); c.fillStyle = '#8aa060'; circle(c, e.x + f * 2, y - 24, 7);
+    c.fillStyle = '#e8e0c8'; c.beginPath(); c.moveTo(e.x - 4, y - 18); c.lineTo(e.x, y - 12); c.lineTo(e.x + 4, y - 18); c.fill();
+    c.fillStyle = '#e04a3a'; c.fillRect(e.x + f * 3 - 3, y - 26, 2, 2); c.fillRect(e.x + f * 3 + 1, y - 26, 2, 2);
+    if (!e.cap) { c.fillStyle = '#c8302a'; c.beginPath(); c.moveTo(e.x - 8, y - 28); c.quadraticCurveTo(e.x, y - 44, e.x + 9, y - 28); c.closePath(); c.fill(); }
+    c.fillStyle = '#8a8a8a'; c.fillRect(e.x - f * 9 - 1, y - 22, 2, 14);
+  },
+});
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -9006,6 +9271,7 @@ function updateAmbient(dt) {
     const tx = Math.floor(x / T), ty = Math.floor(y / T), rg = region[ty * W + tx];
     if (isLand(tileAt(tx, ty))) {
       if (rg === 4) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: Math.random() < 0.5 ? '#5aa65c' : '#d9a23c' });
+      else if (rg === 23) ambient.push({ kind: 'mote', x, y, life: 5, ph: Math.random() * 6, vx: 6 + Math.random() * 6, vy: -2 - Math.random() * 3 });
       else if (rg === 22 && Math.random() < 0.5) ambient.push({ kind: 'dust', x, y, life: 3, ph: Math.random() * 6 });
       else if (rg === 21) ambient.push({ kind: 'glow', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12 });
       else if (rg === 19) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: ['#e8703a', '#c8402a', '#e8c060'][Math.floor(Math.random() * 3)] });
@@ -9247,6 +9513,8 @@ function drawProjectiles(c) {
     } else if (p.kind === 'fire') {
       const pu = 1 + Math.sin(time * 20) * 0.15;
       c.fillStyle = 'rgba(255,140,60,.35)'; circle(c, p.x, p.y, 12 * pu); c.fillStyle = '#ffb347'; circle(c, p.x, p.y, 7 * pu); c.fillStyle = '#fff2c4'; circle(c, p.x - 1, p.y - 1, 3);
+    } else if (p.kind === 'cap') {
+      c.save(); c.translate(p.x, p.y); c.rotate(time * 16); c.fillStyle = '#c8302a'; c.beginPath(); c.moveTo(-8, 3); c.quadraticCurveTo(0, -12, 9, 3); c.closePath(); c.fill(); c.fillStyle = '#ffffff'; c.fillRect(-1, -8, 2, 2); c.restore();
     } else if (p.kind === 'needle') {
       c.save(); c.translate(p.x, p.y); c.rotate(p.ang || 0); c.fillStyle = '#e8e0c0'; c.fillRect(-6, -1, 12, 2); c.fillStyle = '#4a8a3a'; c.fillRect(-7, -1.5, 3, 3); c.restore();
     } else if (p.kind === 'mud') {
@@ -9701,7 +9969,7 @@ function drawProp(c, o) {
 
 function drawNPC(c, n) {
   const near = Math.hypot(n.x - P.x, n.y - P.y) < 50;
-  if (n.boat) { if (n.id.startsWith('coach_')) drawStagecoach(c, n.x, n.y); else if (n.id.startsWith('punt_')) drawPunt(c, n.x, n.y); else if (n.id.startsWith('sled_')) drawDogSled(c, n.x, n.y, n.id === 'sled_home'); else if (n.id.startsWith('wagon_')) drawHayWagon(c, n.x, n.y, n.id === 'wagon_home'); else if (n.id.startsWith('beam_')) drawMoonbeam(c, n.x, n.y, n.id === 'beam_home'); else if (n.id.startsWith('cogpad')) drawBigPad(c, n.x, n.y); else if (n.id.startsWith('bell_')) drawDivingBell(c, n.x, n.y, n.id === 'bell_home'); else if (n.id.startsWith('pass_')) drawPass(c, n.x, n.y, n.id === 'pass_home'); else if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
+  if (n.boat) { if (n.id.startsWith('pony_')) drawPonyCart(c, n.x, n.y); else if (n.id.startsWith('coach_')) drawStagecoach(c, n.x, n.y); else if (n.id.startsWith('punt_')) drawPunt(c, n.x, n.y); else if (n.id.startsWith('sled_')) drawDogSled(c, n.x, n.y, n.id === 'sled_home'); else if (n.id.startsWith('wagon_')) drawHayWagon(c, n.x, n.y, n.id === 'wagon_home'); else if (n.id.startsWith('beam_')) drawMoonbeam(c, n.x, n.y, n.id === 'beam_home'); else if (n.id.startsWith('cogpad')) drawBigPad(c, n.x, n.y); else if (n.id.startsWith('bell_')) drawDivingBell(c, n.x, n.y, n.id === 'bell_home'); else if (n.id.startsWith('pass_')) drawPass(c, n.x, n.y, n.id === 'pass_home'); else if (n.id.startsWith('turtle')) drawTurtle(c, n.x, n.y, n.id === 'turtle_home'); else if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bed) { drawBed(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText('Bed').width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText('Bed', n.x, n.y + 17); } return; }
   if (n.sign) { drawSign(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bench) {
@@ -9767,6 +10035,7 @@ function render() {
   if (CD === HARV_D || CD === MILL_D) drawBouncers(ctx, inViewT);
   if (CD === CARN_D) drawToggleCrystals(ctx);
   if (CD === CANY_D || CD === THUN_D) drawCrumbles(ctx);
+  if (CD === MOOR_D) drawRunes(ctx);
   if (CD === SERP_D) drawDartTraps(ctx);
   if (CD === VALE_D || CD === SHRINE_D) drawLilyWobble(ctx);
   if (CD === REEF_D || CD === PALACE_D) drawAirVents(ctx, inViewT);
@@ -9813,6 +10082,8 @@ function render() {
     else if (kind === 5 && o.scareprop) drawScarecrowProp(ctx, o);
     else if (kind === 5 && o.igloo) drawIgloo(ctx, o);
     else if (kind === 5 && o.stilthut) drawStiltHut(ctx, o);
+    else if (kind === 5 && o.sheep) drawSheep(ctx, o);
+    else if (kind === 5 && o.menhirprop) PROC_DRAW.menhir(ctx, { x: o.x, y: o.y, state: 'dormant', st: 0, anim: 0 }, 1);
     else if (kind === 5 && o.crater) drawCrater(ctx, o);
     else if (kind === 5 && o.biggear) drawBigGear(ctx, o);
     else if (kind === 5 && o.templeIdol) drawTempleIdol(ctx, o);
@@ -9863,6 +10134,7 @@ function render() {
     if (CD === GLAC_D) drawAurora(ctx);
     if (CD === MANG_D || CD === GROTTO_D) drawMangroveHUD(ctx);
     if (CD === CANY_D) drawCanyonHaze(ctx);
+    if (CD === MOOR_D) drawMoorMist(ctx);
     if (CD === STAR_D) { ctx.fillStyle = 'rgba(10,12,44,.22)'; ctx.fillRect(0, 0, cvs.width, cvs.height); const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(10,10,40,0)'); g.addColorStop(1, 'rgba(8,8,30,.45)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === COG_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(140,90,30,0)'); g.addColorStop(1, 'rgba(90,60,20,.3)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === CINDER_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(255,90,30,0)'); g.addColorStop(1, `rgba(140,40,20,${0.36 + Math.sin(time * 0.8) * 0.05})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
@@ -9930,6 +10202,8 @@ async function start(hot) {
   if (qState('bloom') && qState('bloom').state === 'active') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (qState('chime') && qState('chime').state === 'active') spawnFind('chime', 11, SKY_D.x0, DW);
   if (qState('comb') && qState('comb').state === 'active') spawnComb();
+  if (qState('bluebell') && qState('bluebell').state === 'active') spawnBluebell();
+  spawnCairn();
   if (qState('plume') && qState('plume').state === 'active') spawnPlume();
   if (qState('moonshell') && qState('moonshell').state === 'active') spawnShell();
   if (qState('snowlily') && qState('snowlily').state === 'active') spawnLily();
