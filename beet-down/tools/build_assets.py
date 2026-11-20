@@ -59,7 +59,7 @@ def put(name, im, q=82, **meta):
 # ---------- 3D renders ----------
 HUE = {'w_rail': 62, 'i_core': -92, 'i_crown': 92, 'i_chrono': -50}
 TINT = {'veg_egg': ((110, 96, 80), (238, 230, 214), (255, 253, 247)), 'i_glassball': ((10, 50, 80), (110, 220, 255), (235, 252, 255)), 'i_candle': ((30, 30, 90), (150, 170, 255), (240, 244, 255)), 'i_urn': ((90, 50, 0), (240, 170, 30), (255, 236, 150)), 'i_fshield': ((10, 40, 80), (70, 190, 255), (220, 248, 255))}  # colourise grey models  # hue shift (0-255 scale): purple crystal -> alien green, blue jewel -> ruby red
-ROT = {'veg_banana': 58, 'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90, 'w_pick': -90, 'w_scythe': -90, 'w_cane': -90}
+ROT = {'veg_banana': 58, 'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90, 'w_pick': -90, 'w_scythe': -90, 'w_cane': -90, 'w_pepper': -90}
 FLIP = {'w_pizza', 'w_silencer', 'w_cluster', 'w_tender', 'w_laser', 'w_rail', 'w_mines', 'w_guzi', 'w_knife', 'w_pistol', 'w_smg', 'w_shotgun', 'w_rocket', 'w_zapper', 'w_sniper', 'w_minigun', 'w_bouncer', 'w_lobber', 'w_flamer'}
 for f in sorted(os.listdir(RAW)):
     n = f[:-4]
@@ -336,6 +336,18 @@ compose('e_rampager', 'body_redA.png', [
     ('leg_redB.png', -34, 84, .8, 0, False, L), ('leg_redB.png', 34, 84, .8, 0, True, L),
     ('eye_angry_red.png', -31, -22, 1.0, 0, False), ('eye_angry_red.png', 31, -22, 1.0, 0, True),
     ('eyebrowC.png', -31, -48, 1.0, -15, False), ('eyebrowC.png', 31, -48, 1.0, 15, True), ('mouth_closed_fangs.png', 0, 34, 1.5, 0, False)], maxpx=300)
+
+compose('e_bee', 'body_yellowE.png', [
+    ('detail_white_ear.png', -62, -45, 1.7, 55, False, L), ('detail_white_ear.png', 62, -45, 1.7, -55, True, L),
+    ('detail_yellow_antenna_small.png', -28, -128, 1.0, 15, False, L), ('detail_yellow_antenna_small.png', 28, -128, 1.0, -15, True, L),
+    ('detail_dark_horn_small.png', 0, 128, 1.4, 180, False, L),
+    ('eye_cute_dark.png', -26, -45, .5, 0, False), ('eye_cute_dark.png', 26, -45, .5, 0, True), ('mouthA.png', 0, 20, .55, 0, False)], bscale=.75, maxpx=130)
+compose('e_hqueen', 'body_yellowA.png', [
+    ('detail_white_ear.png', -105, -40, 3.4, 60, False, L), ('detail_white_ear.png', 105, -40, 3.4, -60, True, L),
+    ('arm_yellowB.png', -82, 30, .8, -30, False, L), ('arm_yellowB.png', 82, 30, .8, 30, True, L),
+    ('detail_dark_horn_large.png', 0, 92, 1.3, 180, False, L),
+    ('eyebrowB.png', -36, -52, .7, 10, False), ('eyebrowB.png', 36, -52, .7, -10, True),
+    ('eye_human.png', -36, -26, .62, 0, False), ('eye_human.png', 36, -26, .62, 0, True), ('mouthF.png', 0, 30, .8, 0, False)], maxpx=300)
 
 # ---------- particles ----------
 PART = {'smoke': ('smoke_07.png', 128), 'puff': ('smoke_04.png', 96), 'fire': ('fire_01.png', 96), 'flame': ('flame_05.png', 64),
