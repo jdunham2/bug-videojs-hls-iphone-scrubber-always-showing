@@ -96,6 +96,19 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Catching little birds**: sparrows scatter if you walk or run up to them, but sneak (hold C, or push the
   stick gently) and you can creep right up and pounce (E). Robins, pigeons and blackbirds can be caught
   the same way. The bird sits in your paws for a moment, then flutters off unharmed.
+- **Mischief combos**: make someone jump, smash something or finish a task, then do it again within five
+  seconds to build a combo (shown above your head with a timer bar). Every x5 earns a bonus shiny.
+- **Cardboard boxes**: a couple of empty boxes sit outside houses. Wear one (G) and keep still and nobody can
+  see you, even right next to them; shuffle about in it (slowly) and anyone watching will wonder whether that
+  box just moved.
+- **Treasure maps**: most villages have a treasure map lying about. Pick it up and an X appears on the ground
+  and the minimap; dig there (B, empty-pawed) for a pirate's strongbox and 3 bonus shinies.
+- **The bubble machine**: beside the plaza. Switch it on (E) and bubbles drift about for a while (pop them by
+  walking into them, or chitter to hop for the high ones); everyone nearby stops to watch, which makes it a
+  perfect moment to rob them. It needs a while to refill afterwards.
+- **Wanted!**: there's a poster of you by the plaza (tear it down with E), and each morning *The Daily Acorn*
+  on the day card reports on yesterday's mischief. Your wanted level and reward grow with every fright,
+  smash and task.
 - **Bandit, the rival raccoon**: a scruffy brown raccoon in a red bandana with a den (a tipped-over dustbin)
   at the other end of the road. All day he sneaks about stealing loose things and hauling them back to his
   den. Chitter at him and he drops whatever he's carrying, press E right next to him to snatch it out of his
@@ -255,7 +268,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 318 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 326 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -352,6 +365,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   pond life, zoo escape, storms and breezes: `spawnPondLife()`, `spawnZoo()` / `returnZooAnimal()`, `updatePondZoo()`
   / `pzScare()` / `drawPondZoo()`, `updateStormsBreeze()` (ice skids, flooded roads, kites, blowing washing),
   `drawCloudburst()`, `drawKite()`, `blowDandelion()`, `placeBreezyItems()`;
+  combos, boxes, treasure, bubbles and the paper: `mischief()` / `drawCombo()`, `drawBox()` / `updateBox()` /
+  `boxStill()`, `placeTreasure()` / `readMap()` / `digTreasure()`, `placeExtras()` / `extraAction()` (bubble machine,
+  poster), `watchingBubbles()`, `recordNews()` / `renderNews()`, `wantedLevel()`, `updateExtras()`;
   Bandit the rival raccoon: `buildRivalDen()` (called from `buildMap()`), `placeRivalDen()`, `spawnRival()`,
   `updateRival()` (hauling, fleeing, racing), `startRace()` / `endRace()`, `rivalScare()`, `rivalSnatch()`,
   `rivalPickUp()`, `drawRival()`, `drawRaceMarker()`, `drawRivalMini()`;

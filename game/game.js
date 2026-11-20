@@ -1485,6 +1485,7 @@
     else if (inBog(player.x, player.y)) maxSpd *= 0.45; // stuck in the sucking mud
     else if (L && L.weather === 'cloudburst' && areaOf(player.x, player.y) === 0 && tileAt(player.x, player.y) === PATH) maxSpd *= 0.7; // wading down a flooded road
     if (player.disguise && player.disguise.kind === 'sack') maxSpd = Math.min(maxSpd, 85); // hop, hop
+    if (player.disguise && player.disguise.kind === 'cardbox') maxSpd = Math.min(maxSpd, 70); // shuffle, shuffle
     else if (player.stuffed) maxSpd = Math.min(maxSpd, WALK_SPEED * 0.75); // waddle
     else if (player.sugar > 0) maxSpd *= 1.25;                         // zoom
     const tx = ix * maxSpd, ty = iy * maxSpd;
@@ -2449,6 +2450,7 @@
     if (it.blownWash) { it.blownWash = false; completeTask('washingblown'); }
     festPickUp(it);
     rivalPickUp(it);
+    extraPickUp(it);
     if (it.kind === 'coins') completeTask('smugglers');
     if (it.kind === 'medal') completeTask('medal');
     if (it.kind === 'stardust') { // make a wish...
@@ -3126,6 +3128,7 @@
     if (dropped && v.id === 'bertram') completeTask('bertdrop');
     v.after = after || (dropped ? { state: 'fetch', target: dropped } : { state: v.state, target: v.target });
     v.state = 'startled'; v.stateT = 0.75; v.path = null;
+    if (started && v.id) { run.frights = (run.frights || 0) + 1; mischief('fright'); }
     return true;
   }
   function afterStartle(v) {
@@ -3684,6 +3687,11 @@
     { id: 'skylantern', tier: 'Easy', text: 'Send up a sky lantern', hint: 'pick one up, then let go', req: ['ltable'] },
     { id: 'dumpling', tier: 'Easy', text: 'Swipe food from a festival stall', req: ['feststalls'] },
     { id: 'rivaldrop', tier: 'Easy', text: 'Make Bandit drop his loot', hint: 'chitter at him, or snatch it (E)', req: ['rival'] },
+    { id: 'boxhide', tier: 'Easy', text: 'Hide in a cardboard box right next to someone', hint: 'wear it (G) and keep still', req: ['cardbox'] },
+    { id: 'boxspotted', tier: 'Easy', text: 'Get spotted shuffling about in a box', req: ['cardbox'] },
+    { id: 'combo3', tier: 'Easy', text: 'Pull off a x3 mischief combo', hint: 'frights, smashes and tasks in quick succession' },
+    { id: 'bubbles', tier: 'Easy', text: 'Pop 10 bubbles', goal: 10, hint: 'switch on the bubble machine (E)', req: ['bubbler'] },
+    { id: 'wanted', tier: 'Easy', text: 'Tear down your wanted poster', req: ['poster'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3821,6 +3829,9 @@
     { id: 'dragondance', tier: 'Medium', text: 'Join the dragon dance', hint: 'follow close behind its tail', req: ['lanternfest'] },
     { id: 'beatrival', tier: 'Medium', text: 'Beat Bandit in a race for the golden acorn', hint: 'get it to your hideout first', req: ['rival'] },
     { id: 'raidrival', tier: 'Medium', text: 'Pinch something back from Bandit’s den', req: ['rival'] },
+    { id: 'combo5', tier: 'Medium', text: 'Pull off a x5 mischief combo', hint: 'keep the chaos coming' },
+    { id: 'treasure', tier: 'Medium', text: 'Dig up the treasure from the map', hint: 'find the map first, then dig (B) at the X', req: ['tmap'] },
+    { id: 'bubblesneak', tier: 'Medium', text: 'Steal from someone while they watch the bubbles', req: ['bubbler'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3915,7 +3926,7 @@
   const chitterRadius = () => 95 * (1 + 0.35 * lvl('chitter'));
 
   function setupRun(day) {
-    Object.assign(run, { day, eaten: 0, tobyHits: 0, prints: 0, painted: 0, birdsCaught: 0, crows: 0, fireflies: 0, puddles: 0, eggs: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
+    Object.assign(run, { day, combo: null, frights: 0, smashed: 0, bubblesPopped: 0, eaten: 0, tobyHits: 0, prints: 0, painted: 0, birdsCaught: 0, crows: 0, fireflies: 0, puddles: 0, eggs: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
     run.maxStrikes = 3 + lvl('fur');
     run.timeTotal = Math.min(600, 420 + 30 * (day - 1)) + 60 * lvl('day'); // the bigger village takes a little longer to ransack
     run.timeLeft = run.timeTotal;
@@ -4006,6 +4017,10 @@
       for (const [rq, ty] of [['geese', 'goose'], ['peacock', 'peacock'], ['donkey', 'donkey'], ['turkey', 'turkey'], ['magpie', 'magpie'], ['moths', 'moth']]) if (r === rq && !critters.some((c) => c.type === ty)) return false;
       if (r === 'wasps' && !L.waspNest) return false;
       if (r === 'school' && !L.school) return false;
+      if (r === 'cardbox' && !items.some((i) => i.kind === 'cardbox')) return false;
+      if (r === 'tmap' && !L.treasure) return false;
+      if (r === 'bubbler' && !L.bubbler) return false;
+      if (r === 'poster' && !L.poster) return false;
       if (r === 'rival' && !L.rivalDen) return false;
       if (r === 'skislope' && !L.ski) return false;
       if (r === 'chaletc' && !L.chalet) return false;
@@ -4099,6 +4114,7 @@
     for (let k = 0; k < 3; k++) sparkle(player.x + rr(-10, 10), player.y, 20 + k * 6);
     renderTodo(id);
     updateRunBar();
+    if (!id.startsWith('combo')) mischief('task');
     if (run.tasks.every((t) => run.done.has(t.id))) {
       run.over = true;
       setTimeout(() => endRun('win'), 1600);
@@ -4166,6 +4182,7 @@
     save.runs++;
     if (win) { save.bestDay = Math.max(save.bestDay, run.day); save.day = run.day + 1; } else save.day = 1;
     const trophyNews = recordTrophies(win);
+    recordNews(reason);
     writeSave();
     postScore();
     sfx(win ? 'fanfare' : 'hmph');
@@ -4222,6 +4239,7 @@
     showRunCard();
   }
   function showRunCard() {
+    renderNews();
     buildTodo();
     updateRunBar();
     document.getElementById('rc-day').textContent = `Day ${run.day}`;
@@ -4525,6 +4543,9 @@
   // Villagers only spot a hidden raccoon if they're practically in the bush with it
   function canSeePlayer(v) {
     if (player.inWardrobe) return false;
+    if (boxStill() && Math.hypot(v.x - player.x, v.y - player.y) > 18) return false; // just a box
+    if (watchingBubbles(v)) return false; // ooh, bubbles
+
     if (!canSee(v, player.x, player.y - 6)) return false;
     return !player.hidden || Math.hypot(v.x - player.x, v.y - player.y) < 20;
   }
@@ -4853,6 +4874,7 @@
 
   // Fragile things smash when they hit the floor hard
   function shatter(it) {
+    run.smashed = (run.smashed || 0) + 1; mischief('smash');
     if (it.kind === 'fishbowl') { // SPLOSH: the goldfish flops about until someone scoops it into a glass
       splash(it.x, it.y, false); sfx('crash'); sfx('splash');
       critters.push({ type: 'goldfish', x: it.x, y: it.y, z: 0, dir: 'left', walk: 0, ph: 0, life: 6 });
@@ -7844,6 +7866,7 @@
     placeSchoolItems();
     placeBreezyItems();
     placeFestItems();
+    placeExtraItems();
     if (L.rail) for (let k = 0; k < 3; k++) placeFree('suitcase', L.rail.station.x - 90 + k * 22, L.rail.station.y - 4, { owner: 'percy' });
     if (L.castleChest) addItem('chest', L.castleChest.x, L.castleChest.y);
     if (L.plinths) ['crown', 'gem', 'goldvase'].forEach((k, i) => { const p = L.plinths[i]; addItem(k, p.x, p.y - 2, { z: 18, owner: 'guard' }).museum = true; });
@@ -9249,6 +9272,7 @@
       case 'crown': ctx.fillStyle = '#f2c14e'; poly(ctx, [[hx - 6, hy + 3], [hx + 6, hy + 3], [hx + 7, hy - 5], [hx + 3.5, hy - 1], [hx, hy - 6], [hx - 3.5, hy - 1], [hx - 7, hy - 5]]); ctx.fill(); ctx.fillStyle = '#e8453c'; circle(ctx, hx, hy, 1.3); break;
       case 'sock': ctx.fillStyle = '#e8453c'; roundRect(ctx, hx - 6, hy - 2, 12, 6, 3, true); ctx.fillStyle = '#ffffff'; ctx.fillRect(hx - 6, hy + 2, 12, 2); circle(ctx, hx + 6, hy - 4, 2.2); break;
       case 'sack': drawSack(ctx, p); break;
+      case 'cardbox': drawBox(ctx, p); break;
       case 'shirt': ctx.globalAlpha = 0.92; ctx.fillStyle = '#4f93c7'; roundRect(ctx, -9, -17, 18, 11, 4, true); ctx.fillStyle = '#ffffff'; ctx.fillRect(-1, -17, 2, 11); ctx.globalAlpha = 1; break;
     }
   }
@@ -9273,6 +9297,7 @@
     if (Math.random() < dt * 14) puff(player.x + rr(-6, 6), player.y + 2, 1, 'soil');
     if (D.t > 0) return;
     player.digging = null;
+    if (D.worms && digTreasure()) return;
     if (D.worms) { if (Math.random() < 0.45) { player.worms = (player.worms || 0) + 1; player.bubble = { text: `a worm! (${player.worms})`, t: 1.2 }; sfx('pick'); } else player.bubble = { text: 'just dirt...', t: 1 }; return; }
     if (D.up) { // dig it back up
       const b = D.up; L.buried.splice(L.buried.indexOf(b), 1);
@@ -11357,7 +11382,7 @@
     buildHarbour();
     placeMarsh();
     placeSchool(); placeSprings(); buildClifftop(); placeSports();
-    placeSki(); placeVineyard(); buildFunPier(); placeLanterns(); placeRivalDen();
+    placeSki(); placeVineyard(); buildFunPier(); placeLanterns(); placeRivalDen(); placeExtras();
   }
 
   // ---------------------------------------------------------------------------
@@ -11927,6 +11952,7 @@
   // --- Rides: swing, slide, roundabout, zipline ----------------------------------------------------
   function playAction() {
     if (rivalSnatch()) return true;
+    if (extraAction()) return true;
     if (festAction()) return true;
     if (!L || player.ride || (player.held && player.held.type.heavy)) return false;
     const near = (P, r) => P && Math.hypot(player.x - P.x, player.y - P.y) < r;
@@ -11939,6 +11965,7 @@
   }
   const playNear = () => {
     { const rn = rivalNear(); if (rn) return rn; }
+    { const en = extraNear(); if (en) return en; }
     { const fn = festNear(); if (fn) return fn; }
     if (!L || player.ride) return null;
     const near = (P, r) => P && Math.hypot(player.x - P.x, player.y - P.y) < r;
@@ -13012,6 +13039,259 @@
   }
 
   // ---------------------------------------------------------------------------
+  // More things to do: a cardboard box to hide in, mischief combos, treasure
+  // maps, a bubble machine on the plaza, and your wanted poster (plus the morning
+  // paper that reports on yesterday's mischief).
+  // ---------------------------------------------------------------------------
+  Object.assign(ITEM, {
+    cardbox: { name: 'cardboard box', h: 12, r: 7, draw(c) { c.fillStyle = '#c99a5e'; c.fillRect(-7, -11, 14, 11); c.fillStyle = '#b5844a'; c.fillRect(-7, -11, 14, 2); c.fillStyle = '#e0b878'; poly(c, [[-7, -11], [-10, -14], [-3, -14], [0, -11]]); c.fill(); poly(c, [[7, -11], [10, -14], [3, -14], [0, -11]]); c.fill(); c.strokeStyle = 'rgba(90,60,30,0.5)'; c.lineWidth = 0.6; c.beginPath(); c.moveTo(-4, -6); c.lineTo(4, -6); c.stroke(); } },
+    tmap: { name: 'treasure map', h: 6, r: 5, draw(c) { c.fillStyle = '#efe0b4'; poly(c, [[-6, -6], [5, -7], [6, -1], [-5, 0]]); c.fill(); c.strokeStyle = '#a07a40'; c.lineWidth = 0.6; c.beginPath(); c.moveTo(-4, -4); c.quadraticCurveTo(-1, -1, 2, -5); c.stroke(); c.strokeStyle = '#c0392b'; c.lineWidth = 1; c.beginPath(); c.moveTo(1, -6); c.lineTo(4, -3); c.moveTo(4, -6); c.lineTo(1, -3); c.stroke(); } },
+    strongbox: { name: 'pirate’s strongbox', h: 9, r: 6, draw(c) { c.fillStyle = '#6b4a2e'; roundRect(c, -6.5, -9, 13, 9, 2, true); c.fillStyle = '#8a6040'; c.fillRect(-6.5, -9, 13, 3); c.fillStyle = '#c9a33a'; c.fillRect(-6.5, -6.4, 13, 1.2); c.fillRect(-1.2, -7, 2.4, 3.4); c.fillStyle = '#f2c14e'; circle(c, -3, -9.6, 1.2); circle(c, 2, -9.8, 1.2); } },
+  });
+  WEARABLE.add('cardbox');
+
+  // --- Mischief combos: frights, smashes and tasks in quick succession ----------------------------
+  let inMischief = false;
+  function mischief(what) {
+    if (!started || paused || run.over || inMischief) return;
+    inMischief = true;
+    const C = run.combo || (run.combo = { n: 0, t: 0, best: 0, show: 0 });
+    C.n = C.t > 0 ? C.n + 1 : 1; C.t = 5; C.show = 1.6; C.what = what; C.best = Math.max(C.best, C.n);
+    if (C.n >= 3) completeTask('combo3');
+    if (C.n >= 5) completeTask('combo5');
+    if (C.n >= 2 && C.n % 5 === 0) { run.earned += 1; updateRunBar(); sfx('fanfare'); toast('+1 ✦ bonus', `Mischief combo x${C.n}!`, true); }
+    else if (C.n >= 2) sfx('pop');
+    inMischief = false;
+  }
+  function drawCombo(ctx, t) {
+    const C = run.combo;
+    if (!C || C.show <= 0 || C.n < 2) return;
+    const a = Math.min(1, C.show * 2), s = 1 + Math.max(0, C.show - 1.3) * 1.5;
+    ctx.save(); ctx.translate(player.x, player.y - 46 - player.hop); ctx.scale(s, s); ctx.globalAlpha = a;
+    ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#3a2a1a';
+    const txt = `COMBO x${C.n}`; ctx.strokeText(txt, 0, 0); ctx.fillStyle = C.n >= 5 ? '#ffd166' : '#ffffff'; ctx.fillText(txt, 0, 0);
+    // a little bar showing how long you have to keep it going
+    ctx.fillStyle = 'rgba(58,42,26,0.7)'; ctx.fillRect(-20, 4, 40, 3); ctx.fillStyle = '#ffb547'; ctx.fillRect(-20, 4, 40 * Math.max(0, C.t / 5), 3);
+    ctx.restore();
+  }
+
+  // --- The cardboard box ---------------------------------------------------------------------------
+  const inBox = () => !!(player.disguise && player.disguise.kind === 'cardbox');
+  const boxStill = () => inBox() && player.speed < 8 && !player.held;
+  function drawBox(ctx, p) {
+    const still = p.speed < 8, wob = still ? 0 : Math.sin(p.walk * 2) * 1.2;
+    ctx.save(); ctx.rotate(wob * 0.03);
+    ctx.fillStyle = '#c99a5e'; ctx.fillRect(-14, -26, 28, 26); ctx.fillStyle = '#b5844a'; ctx.fillRect(-14, -26, 28, 3); ctx.fillRect(-14, -14, 28, 1);
+    ctx.fillStyle = '#e0b878'; poly(ctx, [[-14, -26], [-19, -31], [-4, -31], [0, -26]]); ctx.fill(); poly(ctx, [[14, -26], [19, -31], [4, -31], [0, -26]]); ctx.fill();
+    ctx.fillStyle = '#7a5230'; ctx.font = 'bold 5px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('THIS WAY UP', 0, -6); ctx.fillText('↑ ↑', 0, -1);
+    if (!still || Math.sin(time * 0.7) > 0.85) { ctx.fillStyle = '#1d1d22'; ctx.fillRect(-7, -20, 14, 3.4); ctx.fillStyle = '#ffffff'; circle(ctx, -3, -18.4, 1.1); circle(ctx, 3, -18.4, 1.1); } // eyes peeking out
+    if (!still) { ctx.fillStyle = '#4a4e58'; ellipse(ctx, -8 + wob * 3, 0, 3, 1.4); ellipse(ctx, 8 - wob * 3, 0, 3, 1.4); } // little feet
+    ctx.restore();
+  }
+  function updateBox(dt) {
+    if (!inBox()) { L.boxNear = 0; return; }
+    const outside = areaOf(player.x, player.y) === 0;
+    let near = false;
+    for (const v of villagers) {
+      if (areaOf(v.x, v.y) !== areaOf(player.x, player.y)) continue;
+      const d = Math.hypot(v.x - player.x, v.y - player.y);
+      if (d < 60 && boxStill()) near = true;
+      if (!boxStill() && d < 140 && d > 18 && canSee(v, player.x, player.y - 6) && (v.boxCD || 0) < time && v.state !== 'chase' && v.state !== 'startled') {
+        v.boxCD = time + 6; say(v, rpick(['Did that box just... move?', 'Huh? A walking box?', 'I could’ve sworn that box moved.', '...boxes don’t have feet.']), 1.8);
+        v.dir = Math.abs(player.x - v.x) > Math.abs(player.y - v.y) ? (player.x > v.x ? 'right' : 'left') : (player.y > v.y ? 'down' : 'up');
+        if (v.state === 'act') v.actT = Math.max(v.actT, 1.5);
+        completeTask('boxspotted');
+      }
+    }
+    if (near && outside !== null) { L.boxNear = (L.boxNear || 0) + dt; if (L.boxNear > 1.5) { completeTask('boxhide'); if (!L.boxSaid) { L.boxSaid = true; player.bubble = { text: '*I am a box*', t: 1.4 }; } } } else L.boxNear = 0;
+  }
+
+  // --- Treasure maps ------------------------------------------------------------------------------
+  function placeTreasure() {
+    L.treasure = null;
+    if (rand() < 0.25) return; // not every village has one
+    let x = null, y = null;
+    for (let n = 0; n < 200; n++) {
+      const tx = rr(6, MW - 6), ty = rr(6, MH - 8), px = (tx + 0.5) * TILE, py = (ty + 0.6) * TILE;
+      if (getT(Math.floor(tx), Math.floor(ty)) !== GRASS || navBlockedPt(px, py) || Math.hypot(px - HIDEOUT.x, py - HIDEOUT.y) < 200) continue;
+      if (!findPath(HIDEOUT.x, HIDEOUT.y + 6, px, py)) continue;
+      x = px; y = py; break;
+    }
+    if (x === null) return;
+    let map = null;
+    for (let n = 0; n < 80 && !map; n++) { const s = randomFreeSpot(1, 1); if (s && Math.hypot((s[0] + 0.5) * TILE - x, (s[1] + 0.6) * TILE - y) > 500) map = addItem('tmap', (s[0] + 0.5) * TILE, (s[1] + 0.6) * TILE); }
+    if (!map) return;
+    L.treasure = { x, y, known: false, found: false };
+  }
+  function readMap(it) {
+    if (it.kind !== 'tmap' || !L.treasure) return false;
+    player.held = null; const i = items.indexOf(it); if (i >= 0) items.splice(i, 1);
+    L.treasure.known = true; sfx('fanfare');
+    toast('X marks the spot! It’s on your minimap. Dig there with B.', 'A treasure map!', true);
+    player.bubble = { text: 'ooh, treasure!', t: 1.4 };
+    return true;
+  }
+  function digTreasure() { // called when you dig with empty paws
+    const T = L.treasure;
+    if (!T || T.found || Math.hypot(player.x - T.x, player.y - T.y) > 26) return false;
+    T.found = true;
+    const it = addItem('strongbox', T.x, T.y); Object.assign(it, { air: true, vz: 150, vy: 10, touched: true });
+    for (let k = 0; k < 10; k++) sparkle(T.x + rr(-10, 10), T.y, rr(4, 24));
+    run.earned += 3; updateRunBar(); sfx('fanfare');
+    toast('+3 ✦ · Stash the strongbox in your hideout to keep it!', 'Buried treasure!', true);
+    player.bubble = { text: 'TREASURE!', t: 1.4 };
+    completeTask('treasure'); mischief('treasure');
+    return true;
+  }
+  function drawTreasureX(ctx) {
+    const T = L && L.treasure;
+    if (!T || !T.known || T.found) return;
+    ctx.strokeStyle = 'rgba(192,57,43,0.85)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(T.x - 8, T.y - 4); ctx.lineTo(T.x + 8, T.y + 4); ctx.moveTo(T.x + 8, T.y - 4); ctx.lineTo(T.x - 8, T.y + 4); ctx.stroke();
+  }
+
+  // --- The bubble machine -------------------------------------------------------------------------
+  function makeBubbler(B) {
+    return { kind: 'bubbler', x: B.x, y: B.y, hitbox: box(B.x - 9, B.y - 6, 18, 7), bounds: { l: B.x - 20, r: B.x + 20, t: B.y - 40, b: B.y + 4 }, draw(ctx, t) {
+      ctx.fillStyle = '#4f93c7'; roundRect(ctx, B.x - 10, B.y - 18, 20, 18, 4, true); ctx.fillStyle = '#9ad1ff'; roundRect(ctx, B.x - 7, B.y - 15, 14, 8, 3, true);
+      ctx.fillStyle = '#f2c14e'; ctx.fillRect(B.x + 6, B.y - 24, 4, 8); ctx.fillStyle = '#e8453c'; circle(ctx, B.x - 5, B.y - 4, 1.6);
+      if (B.on > 0) { ctx.fillStyle = '#7fe08a'; circle(ctx, B.x - 5, B.y - 4, 1.6); const r = (t * 8) % 4; ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.arc(B.x + 8, B.y - 26 - r * 2, 2 + r, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.fillStyle = '#f4e3b8'; roundRect(ctx, B.x - 15, B.y - 34, 30, 8, 2, true); ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 5px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('BUBBLES!', B.x, B.y - 28.5);
+    } };
+  }
+  function makePoster(W) {
+    return { kind: 'poster', x: W.x, y: W.y, hitbox: box(W.x - 3, W.y - 4, 6, 5), bounds: { l: W.x - 18, r: W.x + 18, t: W.y - 54, b: W.y + 4 }, draw(ctx) {
+      ctx.fillStyle = '#7a5230'; ctx.fillRect(W.x - 1.5, W.y - 40, 3, 40);
+      const x = W.x, y = W.y - 50;
+      if (W.torn) { ctx.fillStyle = '#efe0b4'; poly(ctx, [[x - 13, y], [x - 4, y], [x - 7, y + 6], [x - 13, y + 8]]); ctx.fill(); poly(ctx, [[x + 13, y + 22], [x + 6, y + 24], [x + 13, y + 16]]); ctx.fill(); return; }
+      ctx.fillStyle = '#efe0b4'; ctx.fillRect(x - 13, y, 26, 26); ctx.strokeStyle = '#a07a40'; ctx.lineWidth = 0.6; ctx.strokeRect(x - 13, y, 26, 26);
+      ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 5px serif'; ctx.textAlign = 'center'; ctx.fillText('WANTED', x, y + 6);
+      ctx.fillStyle = FUR; circle(ctx, x, y + 13, 5); ctx.fillStyle = MASK; ellipse(ctx, x - 2.2, y + 12.6, 2.2, 1.4); ellipse(ctx, x + 2.2, y + 12.6, 2.2, 1.4); ctx.fillStyle = '#fff'; circle(ctx, x - 2, y + 12.6, 0.7); circle(ctx, x + 2, y + 12.6, 0.7);
+      const lv = wantedLevel(); ctx.fillStyle = '#c0392b'; ctx.font = 'bold 4px sans-serif'; ctx.fillText('★'.repeat(lv) + '☆'.repeat(5 - lv), x, y + 21);
+      ctx.fillStyle = '#5a3a20'; ctx.font = '3.4px serif'; ctx.fillText(`REWARD ${wantedReward()} ACORNS`, x, y + 25);
+    } };
+  }
+  const WANTED_STEPS = [0, 15, 40, 90, 160, 260];
+  const wantedLevel = () => { const w = save.wanted || 0; let lv = 0; for (let k = 1; k < WANTED_STEPS.length; k++) if (w >= WANTED_STEPS[k]) lv = k; return Math.min(5, lv); };
+  const wantedReward = () => 10 + Math.floor((save.wanted || 0) / 5) * 5;
+  function placeExtras() {
+    const T = TILE, P = L.plaza;
+    const b = freeSpotNear(P.x - 2, P.y + Math.floor(P.h / 2), 1, 1, 6) || freeSpotNear(P.x + P.w + 1, P.y + 3, 1, 1, 6);
+    L.bubbler = b ? { x: (b[0] + 0.5) * T, y: (b[1] + 0.8) * T, on: 0, cd: 0 } : null;
+    if (L.bubbler) objects.push(makeBubbler(L.bubbler));
+    const w = freeSpotNear(P.x + P.w + 1, P.y + 1, 1, 1, 6) || freeSpotNear(P.x + 3, P.y - 2, 1, 1, 6);
+    L.poster = w ? { x: (w[0] + 0.5) * T, y: (w[1] + 0.8) * T, torn: false } : null;
+    if (L.poster) objects.push(makePoster(L.poster));
+    L.bubbles = [];
+  }
+  function placeExtraItems() {
+    const hs = shuffled(L.houses).slice(0, 2);
+    for (const h of hs) placeFree('cardbox', (h.doorX + 2.5) * TILE, (h.y + h.h + 0.7) * TILE);
+    placeTreasure();
+  }
+  const watchingBubbles = (v) => !!(L && L.bubbler && L.bubbler.on > 0 && areaOf(v.x, v.y) === 0 && Math.hypot(v.x - L.bubbler.x, v.y - L.bubbler.y) < 230);
+  function extraAction() {
+    if (!L || player.ride) return false;
+    const B = L.bubbler;
+    if (B && Math.hypot(player.x - B.x, player.y - B.y) < 22 && !(target && itemReach(target) < 12)) {
+      if (B.on > 0) { player.bubble = { text: 'already bubbling!', t: 1 }; return true; }
+      if (B.cd > 0) { player.bubble = { text: 'out of bubble mix... wait a bit', t: 1.2 }; return true; }
+      B.on = 18; B.cd = 40; sfx('whoosh'); player.bubble = { text: 'BUBBLES!', t: 1.2 };
+      for (const v of villagers) if (watchingBubbles(v)) say(v, rpick(['Ooh, bubbles!', 'How pretty!', 'Bubbles! Wheee!']), 1.6);
+      mischief('bubbles');
+      return true;
+    }
+    const W = L.poster;
+    if (W && !W.torn && Math.hypot(player.x - W.x, player.y - W.y) < 22 && !(target && itemReach(target) < 12)) {
+      W.torn = true; sfx('rustle'); player.bubble = { text: rpick(['that’s not even my good side.', 'slander!', 'nobody saw that.']), t: 1.4 };
+      for (let k = 0; k < 8; k++) particles.push({ kind: 'shard', col: '#efe0b4', x: W.x + rr(-8, 8), y: W.y, z: 40, vx: rr(-40, 40), vy: rr(-10, 20), vz: rr(10, 50), life: 1.2, max: 1.2 });
+      completeTask('wanted'); mischief('poster');
+      return true;
+    }
+    return false;
+  }
+  const extraNear = () => {
+    if (!L || player.ride) return null;
+    const B = L.bubbler, W = L.poster;
+    if (B && Math.hypot(player.x - B.x, player.y - B.y) < 22) return B.on > 0 ? null : 'switch on the bubble machine';
+    if (W && !W.torn && Math.hypot(player.x - W.x, player.y - W.y) < 22) return 'tear down your wanted poster';
+    return null;
+  };
+  function extraPickUp(it) {
+    if (readMap(it)) return;
+    if (it.owner && villagers.some((v) => v.id === it.owner && watchingBubbles(v))) completeTask('bubblesneak');
+  }
+  function drawBubbles(ctx) {
+    for (const b of (L && L.bubbles) || []) {
+      const y = b.y - b.z, a = Math.min(1, b.life);
+      ctx.strokeStyle = `rgba(255,255,255,${0.75 * a})`; ctx.lineWidth = 0.8; ctx.fillStyle = `rgba(190,225,255,${0.18 * a})`;
+      ctx.beginPath(); ctx.arc(b.x, y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${0.8 * a})`; circle(ctx, b.x - b.r * 0.35, y - b.r * 0.35, b.r * 0.22);
+      ctx.fillStyle = `rgba(255,170,220,${0.25 * a})`; ctx.beginPath(); ctx.arc(b.x + b.r * 0.2, y + b.r * 0.2, b.r * 0.6, 0, Math.PI); ctx.fill();
+    }
+  }
+
+  // --- The morning paper ----------------------------------------------------------------------------
+  function recordNews(reason) {
+    const kept = items.filter(inHideout).length + (L.buried || []).length;
+    const R = L.rival || {};
+    save.lastNews = { town: L.name, day: run.day, reason, eaten: run.eaten || 0, frights: run.frights || 0, smashed: run.smashed || 0, kept, tasks: run.done.size, won: R.won || 0, lost: R.lost || 0, combo: (run.combo && run.combo.best) || 0, treasure: !!(L.treasure && L.treasure.found) };
+    save.wanted = (save.wanted || 0) + (run.frights || 0) + (run.smashed || 0) + run.done.size;
+  }
+  function renderNews() {
+    const el = document.getElementById('rc-news');
+    if (!el) return;
+    const N = save.lastNews;
+    if (!N) { el.hidden = true; return; }
+    const town = N.town.toUpperCase();
+    const heads = [];
+    if (N.reason === 'caught') heads.push(`MASKED MENACE NABBED IN ${town}!`, `RACCOON CAUGHT RED-PAWED IN ${town}`);
+    if (N.treasure) heads.push(`RACCOON DIGS UP PIRATE GOLD IN ${town}`);
+    if (N.combo >= 5) heads.push(`${town} IN UPROAR AFTER ${N.combo}-PRANK SPREE`);
+    if (N.smashed >= 3) heads.push(`${N.smashed} THINGS SMASHED IN ${town} RAMPAGE`);
+    if (N.frights >= 8) heads.push(`JUMPY ${town} RESIDENTS DEMAND ANSWERS`);
+    if (N.eaten >= 3) heads.push(`${town} PANTRIES RAIDED: ${N.eaten} SNACKS GONE`);
+    if (N.lost > N.won) heads.push(`RIVAL RACCOON “BANDIT” WINS GOLDEN ACORN LEAGUE`);
+    else if (N.won > 0) heads.push(`LOCAL RACCOON BEATS RIVAL ${N.won}–${N.lost} IN ACORN RACES`);
+    if (N.reason === 'win') heads.push(`${town} THOROUGHLY RANSACKED`);
+    heads.push(`STRANGE GOINGS-ON IN ${town}`);
+    const lv = wantedLevel();
+    el.hidden = false;
+    el.innerHTML = '';
+    const mk = (cls, text) => { const d = document.createElement('div'); d.className = cls; d.textContent = text; el.appendChild(d); return d; };
+    mk('news-mast', 'The Daily Acorn');
+    mk('news-head', heads[0]);
+    mk('news-body', `Yesterday in ${N.town}: ${N.frights} villager${N.frights === 1 ? '' : 's'} frightened, ${N.smashed} thing${N.smashed === 1 ? '' : 's'} smashed, ${N.eaten} snack${N.eaten === 1 ? '' : 's'} eaten and ${N.kept} treasure${N.kept === 1 ? '' : 's'} carried off. Police say the culprit has “a stripy tail and no shame”.`);
+    mk('news-wanted', `Wanted level ${'★'.repeat(lv)}${'☆'.repeat(5 - lv)} · reward ${wantedReward()} acorns`);
+  }
+
+  // --- Once a frame ---------------------------------------------------------------------------------
+  function updateExtras(dt) {
+    if (!L || !started || paused) return;
+    const C = run.combo;
+    if (C) { C.t = Math.max(0, C.t - dt); C.show = Math.max(0, C.show - dt); if (C.t <= 0) C.n = 0; }
+    updateBox(dt);
+    const B = L.bubbler;
+    if (B) {
+      B.cd = Math.max(0, B.cd - dt);
+      if (B.on > 0) {
+        B.on -= dt;
+        if (Math.random() < dt * 9) L.bubbles.push({ x: B.x + 8, y: B.y + rr(-4, 4), z: 26, vx: rr(-25, 25) + WIND() * 0.3, vy: rr(-14, 14), r: rr(3, 7), life: rr(5, 9), ph: rr(0, 6) });
+      }
+      for (let i = L.bubbles.length - 1; i >= 0; i--) {
+        const b = L.bubbles[i];
+        b.life -= dt; b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 1 - dt * 0.3; b.ph += dt * 2; b.z = Math.max(4, b.z + Math.sin(b.ph) * 8 * dt - 2 * dt);
+        const popped = areaOf(player.x, player.y) === 0 && Math.hypot(b.x - player.x, b.y - player.y) < b.r + 8 && b.z < 22 + player.hop;
+        if (popped || b.life <= 0) {
+          L.bubbles.splice(i, 1);
+          for (let k = 0; k < 4; k++) particles.push({ kind: 'shard', col: 'rgba(220,240,255,0.9)', x: b.x, y: b.y, z: b.z, vx: rr(-30, 30), vy: rr(-20, 20), vz: rr(-10, 30), life: 0.3, max: 0.3 });
+          if (popped) { sfx('pop'); run.bubblesPopped = (run.bubblesPopped || 0) + 1; setProgress('bubbles', run.bubblesPopped); }
+        }
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -13303,7 +13583,7 @@
     for (const h of hens) if (h.x > left - pad && h.x < left + viewW + pad && h.y > top - pad && h.y < top + viewH + pad) vis.push({ y: h.y, isHen: true, h });
     if (cat && cat.x > left - pad && cat.x < left + viewW + pad && cat.y > top - pad && cat.y < top + viewH + pad + 40) vis.push({ y: cat.y + 0.5, isCat: true });
 
-    if (!indoors) { drawPuddles(ctx, t); drawFrost(ctx, left, top, viewW, viewH, t); drawMounds(ctx); drawFlood(ctx, t); drawCloudburst(ctx, left, top, viewW, viewH, t); drawPiste(ctx, t); drawRainyGround(ctx); }
+    if (!indoors) { drawPuddles(ctx, t); drawFrost(ctx, left, top, viewW, viewH, t); drawMounds(ctx); drawFlood(ctx, t); drawCloudburst(ctx, left, top, viewW, viewH, t); drawPiste(ctx, t); drawTreasureX(ctx); drawRainyGround(ctx); }
     // Ground-level effects: dust and ripples
     for (const q of particles) {
       if (q.kind === 'ring') {
@@ -13339,7 +13619,7 @@
       o.draw(ctx, t, fade);
     }
 
-    if (!indoors) { drawSkyWorld(ctx, left, top, viewW, viewH, t); drawBolt(ctx, top); drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); drawLantern(ctx, t); drawKite(ctx, t); drawRaceMarker(ctx, t); }
+    if (!indoors) { drawSkyWorld(ctx, left, top, viewW, viewH, t); drawBolt(ctx, top); drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); drawLantern(ctx, t); drawKite(ctx, t); drawRaceMarker(ctx, t); drawBubbles(ctx); drawCombo(ctx, t); }
     if (player.roof) drawPlayerWithHeld(ctx, t);
     // Indoors: black out everything beyond this room's walls (other rooms share the strip)
     if (indoors) {
@@ -13449,6 +13729,7 @@
       ctx.beginPath(); ctx.arc(mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 3.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#24170e'; circle(ctx, mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 1.4);
       drawRivalMini(ctx, mx, my, mw, mh);
+      if (L.treasure && L.treasure.known && !L.treasure.found) { const tx = mx + L.treasure.x / WORLD_W * mw, ty = my + L.treasure.y / WORLD_H * mh; ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx - 3, ty - 3); ctx.lineTo(tx + 3, ty + 3); ctx.moveTo(tx + 3, ty - 3); ctx.lineTo(tx - 3, ty + 3); ctx.stroke(); }
       for (const r of online.peers.values()) {
         const rp = outdoorPos(r.x, r.y);
         ctx.fillStyle = (r.by && online.colors[r.by]) || '#7fe3ff';
@@ -13505,6 +13786,7 @@
       updateSchoolEtc(dt);
       updateStormsBreeze(dt);
       updateFestivals(dt);
+      updateExtras(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
