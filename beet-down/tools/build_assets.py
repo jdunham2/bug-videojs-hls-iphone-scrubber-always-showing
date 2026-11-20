@@ -57,10 +57,10 @@ def put(name, im, q=82, **meta):
 
 
 # ---------- 3D renders ----------
-HUE = {'w_rail': 62, 'i_core': -92, 'i_crown': 92, 'i_chrono': -50}
+HUE = {'w_frost': 58, 'w_rail': 62, 'i_core': -92, 'i_crown': 92, 'i_chrono': -50}
 TINT = {'veg_avocado': ((20, 45, 10), (70, 130, 40), (170, 215, 110)), 'i_ember': ((90, 20, 0), (255, 120, 20), (255, 232, 130)), 'i_mirror': ((20, 40, 70), (150, 200, 240), (245, 252, 255)), 'i_coffin': ((30, 10, 40), (120, 70, 150), (225, 195, 245)), 'veg_egg': ((110, 96, 80), (238, 230, 214), (255, 253, 247)), 'i_glassball': ((10, 50, 80), (110, 220, 255), (235, 252, 255)), 'i_candle': ((30, 30, 90), (150, 170, 255), (240, 244, 255)), 'i_urn': ((90, 50, 0), (240, 170, 30), (255, 236, 150)), 'i_fshield': ((10, 40, 80), (70, 190, 255), (220, 248, 255))}  # colourise grey models  # hue shift (0-255 scale): purple crystal -> alien green, blue jewel -> ruby red
-ROT = {'veg_banana': 58, 'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90, 'w_pick': -90, 'w_scythe': -90, 'w_cane': -90, 'w_pepper': -90}
-FLIP = {'w_pizza', 'w_silencer', 'w_cluster', 'w_tender', 'w_laser', 'w_rail', 'w_mines', 'w_guzi', 'w_knife', 'w_pistol', 'w_smg', 'w_shotgun', 'w_rocket', 'w_zapper', 'w_sniper', 'w_minigun', 'w_bouncer', 'w_lobber', 'w_flamer'}
+ROT = {'veg_banana': 58, 'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90, 'w_pick': -90, 'w_scythe': -90, 'w_cane': -90, 'w_pepper': -90, 'w_shovel': -90}
+FLIP = {'w_ballista', 'w_cannon', 'w_turret', 'w_pizza', 'w_silencer', 'w_cluster', 'w_tender', 'w_laser', 'w_rail', 'w_mines', 'w_guzi', 'w_knife', 'w_pistol', 'w_smg', 'w_shotgun', 'w_rocket', 'w_zapper', 'w_sniper', 'w_minigun', 'w_bouncer', 'w_lobber', 'w_flamer'}
 for f in sorted(os.listdir(RAW)):
     n = f[:-4]
     im = load(os.path.join(RAW, f))
