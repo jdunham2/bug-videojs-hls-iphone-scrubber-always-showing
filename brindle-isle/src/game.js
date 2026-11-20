@@ -1296,6 +1296,22 @@ function buildCache() {
 const walkable = (px, py) => { const x = Math.floor(px / T), y = Math.floor(py / T); return isLand(tileAt(x, y)) && (!isBridge(x, y) || S.bridge); };
 
 // ---------- state ----------
+const FISH = {
+  minnow: { name: 'Silver Minnow', price: 5, r: 'common', col: ['#c8d4e0', '#8898a8'], z: ['isle', 'murky', 'warm'] },
+  bass: { name: 'Brindle Bass', price: 12, r: 'common', col: ['#6a8a4a', '#4a6a34'], z: ['isle'] },
+  trout: { name: 'Rainbow Trout', price: 28, r: 'rare', col: ['#e8a8c0', '#7fa8d8'], z: ['isle', 'cold'] },
+  perch: { name: 'Ice Perch', price: 10, r: 'common', col: ['#bfe0f0', '#7fb0d0'], z: ['cold'] },
+  pike: { name: 'Frost Pike', price: 32, r: 'rare', col: ['#8ab8d8', '#e6f4ff'], z: ['cold'] },
+  sunfish: { name: 'Sunfish', price: 10, r: 'common', col: ['#e8c060', '#e8803a'], z: ['warm'] },
+  angelfish: { name: 'Coral Angelfish', price: 30, r: 'rare', col: ['#ff9a7a', '#5ab0d8'], z: ['warm'] },
+  mudcat: { name: 'Mudcat', price: 9, r: 'common', col: ['#7a6a4a', '#5a4a34'], z: ['murky'] },
+  snapper: { name: 'Mangrove Snapper', price: 16, r: 'uncommon', col: ['#d86a4a', '#a84a3a'], z: ['murky', 'warm'] },
+  gar: { name: 'Ghost Gar', price: 34, r: 'rare', col: ['#d8e0e0', '#9aa8a8'], z: ['murky', 'dark'] },
+  glowfin: { name: 'Glowfin', price: 14, r: 'uncommon', col: ['#5a6aa8', '#9fe8ff'], z: ['dark', 'cold'] },
+  stareel: { name: 'Starry Eel', price: 40, r: 'rare', col: ['#2a2a5a', '#ffe9a8'], z: ['dark'] },
+  goldkoi: { name: 'Golden Koi', price: 90, r: 'legendary', col: ['#ffd65a', '#e8803a'], z: ['all'] },
+  boot: { name: 'Old Boot', price: 1, r: 'junk', col: ['#6a4a30', '#3a2a1a'], z: ['all'] },
+};
 const ITEMS = {
   wood:    { name: 'Wood', price: 2 },
   stone:   { name: 'Stone', price: 3 },
@@ -1326,6 +1342,22 @@ const ITEMS = {
   aurorastone: { name: 'Aurora Stone', price: 1000 },
   abyssaltooth: { name: 'Abyssal Tooth', price: 1050 },
   baton: { name: 'Ringmaster\'s Baton', price: 1100 },
+  minnow: { name: 'Silver Minnow', price: 5 },
+  bass: { name: 'Brindle Bass', price: 12 },
+  trout: { name: 'Rainbow Trout', price: 28 },
+  perch: { name: 'Ice Perch', price: 10 },
+  pike: { name: 'Frost Pike', price: 32 },
+  sunfish: { name: 'Sunfish', price: 10 },
+  angelfish: { name: 'Coral Angelfish', price: 30 },
+  mudcat: { name: 'Mudcat', price: 9 },
+  snapper: { name: 'Mangrove Snapper', price: 16 },
+  gar: { name: 'Ghost Gar', price: 34 },
+  glowfin: { name: 'Glowfin', price: 14 },
+  stareel: { name: 'Starry Eel', price: 40 },
+  goldkoi: { name: 'Golden Koi', price: 90 },
+  boot: { name: 'Old Boot', price: 1 },
+  stew: { name: 'Fisher\'s Stew', price: 45 },
+  luckylure: { name: 'Lucky Lure', price: 300 },
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
@@ -1443,6 +1475,18 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'firstcast', giver: 'finn', name: 'First Cast', goal: { bring: { minnow: 3 } }, reward: { gold: 60, items: { herb: 4 } },
+    offer: ['Shh, you\'ll scare the fish! Oh, hello. Finn\'s the name. Ever been fishing?', 'Craft a Fishing Rod at the village workbench: four wood and two herbs. Face the water and cast. When the bobber dips, press again, then stop the marker in the green zone!', 'Bring me three Silver Minnows and I\'ll make an angler of you yet.'],
+    done: ['Three fine minnows! You\'re a natural. Here, some herbs. Minnows and herbs make a lovely stew at the workbench.'] },
+  { id: 'bigcatch', giver: 'finn', name: 'The Big Ones', req: 'firstcast', goal: { bring: { trout: 1, pike: 1 } }, reward: { gold: 220, items: { crystal: 4 } },
+    offer: ['Every region has its own fish. Cold waters, warm seas, murky swamps, the dark lakes of Duskhollow.', 'Bring me a Rainbow Trout from here on the isle and a Frost Pike from the cold north. They\'re rare, and they fight hard: the green zone is small.'],
+    done: ['Look at the size of them! You\'ve got the touch.'] },
+  { id: 'journal', giver: 'finn', name: 'The Fish Journal', req: 'bigcatch', goal: { journal: 10 }, reward: { gold: 400, items: { luckylure: 1 } },
+    offer: ['Now for a real challenge. Catch ten different kinds of fish. Your rod keeps count in its little journal.', 'Try every kind of water: the swamps, the sands, the snow, the dusk.'],
+    done: ['Ten species! Take my Lucky Lure. While you carry it, rare fish bite more often and the green zone is wider.'] },
+  { id: 'goldkoi', giver: 'finn', name: 'The Golden Koi', req: 'journal', goal: { bring: { goldkoi: 1 } }, reward: { gold: 900, items: { crystal: 10 } },
+    offer: ['There\'s one fish I\'ve never caught. The Golden Koi. It swims in every water, but bites once in a blue moon.', 'Its green zone is tiny and the marker flies. Bring me one, and you\'ll be the greatest angler on Brindle Isle.'],
+    done: ['The Golden Koi... I never thought I\'d see one. You\'re the greatest angler on Brindle Isle!'] },
   { id: 'carnival', giver: 'tobin', name: 'The Carnival of Masks', req: 'lumber', goal: { boss: ['jesters', 'ringmaster'] }, reward: { gold: 720, items: { crystal: 20, potion: 3 } },
     offer: ['A carnival tent popped up in the north field overnight. Music plays, but nobody\'s inside. Nobody alive, anyway.', 'The crew says two jesters and a ringmaster run the show. Mind the red and blue blocks in there: strike a crystal and they swap!'],
     done: ['The music\'s stopped and the tent is empty. Keep the baton, hero: you stole the show.'] },
@@ -1639,6 +1683,7 @@ function questDone(q) {
   if (g.find) return !!S.found[g.find];
   if (g.boss) return g.boss.every(b => S.defeated[b]);
   if (g.lanterns) return litLanterns() >= g.lanterns;
+  if (g.journal) return fishSpecies() >= g.journal;
   return false;
 }
 function questProgress(q) {
@@ -1647,6 +1692,7 @@ function questProgress(q) {
   if (g.bring) return Object.entries(g.bring).map(([k, n]) => `${ITEMS[k].name} ${Math.min(n, S.inv[k])}/${n}`).join(', ');
   if (g.find) return S.found[g.find] ? (q.foundText || 'Found! Return it.') : (q.hint || 'Search the western forest');
   if (g.boss) return `Bosses ${g.boss.filter(b => S.defeated[b]).length}/${g.boss.length}`;
+  if (g.journal) return `Fish species ${Math.min(g.journal, fishSpecies())}/${g.journal}`;
   if (g.lanterns) return `Spirit lanterns ${Math.min(g.lanterns, litLanterns())}/${g.lanterns}`;
   return '';
 }
@@ -1716,13 +1762,15 @@ function questInteract(n, after) {
 }
 const RECIPES = [
   { id: 'pickaxe', name: 'Stone Pickaxe', desc: 'Lets you mine crystals. Breaks rocks twice as fast and doubles stone.', cost: { wood: 5, stone: 4 }, tool: true },
+  { id: 'rod', name: 'Fishing Rod', desc: 'Face any water and press the action button to cast. Press again when a fish bites, then stop the marker in the green zone.', cost: { wood: 4, herb: 2 }, tool: true },
+  { id: 'stew', name: 'Fisher\'s Stew', desc: 'A hearty bowl of minnow stew. Sells for 45g.', cost: { minnow: 2, herb: 2 } },
   { id: 'planks', name: 'Plank Bundle', desc: 'Sells for 14g, much more than loose wood.', cost: { wood: 4 } },
   { id: 'potion', name: 'Meadow Tonic', desc: 'Restores 3 hearts (press Q). Sells for 20g.', cost: { herb: 2, goo: 1 } },
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0, harvestcrown: 0, glacial: 0, aurorastone: 0, driftwood: 0, abyssaltooth: 0, baton: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
-    tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0, prismheart: 0, jade: 0, serpenteye: 0, petal: 0, dragonpearl: 0, coral: 0, krakenbeak: 0, gear: 0, clockheart: 0, starshard: 0, cosmicheart: 0, corn: 0, harvestcrown: 0, glacial: 0, aurorastone: 0, driftwood: 0, abyssaltooth: 0, baton: 0, minnow: 0, bass: 0, trout: 0, perch: 0, pike: 0, sunfish: 0, angelfish: 0, mudcat: 0, snapper: 0, gar: 0, glowfin: 0, stareel: 0, goldkoi: 0, boot: 0, stew: 0, luckylure: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+    tools: { pickaxe: false, rod: false }, fishLog: {}, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
 let S = freshState();
@@ -2478,6 +2526,15 @@ if (HAMLET) {
   addSign('Odo\'s Landing', 'Odo\'s Landing. The tide turns every half minute or so: watch the tide meter, and never get caught out on the sandbars!', MANG_D.camp.x - 60, MANG_D.camp.y + 110);
 }
 addSign('Carnival poster', 'Come one, come all! The Carnival of Masks! See the Twin Jesters! Marvel at the Ringmaster! Admission: your courage.', CARNIVAL.x + 80, CARNIVAL.y - 10);
+// Angler Finn, fishing on the shore by Saltmarsh Hamlet
+{
+  let spot = null, bd = 1e9;
+  const hx = HAMLET ? Math.floor(HAMLET.x / T) + 4 : cx, hy = HAMLET ? Math.floor(HAMLET.y / T) + 1 : cy, ferry = NPCS.find(n => n.id === 'ferry_out');
+  for (let y = hy - 10; y <= hy + 10; y++) for (let x = hx - 10; x <= hx + 10; x++) { if (x < 1 || x >= OW - 1 || (tiles[y * W + x] !== LAND && tiles[y * W + x] !== PATH)) continue; const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b2]) => tiles[(y + b2) * W + x + a] === DEEP); if (!wet || nearHouse(x, y, 3) || (ferry && Math.hypot(x * T + 16 - ferry.x, y * T + 16 - ferry.y) < 4 * T)) continue; const d = Math.hypot(x - hx, y - hy); if (d < bd) { bd = d; spot = [x, y]; } }
+  if (!spot) spot = [cx + 4, cy - 6];
+  const fx = spot[0] * T + 16, fy = spot[1] * T + 20;
+  NPCS.push(Object.assign({ id: 'finn', name: 'Angler Finn', x: fx, y: fy, sheet: 'finn_idle', walk: 'finn_walk', verb: 'Talk to', path: [[fx, fy], [fx + 1, fy]] }, { fx: 0, fy: 1, wait: 0, target: 0, moving: false, step: 0 }));
+}
 addFerry('ferry_home', 'Boat to Saltmarsh', (SUN_D.x0 + 21) * T + 6, 3 * T + 16);
 addSign('Mirra Oasis', 'Mirra Oasis. Shade, cool water and Zahir\'s bazaar. Corsair\'s Cove lies down the east path, the Sunken Ruins to the southwest.', SUN_D.mirra.x + 40, SUN_D.mirra.y - 20);
 addSign('Corsair\'s Cove', 'Corsair\'s Cove. No questions asked, no gold returned.', SUN_D.cove.x - 90, SUN_D.cove.y - 40);
@@ -2527,7 +2584,25 @@ for (const [key, n] of [['chicken', 3], ['sheep', 1], ['cow', 1]]) for (let i = 
 }
 
 // ---------- icons ----------
+const HIDE_ZERO = new Set(['minnow', 'bass', 'trout', 'perch', 'pike', 'sunfish', 'angelfish', 'mudcat', 'snapper', 'gar', 'glowfin', 'stareel', 'goldkoi', 'boot', 'stew', 'luckylure']);
 const ICON_DRAW = {
+  minnow: c => fishIcon(c, '#c8d4e0', '#8898a8'),
+  bass: c => fishIcon(c, '#6a8a4a', '#4a6a34'),
+  trout: c => fishIcon(c, '#e8a8c0', '#7fa8d8'),
+  perch: c => fishIcon(c, '#bfe0f0', '#7fb0d0'),
+  pike: c => fishIcon(c, '#8ab8d8', '#e6f4ff'),
+  sunfish: c => fishIcon(c, '#e8c060', '#e8803a'),
+  angelfish: c => fishIcon(c, '#ff9a7a', '#5ab0d8'),
+  mudcat: c => fishIcon(c, '#7a6a4a', '#5a4a34'),
+  snapper: c => fishIcon(c, '#d86a4a', '#a84a3a'),
+  gar: c => fishIcon(c, '#d8e0e0', '#9aa8a8'),
+  glowfin: c => fishIcon(c, '#5a6aa8', '#9fe8ff'),
+  stareel: c => fishIcon(c, '#2a2a5a', '#ffe9a8'),
+  goldkoi: c => fishIcon(c, '#ffd65a', '#e8803a'),
+  boot: c => { c.fillStyle = '#6a4a30'; c.beginPath(); c.moveTo(10, 4); c.lineTo(18, 4); c.lineTo(18, 18); c.lineTo(28, 22); c.lineTo(28, 28); c.lineTo(8, 28); c.closePath(); c.fill(); c.fillStyle = '#3a2a1a'; c.fillRect(8, 26, 20, 3); c.fillStyle = '#8a6a44'; c.fillRect(10, 8, 8, 2); c.fillStyle = '#5a8a3a'; c.fillRect(20, 4, 2, 6); },
+  stew: c => { c.fillStyle = '#5a5a64'; c.beginPath(); c.ellipse(16, 20, 12, 8, 0, 0, Math.PI); c.fill(); c.fillRect(4, 16, 24, 4); c.fillStyle = '#d8a050'; c.beginPath(); c.ellipse(16, 16, 11, 4, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c8d4e0'; c.fillRect(12, 14, 6, 3); c.fillStyle = '#5a8a3a'; c.fillRect(19, 15, 3, 2); c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 1.5; for (const x of [11, 16, 21]) { c.beginPath(); c.moveTo(x, 10); c.quadraticCurveTo(x + 3, 7, x, 3); c.stroke(); } },
+  luckylure: c => { c.fillStyle = 'rgba(255,214,90,.35)'; circle(c, 16, 16, 13); c.strokeStyle = '#c8c8c8'; c.lineWidth = 2; c.beginPath(); c.moveTo(16, 2); c.lineTo(16, 8); c.stroke(); c.fillStyle = '#ffd65a'; c.beginPath(); c.ellipse(16, 16, 6, 9, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#e04a4a'; c.fillRect(11, 14, 10, 3); c.strokeStyle = '#c8c8c8'; c.beginPath(); c.arc(16, 27, 3, 0, Math.PI); c.stroke(); },
+  rod: c => { c.strokeStyle = '#8a5a32'; c.lineWidth = 3; c.beginPath(); c.moveTo(6, 28); c.lineTo(26, 4); c.stroke(); c.strokeStyle = 'rgba(240,240,240,.9)'; c.lineWidth = 1; c.beginPath(); c.moveTo(26, 4); c.quadraticCurveTo(30, 14, 24, 22); c.stroke(); c.fillStyle = '#e04a4a'; circle(c, 24, 23, 2.5); c.fillStyle = '#5a5a64'; circle(c, 10, 23, 3); },
   wood: c => { c.fillStyle = '#2a1a10'; c.fillRect(4, 10, 24, 13); c.fillStyle = '#7a4b27'; c.fillRect(5, 11, 22, 11); c.fillStyle = '#9a6234'; c.fillRect(5, 11, 22, 3); c.fillStyle = '#d8a96b'; ellipse(c, 25, 16.5, 4, 5.5); c.strokeStyle = '#7a4b27'; c.lineWidth = 1; c.beginPath(); c.arc(25, 16.5, 2, 0, 7); c.stroke(); },
   goo: c => { c.fillStyle = '#5fd06a'; c.beginPath(); c.moveTo(16, 5); c.quadraticCurveTo(26, 18, 22, 24); c.quadraticCurveTo(16, 30, 10, 24); c.quadraticCurveTo(6, 18, 16, 5); c.fill(); c.fillStyle = 'rgba(255,255,255,.6)'; circle(c, 13, 19, 2.5); },
   planks: c => { for (let i = 0; i < 3; i++) { c.fillStyle = '#2a1a10'; c.fillRect(3, 7 + i * 6, 26, 6); c.fillStyle = i % 2 ? '#a8713f' : '#8a5a32'; c.fillRect(4, 8 + i * 6, 24, 4); } c.fillStyle = '#d8c48a'; c.fillRect(14, 6, 4, 20); },
@@ -2596,7 +2671,7 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'glacial', 'driftwood', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone', 'abyssaltooth', 'baton'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'jade', 'petal', 'coral', 'gear', 'starshard', 'corn', 'glacial', 'driftwood', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone', 'abyssaltooth', 'baton', 'minnow', 'bass', 'trout', 'perch', 'pike', 'sunfish', 'angelfish', 'mudcat', 'snapper', 'gar', 'glowfin', 'stareel', 'goldkoi', 'boot', 'stew', 'luckylure'];
 const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem', 'prismheart', 'serpenteye', 'dragonpearl', 'krakenbeak', 'clockheart', 'cosmicheart', 'harvestcrown', 'aurorastone', 'abyssaltooth', 'baton'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
@@ -2621,7 +2696,8 @@ function updateHUD() {
   document.querySelector('.objective .label').textContent = DI ? DI.name : DL ? DL.name : 'Goal · Rebuild the south bridge';
   $('fund').style.width = Math.min(100, S.gold / GOAL * 100) + '%';
   let inv = '';
-  for (const k of INV_ORDER) if (!TROPHIES.includes(k) || S.inv[k]) inv += `<button class="slot ${S.inv[k] ? '' : 'zero'}" data-item="${k}" title="${ITEMS[k].name}" aria-label="${ITEMS[k].name}: ${S.inv[k]}"><img src="${ICONS[k]}" alt=""><b>${S.inv[k]}</b></button>`;
+  for (const k of INV_ORDER) if ((!TROPHIES.includes(k) && !HIDE_ZERO.has(k)) || S.inv[k]) inv += `<button class="slot ${S.inv[k] ? '' : 'zero'}" data-item="${k}" title="${ITEMS[k].name}" aria-label="${ITEMS[k].name}: ${S.inv[k]}"><img src="${ICONS[k]}" alt=""><b>${S.inv[k]}</b></button>`;
+  if (S.tools.rod) inv += `<div class="slot tool" title="Fishing Rod · fish journal ${fishSpecies()} / ${FISH_SPECIES.length}"><img src="${ICONS.rod}" alt="Fishing Rod"><b>${fishSpecies()}</b></div>`;
   if (S.tools.pickaxe) inv += `<div class="slot tool" title="Stone Pickaxe"><img src="${ICONS.pickaxe}" alt="Stone Pickaxe"></div>`;
   inv += `<button class="slot tool" data-gear="1" title="${gearW().name}"><img src="${ICONS['w_' + S.gear.weapon]}" alt="${gearW().name}"></button>`;
   inv += `<button class="slot tool" data-gear="1" title="${gearA().name}"><img src="${ICONS['a_' + S.gear.armor]}" alt="${gearA().name}"></button>`;
@@ -2717,6 +2793,12 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">Fishing</div>
+      <dl class="controls">
+      <dt>Rod</dt><dd>Craft a Fishing Rod at the village workbench (4 wood, 2 herbs). Angler Finn fishes on the shore by Saltmarsh Hamlet, on the southeast coast.</dd>
+      <dt>Casting</dt><dd>Face water and press the action button to cast. When the bobber dips and a "!" appears, press again quickly. Then a marker sweeps across a bar: press when it's inside the green zone to land the fish. Walking away reels in.</dd>
+      <dt>Fish</dt><dd>14 kinds to catch. The isle, cold waters (Frostmoor, Glacier Rift), warm waters (Sunward Isles, Petalfall Vale), murky waters (Mirewood, Verdant Wilds, Harvest Hollow, Mangrove Shoals) and the dark lakes of Duskhollow each have their own. Rarer fish have smaller green zones and faster markers. The Golden Koi bites anywhere, but very rarely.</dd>
+      <dt>Journal</dt><dd>Your rod counts the species you've caught (shown on its slot). Talk to Finn to read the journal. Sell fish at any shop, or cook two minnows and two herbs into Fisher's Stew.</dd></dl>
       <div class="label">The Carnival of Masks</div>
       <dl class="controls">
       <dt>Getting in</dt><dd>The striped tent in Brindle Isle's north field, west of the slime arena.</dd>
@@ -3119,6 +3201,7 @@ function onAction() {
   if (P.ride || P.bounce) return false;
   if (dlg) { advanceDialogue(); return false; }
   if (!$('victory').hidden || panel || P.dash) return false;
+  if (P.fish) { fishPress(); return true; }
   if (P.act) { if (!['faint', 'drink', 'spin'].includes(P.act.kind)) P.queued = true; return true; }
   const n = nearestNPC();
   if (n) { face(n); interact(n); return false; }
@@ -3163,6 +3246,7 @@ function onAction() {
     else doAct(S.tools.pickaxe ? 'pick' : 'sword', a => hitResource(res, a));
     return true;
   }
+  if (S.tools.rod) { const w = waterAhead(); if (w) { startFishing(w); return true; } }
   doAct('sword', hitEnemies);
   return true;
 }
@@ -3178,6 +3262,7 @@ function interact(n) {
   if (n.id === 'ysolde') { shopName = 'Ysolde\'s Trading Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
   if (n.boat && n.id === 'punt_out') { const first = !S.found.mangrove; S.found.mangrove = true; travel(MANG_D.start.x, MANG_D.start.y, 0, 1, 'Mangrove Shoals'); if (first) setTimeout(() => toast('Misty water and twisted roots. Odo\'s Landing is just south of the punt.', 4500), 1200); return; }
   if (n.boat && n.id === 'punt_home') { const Pn = NPCS.find(m => m.id === 'punt_out'); travel(Pn.x + 50, Pn.y + 10, 1, 0, 'The Mirewood'); return; }
+  if (n.id === 'finn') { if (!questInteract(n)) say(n.name, finnLines()); return; }
   if (n.id === 'odo') { shopName = 'Odo\'s Bait & Tackle'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
   if (n.boat && n.id === 'sled_out') { const first = !S.found.glacier; S.found.glacier = true; travel(GLAC_D.start.x, GLAC_D.start.y, 0, 1, 'Glacier Rift'); if (first) setTimeout(() => toast('Shimmering lights over a frozen valley. Rift Camp is just south of the sled.', 4500), 1200); return; }
   if (n.boat && n.id === 'sled_home') { const Sd = NPCS.find(m => m.id === 'sled_out'); travel(Sd.x, Sd.y + 50, 0, 1, 'The Frostmoor'); return; }
@@ -3515,7 +3600,7 @@ function update(dt) {
   for (const e of enemies) updateEnemy(e, dt, fainted);
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].remove) enemies.splice(i, 1);
   updateProjectiles(dt, fainted);
-  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); updateAir(dt, fainted); updateTelepads(fainted); updateMeteors(dt); updateBouncers(dt, fainted); updateTide(dt, fainted); updateToggles(dt); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D || dungeonAt(P.x) === TOWER_D) updateJets(dt);
+  updateHazards(dt, fainted); updateVents(fainted); updateDartTraps(); updateLilies(dt, fainted); updateAir(dt, fainted); updateTelepads(fainted); updateMeteors(dt); updateBouncers(dt, fainted); updateTide(dt, fainted); updateToggles(dt); updateFishing(dt); if (dungeonAt(P.x) === SKY_D || dungeonAt(P.x) === SPIRE_D || dungeonAt(P.x) === TOWER_D) updateJets(dt);
   updateBosses(dt, fainted);
   updateWorldLinks(dt);
   for (let i = pickups.length - 1; i >= 0; i--) {
@@ -8377,6 +8462,109 @@ function drawCarnivalGate(c) {
   c.fillStyle = '#1a1018'; c.beginPath(); c.moveTo(x - 16, y); c.lineTo(x - 4, y - 44); c.lineTo(x + 4, y - 44); c.lineTo(x + 16, y); c.closePath(); c.fill();
   c.fillStyle = '#f2ecd8'; ellipse(c, x, y - 64, 9, 10); c.fillStyle = '#1a1018'; c.fillRect(x - 5, y - 67, 3, 2); c.fillRect(x + 2, y - 67, 3, 2); c.strokeStyle = '#c83a4a'; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y - 63, 4, 0.2, Math.PI - 0.2); c.stroke();
 }
+// ---------- fishing: cast, wait for a bite, then stop the reel in the green zone ----------
+const FISH_RARITY = { junk: { w: 6, zone: 0.4, sp: 0.8, col: '#a89878' }, common: { w: 60, zone: 0.34, sp: 0.9, col: '#eef3e6' }, uncommon: { w: 25, zone: 0.26, sp: 1.2, col: '#7fe07a' }, rare: { w: 9, zone: 0.18, sp: 1.55, col: '#7fc8ff' }, legendary: { w: 1.5, zone: 0.12, sp: 1.95, col: '#ffd65a' } };
+const FISH_SPECIES = Object.keys(FISH).filter(k => FISH[k].r !== 'junk');
+let fishHint = false;
+function fishZone(x, y) {
+  if (x < OW * T) return 'isle';
+  const D = dungeonAt(x); if (!D) return null;
+  return { frost: 'cold', glacier: 'cold', sun: 'warm', vale: 'warm', shrine: 'warm', mire: 'murky', jungle: 'murky', mangrove: 'murky', grotto: 'murky', harvest: 'murky', dusk: 'dark' }[D.id] || null;
+}
+function waterAt(x, y) {
+  const t = tileAt(Math.floor(x / T), Math.floor(y / T));
+  if (t !== DEEP && t !== FLOODBAR && t !== POOL) return false;
+  return !!fishZone(x, y);
+}
+function waterAhead() {
+  for (const d of [36, 52, 68, 84]) { const x = P.x + P.fx * d, y = P.y - 6 + P.fy * d; if (waterAt(x, y)) return { x, y }; }
+  return null;
+}
+function fishSpecies() { S.fishLog = S.fishLog || {}; return FISH_SPECIES.filter(k => S.fishLog[k]).length; }
+function startFishing(w) {
+  P.fish = { state: 'cast', t: 0, bx: w.x, by: w.y, sx: P.x, sy: P.y, zone: fishZone(w.x, w.y) };
+  SFX.play('swing');
+  if (!fishHint) { fishHint = true; toast('Wait for a bite, then press again! Stop the moving marker inside the green zone to land the fish.', 4500); }
+}
+function endFishing(msg, col) { if (msg) floatText(P.x, P.y - 70, msg, col || '#eef3e6'); P.fish = null; }
+function pickFish(zone) {
+  const lure = S.inv.luckylure > 0, pool = Object.keys(FISH).filter(k => FISH[k].z.includes(zone) || FISH[k].z.includes('all'));
+  const wt = k => { const r = FISH[k].r; return FISH_RARITY[r].w * (lure && (r === 'rare' || r === 'legendary') ? 1.8 : 1); };
+  let tot = pool.reduce((a, k) => a + wt(k), 0), roll = rng() * tot;
+  for (const k of pool) { roll -= wt(k); if (roll <= 0) return k; }
+  return pool[0];
+}
+function fishPress() {
+  const F = P.fish;
+  if (F.state === 'bite') {
+    const k = pickFish(F.zone), R = FISH_RARITY[FISH[k].r], lure = S.inv.luckylure > 0 ? 1.3 : 1;
+    Object.assign(F, { state: 'reel', t: 0, k, m: 0, dir: 1, zw: Math.min(0.6, R.zone * lure), sp: R.sp, zc: 0 });
+    F.zc = F.zw / 2 + rng() * (1 - F.zw); SFX.play('hit');
+    return;
+  }
+  if (F.state === 'reel') {
+    if (Math.abs(F.m - F.zc) <= F.zw / 2) landFish(F.k);
+    else { burst(F.bx, F.by, '#bfe8ff', 8); endFishing('It slipped off the hook!', '#ff9a9a'); }
+    return;
+  }
+  endFishing('You reel in your line.');
+}
+function landFish(k) {
+  const F = P.fish, f = FISH[k];
+  for (let i = 0; i < 12; i++) particles.push({ x: F.bx, y: F.by, vx: (rng() - 0.5) * 120, vy: -60 - rng() * 80, life: 0.6, color: '#bfe8ff', size: 3 });
+  P.fish = null;
+  if (rng() < 0.03) { drop(P.x, P.y - 20, 'gold', 12, 4); banner('You hooked a sunken treasure chest!', '#ffe08a'); SFX.play('lucky'); return; }
+  S.inv[k] = (S.inv[k] || 0) + 1; S.fishLog = S.fishLog || {};
+  const first = !S.fishLog[k] && f.r !== 'junk'; S.fishLog[k] = (S.fishLog[k] || 0) + 1;
+  if (first) banner(`New fish: ${f.name}! Journal ${fishSpecies()} / ${FISH_SPECIES.length}`, FISH_RARITY[f.r].col);
+  floatText(P.x, P.y - 70, f.r === 'junk' ? `${f.name}... oh well.` : `Caught a ${f.name}!`, FISH_RARITY[f.r].col);
+  SFX.play(f.r === 'rare' || f.r === 'legendary' ? 'lucky' : 'collect');
+  if (f.r === 'legendary') impact(4);
+  updateHUD(); questTick(); save();
+}
+function updateFishing(dt) {
+  const F = P.fish; if (!F) return;
+  if (Math.hypot(P.x - F.sx, P.y - F.sy) > 3 || P.act || dlg || panel || S.hp <= 0) { P.fish = null; return; }
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].some(k => keys[k]) || Math.hypot(joy.dx, joy.dy) > 0.3) { endFishing('You reel in your line.'); return; }
+  F.t += dt;
+  if (F.state === 'cast' && F.t > 0.45) { F.state = 'wait'; F.t = 0; F.wait = 1.4 + rng() * 3.2; SFX.play('slime'); }
+  else if (F.state === 'wait' && F.t > F.wait) { F.state = 'bite'; F.t = 0; SFX.play('coin'); }
+  else if (F.state === 'bite' && F.t > 0.9) endFishing('Too slow! It got away.', '#ff9a9a');
+  else if (F.state === 'reel') { F.m += F.dir * F.sp * dt; if (F.m > 1) { F.m = 1; F.dir = -1; } if (F.m < 0) { F.m = 0; F.dir = 1; } if (F.t > 5) endFishing('The line snapped!', '#ff9a9a'); }
+}
+function drawFishing(c) {
+  const F = P.fish; if (!F) return;
+  const tipX = P.x + P.fx * 18 + (P.fx === 0 ? 10 : 0), tipY = P.y - 46, k = F.state === 'cast' ? Math.min(1, F.t / 0.45) : 1;
+  const bx = tipX + (F.bx - tipX) * k, by = tipY + (F.by - tipY) * k - Math.sin(Math.PI * k) * 40 * (F.state === 'cast' ? 1 : 0);
+  const dip = F.state === 'bite' ? 5 + Math.sin(time * 30) * 2 : F.state === 'reel' ? 3 + Math.sin(time * 20) * 3 : Math.sin(time * 3) * 1.5;
+  c.strokeStyle = '#6a4424'; c.lineWidth = 3; c.beginPath(); c.moveTo(P.x + P.fx * 4, P.y - 22); c.lineTo(tipX, tipY); c.stroke();
+  c.strokeStyle = 'rgba(240,240,240,.8)'; c.lineWidth = 1; c.beginPath(); c.moveTo(tipX, tipY); c.quadraticCurveTo((tipX + bx) / 2, Math.max(tipY, by) + 10, bx, by + dip); c.stroke();
+  if (F.state !== 'cast') { c.strokeStyle = 'rgba(220,245,250,.6)'; c.lineWidth = 1; for (let i = 0; i < 2; i++) { const r = ((time * (F.state === 'bite' ? 40 : 14) + i * 10) % 20); c.globalAlpha = 1 - r / 20; c.beginPath(); c.ellipse(F.bx, F.by + 2, 4 + r, 2 + r * 0.4, 0, 0, Math.PI * 2); c.stroke(); } c.globalAlpha = 1; }
+  c.fillStyle = '#e04a4a'; circle(c, bx, by + dip - 2, 4); c.fillStyle = '#ffffff'; c.beginPath(); c.arc(bx, by + dip - 2, 4, 0, Math.PI); c.fill();
+  if (F.state === 'bite') { c.fillStyle = '#ffe08a'; c.font = '700 26px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.fillText('!', P.x, P.y - 74 - Math.abs(Math.sin(time * 14)) * 6); }
+  if (F.state === 'reel') {
+    const w = 120, x0 = P.x - w / 2, y0 = P.y - 96, R = FISH_RARITY[FISH[F.k].r];
+    c.fillStyle = 'rgba(14,20,30,.8)'; c.fillRect(x0 - 4, y0 - 4, w + 8, 18);
+    c.fillStyle = '#3a4a5a'; c.fillRect(x0, y0, w, 10);
+    c.fillStyle = R.col === '#eef3e6' ? '#7fe07a' : R.col; c.fillRect(x0 + (F.zc - F.zw / 2) * w, y0, F.zw * w, 10);
+    c.fillStyle = '#ffffff'; c.fillRect(x0 + F.m * w - 2, y0 - 4, 4, 18);
+    c.fillStyle = '#eef3e6'; c.font = '700 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; c.fillText('Press now!', P.x, y0 - 8);
+  }
+}
+function fishIcon(c, body, fin) {
+  c.fillStyle = 'rgba(160,210,240,.25)'; circle(c, 16, 16, 13);
+  c.fillStyle = fin; c.beginPath(); c.moveTo(6, 16); c.lineTo(1, 9); c.lineTo(1, 23); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(13, 10); c.lineTo(18, 4); c.lineTo(21, 10); c.closePath(); c.fill();
+  c.fillStyle = body; c.beginPath(); c.ellipse(16, 16, 11, 6.5, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(16, 13, 8, 2, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#1a1a24'; circle(c, 23, 15, 1.6); c.strokeStyle = fin; c.lineWidth = 1; c.beginPath(); c.arc(19, 16, 4, -1, 1); c.stroke();
+}
+function finnLines() {
+  S.fishLog = S.fishLog || {};
+  const got = FISH_SPECIES.filter(k => S.fishLog[k]);
+  return [`Your fish journal: ${got.length} of ${FISH_SPECIES.length} species.`, got.length ? 'You\'ve caught: ' + got.map(k => FISH[k].name + ' x' + S.fishLog[k]).join(', ') + '.' : 'Nothing yet! Craft a Fishing Rod at the workbench, face any water and press the action button.',
+    'Each region has its own fish. Cold waters, warm seas, murky swamps, and the dark lakes of Duskhollow. Golden Koi swim everywhere, but they\'re very rare.'];
+}
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -9213,6 +9401,7 @@ function render() {
     ctx.restore();
   }
   ctx.globalAlpha = 1;
+  drawFishing(ctx);
   ctx.textAlign = 'center'; ctx.font = '700 13px "Pixelify Sans", sans-serif';
   for (const f of floats) {
     ctx.globalAlpha = Math.min(1, f.life * 2);
