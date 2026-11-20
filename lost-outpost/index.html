@@ -17,7 +17,7 @@
   --warn:#ffd36b;
   --bad:#ff5d7a;
   --wood:#c27a3e; --stone:#9a86e0; --ore:#ff9a3c; --crystal:#5ff3ff; --frost:#8fb8ff; --coin:#ffd23a;
-  --ice:#bfe6ff; --magma:#ff5a2a; --spore:#6affc8; --star:#fff27a; --prism:#e0a8ff; --feather:#7ad8ff; --pearl:#f4ecff;
+  --ice:#bfe6ff; --magma:#ff5a2a; --spore:#6affc8; --star:#fff27a; --prism:#e0a8ff; --feather:#7ad8ff; --pearl:#f4ecff; --cog:#d8a040;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 html,body{height:100%;overflow:hidden;background:#1b2350;color:var(--text);font-family:'Fredoka',system-ui,sans-serif}
@@ -38,6 +38,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 .ic.prism{background:linear-gradient(135deg,#ff8a8a,#ffd36b 25%,#7dff8a 50%,#5fb8ff 75%,#c88aff);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);transform:none;box-shadow:none;border-radius:0}
 .ic.feather{background:linear-gradient(160deg,#fff 0%,#7ad8ff 40%,#3a6aff 80%);border-radius:90% 10% 90% 10%;transform:rotate(-20deg)}
 .ic.pearl{background:radial-gradient(circle at 35% 35%,#fff,#f4ecff 40%,#b8a8d8);border-radius:50%;transform:none}
+.ic.cog{background:radial-gradient(circle,#3a2a10 20%,#ffd36b 24%,#d8a040 60%,#a87020);border-radius:50%;transform:none;box-shadow:0 0 0 2px #b8802a inset}
 .ic.coins{background:radial-gradient(circle at 35% 35%,#fff3a8,var(--coin) 45%,#c98a12);border-radius:50%;transform:none;box-shadow:inset -2px -2px 0 rgba(0,0,0,.2)}
 #bag{padding:6px 10px;min-width:170px;font-size:13px;font-weight:700}
 #bag .bar{height:8px;border-radius:5px;background:rgba(255,255,255,.15);margin-top:4px;overflow:hidden}
@@ -225,6 +226,14 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 #raceHud .bar{height:8px;border-radius:5px;background:rgba(255,255,255,.15);overflow:hidden;margin:6px 0}
 #raceHud .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ffd36b,#ff8a3a)}
 #raceHud .sbtn{font-size:18px;padding:10px 24px}
+#talkBtn{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);pointer-events:auto;font-family:inherit;font-size:17px;font-weight:700;color:#2a1a00;padding:10px 18px;border-radius:14px;border:0;background:linear-gradient(180deg,#ffe08a,#ffb340);box-shadow:0 3px 0 #b36b12;cursor:pointer}
+#talkBtn[hidden],#pkChip[hidden]{display:none}
+#talkBtn:focus-visible,.galcell:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#pkChip{padding:6px 10px;font-size:14px;font-weight:700}
+#slowmo{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(90,184,255,0) 30%,rgba(60,120,255,.6));opacity:0;transition:opacity .4s}
+.galgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.galcell{aspect-ratio:1;font-size:44px;border-radius:16px;border:2px solid rgba(255,255,255,.2);background:radial-gradient(circle,#3a2a5a,#1a1430);cursor:pointer;font-family:inherit;color:#fff;touch-action:manipulation;line-height:1}
+.galcell:active{transform:scale(.94)}
 .nameprev{margin-top:14px;text-align:center;font-size:26px;font-weight:700;text-shadow:0 2px 0 rgba(0,0,0,.5)}
 @media (max-width:600px){
   .planets{grid-template-columns:1fr}
@@ -274,6 +283,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
     <div id="rushChip" class="panel" hidden></div>
     <div id="tmHint" class="panel" hidden></div>
     <button id="evChip" class="panel" hidden></button>
+    <div id="pkChip" class="panel" hidden></div>
   </div>
   <div id="boss" class="panel"><div class="nm" id="bossName">❄ ICE GOLEM</div><div class="bar"><div class="fill" id="bossFill"></div></div></div>
   <div id="res">
@@ -290,6 +300,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
       <div class="chip panel" id="r-prism"><i class="ic prism"></i><b>0</b></div>
       <div class="chip panel" id="r-feather"><i class="ic feather"></i><b>0</b></div>
       <div class="chip panel" id="r-pearl"><i class="ic pearl"></i><b>0</b></div>
+      <div class="chip panel" id="r-cog"><i class="ic cog"></i><b>0</b></div>
     </div>
     <div id="bag" class="panel"><div>🎒 BAG <span id="bagTxt">0/20</span></div><div class="bar"><div class="fill" id="bagFill"></div></div><div class="contents" id="bagC"></div></div>
   </div>
@@ -302,10 +313,12 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
   <button id="photoBtn" class="panel">📷 Photo</button>
   <button id="tmapBtn" class="panel" hidden>🗺 Treasure</button>
   <div id="raceHud" class="panel" hidden><div class="h" id="raceTitle">🏁 PET RACE</div><div id="raceList"></div><div class="bar"><i id="raceBar"></i></div><button id="raceCheer" class="sbtn">📣 Cheer!</button></div>
+  <button id="talkBtn" hidden>💬 Talk</button>
   <button id="jumpBtn" class="panel" aria-label="Jump">⤒<span>JUMP</span></button>
 </div>
 <div id="joy"><div class="k"></div></div>
 <div id="ink"></div>
+<div id="slowmo"></div>
 <div id="fade"></div>
 <div id="pvig"></div><div id="pflash"></div>
 <div id="photoBar" hidden>
@@ -324,7 +337,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
     <p>Your ship crash-landed on a forgotten planet. Gather wood, stone, ore and crystals, rebuild the abandoned outpost, and survive the Gloomers that crawl out at night.</p>
     <button class="btn" id="play">Play</button><br>
     <button class="btn ghost" id="newgame" style="display:none">Start over</button><br>
-    <span class="new">NEW: Coral Deep, the Kraken, sailing, pet races, holidays &amp; daily quests</span>
+    <span class="new">NEW: Clockwork Citadel, robot pets, villagers, mini-games &amp; the night market</span>
     <div class="keys">Move: <b>WASD</b> / arrows · drag on phone · <b>Space</b> jump · <b>Q</b> switch weapon<br>Walk up to trees &amp; rocks to harvest · stand on glowing pads to build</div>
   </div>
 </div>
@@ -346,10 +359,10 @@ const lerp = (a, b, t) => a + (b - a) * t;
 let seed = 1337;
 const srand = () => (seed = (seed * 16807) % 2147483647, (seed - 1) / 2147483646);
 const sr = (a, b) => a + srand() * (b - a);
-const RES = ['wood', 'stone', 'ore', 'crystal', 'frost', 'magma', 'spore', 'star', 'prism', 'feather', 'pearl'];
+const RES = ['wood', 'stone', 'ore', 'crystal', 'frost', 'magma', 'spore', 'star', 'prism', 'feather', 'pearl', 'cog'];
 const COST_KEYS = ['coins', ...RES];
-const RES_NAME = { wood: 'Wood', stone: 'Stone', ore: 'Ore', crystal: 'Crystal', frost: 'Frost Gems', magma: 'Magma Cores', spore: 'Spore Crystals', star: 'Star Cores', prism: 'Prism Shards', feather: 'Storm Feathers', pearl: 'Pearls', coins: 'Coins' };
-const RES_COL = { wood: 0xc27a3e, stone: 0x9a86e0, ore: 0xff9a3c, crystal: 0x5ff3ff, frost: 0x8fb8ff, magma: 0xff5a2a, spore: 0x6affc8, star: 0xfff27a, prism: 0xe0a8ff, feather: 0x7ad8ff, pearl: 0xf4ecff, coins: 0xffd23a };
+const RES_NAME = { wood: 'Wood', stone: 'Stone', ore: 'Ore', crystal: 'Crystal', frost: 'Frost Gems', magma: 'Magma Cores', spore: 'Spore Crystals', star: 'Star Cores', prism: 'Prism Shards', feather: 'Storm Feathers', pearl: 'Pearls', cog: 'Brass Cogs', coins: 'Coins' };
+const RES_COL = { wood: 0xc27a3e, stone: 0x9a86e0, ore: 0xff9a3c, crystal: 0x5ff3ff, frost: 0x8fb8ff, magma: 0xff5a2a, spore: 0x6affc8, star: 0xfff27a, prism: 0xe0a8ff, feather: 0x7ad8ff, pearl: 0xf4ecff, cog: 0xd8a040, coins: 0xffd23a };
 const ic = r => `<i class="ic ${r}"></i>`;
 const dist2 = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -362,11 +375,11 @@ const SAVE_KEY = 'lost-outpost-save-v1';
 const OLD_Q = ['trees', 'rocks', 'deposit', 'workshop', 'pick2', 'mine', 'ore', 'generator', 'turret', 'house', 'pick3', 'crystals', 'portal'];
 function freshState() {
   return {
-    store: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0, spore: 0, star: 0, prism: 0, feather: 0, pearl: 0 },
-    bag: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0, spore: 0, star: 0, prism: 0, feather: 0, pearl: 0 },
+    store: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0, spore: 0, star: 0, prism: 0, feather: 0, pearl: 0, cog: 0 },
+    bag: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0, spore: 0, star: 0, prism: 0, feather: 0, pearl: 0, cog: 0 },
     tools: { axe: 1, pick: 1, sword: 1, bag: 1 },
     built: {}, paid: {},
-    stats: { trees: 0, rocks: 0, ore: 0, crystal: 0, kills: 0, deposits: 0, frostTrees: 0, frost: 0, golem: 0, sold: 0, iceVisits: 0, obsTrees: 0, magma: 0, serpent: 0, crossed: 0, emberVisits: 0, goblins: 0, meteors: 0, flights: 0, cosBought: 0, hatched: 0, fish: 0, legendFish: 0, cooked: 0, bounces: 0, swings: 0, queen: 0, jungleVisits: 0, rushes: 0, recruited: 0, jobs: 0, spore: 0, jumps: 0, stationGap: 0, stationVisits: 0, aicore: 0, star: 0, fameVisit: 0, prism: 0, shadow: 0, carts: 0, caveVisits: 0, harvests: 0, planted: 0, photos: 0, lettersRead: 0, mailQuests: 0, skyVisits: 0, feather: 0, gusts: 0, drafts: 0, roc: 0, evolved: 0, megaPets: 0, donated: 0, pieces: 0, fed: 0, seaVisits: 0, pearl: 0, turtles: 0, kraken: 0, sails: 0, races: 0, raceWins: 0, dailyDone: 0, treats: 0 },
+    stats: { trees: 0, rocks: 0, ore: 0, crystal: 0, kills: 0, deposits: 0, frostTrees: 0, frost: 0, golem: 0, sold: 0, iceVisits: 0, obsTrees: 0, magma: 0, serpent: 0, crossed: 0, emberVisits: 0, goblins: 0, meteors: 0, flights: 0, cosBought: 0, hatched: 0, fish: 0, legendFish: 0, cooked: 0, bounces: 0, swings: 0, queen: 0, jungleVisits: 0, rushes: 0, recruited: 0, jobs: 0, spore: 0, jumps: 0, stationGap: 0, stationVisits: 0, aicore: 0, star: 0, fameVisit: 0, prism: 0, shadow: 0, carts: 0, caveVisits: 0, harvests: 0, planted: 0, photos: 0, lettersRead: 0, mailQuests: 0, skyVisits: 0, feather: 0, gusts: 0, drafts: 0, roc: 0, evolved: 0, megaPets: 0, donated: 0, pieces: 0, fed: 0, seaVisits: 0, pearl: 0, turtles: 0, kraken: 0, sails: 0, races: 0, raceWins: 0, dailyDone: 0, treats: 0, clockVisits: 0, cog: 0, vents: 0, cdragon: 0, villQuests: 0, nightBuys: 0, parkRuns: 0, garden: 0 },
     day: 1, time: 0.08, hp: 100, maxHp: 100,
     coins: 0, weapons: { sword: true }, weapon: 'sword',
     daily: { last: null, streak: 0, claims: 0 },
@@ -377,6 +390,7 @@ function freshState() {
     runes: {}, tree: {}, mail: { letters: [], seq: 0, t: 25 }, farm: { plots: [null, null, null, null, null, null] }, food: { carrot: 0, corn: 0, pumpkin: 0 }, shadowDay: 0,
     rocDay: 0, petxp: {}, tmap: { pieces: 0, site: -1, dug: {}, chests: 0, last: -1 }, relics: {}, museum: { fish: {}, gems: {}, relics: {}, done: {} }, seasonHarv: 0,
     krakenDay: 0, race: { wins: 0, races: 0, day: '' }, dq: { date: '', list: [], bonus: false }, evt: { day: 0, got: {} }, candy: 0, cookies: 0,
+    cdragonDay: 0, mybot: { built: false, head: 'dome', body: 'round', wheels: 'wheels', gadget: 'laser', color: '#5ab8ff', name: 'Robo Buddy' }, mg: { galBest: 0, fishBest: 0, parkBest: 0, played: 0 }, vill: {}, market: { day: 0, bought: {} },
     cos: { owned: { suit_orange: true, hat_none: true }, suit: 'orange', hat: 'none' },
   };
 }
@@ -410,6 +424,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
+const CW_DAY = new THREE.Color(0xd8a070), CW_NIGHT = new THREE.Color(0x2a1a2a), CW_TIME = new THREE.Color(0x3a6ab8);
 const SEA_DAY = new THREE.Color(0x0e5a7a), SEA_NIGHT = new THREE.Color(0x041a2a), ISL_DAY = new THREE.Color(0x8ad8ff), ISL_NIGHT = new THREE.Color(0x0a1a3a), PUMPKIN_SKY = new THREE.Color(0x3a1a4a);
 const SKY_REACH_DAY = new THREE.Color(0x8ac8ff), SKY_REACH_NIGHT = new THREE.Color(0x1a2a5a), SKY_REACH_STORM = new THREE.Color(0x4a5a7a);
 const SKY_DAY = new THREE.Color(0x1d2a63), SKY_NIGHT = new THREE.Color(0x060818), SKY_MINE = new THREE.Color(0x07040d);
@@ -525,7 +540,7 @@ const CHASMS = [{ z0: -6, z1: -1 }, { z0: -22, z1: -17 }];
 const LAGOON = jv(-19, 18), LAGOON_R = 6;
 const POND = V(20, 0, 22), POND_R = 3.8;
 const CREW_POS = V(-17, 0, 13), KITCHEN_POS = V(16, 0, 15), OBELISK_POS = V(8, 0, -21);
-const MAXLV = { workshop: 1, generator: 3, house1: 2, house2: 2, turret1: 3, turret2: 3, trading: 1, petden: 3, shop: 1, forge: 1, heater: 3, nest: 3, crew: 3, kitchen: 1, petcenter: 1, farm: 1, museum: 1, glider: 1, dock: 1, racetrack: 1, airtank: 2 };
+const MAXLV = { workshop: 1, generator: 3, house1: 2, house2: 2, turret1: 3, turret2: 3, trading: 1, petden: 3, shop: 1, forge: 1, heater: 3, nest: 3, crew: 3, kitchen: 1, petcenter: 1, farm: 1, museum: 1, glider: 1, dock: 1, racetrack: 1, airtank: 2, cottage1: 1, cottage2: 1, cottage3: 1, botshop: 1, gallery: 1, market: 1, parkgate: 1 };
 // Nebula Station (space station) & the Survival arena
 const ST_C = V(1000, 0, -1000);
 const sv = (x, z) => V(ST_C.x + x, 0, ST_C.z + z);
@@ -568,6 +583,20 @@ const islv = (x, z) => V(ISL_C.x + x, 0, ISL_C.z + z);
 const ISLES = [{ x: 0, z: 34, r: 7 }, { x: -34, z: 4, r: 10 }, { x: 32, z: -2, r: 8 }, { x: 0, z: -32, r: 9 }];
 const ISL_ARRIVE = islv(0, 33), ISL_HOME_PAD = islv(3, 36.5), ISL_STORE_POS = islv(-3.5, 36).setY(1);
 const DOCK_POS = V(25.4, 0, 22.6), DOCK_SAIL = V(26.4, 0, 25.4), RACE_POS = V(-36, 0, -12), QBOARD_POS = V(-15, 0, -8), FEST_POS = V(8, 0, -13);
+// Clockwork Citadel, the parkour course, and new outpost spots
+const CW_C = V(2000, 0, 0);
+const cwv = (x, z) => V(CW_C.x + x, 0, CW_C.z + z);
+const CW_FLOORS = [{ x: 0, z: 18, r: 14, h: 0 }, { x: 0, z: -5, r: 10, h: 4 }, { x: 0, z: -25, r: 11, h: 8 }, { x: -21, z: -8, r: 7, h: 0 }, { x: 22, z: -7, r: 6, h: 0 }, { x: 22, z: 8, r: 2.6, h: 0 }];
+const CW_GEARS = [{ x: -17, z: 14, r: 4, w: .6 }, { x: -22.5, z: 8.5, r: 4, w: -.6 }, { x: -24, z: 1, r: 4, w: .6 }];
+const CW_BRIDGE = [11, 13.5, 20.2, 9];
+const CW_HAND = { x: 22, z: 8, len: 10.5, w: .85, per: 14 };
+const CW_VENTS = [{ x: 0, z: 8.5, tx: 0, tz: -2, h0: 0, h1: 4 }, { x: 5, z: -9, tx: 0, tz: -19, h0: 4, h1: 8 }];
+const CW_CAMP = cwv(0, 22), CW_ARRIVE = cwv(1, 20), CW_STORE_POS = cwv(-5, 24).setY(1);
+const CDRAGON_C = cwv(0, -27);
+const PK_C = V(-2000, 0, 0);
+const COTTAGES = [[32, -12], [37, -1], [31, 13]].map(([x, z]) => ({ x, z, r: Math.atan2(-x, -z) }));
+const BOTSHOP_POS = V(-32, 0, 5);
+const FAIR = { gallery: V(-9, 0, 31), market: V(0, 0, 34), park: V(9, 0, 31), tourney: V(15.2, 0, 22.4) };
 const ECAMP = ev(0, 12);
 const EMB_PORTAL_T = ev(0, 5.4);
 const EMB_ARRIVE = ev(0, 8.8);
@@ -578,12 +607,12 @@ const BRIDGE_X = -6;
 const EP_ON_ICE = iv(20, 8);
 const EP_ICE_T = iv(20, 10.2);
 const ICE_FROM_EMB = iv(20, 13.4);
-const SHIP_SPOTS = { home: { pad: V(-.6, 0, 14), arrive: V(1.6, 0, 11.4) }, ice: { pad: iv(6.8, 20.3), arrive: iv(4.4, 18.2) }, ember: { pad: ev(8, 13.5), arrive: ev(5.6, 11.2) }, jungle: { pad: jv(3.6, 17), arrive: jv(1, 14.2) }, station: { pad: sv(5.5, 13.5), arrive: sv(2, 11) }, arena: { pad: ARENA_EXIT, arrive: ARENA_EXIT }, cave: { pad: cvv(5, 18.5), arrive: cvv(1, 15) }, sky: { pad: skv(5.5, 20.5), arrive: skv(1, 17) }, sea: { pad: sev(5.5, 22.5), arrive: sev(1, 17) }, isles: { pad: ISL_HOME_PAD, arrive: ISL_ARRIVE } };
+const SHIP_SPOTS = { home: { pad: V(-.6, 0, 14), arrive: V(1.6, 0, 11.4) }, ice: { pad: iv(6.8, 20.3), arrive: iv(4.4, 18.2) }, ember: { pad: ev(8, 13.5), arrive: ev(5.6, 11.2) }, jungle: { pad: jv(3.6, 17), arrive: jv(1, 14.2) }, station: { pad: sv(5.5, 13.5), arrive: sv(2, 11) }, arena: { pad: ARENA_EXIT, arrive: ARENA_EXIT }, cave: { pad: cvv(5, 18.5), arrive: cvv(1, 15) }, sky: { pad: skv(5.5, 20.5), arrive: skv(1, 17) }, sea: { pad: sev(5.5, 22.5), arrive: sev(1, 17) }, isles: { pad: ISL_HOME_PAD, arrive: ISL_ARRIVE }, clock: { pad: cwv(5.5, 26), arrive: cwv(1, 20) } };
 const SHOP_POS = V(5, 0, 16.5);
 const ORIGIN = V(0, 0, 0);
-const zoneOf = (x, z) => z < -1500 ? 'isles' : z > 700 ? (x > 700 ? 'sky' : x < -700 ? 'sea' : 'cave') : z > 300 ? 'mine' : x > 700 ? (z < -700 ? 'station' : 'ice') : x < -700 ? (z < -700 ? 'arena' : 'ember') : z < -700 ? 'jungle' : 'home';
-const zoneCenter = z => z === 'mine' ? MINE_C : z === 'ice' ? ICE_C : z === 'ember' ? EMB_C : z === 'jungle' ? JUN_C : z === 'station' ? ST_C : z === 'arena' ? AR_C : z === 'cave' ? CV_C : z === 'sky' ? SK_C : z === 'sea' ? SEA_C : z === 'isles' ? ISL_C : ORIGIN;
-const zoneRadius = z => z === 'mine' ? 25 : z === 'ice' ? ICE_R - 3 : z === 'ember' ? EMB_R - 3 : z === 'jungle' ? JUN_R - 3 : z === 'station' ? 64 : z === 'arena' ? 20 : z === 'cave' ? 64 : z === 'sky' ? 80 : z === 'sea' ? SEA_R - 1 : z === 'isles' ? 75 : ISLAND_R - 3;
+const zoneOf = (x, z) => x > 1500 ? 'clock' : x < -1500 ? 'park' : z < -1500 ? 'isles' : z > 700 ? (x > 700 ? 'sky' : x < -700 ? 'sea' : 'cave') : z > 300 ? 'mine' : x > 700 ? (z < -700 ? 'station' : 'ice') : x < -700 ? (z < -700 ? 'arena' : 'ember') : z < -700 ? 'jungle' : 'home';
+const zoneCenter = z => z === 'mine' ? MINE_C : z === 'ice' ? ICE_C : z === 'ember' ? EMB_C : z === 'jungle' ? JUN_C : z === 'station' ? ST_C : z === 'arena' ? AR_C : z === 'cave' ? CV_C : z === 'sky' ? SK_C : z === 'sea' ? SEA_C : z === 'isles' ? ISL_C : z === 'clock' ? CW_C : z === 'park' ? PK_C : ORIGIN;
+const zoneRadius = z => z === 'mine' ? 25 : z === 'ice' ? ICE_R - 3 : z === 'ember' ? EMB_R - 3 : z === 'jungle' ? JUN_R - 3 : z === 'station' ? 64 : z === 'arena' ? 20 : z === 'cave' ? 64 : z === 'sky' ? 80 : z === 'sea' ? SEA_R - 1 : z === 'isles' ? 75 : z === 'clock' ? 50 : z === 'park' ? 80 : ISLAND_R - 3;
 
 const colliders = [];
 function addCol(x, z, r) { const c = { x, z, r, on: true }; colliders.push(c); return c; }
@@ -897,6 +926,8 @@ const NODE_DEF = {
   kelp: { res: 'wood', hp: 4, yield: 3, tool: 'axe', req: 1, respawn: 30, r: .6, sfx: 'chop', chip: 0x4aba5a },
   reefrock: { res: 'stone', hp: 5, yield: 3, tool: 'pick', req: 1, respawn: 30, r: 1.1, sfx: 'mine', chip: 0xff8aa8 },
   clam: { res: 'pearl', hp: 12, yield: 2, tool: 'pick', req: 4, respawn: 60, r: .9, sfx: 'crystal', chip: 0xf4ecff },
+  crate: { res: 'wood', hp: 4, yield: 3, tool: 'axe', req: 1, respawn: 30, r: .8, sfx: 'chop', chip: 0xb07a44 },
+  cogpile: { res: 'cog', hp: 12, yield: 2, tool: 'pick', req: 4, respawn: 60, r: .9, sfx: 'mine', chip: 0xd8a040 },
 };
 const TOOL_NAME = { axe: 'Axe', pick: 'Pickaxe', sword: 'Sword', bag: 'Backpack' };
 
@@ -1137,10 +1168,22 @@ function makeClam() {
   const pearl = new THREE.Mesh(new THREE.SphereGeometry(.2, 12, 8), PEARL_MAT); pearl.position.y = .55; g.add(pearl);
   return g;
 }
+function makeCrate() {
+  const g = new THREE.Group(), n = 1 + Math.floor(srand() * 2), parts = [];
+  for (let i = 0; i < n + 1; i++) { const s = sr(.6, .85), x = i ? sr(-.4, .4) : 0, y = i === 2 ? 1.2 : i ? s / 2 : s / 2, z = i ? sr(-.4, .4) : 0; parts.push(part(G.box, [0xb07a44, 0x9a6a3a][i % 2], x, y, z, 0, sr(0, 1), 0, s, s, s), part(G.box, 0x6a4430, x, y, z, 0, 0, 0, s + .02, .08, s + .02)); }
+  g.add(mesh(parts)); return g;
+}
+const COG_MAT = new THREE.MeshLambertMaterial({ color: 0xd8a040, emissive: 0x6a4400, emissiveIntensity: .35, flatShading: true });
+function makeCogPile() {
+  const g = new THREE.Group();
+  g.add(mesh([part(jitter(G.dode, .3), 0x5a5a6a, 0, .3, 0, 0, 0, 0, 1, .5, .95)]));
+  for (let i = 0; i < 4; i++) { const r = sr(.25, .45), m = new THREE.Mesh(mergeGeometries([part(G.cyl8, 0xffffff, 0, 0, 0, 0, 0, 0, r, .12, r), ...Array.from({ length: 8 }, (_, k) => { const a = k / 8 * 6.28; return part(G.box, 0xffffff, Math.sin(a) * (r + .08), 0, Math.cos(a) * (r + .08), 0, a, 0, .12, .12, .14); })]), COG_MAT); m.position.set(sr(-.4, .4), .6 + i * .12, sr(-.4, .4)); m.rotation.set(sr(-1, 1), sr(0, 3), sr(-1, 1)); m.castShadow = true; g.add(m); }
+  return g;
+}
 const OSTUMP_GEO = mergeGeometries([part(G.cyl6, 0x2a2030, 0, .2, 0, 0, 0, 0, .25, .4, .25), part(G.cyl6, 0xff8a3a, 0, .41, 0, 0, 0, 0, .2, .03, .2)]);
 const STUMP_GEO = mergeGeometries([part(G.cyl6, 0x7a4c32, 0, .2, 0, 0, 0, 0, .3, .4, .3), part(G.cyl6, 0xd9a46a, 0, .41, 0, 0, 0, 0, .26, .02, .26)]);
 const ISTUMP_GEO = mergeGeometries([part(G.cyl6, 0x4a5a8a, 0, .2, 0, 0, 0, 0, .25, .4, .25), part(G.cyl6, 0xdff6ff, 0, .41, 0, 0, 0, 0, .22, .03, .22)]);
-const MAKERS = { tree: () => srand() < .72 ? makePalm() : makePuff(), rock: () => makeRock(sr(.85, 1.15)), ore: makeOre, crystal: makeCrystal, ftree: makeFrostTree, icerock: makeIceRock, frost: makeFrostGem, otree: makeObsTree, basalt: makeBasalt, magma: makeMagma, jtree: makeJTree, mossrock: makeMossRock, spore: makeSpore, planter: makePlanter, scrap: makeScrap, star: makeStarPod, prism: makePrism, gemrock: makeGemRock, cshroom: makeCaveShroom, feather: makeFeatherNest, cloudtree: makeCloudTree, skyrock: makeSkyRock, kelp: makeKelpNode, reefrock: makeReefRock, clam: makeClam };
+const MAKERS = { tree: () => srand() < .72 ? makePalm() : makePuff(), rock: () => makeRock(sr(.85, 1.15)), ore: makeOre, crystal: makeCrystal, ftree: makeFrostTree, icerock: makeIceRock, frost: makeFrostGem, otree: makeObsTree, basalt: makeBasalt, magma: makeMagma, jtree: makeJTree, mossrock: makeMossRock, spore: makeSpore, planter: makePlanter, scrap: makeScrap, star: makeStarPod, prism: makePrism, gemrock: makeGemRock, cshroom: makeCaveShroom, feather: makeFeatherNest, cloudtree: makeCloudTree, skyrock: makeSkyRock, kelp: makeKelpNode, reefrock: makeReefRock, clam: makeClam, crate: makeCrate, cogpile: makeCogPile };
 function addNode(type, x, z) {
   const m = MAKERS[type]();
   const def = NODE_DEF[type];
@@ -1478,6 +1521,40 @@ function refreshBuilding(id, anim = true) {
   } else if (b.type === 'qboard') {
     b.g.add(mesh([part(G.box, 0x6a4430, -.9, .9, 0, 0, 0, 0, .14, 1.8, .14), part(G.box, 0x6a4430, .9, .9, 0, 0, 0, 0, .14, 1.8, .14), part(G.box, 0xa0703c, 0, 1.35, 0, 0, 0, 0, 2.1, 1.2, .12), part(G.prism, 0xc8704a, 0, 2.1, 0, Math.PI / 2, 0, Math.PI / 2, .3, 2.4, .5),
       part(G.box, 0xfff6e0, -.55, 1.45, .08, 0, 0, .06, .5, .6, .02), part(G.box, 0xfff6e0, .05, 1.35, .08, 0, 0, -.05, .5, .65, .02), part(G.box, 0xfff6e0, .62, 1.5, .08, 0, 0, .04, .45, .55, .02), part(G.box, 0xff5a5a, -.55, 1.72, .1, 0, 0, 0, .08, .08, .02), part(G.box, 0xff5a5a, .05, 1.65, .1, 0, 0, 0, .08, .08, .02), part(G.box, 0xff5a5a, .62, 1.75, .1, 0, 0, 0, .08, .08, .02)]));
+  } else if (b.type === 'cottage') {
+    if (!L) b.g.add(ruin(3, 2.6));
+    else {
+      const wall = [0xf2e2c4, 0xe8f0d8, 0xf0dce8][['cottage1', 'cottage2', 'cottage3'].indexOf(b.id)] || 0xf2e2c4, roof = [0xd8604a, 0x4a8ad8, 0x9a5ad8][['cottage1', 'cottage2', 'cottage3'].indexOf(b.id)] || 0xd8604a;
+      b.g.add(mesh([part(G.box, 0x8a7a6a, 0, .15, 0, 0, 0, 0, 3.4, .3, 3), part(G.box, wall, 0, 1.25, 0, 0, 0, 0, 3, 2, 2.6), part(G.prism, roof, 0, 2.85, 0, Math.PI / 2, 0, Math.PI / 2, 1.5, 3.4, 1.9),
+        part(G.box, 0x6a4430, 0, .85, 1.31, 0, 0, 0, .8, 1.4, .06), part(G.box, 0xffd23a, .28, .85, 1.36, 0, 0, 0, .08, .08, .04), part(G.box, 0x9ad8ff, -1, 1.4, 1.31, 0, 0, 0, .6, .55, .05), part(G.box, 0x9ad8ff, 1, 1.4, 1.31, 0, 0, 0, .6, .55, .05),
+        part(G.box, 0x8a5a3c, .9, 3.3, -.4, 0, 0, 0, .35, .9, .35), part(G.box, 0x7fc23a, -1.2, .35, 1.6, 0, 0, 0, .8, .4, .3), part(G.ico, 0xff7ae0, -1.4, .62, 1.6, 0, 0, 0, .12), part(G.ico, 0xffd23a, -1, .62, 1.62, 0, 0, 0, .12)]));
+    }
+  } else if (b.type === 'botshop') {
+    if (!L) b.g.add(ruin(3.6, 3));
+    else {
+      b.g.add(mesh([part(G.box, 0x6a6a7a, 0, .15, 0, 0, 0, 0, 4.2, .3, 3.6), part(G.box, 0xb8bcc8, 0, 1.5, -.3, 0, 0, 0, 3.8, 2.8, 2.8), part(G.box, 0x5a5a6a, 0, 3.05, -.3, 0, 0, 0, 4.1, .3, 3.1), part(G.box, 0x2a2a3a, 0, 1.2, 1.12, 0, 0, 0, 2, 2, .06),
+        part(G.cyl8, 0xd8a040, 1.3, 3.6, -.3, 0, 0, 0, .3, .8, .3), part(G.box, 0x5ab8ff, 0, 2.6, 1.13, 0, 0, 0, 2.6, .4, .05), part(G.box, 0xc8704a, -1.6, .6, 1.4, 0, 0, 0, .8, .9, .7), part(G.box, 0x8a8a9a, -1.6, 1.15, 1.4, 0, 0, 0, .9, .1, .8)]));
+      const gr = new THREE.Mesh(gearGeo(.55, 8, .15), BRASS); gr.rotation.x = Math.PI / 2; gr.position.set(1, 2.6, 1.2); b.g.add(gr); b.disc = gr;
+    }
+  } else if (b.type === 'gallery') {
+    if (!L) b.g.add(mesh([part(G.box, 0x8a5a3c, 0, .5, 0, 0, 0, 0, .12, 1, .12), part(G.box, 0xe8d8b0, 0, 1, 0, 0, 0, 0, 1.4, .5, .06)]));
+    else b.g.add(mesh([part(G.box, 0xc84a4a, 0, 1.2, -.6, 0, 0, 0, 3.6, 2.4, .2), part(G.box, 0xffffff, 0, .55, .2, 0, 0, 0, 3.6, 1.1, .8), ...[-1.2, 0, 1.2].map(x => part(G.cyl8, 0xffffff, x, 1.6, -.48, Math.PI / 2, 0, 0, .35, .05, .35)), ...[-1.2, 0, 1.2].map(x => part(G.cyl8, 0xff4a4a, x, 1.6, -.46, Math.PI / 2, 0, 0, .2, .05, .2)),
+      part(G.box, 0xffd23a, 0, 2.7, .1, 0, 0, 0, 3.9, .3, 1.6), ...[-1.6, -.8, 0, .8, 1.6].map((x, i) => part(G.box, i % 2 ? 0xffffff : 0xff4a4a, x, 2.95, .1, 0, 0, 0, .8, .2, 1.6)), part(G.box, 0x8a5a3c, -1.85, 1.3, .7, 0, 0, 0, .14, 2.6, .14), part(G.box, 0x8a5a3c, 1.85, 1.3, .7, 0, 0, 0, .14, 2.6, .14)]));
+  } else if (b.type === 'market') {
+    if (!L) b.g.add(mesh([part(G.box, 0x8a5a3c, 0, .4, 0, 0, 0, 0, 1.6, .8, .8), part(G.box, 0x6a4430, 0, .9, 0, 0, 0, 0, .1, 1, .1)]));
+    else {
+      b.g.add(mesh([part(G.box, 0x8a5a3c, 0, .5, .3, 0, 0, 0, 3, 1, 1), part(G.box, 0xa0703c, 0, 1.02, .3, 0, 0, 0, 3.1, .08, 1.1), part(G.box, 0x6a4430, -1.4, 1.5, -.3, 0, 0, 0, .14, 3, .14), part(G.box, 0x6a4430, 1.4, 1.5, -.3, 0, 0, 0, .14, 3, .14), part(G.box, 0x6a4430, -1.4, 1.2, .75, 0, 0, 0, .14, 2.4, .14), part(G.box, 0x6a4430, 1.4, 1.2, .75, 0, 0, 0, .14, 2.4, .14),
+        part(G.box, 0xffd23a, -.8, 1.2, .2, 0, 0, 0, .4, .3, .4), part(G.sph, 0xff7a5a, .2, 1.25, .3, 0, 0, 0, .2), part(G.box, 0x9a5ad8, .9, 1.2, .2, 0, 0, 0, .35, .35, .35)]));
+      const aw = new THREE.Mesh(new THREE.BoxGeometry(3.4, .12, 1.8), new THREE.MeshLambertMaterial({ color: 0xff9a3a, flatShading: true })); aw.position.set(0, 2.9, .2); aw.rotation.x = .25; b.g.add(aw); b.awning = aw;
+      b.lamps = [-1.3, 1.3].map(x => { const l = new THREE.Mesh(new THREE.SphereGeometry(.18, 8, 6), emis(0xffd8a0, 1)); l.position.set(x, 2.4, .9); b.g.add(l); return l; });
+      const moon = new THREE.Mesh(new THREE.SphereGeometry(.35, 10, 8), emis(0xd8d8ff, 1.4)); moon.position.set(0, 3.6, 0); b.g.add(moon); b.moon = moon;
+    }
+  } else if (b.type === 'parkgate') {
+    if (!L) b.g.add(mesh([part(G.box, 0x8a8a9a, -1.4, .4, 0, 0, 0, 0, .4, .8, .4), part(G.box, 0x8a8a9a, 1.4, .3, 0, 0, 0, 0, .4, .6, .4)]));
+    else {
+      b.g.add(mesh([part(G.box, 0xff7a5a, -1.6, 1.6, 0, 0, 0, 0, .4, 3.2, .4), part(G.box, 0xff7a5a, 1.6, 1.6, 0, 0, 0, 0, .4, 3.2, .4), part(G.box, 0x7ad8ff, 0, 3.3, 0, 0, 0, 0, 3.8, .5, .5), ...Array.from({ length: 8 }, (_, i) => part(G.box, i % 2 ? 0x1a1a2a : 0xffffff, -1.4 + i * .4, 3.62, 0, 0, 0, 0, .4, .15, .52))]));
+      const sw = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), new THREE.MeshBasicMaterial({ color: 0x9ae0ff, transparent: true, opacity: .45, side: THREE.DoubleSide })); sw.position.set(0, 1.5, 0); b.g.add(sw); b.disc = sw;
+    }
   } else if (b.type === 'fame') {
     b.g.add(mesh([
       part(G.box, 0x8e86a8, 0, .2, 0, 0, 0, 0, 10, .4, 5.6), part(G.box, 0x9a92b4, 0, .5, -.4, 0, 0, 0, 9.4, .2, 4.4),
@@ -1486,8 +1563,8 @@ function refreshBuilding(id, anim = true) {
       part(G.box, 0xe8e0c0, 0, 4.7, -2.2, 0, 0, 0, 9.8, .5, .6), part(G.box, 0xffc23a, 0, 4.7, -1.88, 0, 0, 0, 5, .35, .05),
       part(G.box, 0xff5a5a, -3.2, 3.6, -2.15, 0, 0, 0, .8, 1.6, .05), part(G.box, 0x5fb8ff, 3.2, 3.6, -2.15, 0, 0, 0, .8, 1.6, .05),
     ]));
-    ['golem', 'serpent', 'queen', 'aicore', 'shadow', 'roc', 'kraken'].forEach((k, i) => {
-      const x = -3.9 + i * 1.3, won = S.stats[k] > 0;
+    ['golem', 'serpent', 'queen', 'aicore', 'shadow', 'roc', 'kraken', 'cdragon'].forEach((k, i) => {
+      const x = -3.85 + i * 1.1, won = S.stats[k] > 0;
       b.g.add(mesh([part(G.cyl8, 0x6e6888, x, .9, -.6, 0, 0, 0, .7, .6, .7), part(G.cyl8, 0x8e86a8, x, 1.25, -.6, 0, 0, 0, .8, .1, .8), part(G.box, won ? 0xffc23a : 0x4a4660, x, .85, .12, -.3, 0, 0, .6, .25, .05)]));
       if (won) { const st = makeStatue(k); st.position.set(x, 1.3, -.6); b.g.add(st); }
       else { const q = new THREE.Mesh(G.oct, new THREE.MeshLambertMaterial({ color: 0x55506a, flatShading: true, transparent: true, opacity: .55 })); q.scale.setScalar(.3); q.position.set(x, 1.8, -.6); b.g.add(q); }
@@ -1596,7 +1673,7 @@ placeBuilding('crew', 'crew', CREW_POS.x, CREW_POS.z, 2.22, 2.5);
 placeBuilding('kitchen', 'kitchen', KITCHEN_POS.x, KITCHEN_POS.z, -2.33, 2.4);
 placeBuilding('obelisk', 'obelisk', OBELISK_POS.x, OBELISK_POS.z, -.36, 1.2);
 placeBuilding('fame', 'fame', FAME_POS.x, FAME_POS.z, Math.PI / 2, 0);
-for (let i = 0; i < 7; i++) addCol(FAME_POS.x - .6, FAME_POS.z - (-3.9 + i * 1.3), .42);
+for (let i = 0; i < 8; i++) addCol(FAME_POS.x - .6, FAME_POS.z - (-3.85 + i * 1.1), .38);
 addCol(FAME_POS.x - 2.2, FAME_POS.z + 4.4, .45); addCol(FAME_POS.x - 2.2, FAME_POS.z - 4.4, .45);
 placeBuilding('petcenter', 'petcenter', PETC_POS.x, PETC_POS.z, .18, 2.1);
 placeBuilding('arenagate', 'arenagate', GATE_POS.x, GATE_POS.z, -.65, 0);
@@ -2497,6 +2574,120 @@ function makeGift(c1, c2) {
   sn.visible = false;
 }
 
+/* ================================================================
+   CLOCKWORK CITADEL + PARKOUR COURSE + outpost fun fair
+   ================================================================ */
+const cwGearMeshes = [], cwVentFx = [], cwBgGears = [];
+let cwHandMesh = null, cwMinute = null;
+const segDist = (px, pz, ax, az, bx, bz) => { const vx = bx - ax, vz = bz - az, k = clamp(((px - ax) * vx + (pz - az) * vz) / (vx * vx + vz * vz || 1), 0, 1); return Math.hypot(px - ax - vx * k, pz - az - vz * k); };
+CW_HAND.ang = 0;
+const cwHandAngle = () => CW_HAND.ang;
+function cwStatic(lx, lz) { let h = null; for (const f of CW_FLOORS) if (dist2(lx, lz, f.x, f.z) < f.r - .15 && (h === null || f.h > h)) h = f.h; if (h === null && segDist(lx, lz, ...CW_BRIDGE) < 1.2) h = 0; return h; }
+function cwCarrier(lx, lz) {
+  for (const g of CW_GEARS) if (dist2(lx, lz, g.x, g.z) < g.r - .1) return { x: g.x, z: g.z, w: g.w };
+  const a = cwHandAngle(); if (segDist(lx, lz, CW_HAND.x, CW_HAND.z, CW_HAND.x + Math.sin(a) * CW_HAND.len, CW_HAND.z + Math.cos(a) * CW_HAND.len) < CW_HAND.w) return { x: CW_HAND.x, z: CW_HAND.z, w: Math.PI * 2 / CW_HAND.per, hand: true };
+  return null;
+}
+function cwFloor(x, z) { const lx = x - CW_C.x, lz = z - CW_C.z, h = cwStatic(lx, lz); if (h !== null) return h; return cwCarrier(lx, lz) ? 0 : null; }
+function gearGeo(r, teeth, th) {
+  const parts = [part(G.cyl8, 0xffffff, 0, 0, 0, 0, 0, 0, r, th, r)];
+  for (let i = 0; i < teeth; i++) { const a = i / teeth * Math.PI * 2; parts.push(part(G.box, 0xffffff, Math.sin(a) * (r + .25), 0, Math.cos(a) * (r + .25), 0, a, 0, .45, th, .5)); }
+  return mergeGeometries(parts);
+}
+const BRASS = new THREE.MeshLambertMaterial({ color: 0xd8a040, emissive: 0x3a2400, emissiveIntensity: .25, flatShading: true });
+const COPPER = new THREE.MeshLambertMaterial({ color: 0xc8704a, flatShading: true });
+const IRON = new THREE.MeshLambertMaterial({ color: 0x5a5a6a, flatShading: true });
+{
+  // floors (stepped terraces)
+  const topC = [0xb8a888, 0xa89878, 0xc8b898];
+  CW_FLOORS.forEach((f, i) => {
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(f.r, f.r, f.h + 3, 36), new THREE.MeshLambertMaterial({ color: topC[i % 3], flatShading: true }));
+    top.position.set(CW_C.x + f.x, f.h - (f.h + 3) / 2, CW_C.z + f.z); top.receiveShadow = true; top.castShadow = true; scene.add(top);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(f.r - .1, .14, 4, 40), BRASS); rim.rotation.x = Math.PI / 2; rim.position.set(CW_C.x + f.x, f.h + .05, CW_C.z + f.z); scene.add(rim);
+    const under = jitter(new THREE.ConeGeometry(f.r, f.r * 1.3, 12, 2, true), .8, srand); under.rotateX(Math.PI);
+    const um = new THREE.Mesh(under, new THREE.MeshLambertMaterial({ color: 0x6a5a5a, flatShading: true })); um.position.set(CW_C.x + f.x, -3 - f.r * .65, CW_C.z + f.z); scene.add(um);
+    const tiles = [];
+    for (let k = 0; k < f.r * 2; k++) { const a = srand() * 6.28, rr = Math.sqrt(srand()) * (f.r - 1); tiles.push(part(G.box, [0x9a8a6a, 0xa8987a][k % 2], Math.cos(a) * rr, .02, Math.sin(a) * rr, 0, srand() * 3, 0, sr(.8, 1.4), .04, sr(.8, 1.4))); }
+    const tm = mesh(tiles); tm.position.set(CW_C.x + f.x, f.h, CW_C.z + f.z); scene.add(tm);
+  });
+  // bridge to the clock hub
+  { const [ax, az, bx, bz] = CW_BRIDGE, len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(bx - ax, bz - az);
+    const br = mesh([part(G.box, 0x8a7a5a, 0, -.2, 0, 0, 0, 0, 2.4, .4, len + 1), part(G.box, 0xd8a040, 1.2, .35, 0, 0, 0, 0, .1, .1, len), part(G.box, 0xd8a040, -1.2, .35, 0, 0, 0, 0, .1, .1, len), ...[-.4, -.2, 0, .2, .4].flatMap(k => [part(G.box, 0x6a5a4a, 1.2, .18, k * len, 0, 0, 0, .1, .4, .1), part(G.box, 0x6a5a4a, -1.2, .18, k * len, 0, 0, 0, .1, .4, .1)])]);
+    br.position.set(CW_C.x + (ax + bx) / 2, 0, CW_C.z + (az + bz) / 2); br.rotation.y = ry; scene.add(br); }
+  // spinning gear platforms
+  for (const g of CW_GEARS) {
+    const m = new THREE.Mesh(gearGeo(g.r, 14, .5), BRASS); m.position.set(CW_C.x + g.x, -.25, CW_C.z + g.z); m.receiveShadow = true; m.castShadow = true; scene.add(m);
+    const hub = new THREE.Mesh(G.cyl8, COPPER); hub.scale.set(.8, .3, .8); hub.position.y = .3; m.add(hub);
+    for (let i = 0; i < 4; i++) { const sp = new THREE.Mesh(G.box, COPPER); sp.scale.set(.25, .08, g.r * 1.6); sp.rotation.y = i * Math.PI / 4; sp.position.y = .27; m.add(sp); }
+    cwGearMeshes.push({ m, g, ang: 0 });
+  }
+  // the great clock (hub + face + rotating hands)
+  { const hx = CW_C.x + CW_HAND.x, hz = CW_C.z + CW_HAND.z;
+    const face = new THREE.Mesh(new THREE.CircleGeometry(CW_HAND.len + .6, 48), new THREE.MeshBasicMaterial({ color: 0xfff6e0, transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false })); face.rotation.x = -Math.PI / 2; face.position.set(hx, -1.2, hz); scene.add(face);
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, n = new THREE.Mesh(G.box, BRASS); n.scale.set(.3, .3, i % 3 ? .8 : 1.6); n.position.set(hx + Math.sin(a) * (CW_HAND.len + .3), -1.1, hz + Math.cos(a) * (CW_HAND.len + .3)); n.rotation.y = a; scene.add(n); }
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(CW_HAND.len + .7, .22, 5, 64), BRASS); ring.rotation.x = Math.PI / 2; ring.position.set(hx, -1.1, hz); scene.add(ring);
+    cwHandMesh = new THREE.Group(); cwHandMesh.position.set(hx, 0, hz); scene.add(cwHandMesh);
+    cwHandMesh.add(mesh([part(G.box, 0x2a2a3a, 0, -.12, CW_HAND.len / 2, 0, 0, 0, CW_HAND.w * 2, .24, CW_HAND.len), part(G.box, 0xd8a040, 0, .02, CW_HAND.len / 2, 0, 0, 0, CW_HAND.w * 2 - .3, .04, CW_HAND.len - .4), part(G.cone4, 0x2a2a3a, 0, -.12, CW_HAND.len + .4, Math.PI / 2, 0, 0, CW_HAND.w * 1.3, .9, .2)]));
+    cwMinute = new THREE.Group(); cwMinute.position.set(hx, -.6, hz); scene.add(cwMinute);
+    cwMinute.add(mesh([part(G.box, 0x4a3a2a, 0, 0, 2.5, 0, 0, 0, .7, .15, 5)]));
+    const hb = mesh([part(G.cyl8, 0x8a7a5a, 0, -.5, 0, 0, 0, 0, CW_HAND.x ? 2.6 : 2, 1, 2.6), part(G.cyl8, 0xd8a040, 0, .1, 0, 0, 0, 0, .7, .3, .7)]); hb.position.set(hx, 0, hz); scene.add(hb); }
+  // steam vents
+  for (const v of CW_VENTS) {
+    const p = cwv(v.x, v.z);
+    const m = mesh([part(G.cyl8, 0x5a5a6a, 0, .15, 0, 0, 0, 0, 1.2, .3, 1.2), part(G.cyl8, 0x2a2a3a, 0, .32, 0, 0, 0, 0, .8, .06, .8), part(G.cyl6, 0xc8704a, 1.3, .6, 0, 0, 0, 0, .2, 1.2, .2), part(G.cyl6, 0xc8704a, .9, 1.2, 0, 0, 0, Math.PI / 2, .2, .9, .2)]);
+    m.position.set(p.x, v.h0, p.z); scene.add(m);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.5, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .4, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.set(p.x, v.h0 + .05, p.z); scene.add(ring);
+    cwVentFx.push({ v, p });
+  }
+  // camp pod, chimneys, decor
+  const pod = mesh([part(G.cyl8, 0xe9e9f4, 0, .9, 0, 0, 0, 0, .9, 1.8, .9), part(G.cone6, 0xd8a040, 0, 2.1, 0, 0, 0, 0, .9, .7, .9), part(G.box, 0xd8a040, 0, .25, 0, 0, 0, 0, 2, .12, .3), part(G.box, 0xd8a040, 0, .25, 0, 0, Math.PI / 2, 0, 2, .12, .3)]);
+  pod.position.set(CW_STORE_POS.x, 0, CW_STORE_POS.z); scene.add(pod); addCol(CW_STORE_POS.x, CW_STORE_POS.z, 1.1);
+  for (const [x, z, h] of [[-10, 26, 0], [10, 12, 0], [-7, -11, 4], [7, -1, 4], [-25, -12, 0]]) {
+    const ch = mesh([part(G.cyl8, 0x8a5a4a, 0, 1.5, 0, 0, 0, 0, .55, 3, .55), part(G.cyl8, 0x6a4a3a, 0, 3.1, 0, 0, 0, 0, .7, .3, .7), part(G.box, 0xd8a040, 0, 1, 0, 0, 0, 0, 1.2, .2, 1.2)]); ch.position.set(CW_C.x + x, h, CW_C.z + z); scene.add(ch); addCol(CW_C.x + x, CW_C.z + z, .7);
+    cwVentFx.push({ chimney: V(CW_C.x + x, h + 3.3, CW_C.z + z) });
+  }
+  // belfry: big bell + clock tower wall
+  { const b = cwv(0, -34); const tw = mesh([part(G.box, 0x9a7a5a, 0, 8 + 4, 0, 0, 0, 0, 7, 8, 2), part(G.prism, 0x6a4a3a, 0, 16.6, 0, Math.PI / 2, 0, Math.PI / 2, 1.2, 7.4, 4), part(G.cyl8, 0xfff6e0, 0, 13, 1.05, Math.PI / 2, 0, 0, 2.2, .1, 2.2), part(G.cyl8, 0xd8a040, 0, 13, 1.1, Math.PI / 2, 0, 0, 2.4, .05, 2.4), part(G.box, 0x2a2a3a, 0, 13.6, 1.15, 0, 0, 0, .15, 1.3, .05), part(G.box, 0x2a2a3a, .45, 13, 1.15, 0, 0, -1, .15, 1, .05)]); tw.position.set(b.x, 0, b.z); scene.add(tw); addCol(b.x - 2, b.z, 1.6); addCol(b.x + 2, b.z, 1.6); addCol(b.x, b.z, 1.6); }
+  // giant background gears
+  for (let i = 0; i < 6; i++) { const r = sr(5, 10), m = new THREE.Mesh(gearGeo(r, 16, .8), new THREE.MeshLambertMaterial({ color: [0xb88a3a, 0x8a6a3a, 0xc8a05a][i % 3], flatShading: true })); const a = i / 6 * 6.28; m.position.set(CW_C.x + Math.cos(a) * sr(48, 60), sr(-14, 14), CW_C.z - 5 + Math.sin(a) * sr(48, 60)); m.rotation.x = Math.PI / 2; m.rotation.z = sr(-.4, .4); scene.add(m); cwBgGears.push({ m, w: sr(.1, .3) * (i % 2 ? 1 : -1) }); }
+}
+placeBuilding('ship_r_cw', 'rocket', CW_C.x + 8.5, CW_C.z + 26, -.4, 1.4, { linked: 'ship' });
+DIG_SITES.push({ zone: 'clock', pos: cwv(24, -9), clue: 'In Clockwork Citadel, in the Bell Garden: the island you reach by riding the giant clock hand.' });
+
+// ---------------- parkour course (its own floating zone) ----------------
+const PK_STATIC = [[0, 20, 8, 8, 0x7ad8ff], [0, 13, 3, 3], [2.5, 8, 2.5, 2.5], [-1, 3, 2.5, 2.5], [0, -4, 6, 8, 0xffd23a], [0, -24, 7, 6, 0xffd23a], [0, -33, 1.4, 10], [0, -43.5, 4, 4], [3, -49, 2.5, 2.5], [-1, -53.5, 2.5, 2.5], [0, -61, 8, 8, 0x7dff8a]];
+const PK_MOVING = [{ x: 0, z: -12.5, w: 3, d: 3, ax: 3.5, sp: 1.3, ph: 0 }, { x: 0, z: -18, w: 3, d: 3, ax: 3.5, sp: 1.3, ph: Math.PI }];
+const PK_SPIN = [{ x: 0, z: -4, len: 2.7, sp: 1.6 }, { x: 0, z: -24, len: 3.2, sp: -2.1 }, { x: 0, z: -43.5, len: 1.8, sp: 2.6 }];
+const PK_CHECKS = [[0, 20], [0, -1.5], [0, -22], [0, -43.5]];
+const pkMeshes = [], pkSpinMeshes = [];
+const pkPos = (x, z) => V(PK_C.x + x, 0, PK_C.z + z);
+{
+  const cols = [0xff7a5a, 0xff9ad8, 0xb88aff, 0x5ab8ff];
+  PK_STATIC.forEach(([x, z, w, d, c], i) => { const m = mesh([part(G.box, c || cols[i % 4], 0, -.35, 0, 0, 0, 0, w, .7, d), part(G.box, 0xffffff, 0, -.02, 0, 0, 0, 0, w - .3, .04, d - .3)]); m.position.copy(pkPos(x, z)); scene.add(m); });
+  for (const mv of PK_MOVING) { const m = mesh([part(G.box, 0x7dff8a, 0, -.35, 0, 0, 0, 0, mv.w, .7, mv.d), part(G.box, 0xffffff, 0, -.02, 0, 0, 0, 0, mv.w - .3, .04, mv.d - .3), part(G.cyl8, 0xffd23a, 0, -.9, 0, 0, 0, 0, .4, .5, .4)]); scene.add(m); pkMeshes.push(m); mv.cx = mv.x; }
+  for (const sp of PK_SPIN) { const g = new THREE.Group(); g.position.copy(pkPos(sp.x, sp.z)); scene.add(g); g.add(mesh([part(G.cyl8, 0x3a3a4a, 0, .4, 0, 0, 0, 0, .25, .8, .25), part(G.box, 0xff4a4a, 0, .55, 0, 0, 0, 0, .25, .25, sp.len * 2), part(G.box, 0xffffff, 0, .56, sp.len * .5, 0, 0, 0, .27, .27, .3), part(G.box, 0xffffff, 0, .56, -sp.len * .5, 0, 0, 0, .27, .27, .3)])); pkSpinMeshes.push(g); }
+  PK_CHECKS.slice(1).forEach(([x, z]) => { const f = mesh([part(G.box, 0x6a4a2e, 2.3, 1, 0, 0, 0, 0, .1, 2, .1), part(G.prism, 0x7dff8a, 2.65, 1.75, 0, Math.PI / 2, 0, Math.PI / 2, .35, .08, .6)]); f.position.copy(pkPos(x, z)); scene.add(f); });
+  const fin = mesh([part(G.box, 0xffffff, -3, 1.6, 0, 0, 0, 0, .3, 3.2, .3), part(G.box, 0xffffff, 3, 1.6, 0, 0, 0, 0, .3, 3.2, .3), ...Array.from({ length: 12 }, (_, i) => part(G.box, i % 2 ? 0x1a1a2a : 0xffffff, -2.75 + i * .5, 3.1, 0, 0, 0, 0, .5, .5, .1))]); fin.position.copy(pkPos(0, -59.5)); scene.add(fin);
+  const st = mesh([part(G.box, 0xff5a5a, -3.5, 1.4, 0, 0, 0, 0, .3, 2.8, .3), part(G.box, 0xff5a5a, 3.5, 1.4, 0, 0, 0, 0, .3, 2.8, .3), part(G.box, 0xffd23a, 0, 2.8, 0, 0, 0, 0, 7.3, .5, .2)]); st.position.copy(pkPos(0, 16.4)); scene.add(st);
+  const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xd8e8ff, emissiveIntensity: .35, flatShading: true }), puff = new THREE.IcosahedronGeometry(1, 1), N = 70, im = new THREE.InstancedMesh(puff, cloudMat, N), d = new THREE.Object3D();
+  for (let i = 0; i < N; i++) { const a = srand() * 6.28, r = sr(8, 70); d.position.set(PK_C.x + Math.cos(a) * r, sr(-20, -10), PK_C.z - 20 + Math.sin(a) * r); const s = sr(4, 8); d.scale.set(s * 1.6, s * .5, s); d.updateMatrix(); im.setMatrixAt(i, d.matrix); }
+  scene.add(im);
+}
+function pkGround(x, z) {
+  const lx = x - PK_C.x, lz = z - PK_C.z;
+  for (const [cx, cz, w, d] of PK_STATIC) if (Math.abs(lx - cx) < w / 2 + .15 && Math.abs(lz - cz) < d / 2 + .15) return { static: true };
+  for (const mv of PK_MOVING) if (Math.abs(lx - mv.cx) < mv.w / 2 + .15 && Math.abs(lz - mv.z) < mv.d / 2 + .15) return { mv };
+  return null;
+}
+// villager cottages + fun fair buildings at the outpost
+placeBuilding('cottage1', 'cottage', COTTAGES[0].x, COTTAGES[0].z, COTTAGES[0].r, 1.9);
+placeBuilding('cottage2', 'cottage', COTTAGES[1].x, COTTAGES[1].z, COTTAGES[1].r, 1.9);
+placeBuilding('cottage3', 'cottage', COTTAGES[2].x, COTTAGES[2].z, COTTAGES[2].r, 1.9);
+placeBuilding('botshop', 'botshop', BOTSHOP_POS.x, BOTSHOP_POS.z, Math.PI / 2, 2.2);
+placeBuilding('gallery', 'gallery', FAIR.gallery.x, FAIR.gallery.z, Math.PI, 1.8);
+placeBuilding('market', 'market', FAIR.market.x, FAIR.market.z, Math.PI, 1.6);
+placeBuilding('parkgate', 'parkgate', FAIR.park.x, FAIR.park.z, Math.PI, 0);
+
 // snow particles
 const SNOW_N = 1500;
 const snowGeo = new THREE.BufferGeometry();
@@ -2579,10 +2770,10 @@ buildPad({ id: 'portal', x: 0, z: -10.2, name: 'Awaken Ancient Portal', sub: () 
 buildPad({ id: 'trading', x: 14.2, z: -8.6, name: 'Restore Trading Post', sub: () => 'Sell extra resources for coins', max: 1, cost: () => ({ wood: 30, stone: 20 }), visible: () => lvl('workshop') > 0, after: () => { refreshBuilding('trading'); toast('🪙 Trading Post open! Stand on a green pad to sell.', 'big'); } });
 buildPad({ id: 'petden', x: -5.4, z: -9.6, name: l => l ? `Pet Lv ${l + 1}` : 'Adopt a Pet', sub: l => l === 1 ? 'Bloop follows you & gathers' : l === 2 ? 'Faster + zaps enemies' : 'Super Bloop!', max: 3, cost: l => [null, { coins: 80 }, { coins: 250, crystal: 8 }, { coins: 500, frost: 12 }][l], visible: () => lvl('trading') > 0, after: l => { refreshBuilding('petden'); makePet(); toast(l === 1 ? '🐾 Bloop joined you! It gathers nearby stuff.' : '🐾 Bloop leveled up!', 'big'); } });
 // sell pads at the trading post
-const SELL = { wood: { per: 2, coin: 1, keep: 20 }, stone: { per: 2, coin: 1, keep: 20 }, ore: { per: 1, coin: 1, keep: 10 }, crystal: { per: 1, coin: 3, keep: 10 }, frost: { per: 1, coin: 5, keep: 5 }, magma: { per: 1, coin: 8, keep: 5 }, spore: { per: 1, coin: 10, keep: 5 }, star: { per: 1, coin: 15, keep: 5 }, prism: { per: 1, coin: 18, keep: 5 }, feather: { per: 1, coin: 20, keep: 5 }, pearl: { per: 1, coin: 22, keep: 5 } };
+const SELL = { wood: { per: 2, coin: 1, keep: 20 }, stone: { per: 2, coin: 1, keep: 20 }, ore: { per: 1, coin: 1, keep: 10 }, crystal: { per: 1, coin: 3, keep: 10 }, frost: { per: 1, coin: 5, keep: 5 }, magma: { per: 1, coin: 8, keep: 5 }, spore: { per: 1, coin: 10, keep: 5 }, star: { per: 1, coin: 15, keep: 5 }, prism: { per: 1, coin: 18, keep: 5 }, feather: { per: 1, coin: 20, keep: 5 }, pearl: { per: 1, coin: 22, keep: 5 }, cog: { per: 1, coin: 24, keep: 5 } };
 RES.forEach((r, i) => addPad({
   id: 'sell_' + r, kind: 'sell', res: r, x: 9.4 + i * 2.5, z: -7.4 + Math.abs(i - 2) * .5, labelY: 1.6, max: 1, level: () => 0, cost: () => ({}),
-  visible: () => lvl('trading') > 0 && (r !== 'crystal' || S.tools.pick >= 3) && (r !== 'frost' || S.stats.iceVisits > 0) && (r !== 'ore' || lvl('mine') > 0) && (r !== 'magma' || S.stats.emberVisits > 0) && (r !== 'spore' || S.stats.jungleVisits > 0) && (r !== 'star' || S.stats.stationVisits > 0) && (r !== 'prism' || S.stats.caveVisits > 0) && (r !== 'feather' || S.stats.skyVisits > 0) && (r !== 'pearl' || S.stats.seaVisits > 0 || S.stats.sails > 0),
+  visible: () => lvl('trading') > 0 && (r !== 'crystal' || S.tools.pick >= 3) && (r !== 'frost' || S.stats.iceVisits > 0) && (r !== 'ore' || lvl('mine') > 0) && (r !== 'magma' || S.stats.emberVisits > 0) && (r !== 'spore' || S.stats.jungleVisits > 0) && (r !== 'star' || S.stats.stationVisits > 0) && (r !== 'prism' || S.stats.caveVisits > 0) && (r !== 'feather' || S.stats.skyVisits > 0) && (r !== 'pearl' || S.stats.seaVisits > 0 || S.stats.sails > 0) && (r !== 'cog' || S.stats.clockVisits > 0),
 }));
 // Frostveil pads
 buildPad({ id: 'heater', x: CAMP.x + 9, z: CAMP.z + 5.2, name: l => l ? `Heater Lv ${l + 1}` : 'Light the Heater', sub: l => `Safe from blizzards (${heatR(l)}m)`, max: 3, cost: l => [null, { wood: 20, stone: 20, ore: 5 }, { wood: 40, stone: 40, ore: 10, frost: 8 }, { wood: 60, stone: 60, ore: 15, frost: 16 }][l], visible: () => true, after: l => { refreshBuilding('heater'); toast(l === 1 ? '🔥 The Heater blazes! Frost Shards can\'t enter its warmth.' : '🔥 Heater upgraded — warm zone grows!', 'ice'); } });
@@ -2597,7 +2788,7 @@ buildPad({ id: 'forge', x: CAMP.x - 9, z: CAMP.z + 5.6, name: 'Restore the Forge
 addPad({ id: 'core', x: CORE_POS.x, z: CORE_POS.z + 3.2, name: () => 'Claim the Planet Core', sub: () => '+30 max health forever', level: () => S.core, max: 1, cost: () => ({}), visible: () => S.stats.golem > 0 && !S.core, done: () => claimCore() });
 
 buildPad({ id: 'emberportal', x: EP_ON_ICE.x, z: EP_ON_ICE.z + 4.6, name: 'Ignite the Ember Portal', sub: () => 'Opens the way to Emberfall', max: 1, cost: () => ({ coins: 200, frost: 25, crystal: 15, ore: 30 }), visible: () => S.stats.golem > 0, after: () => { refreshBuilding('emberportal'); toast('🌋 The Ember Portal blazes open! Step in to reach Emberfall.', 'big', 4500); } });
-buildPad({ id: 'ship', x: SHIP_SPOTS.home.pad.x, z: SHIP_SPOTS.home.pad.z, name: 'Repair the Space Ship', sub: () => 'Fly between planets', max: 1, cost: () => ({ wood: 80, stone: 60, ore: 40, crystal: 20, frost: 15, coins: 300 }), visible: () => S.stats.iceVisits > 0, after: () => { ['ship', 'ship_r_ice', 'ship_r_emb', 'ship_r_jun', 'ship_r_st', 'ship_r_cv', 'ship_r_sk', 'ship_r_sea'].forEach(id => refreshBuilding(id)); toast('🚀 Your ship is fixed! Stand on its pad to open the Star Map.', 'big', 4500); } });
+buildPad({ id: 'ship', x: SHIP_SPOTS.home.pad.x, z: SHIP_SPOTS.home.pad.z, name: 'Repair the Space Ship', sub: () => 'Fly between planets', max: 1, cost: () => ({ wood: 80, stone: 60, ore: 40, crystal: 20, frost: 15, coins: 300 }), visible: () => S.stats.iceVisits > 0, after: () => { ['ship', 'ship_r_ice', 'ship_r_emb', 'ship_r_jun', 'ship_r_st', 'ship_r_cv', 'ship_r_sk', 'ship_r_sea', 'ship_r_cw'].forEach(id => refreshBuilding(id)); toast('🚀 Your ship is fixed! Stand on its pad to open the Star Map.', 'big', 4500); } });
 buildPad({ id: 'shop', x: SHOP_POS.x, z: SHOP_POS.z - 3.4, name: 'Restore the Suit Shop', sub: () => 'New suit colors & hats', max: 1, cost: () => ({ wood: 35, stone: 25, coins: 40 }), visible: () => lvl('trading') > 0, after: () => { refreshBuilding('shop'); toast('👕 The Suit Shop is open! Stand on its pad to browse.', 'big'); } });
 buildPad({ id: 'bridge', x: EMB_C.x + BRIDGE_X, z: EMB_C.z - 1.8, name: 'Build Obsidian Bridge', sub: () => 'A safe path over the lava', max: 1, cost: () => ({ stone: 60, wood: 30, magma: 6 }), visible: () => true, after: () => { bridgeMesh.visible = true; toast('🌉 Obsidian Bridge built! No more lava hopping here.', 'big'); } });
 buildPad({ id: 'nest', x: ECAMP.x - 9, z: ECAMP.z + 5.2, name: l => l ? `Dragon Lv ${l + 1}` : 'Hatch the Dragon Egg', sub: l => l === 1 ? 'A baby dragon that breathes fire!' : 'Hotter fire, faster breath', max: 3, cost: l => [null, { magma: 8, coins: 250 }, { magma: 15, coins: 500 }, { magma: 25, coins: 900, frost: 20 }][l], visible: () => S.egg > 0, after: l => hatchOrLevel(l) });
@@ -2644,6 +2835,19 @@ uiPad('evshopui', FEST_POS.x, FEST_POS.z + 2.8, '<div class="nm">🎪 Holiday St
 buildPad({ id: 'airtank', x: SEA_C.x - 4.5, z: SEA_C.z + 15, name: l => l ? 'Air Tank Lv 3' : 'Bigger Air Tank', sub: l => l === 1 ? 'Oxygen lasts 40% longer' : 'Oxygen lasts twice as long', max: 2, cost: l => ({ pearl: 6 * l, ore: 30 * l, coins: 150 * l }), visible: () => true, after: l => toast(l === 1 ? '🫧 Bigger air tank! Your oxygen lasts longer.' : '🫧 Mega air tank! Oxygen lasts twice as long.', 'big') });
 uiPad('ship_sea', SHIP_SPOTS.sea.pad.x, SHIP_SPOTS.sea.pad.z, '<div class="nm">🚀 Space Ship</div><div class="sub">Stand here for the Star Map</div>', 'map', () => lvl('ship') > 0);
 
+['cottage1', 'cottage2', 'cottage3'].forEach((id, i) => { const c = COTTAGES[i]; buildPad({ id, x: c.x + Math.sin(c.r) * 3.3, z: c.z + Math.cos(c.r) * 3.3, name: 'Build a Cottage', sub: () => `${VILLAGERS[i + 2].e} ${VILLAGERS[i + 2].name} the ${VILLAGERS[i + 2].job} wants to move in!`, max: 1, cost: () => ({ wood: 60, stone: 40, coins: 100 }), visible: () => lvl('workshop') > 0, after: () => { refreshBuilding(id); toast('🏡 Cottage built! Someone is moving in…', 'big'); } }); });
+buildPad({ id: 'botshop', x: BOTSHOP_POS.x + 3.4, z: BOTSHOP_POS.z, name: 'Build the Robot Workshop', sub: () => 'Design your own robot pet', max: 1, cost: () => ({ wood: 60, ore: 30, coins: 200 }), visible: () => lvl('workshop') > 0, after: () => { refreshBuilding('botshop'); toast('🔧 Robot Workshop open! Design your own robot pet.', 'big'); } });
+uiPad('botui', BOTSHOP_POS.x + 3.4, BOTSHOP_POS.z, '<div class="nm">🔧 Robot Workshop</div><div class="sub">Build your robot pet</div>', 'botshop', () => lvl('botshop') > 0);
+buildPad({ id: 'gallery', x: FAIR.gallery.x, z: FAIR.gallery.z - 3.2, name: 'Build the Target Gallery', sub: () => 'A tapping mini-game', max: 1, cost: () => ({ wood: 40, coins: 100 }), visible: () => lvl('workshop') > 0, after: () => { refreshBuilding('gallery'); toast('🎯 Target Gallery open! How fast are your fingers?', 'big'); } });
+uiPad('galui', FAIR.gallery.x, FAIR.gallery.z - 3.2, '<div class="nm">🎯 Target Gallery</div><div class="sub">Best: tap to play</div>', 'gallery', () => lvl('gallery') > 0);
+buildPad({ id: 'market', x: FAIR.market.x, z: FAIR.market.z - 3, name: 'Build the Market Stall', sub: () => 'Day goods & rare night treasures', max: 1, cost: () => ({ wood: 50, coins: 150 }), visible: () => lvl('workshop') > 0, after: () => { refreshBuilding('market'); toast('🌙 Market open! Different things are sold at night.', 'big'); } });
+uiPad('marketui', FAIR.market.x, FAIR.market.z - 3, '<div class="nm">☀️🌙 Market</div><div class="sub">Rare items at night!</div>', 'market', () => lvl('market') > 0);
+buildPad({ id: 'parkgate', x: FAIR.park.x, z: FAIR.park.z - 3.2, name: 'Build the Parkour Gate', sub: () => 'An obstacle course with best times', max: 1, cost: () => ({ stone: 40, coins: 120 }), visible: () => lvl('workshop') > 0, after: () => { refreshBuilding('parkgate'); toast('🏃 Parkour Gate built! Step on the pad to enter the course.', 'big'); } });
+uiPad('parkui', FAIR.park.x, FAIR.park.z - 3.2, '<div class="nm">🏃 Parkour Course</div><div class="sub">Beat your best time</div>', 'park', () => lvl('parkgate') > 0);
+uiPad('tourneyui', FAIR.tourney.x, FAIR.tourney.z, '<div class="nm">🏆 Fishing Tournament</div><div class="sub">60 seconds, catch them all!</div>', 'tourney', () => lvl('workshop') > 0);
+uiPad('parkexit', PK_C.x - 2.6, PK_C.z + 22.6, '<div class="nm">🚪 Exit</div><div class="sub">Back to the outpost</div>', 'park', () => true);
+uiPad('ship_clock', SHIP_SPOTS.clock.pad.x, SHIP_SPOTS.clock.pad.z, '<div class="nm">🚀 Space Ship</div><div class="sub">Stand here for the Star Map</div>', 'map', () => lvl('ship') > 0);
+
 const portalHint = document.createElement('div'); portalHint.className = 'label panel dim'; portalHint.innerHTML = '<div class="nm">Ancient Portal</div><div class="sub">Dormant… needs crystals</div>'; $('labels').appendChild(portalHint);
 
 /* ================================================================
@@ -2655,6 +2859,7 @@ const portalHint = document.createElement('div'); portalHint.className = 'label 
     if (dist2(x, z, MINE_ENTRANCE.x, MINE_ENTRANCE.z) < 8) return true;
     if (dist2(x, z, -4, 17) < 5) return true;
     if (dist2(x, z, 15, -10) < 16) return true;
+    if (COTTAGES.some(c => dist2(x, z, c.x, c.z) < 5.5) || dist2(x, z, BOTSHOP_POS.x, BOTSHOP_POS.z) < 6 || Object.values(FAIR).some(f => dist2(x, z, f.x, f.z) < 5)) return true;
     if (dist2(x, z, RACE_POS.x, RACE_POS.z) < 11 || dist2(x, z, DOCK_POS.x, DOCK_POS.z) < 4 || dist2(x, z, QBOARD_POS.x, QBOARD_POS.z) < 3.5 || dist2(x, z, FEST_POS.x, FEST_POS.z) < 4.5) return true;
     if (dist2(x, z, MUSEUM_POS.x, MUSEUM_POS.z) < 7 || DIG_SITES.some(d2 => d2.zone === 'home' && dist2(x, z, d2.pos.x, d2.pos.z) < 2.5)) return true;
     if (dist2(x, z, FARM_POS.x, FARM_POS.z) < 7.5 || dist2(x, z, RUNES[0].pos.x, RUNES[0].pos.z) < 2.5) return true;
@@ -2821,6 +3026,26 @@ const portalHint = document.createElement('div'); portalHint.className = 'label 
       addNode(type, wx, wz); k++;
     }
   });
+  // Clockwork Citadel
+  const cwbad = (x, z) => {
+    const wx = CW_C.x + x, wz = CW_C.z + z, h = cwStatic(x, z);
+    if (h === null || !CW_FLOORS.some(f => f.h === h && dist2(x, z, f.x, f.z) < f.r - 1.8)) return true;
+    if (segDist(x, z, ...CW_BRIDGE) < 2.5) return true;
+    for (const v of CW_VENTS) if (dist2(x, z, v.x, v.z) < 3 || dist2(x, z, v.tx, v.tz) < 3) return true;
+    if (dist2(x, z, 0, 22) < 7 || dist2(x, z, 0, -27) < 8 || dist2(x, z, 0, -34) < 5 || dist2(x, z, 8.5, 26) < 3.5 || dist2(x, z, 5.5, 26) < 3) return true;
+    for (const [cx, cz] of [[-10, 26], [10, 12], [-7, -11], [7, -1], [-25, -12]]) if (dist2(x, z, cx, cz) < 2.2) return true;
+    for (const d2 of DIG_SITES) if (d2.zone === 'clock' && dist2(wx, wz, d2.pos.x, d2.pos.z) < 2.5) return true;
+    for (const n of nodes) if (n.zone === 'clock' && dist2(wx, wz, n.x, n.z) < 2.6) return true;
+    return false;
+  };
+  [[0, { crate: 3, scrap: 2 }], [1, { cogpile: 3, scrap: 2, crate: 1 }], [3, { cogpile: 3, crate: 2, scrap: 1 }], [4, { cogpile: 3, crate: 1 }]].forEach(([fi, want]) => {
+    const f = CW_FLOORS[fi];
+    for (const [type, n] of Object.entries(want)) for (let k = 0, tries = 0; k < n && tries < 400; tries++) {
+      const a = srand() * 6.28, r = Math.sqrt(srand()) * (f.r - 2), x = f.x + Math.cos(a) * r, z = f.z + Math.sin(a) * r;
+      if (cwbad(x, z)) continue;
+      const nd = addNode(type, CW_C.x + x, CW_C.z + z); nd.h = f.h; nd.g.position.y = f.h; k++;
+    }
+  });
 }
 
 /* ================================================================
@@ -2836,6 +3061,7 @@ const MAGMA_BODY = new THREE.MeshLambertMaterial({ color: 0x3a1a14, emissive: 0x
 const GOBLIN_BODY = new THREE.MeshLambertMaterial({ color: 0x6bd04a, flatShading: true });
 const SACK_MAT = new THREE.MeshLambertMaterial({ color: 0xa0703a, flatShading: true });
 const BEETLE_MAT = new THREE.MeshLambertMaterial({ color: 0x2a6a5a, emissive: 0x1aff9a, emissiveIntensity: .22, flatShading: true });
+const CBOT_MAT = new THREE.MeshLambertMaterial({ color: 0xc8903a, emissive: 0x3a2400, emissiveIntensity: .2, flatShading: true });
 const PUFF_MAT = new THREE.MeshLambertMaterial({ color: 0xffd23a, emissive: 0x6a4a00, emissiveIntensity: .2, flatShading: true });
 const PUFF_SPIKE = new THREE.MeshLambertMaterial({ color: 0xfff6c0, flatShading: true });
 const WISP_MAT = new THREE.MeshLambertMaterial({ color: 0x8a94b8, emissive: 0x2a3a6a, emissiveIntensity: .35, flatShading: true });
@@ -2843,7 +3069,7 @@ const BAT_MAT = new THREE.MeshLambertMaterial({ color: 0x2a1a3a, emissive: 0x3a1
 const SDRONE_MAT = new THREE.MeshLambertMaterial({ color: 0x4a4f66, emissive: 0xff2a2a, emissiveIntensity: .12, flatShading: true });
 const SDRONE_RING = emis(0xff5a5a, .8);
 const BEETLE_LEG = new THREE.MeshLambertMaterial({ color: 0x1a1428, flatShading: true });
-const BODY_MAT = { gloom: GLOOM_BODY, crawl: CRAWL_BODY, shard: SHARD_BODY, magma: MAGMA_BODY, goblin: GOBLIN_BODY, beetle: BEETLE_MAT, sdrone: SDRONE_MAT, bat: BAT_MAT, wisp: WISP_MAT, puffer: PUFF_MAT };
+const BODY_MAT = { gloom: GLOOM_BODY, crawl: CRAWL_BODY, shard: SHARD_BODY, magma: MAGMA_BODY, goblin: GOBLIN_BODY, beetle: BEETLE_MAT, sdrone: SDRONE_MAT, bat: BAT_MAT, wisp: WISP_MAT, puffer: PUFF_MAT, clockbot: CBOT_MAT };
 function spawnEnemy(kind, x, z) {
   let e0wings = null;
   const g = new THREE.Group();
@@ -2853,6 +3079,13 @@ function spawnEnemy(kind, x, z) {
     const sack = new THREE.Mesh(G.ico1, SACK_MAT); sack.scale.setScalar(.42); sack.position.set(0, .85, -.42); sack.castShadow = true; g.add(sack);
     const knot = new THREE.Mesh(G.ico, emis(0xffd23a, 1)); knot.scale.setScalar(.12); knot.position.set(0, 1.25, -.42); g.add(knot);
     for (const sx of [-1, 1]) { const ear = new THREE.Mesh(G.cone4, GOBLIN_BODY); ear.scale.set(.08, .3, .08); ear.position.set(sx * .42, .75, 0); ear.rotation.z = -sx * 1.1; g.add(ear); const e2 = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), EYE_C); e2.position.set(sx * .14, .66, .36); g.add(e2); }
+  } else if (kind === 'clockbot') {
+    body = new THREE.Mesh(G.box, CBOT_MAT); body.scale.set(.6, .7, .5); body.position.y = .6; body.castShadow = true; g.add(body);
+    const dk = new THREE.MeshLambertMaterial({ color: 0x4a3a2a, flatShading: true });
+    for (const sx of [-1, 1]) { const e2 = new THREE.Mesh(new THREE.SphereGeometry(.08, 6, 5), emis(0xff4a2a, 2.2)); e2.position.set(sx * .14, .78, .26); g.add(e2); const lg = new THREE.Mesh(G.box, dk); lg.scale.set(.14, .3, .14); lg.position.set(sx * .16, .15, 0); g.add(lg); const ar = new THREE.Mesh(G.box, dk); ar.scale.set(.1, .4, .1); ar.position.set(sx * .38, .6, 0); ar.rotation.z = sx * .3; g.add(ar); }
+    const key = new THREE.Group(); key.position.set(0, .7, -.3); g.add(key); g.userData.key = key;
+    const sh = new THREE.Mesh(G.cyl6, dk); sh.scale.set(.05, .3, .05); sh.rotation.x = Math.PI / 2; sh.position.z = -.12; key.add(sh);
+    const hd = new THREE.Mesh(new THREE.TorusGeometry(.14, .04, 5, 12), CBOT_MAT); hd.position.z = -.28; key.add(hd);
   } else if (kind === 'puffer') {
     body = new THREE.Mesh(G.ico1, PUFF_MAT); body.scale.setScalar(.42); body.position.y = 1.2; body.castShadow = true; g.add(body);
     for (let i = 0; i < 12; i++) { const a = i * 2.4, b2 = Math.acos(1 - 2 * (i + .5) / 12), dir = V(Math.sin(b2) * Math.cos(a), Math.cos(b2), Math.sin(b2) * Math.sin(a)); const sp2 = new THREE.Mesh(G.cone4, PUFF_SPIKE); sp2.position.copy(dir).multiplyScalar(1.02); sp2.quaternion.setFromUnitVectors(V(0, 1, 0), dir); sp2.scale.set(.12, .4, .12); body.add(sp2); }
@@ -2894,9 +3127,9 @@ function spawnEnemy(kind, x, z) {
   }
   g.position.set(x, 0, z); g.scale.setScalar(.01);
   scene.add(g);
-  const hp = { gloom: 2 + Math.floor((S.day - 1) * .8), crawl: 3 + S.tools.pick, shard: 5 + Math.floor(S.day * .6), magma: 7 + Math.floor(S.day * .6), goblin: 8 + S.day, beetle: 4 + Math.floor(S.day * .5), sdrone: 6 + Math.floor(S.day * .5), bat: 4 + Math.floor(S.day * .4), wisp: 5 + Math.floor(S.day * .5), puffer: 6 + Math.floor(S.day * .5) }[kind];
-  const speed = { gloom: rand(3, 3.8), crawl: rand(3.4, 4.2), shard: rand(3.8, 4.6), magma: rand(3.2, 4), goblin: 5.6, beetle: rand(4.2, 5), sdrone: rand(4, 4.8), bat: rand(4.6, 5.4), wisp: rand(4.2, 5), puffer: rand(3.6, 4.3) }[kind];
-  const e = { wings: e0wings, g, body, kind, hp, max: hp, speed, cd: 0, hop: Math.random() * 6, flash: 0, kx: 0, kz: 0, spawn: 0, dying: 0, dmg: { gloom: 8 + S.day, crawl: 10, shard: 9, magma: 11, goblin: 0, beetle: 7, sdrone: 8, bat: 6, wisp: 7, puffer: 8 }[kind], burn: 0, slow: 0, life: 25, zone: zoneOf(x, z) };
+  const hp = { gloom: 2 + Math.floor((S.day - 1) * .8), crawl: 3 + S.tools.pick, shard: 5 + Math.floor(S.day * .6), magma: 7 + Math.floor(S.day * .6), goblin: 8 + S.day, beetle: 4 + Math.floor(S.day * .5), sdrone: 6 + Math.floor(S.day * .5), bat: 4 + Math.floor(S.day * .4), wisp: 5 + Math.floor(S.day * .5), puffer: 6 + Math.floor(S.day * .5), clockbot: 7 + Math.floor(S.day * .5) }[kind];
+  const speed = { gloom: rand(3, 3.8), crawl: rand(3.4, 4.2), shard: rand(3.8, 4.6), magma: rand(3.2, 4), goblin: 5.6, beetle: rand(4.2, 5), sdrone: rand(4, 4.8), bat: rand(4.6, 5.4), wisp: rand(4.2, 5), puffer: rand(3.6, 4.3), clockbot: rand(3.4, 4) }[kind];
+  const e = { wings: e0wings, g, body, kind, hp, max: hp, speed, cd: 0, hop: Math.random() * 6, flash: 0, kx: 0, kz: 0, spawn: 0, dying: 0, dmg: { gloom: 8 + S.day, crawl: 10, shard: 9, magma: 11, goblin: 0, beetle: 7, sdrone: 8, bat: 6, wisp: 7, puffer: 8, clockbot: 9 }[kind], burn: 0, slow: 0, life: 25, zone: zoneOf(x, z) };
   enemies.push(e);
   return e;
 }
@@ -3308,6 +3541,50 @@ function resetKraken() {
 function initKraken() { resetKraken(); kraken.state = (S.stats.kraken > 0 && S.day <= S.krakenDay) ? 'gone' : 'sleep'; }
 
 /* ================================================================
+   BOSS: THE CLOCKWORK DRAGON
+   ================================================================ */
+const CD_BODY = new THREE.MeshLambertMaterial({ color: 0xc8903a, emissive: 0x3a2400, emissiveIntensity: .2, flatShading: true });
+const CD_DARK = new THREE.MeshLambertMaterial({ color: 0x6a4a2a, flatShading: true });
+const CD_CORE = new THREE.MeshLambertMaterial({ color: 0xff6a2a, emissive: 0xff4a0a, emissiveIntensity: 1.4, flatShading: true });
+const CD_MODES = { fire: { col: 0xff5a1a, name: '🔥 FIRE MODE' }, gears: { col: 0xffd23a, name: '⚙ GEAR MODE' }, time: { col: 0x5ab8ff, name: '⏳ TIME-FREEZE MODE' } };
+const cdragon = { g: new THREE.Group(), isBoss: true, r: 2.4, textY: 14.5, state: 'sleep', mode: 'fire', modeT: 10, hp: 1, max: 1, flash: 0, burn: 0, slow: 0, deadT: 0, kx: 0, kz: 0, atkT: 2, breath: 0, breathA: 0, tick: 0, slowmo: 0, saws: [], rings: [], bombs: [], n: 0, walk: 0 };
+cdragon.targetable = () => cdragon.state === 'fight';
+cdragon.kill = () => killCDragon();
+{
+  const g = cdragon.g, body = new THREE.Group(); g.add(body); cdragon.body = body;
+  const add = (geo, mat, x, y, z, sx, sy, sz, p = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; p.add(m); return m; };
+  add(G.sph, CD_BODY, 0, 2.2, 0, 1.3, 1.1, 1.9);
+  const chest = add(G.cyl8, CD_DARK, 0, 2.3, 1.55, .75, .1, .75); chest.rotation.x = Math.PI / 2;
+  cdragon.core = add(G.sph, CD_CORE, 0, 2.3, 1.62, .45, .45, .15);
+  cdragon.clockHand = add(G.box, CD_DARK, 0, 2.5, 1.7, .06, .4, .04);
+  const neck = new THREE.Group(); neck.position.set(0, 2.9, 1.5); body.add(neck);
+  for (let i = 0; i < 3; i++) add(G.cyl8, i % 2 ? CD_DARK : CD_BODY, 0, i * .45, i * .35, .45 - i * .05, .4, .45 - i * .05, neck);
+  const head = new THREE.Group(); head.position.set(0, 1.6, 1.4); neck.add(head); cdragon.head = head;
+  add(G.box, CD_BODY, 0, 0, 0, 1, .7, 1.2, head); add(G.box, CD_DARK, 0, -.3, .5, .85, .25, .9, head); cdragon.mouth = add(G.box, CD_DARK, 0, -.15, 1, .7, .3, .3, head);
+  for (const sx of [-1, 1]) { const e = add(G.sph, CD_CORE, sx * .38, .15, .55, .15, .12, .1, head); const h = add(G.cone4, CD_DARK, sx * .3, .55, -.3, .1, .55, .1, head); h.rotation.x = -.6; }
+  cdragon.wings = [-1, 1].map(sx => {
+    const w = new THREE.Group(); w.position.set(sx * 1.2, 3, -.2); body.add(w);
+    const gm = new THREE.Mesh(gearGeo(1.4, 10, .12), CD_BODY); gm.rotation.z = Math.PI / 2; gm.position.set(sx * 1.6, .3, 0); gm.castShadow = true; w.add(gm);
+    const strut = add(G.box, CD_DARK, sx * .8, .1, 0, 1.6, .15, .15, w);
+    return { w, gm };
+  });
+  for (let i = 0; i < 5; i++) add(G.cyl8, i % 2 ? CD_DARK : CD_BODY, 0, 1.9 - i * .15, -1.8 - i * .6, .45 - i * .07, .5, .45 - i * .07).rotation.x = Math.PI / 2;
+  const tg = new THREE.Mesh(gearGeo(.5, 8, .1), CD_DARK); tg.position.set(0, 1.2, -4.8); tg.rotation.x = Math.PI / 2; body.add(tg); cdragon.tailGear = tg;
+  cdragon.legs = [[-1, .8], [1, .8], [-1, -.8], [1, -.8]].map(([sx, z]) => add(G.cyl6, CD_DARK, sx * .9, .6, z, .22, 1.2, .22));
+  g.position.copy(CDRAGON_C).setY(8); g.visible = false; scene.add(g);
+  cdragon.col = addCol(CDRAGON_C.x, CDRAGON_C.z, 1.9); cdragon.col.on = false;
+}
+const SAW_GEO = gearGeo(.42, 8, .12), SAW_MAT = new THREE.MeshLambertMaterial({ color: 0xe8e8f0, emissive: 0x6a6a7a, emissiveIntensity: .3, flatShading: true });
+const cdMaxHp = () => Math.round(1150 * (1 + .35 * (S.stats.cdragon || 0)));
+function clearCDHaz() { for (const a of [cdragon.saws, cdragon.rings, cdragon.bombs]) { for (const o of a) scene.remove(o.m); a.length = 0; } }
+function resetCDragon() {
+  cdragon.max = cdragon.hp = cdMaxHp(); cdragon.mode = 'fire'; cdragon.modeT = 10; cdragon.atkT = 2; cdragon.breath = 0; cdragon.burn = 0; cdragon.slow = 0; cdragon.slowmo = 0; cdragon.n = 0;
+  cdragon.g.position.copy(CDRAGON_C).setY(8); cdragon.g.rotation.set(0, 0, 0); cdragon.body.scale.setScalar(1); cdragon.body.rotation.set(0, 0, 0);
+  cdragon.col.x = CDRAGON_C.x; cdragon.col.z = CDRAGON_C.z; clearCDHaz();
+}
+function initCDragon() { resetCDragon(); cdragon.state = (S.stats.cdragon > 0 && S.day <= S.cdragonDay) ? 'gone' : 'sleep'; }
+
+/* ================================================================
    PET: BLOOP
    ================================================================ */
 const pet = { g: null, lvl: 0, target: null, hitT: 0, scanT: 0, zapT: 0, bob: 0 };
@@ -3360,6 +3637,7 @@ function renderRes() {
     if (r === 'star') hide = !S.stats.star && !S.store.star && !S.stats.stationVisits;
     if (r === 'prism') hide = !S.stats.prism && !S.store.prism && !S.stats.caveVisits;
     if (r === 'feather') hide = !S.stats.feather && !S.store.feather && !S.stats.skyVisits;
+    if (r === 'cog') hide = !S.stats.cog && !S.store.cog && !S.stats.clockVisits;
     if (r === 'pearl') hide = !S.stats.pearl && !S.store.pearl && !S.stats.seaVisits && !S.stats.sails;
     if (r === 'coins') hide = !S.coins && !S.daily.claims && !lvl('trading');
     resEls[r].style.display = hide ? 'none' : '';
@@ -3465,6 +3743,8 @@ const SUITS = [
   { id: 'diver', name: 'Diver Suit', col: 0x2a8ab8, trophy: 'Kraken Tamer' },
   { id: 'ghost', name: 'Ghost Suit', col: 0xf2f2ff, trophy: 'Pumpkin Night event' },
   { id: 'elf', name: 'Elf Suit', col: 0x3aaa4a, trophy: 'Gift Festival event' },
+  { id: 'brass', name: 'Brass Suit', col: 0xd8a040, trophy: 'Clock Stopper' },
+  { id: 'moon', name: 'Moon Cape', col: 0x3a3a8a, trophy: 'Moon Market (night)' },
 ];
 const HATS = [
   { id: 'none', name: 'No Hat', emoji: '🚫', price: 0 },
@@ -3492,6 +3772,8 @@ const HATS = [
   { id: 'witch', name: 'Witch Hat', emoji: '🧙', trophy: 'Pumpkin Night event' },
   { id: 'santa', name: 'Santa Hat', emoji: '🎅', trophy: 'Gift Festival event' },
   { id: 'antlers', name: 'Reindeer Antlers', emoji: '🦌', trophy: 'Gift Festival event' },
+  { id: 'tophat', name: 'Gear Top Hat', emoji: '🎩', trophy: 'Clock Stopper' },
+  { id: 'starcrown', name: 'Star Crown', emoji: '🌟', trophy: 'Moon Market (night)' },
 ];
 function makeHat(id) {
   const g = new THREE.Group();
@@ -3507,6 +3789,8 @@ function makeHat(id) {
   else if (id === 'fisher') { add(new THREE.CylinderGeometry(.5, .5, .03, 16), L(0x7a8a4a), 0, .1, 0); add(new THREE.CylinderGeometry(.28, .34, .26, 12), L(0x7a8a4a), 0, .24, 0); add(new THREE.BoxGeometry(.12, .04, .02), L(0xff5a5a), .3, .25, .1); }
   else if (id === 'chef') { add(new THREE.CylinderGeometry(.3, .3, .3, 12), L(0xffffff), 0, .2, 0); add(new THREE.SphereGeometry(.38, 10, 8), L(0xffffff), 0, .48, 0).scale.y = .6; }
   else if (id === 'antennae') { for (const s of [-1, 1]) { add(new THREE.CylinderGeometry(.025, .025, .6), L(0x1a1428), s * .15, .3, 0, 0, -s * .35); add(new THREE.SphereGeometry(.08, 8, 6), emis(0x3aff9a, 1.3), s * .26, .58, 0); } }
+  else if (id === 'tophat') { add(new THREE.CylinderGeometry(.5, .5, .04, 16), L(0x2a2a3a), 0, .1, 0); add(new THREE.CylinderGeometry(.3, .3, .55, 14), L(0x2a2a3a), 0, .38, 0); add(new THREE.CylinderGeometry(.31, .31, .08, 14), L(0xd8a040), 0, .18, 0); for (const sx of [-1, 1]) add(new THREE.CylinderGeometry(.08, .08, .06, 10), emis(0x9ae0ff, .8), sx * .12, .22, .3).rotation.x = Math.PI / 2; }
+  else if (id === 'starcrown') { add(new THREE.CylinderGeometry(.32, .3, .1, 12, 1, true), emis(0xffd23a, .7), 0, .14, 0); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; add(new THREE.OctahedronGeometry(.08), emis(i % 2 ? 0xd8d8ff : 0xffd23a, 1.6), Math.cos(a) * .31, .3, Math.sin(a) * .31).scale.y = 1.8; } }
   else if (id === 'kraken') { add(new THREE.SphereGeometry(.36, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), L(0xc84a6a), 0, .05, 0); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; const t2 = add(new THREE.ConeGeometry(.05, .3, 4), L(0xc84a6a), Math.cos(a) * .32, -.05, Math.sin(a) * .32); t2.rotation.x = Math.PI; } for (const sx of [-1, 1]) add(new THREE.SphereGeometry(.06, 6, 5), L(0xfff6c0), sx * .14, .25, .28); }
   else if (id === 'racecap') { add(new THREE.SphereGeometry(.34, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), L(0xff4a4a), 0, .05, 0); add(new THREE.BoxGeometry(.42, .04, .32), L(0x1a1a2a), 0, .08, .36); add(new THREE.BoxGeometry(.12, .12, .02), L(0xffffff), 0, .22, .3); }
   else if (id === 'pumpkin') { const pm = add(new THREE.SphereGeometry(.5, 10, 8), L(0xff8a1a), 0, -.2, 0); pm.scale.set(1.1, .9, 1.1); for (const sx of [-1, 1]) add(new THREE.ConeGeometry(.08, .12, 3), emis(0xffe08a, 2), sx * .17, -.12, .46); add(new THREE.BoxGeometry(.3, .06, .03), emis(0xffe08a, 2), 0, -.34, .46); add(new THREE.CylinderGeometry(.05, .06, .16, 6), L(0x5a7a2a), 0, .3, 0); }
@@ -3596,6 +3880,15 @@ const ACH = [
   { id: 'race5', ico: '🏁', name: 'Race Champion', ds: 'Win 5 pet races', cur: () => S.stats.raceWins, goal: 5, rw: { coins: 400, cos: ['hat_racecap'] } },
   { id: 'daily10', ico: '📋', name: 'Daily Hero', ds: 'Finish 10 daily quests', cur: () => S.stats.dailyDone, goal: 10, rw: { coins: 500 } },
   { id: 'treats', ico: '🍬', name: 'Holiday Spirit', ds: 'Collect 30 holiday treats', cur: () => S.stats.treats, goal: 30, rw: { coins: 300 } },
+  { id: 'clock', ico: '⚙', name: 'Clockwork Explorer', ds: 'Fly to Clockwork Citadel', cur: () => S.stats.clockVisits, goal: 1, rw: { coins: 250 } },
+  { id: 'cog30', ico: '🔩', name: 'Cog Collector', ds: 'Collect 30 brass cogs', cur: () => S.stats.cog, goal: 30, rw: { coins: 300 } },
+  { id: 'cdragon', ico: '🐲', name: 'Clock Stopper', ds: 'Defeat the Clockwork Dragon', cur: () => S.stats.cdragon, goal: 1, rw: { coins: 900, cos: ['suit_brass', 'hat_tophat'] } },
+  { id: 'mybot', ico: '🤖', name: 'Robot Maker', ds: 'Build your own robot pet', cur: () => S.mybot.built ? 1 : 0, goal: 1, rw: { coins: 200 } },
+  { id: 'gallery25', ico: '🎯', name: 'Sharpshooter', ds: 'Score 25 in the Target Gallery', cur: () => S.mg.galBest, goal: 25, rw: { coins: 300 } },
+  { id: 'fish12', ico: '🏆', name: 'Tournament Champ', ds: 'Score 12 in a Fishing Tournament', cur: () => S.mg.fishBest, goal: 12, rw: { coins: 300 } },
+  { id: 'park40', ico: '🏃', name: 'Parkour Pro', ds: 'Finish the Parkour Course in under 40 seconds', cur: () => S.mg.parkBest && S.mg.parkBest < 40 ? 1 : 0, goal: 1, rw: { coins: 400 } },
+  { id: 'villager10', ico: '🏡', name: 'Good Neighbor', ds: 'Finish 10 villager requests', cur: () => S.stats.villQuests, goal: 10, rw: { coins: 500 } },
+  { id: 'nightowl', ico: '🌙', name: 'Night Owl', ds: 'Buy 5 things at the Moon Market', cur: () => S.stats.nightBuys, goal: 5, rw: { coins: 300 } },
   { id: 'waves10', ico: '🌊', name: 'Arena Legend', ds: 'Clear wave 10 in Survival', cur: () => S.waveBest, goal: 10, rw: { coins: 400, cos: ['hat_propeller'] } },
 ];
 function checkAch() {
@@ -3669,6 +3962,7 @@ function renderModal() {
       { z: 'cave', name: 'Crystal Caverns', emoji: '💎', orb: 'radial-gradient(circle at 35% 35%,#f0d8ff,#8a5aff 45%,#0a0414)', open: S.stats.aicore > 0 || S.stats.caveVisits > 0, st: S.stats.shadow ? 'The Shadow King is banished ✓' : `Runes found: ${runeCount()}/5`, lock: 'Defeat the Rogue AI Core to unlock' },
       { z: 'sky', name: 'Skyreach', emoji: '☁', orb: 'radial-gradient(circle at 35% 35%,#ffffff,#8ac8ff 45%,#3a6ab8)', open: S.stats.caveVisits > 0 || S.stats.skyVisits > 0, st: S.stats.roc ? 'The Thunder Roc is defeated ✓' : lvl('glider') ? 'Glider ready 🪂' : 'Floating islands & storm feathers', lock: 'Visit Crystal Caverns to unlock' },
       { z: 'sea', name: 'Coral Deep', emoji: '🐠', orb: 'radial-gradient(circle at 35% 35%,#bff4ff,#2a9ac8 45%,#0a2a4a)', open: S.stats.skyVisits > 0 || S.stats.seaVisits > 0, st: S.stats.kraken ? 'The Kraken is defeated ✓' : 'Underwater reefs, turtles & pearls', lock: 'Visit Skyreach to unlock' },
+      { z: 'clock', name: 'Clockwork Citadel', emoji: '⚙', orb: 'radial-gradient(circle at 35% 35%,#fff0c0,#d8a040 45%,#5a3a1a)', open: S.stats.seaVisits > 0 || S.stats.clockVisits > 0, st: S.stats.cdragon ? 'The Clockwork Dragon is stopped ✓' : 'Gears, steam vents & brass cogs', lock: 'Visit Coral Deep to unlock' },
     ];
     body.innerHTML = `<h2>🚀 Star Map</h2><div class="lead">Pick a planet to fly to. A planet unlocks after you first reach it through a portal.</div><div class="planets">${PL.map(p => {
       const here = P.zone === p.z || (p.z === 'home' && P.zone === 'mine');
@@ -3691,7 +3985,7 @@ function modalAction(act, id) {
     closeModal();
     S.stats.flights++;
     toast('🚀 Blast off!', 'big');
-    const b = P.zone === 'ice' ? buildings.ship_r_ice : P.zone === 'ember' ? buildings.ship_r_emb : P.zone === 'jungle' ? buildings.ship_r_jun : P.zone === 'station' ? buildings.ship_r_st : P.zone === 'cave' ? buildings.ship_r_cv : P.zone === 'sky' ? buildings.ship_r_sk : P.zone === 'sea' ? buildings.ship_r_sea : buildings.ship;
+    const b = P.zone === 'ice' ? buildings.ship_r_ice : P.zone === 'ember' ? buildings.ship_r_emb : P.zone === 'jungle' ? buildings.ship_r_jun : P.zone === 'station' ? buildings.ship_r_st : P.zone === 'cave' ? buildings.ship_r_cv : P.zone === 'sky' ? buildings.ship_r_sk : P.zone === 'sea' ? buildings.ship_r_sea : P.zone === 'clock' ? buildings.ship_r_cw : buildings.ship;
     for (let i = 0; i < 5; i++) setTimeout(() => burst(b.x, .5, b.z, i % 2 ? 0xff8a3a : 0xffd23a, 16, 5, .8), i * 70);
     teleport(SHIP_SPOTS[id].arrive, id, 'launch');
     checkQuest(); checkAch(); save();
@@ -3749,7 +4043,7 @@ function rollFish(z) {
 EXTRA_ACTIONS.fishgo = () => {
   const f = FISHING;
   if (f.state === 'idle' || f.state === 'done') {
-    f.state = 'wait'; f.biteAt = performance.now() + rand(1000, 2600); f.fish = rollFish(fishZone()); f.hits = 0; f.miss = 0; f.pos = 0; f.msg = '🎣 Line cast… waiting for a bite…';
+    f.state = 'wait'; f.biteAt = performance.now() + rand(1000, 2600) * (TOURNEY.on ? .45 : 1); f.fish = rollFish(fishZone()); f.hits = 0; f.miss = 0; f.pos = 0; f.msg = '🎣 Line cast… waiting for a bite…';
     tone(600, .15, 'sine', .06, -300); renderModal();
   } else if (f.state === 'reel') fishReel();
 };
@@ -3758,7 +4052,7 @@ function fishReel() {
   if (f.pos >= f.zs && f.pos <= f.zs + f.zw) {
     f.hits++; SFX.pick();
     if (f.hits >= 3) {
-      const fi = f.fish; S.fish[fi.id] = (S.fish[fi.id] || 0) + 1; S.stats.fish++; mapChance(.08, player.position); if (fi.rar === 3) S.stats.legendFish++;
+      const fi = f.fish; S.fish[fi.id] = (S.fish[fi.id] || 0) + 1; S.stats.fish++; mapChance(.08, player.position); tourneyCatch(fi); if (fi.rar === 3) S.stats.legendFish++;
       f.state = 'done'; f.msg = `🎉 You caught a <b style="color:${RARITY[fi.rar].c}">${fi.emoji} ${fi.name}</b>! ${RARITY[fi.rar].n} · worth ${fi.value} coins`;
       fi.rar >= 2 ? SFX.trophy() : SFX.coin(); checkQuest(); save();
     } else { f.zs = rand(.05, .95 - f.zw); f.spd *= 1.12; f.msg = `Nice! ${3 - f.hits} more…`; }
@@ -3833,9 +4127,9 @@ EXTRA_ACTIONS.job = id => {
 
 const rushUnlocked = () => S.stats.golem > 0 && S.stats.serpent > 0;
 const rushReady = () => rushUnlocked() && S.day >= S.rushDay;
-const rushList = () => ['golem', 'serpent'].concat(S.stats.jungleVisits > 0 ? ['queen'] : [], S.stats.stationVisits > 0 ? ['aicore'] : [], S.stats.shadow > 0 ? ['shadow'] : [], S.stats.roc > 0 ? ['roc'] : [], S.stats.kraken > 0 ? ['kraken'] : []);
+const rushList = () => ['golem', 'serpent'].concat(S.stats.jungleVisits > 0 ? ['queen'] : [], S.stats.stationVisits > 0 ? ['aicore'] : [], S.stats.shadow > 0 ? ['shadow'] : [], S.stats.roc > 0 ? ['roc'] : [], S.stats.kraken > 0 ? ['kraken'] : [], S.stats.cdragon > 0 ? ['cdragon'] : []);
 EXTRA_MODALS.rush = body => {
-  const names = rushList().map(k => ({ golem: '❄ Ice Golem', serpent: '🔥 Magmaw', queen: '🪲 Queen Beetle', aicore: '🤖 Rogue AI Core', shadow: '🌑 Shadow King', roc: '⚡ Thunder Roc', kraken: '🐙 Kraken' })[k]).join(' → ');
+  const names = rushList().map(k => ({ golem: '❄ Ice Golem', serpent: '🔥 Magmaw', queen: '🪲 Queen Beetle', aicore: '🤖 Rogue AI Core', shadow: '🌑 Shadow King', roc: '⚡ Thunder Roc', kraken: '🐙 Kraken', cdragon: '⚙ Clockwork Dragon' })[k]).join(' → ');
   const left = S.rushDay - S.day;
   body.innerHTML = `<h2>⚔ Boss Rush</h2><div class="lead">Fight every boss back to back: ${names}. They come back at full strength, and if you faint the rush ends. A new Boss Rush opens every 7 days.</div>
   <div class="ach"><div class="ico">⏱</div><div class="info"><div class="nm">Best time</div><div class="ds">${S.rushBest ? fmtTime(S.rushBest) : 'No full clear yet'} · cleared ${S.stats.rushes} time${S.stats.rushes === 1 ? '' : 's'}</div></div></div>
@@ -3885,7 +4179,7 @@ function updateNameTag() {
   project(player.position, nameTag, 2.6);
 }
 
-function fameKey() { return ['golem', 'serpent', 'queen', 'aicore', 'shadow', 'roc', 'kraken'].map(k => S.stats[k] ? 1 : 0).join(''); }
+function fameKey() { return ['golem', 'serpent', 'queen', 'aicore', 'shadow', 'roc', 'kraken', 'cdragon'].map(k => S.stats[k] ? 1 : 0).join(''); }
 function makeStatue(k) {
   const gm = new THREE.MeshLambertMaterial({ color: 0xffc23a, emissive: 0x6a4a00, emissiveIntensity: .35, flatShading: true });
   const g = new THREE.Group();
@@ -3893,6 +4187,7 @@ function makeStatue(k) {
   if (k === 'golem') { add(G.box, 0, .55, 0, .5, .5, .35); add(G.box, 0, .95, 0, .28, .24, .26); add(G.box, -.35, .5, 0, .14, .45, .14); add(G.box, .35, .5, 0, .14, .45, .14); add(G.box, -.12, .15, 0, .16, .3, .16); add(G.box, .12, .15, 0, .16, .3, .16); }
   else if (k === 'serpent') { for (let i = 0; i < 6; i++) { const s2 = i / 5, r = .17 - s2 * .03; add(G.ico1, -.3 + s2 * .5, .15 + Math.sin(s2 * 2.4) * .7, 0, r, r, r); } add(G.box, .25, .95, .05, .26, .16, .3); }
   else if (k === 'queen') { add(G.ico1, 0, .35, -.15, .35, .24, .48); add(G.ico1, 0, .38, .3, .2, .16, .18); for (let i = 0; i < 6; i++) { const s2 = i < 3 ? -1 : 1; add(G.box, s2 * .3, .2, -.2 + (i % 3) * .2, .3, .04, .04, 0, s2 * .5); } }
+  else if (k === 'cdragon') { add(G.ico1, 0, .4, 0, .26, .22, .38); add(G.box, 0, .68, .32, .18, .14, .22); add(G.cyl8, -.3, .55, -.05, .22, .03, .22, 0, 1.57); add(G.cyl8, .3, .55, -.05, .22, .03, .22, 0, 1.57); add(G.cyl8, 0, .06, 0, .3, .12, .3); }
   else if (k === 'kraken') { add(G.ico1, 0, .68, 0, .3, .36, .3); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; add(G.box, Math.cos(a) * .26, .26, Math.sin(a) * .26, .07, .36, .07, Math.sin(a) * .5, -Math.cos(a) * .5); } add(G.cyl8, 0, .06, 0, .32, .12, .32); }
   else if (k === 'roc') { add(G.ico1, 0, .45, 0, .28, .26, .38); add(G.ico1, 0, .75, .25, .17, .16, .17); add(G.box, -.38, .55, 0, .5, .05, .28, 0, .4); add(G.box, .38, .55, 0, .5, .05, .28, 0, -.4); add(G.box, 0, .72, .45, .06, .06, .16); add(G.cyl8, 0, .08, 0, .3, .16, .3); }
   else if (k === 'shadow') { add(G.cone6, 0, .5, 0, .38, 1, .38); add(G.ico1, 0, 1.12, 0, .16, .16, .16); for (let i = 0; i < 5; i++) add(G.oct, (i - 2) * .08, 1.36, 0, .03, .1, .03); }
@@ -3901,7 +4196,7 @@ function makeStatue(k) {
 }
 EXTRA_MODALS.fame = body => {
   if (!S.stats.fameVisit) { S.stats.fameVisit = 1; setTimeout(checkQuest, 50); }
-  const LIST = [['golem', '🧊', 'The Ice Golem', 'Frostveil'], ['serpent', '🐍', 'Magmaw, the Lava Serpent', 'Emberfall'], ['queen', '🪲', 'The Queen Beetle', 'Verdantia'], ['aicore', '🤖', 'The Rogue AI Core', 'Nebula Station'], ['shadow', '🌑', 'The Shadow King', 'Crystal Caverns (secret!)'], ['roc', '⚡', 'The Thunder Roc', 'Skyreach'], ['kraken', '🐙', 'The Kraken', 'Coral Deep']];
+  const LIST = [['golem', '🧊', 'The Ice Golem', 'Frostveil'], ['serpent', '🐍', 'Magmaw, the Lava Serpent', 'Emberfall'], ['queen', '🪲', 'The Queen Beetle', 'Verdantia'], ['aicore', '🤖', 'The Rogue AI Core', 'Nebula Station'], ['shadow', '🌑', 'The Shadow King', 'Crystal Caverns (secret!)'], ['roc', '⚡', 'The Thunder Roc', 'Skyreach'], ['kraken', '🐙', 'The Kraken', 'Coral Deep'], ['cdragon', '⚙', 'The Clockwork Dragon', 'Clockwork Citadel']];
   body.innerHTML = `<h2>🏆 Hall of Fame</h2><div class="lead">A golden statue appears here for every boss <b style="color:${S.profile.color}">${esc(S.profile.name)}</b> has beaten.</div>`
     + LIST.map(([k, e, n, w]) => `<div class="ach ${S.stats[k] ? '' : 'locked'}"><div class="ico">${S.stats[k] ? e : '❔'}</div><div class="info"><div class="nm">${S.stats[k] ? n : '???'}</div><div class="ds">${w} · ${S.stats[k] ? `defeated ${S.stats[k]} time${S.stats[k] === 1 ? '' : 's'}` : 'not defeated yet'}</div></div></div>`).join('')
     + `<h3>RECORDS</h3><div class="ach"><div class="ico">⚔</div><div class="info"><div class="nm">Best Boss Rush</div><div class="ds">${S.rushBest ? fmtTime(S.rushBest) : 'not cleared yet'}</div></div></div><div class="ach"><div class="ico">🌊</div><div class="info"><div class="nm">Best Survival wave</div><div class="ds">${S.waveBest ? 'Wave ' + S.waveBest : 'not played yet'}</div></div></div><div class="ach"><div class="ico">💀</div><div class="info"><div class="nm">Monsters defeated</div><div class="ds">${S.stats.kills}</div></div></div>`;
@@ -4219,8 +4514,8 @@ const PET_EVO = {
   robo: { emoji: '🤖', names: ['Mini Robot', 'Robo Pal', 'Mega Mech'], what: 'digs up treasure more often' },
   phoenix: { emoji: '🔥', names: ['Baby Phoenix', 'Fire Bird', 'Sun Phoenix'], what: 'shoots stronger fireballs' },
 };
-const petHave = k => k === 'bloop' ? lvl('petden') > 0 : k === 'sparky' ? lvl('nest') > 0 : !!S.pets.owned[k];
-const petWithYou = k => k === 'bloop' || k === 'sparky' ? petHave(k) : S.pets.active === k;
+const petHave = k => k === 'mybot' ? !!S.mybot.built : k === 'bloop' ? lvl('petden') > 0 : k === 'sparky' ? lvl('nest') > 0 : !!S.pets.owned[k];
+const petWithYou = k => k === 'bloop' || k === 'sparky' || k === 'mybot' ? petHave(k) : S.pets.active === k;
 const petStage = k => { const x = S.petxp[k] || 0; return x >= PET_STAGES[2].xp ? 2 : x >= PET_STAGES[1].xp ? 1 : 0; };
 const petMul = k => PET_STAGES[petStage(k)].m;
 const petScale = k => PET_STAGES[petStage(k)].s;
@@ -4230,7 +4525,7 @@ function evoDecor(parent, k, y) {
   const gem = new THREE.Mesh(G.oct, emis(st === 2 ? 0xffd23a : 0x7fd8ff, 1.5)); gem.scale.set(.06, .1, .06); gem.position.set(0, y, 0); parent.add(gem);
   if (st === 2) { const halo = new THREE.Mesh(new THREE.TorusGeometry(.2, .025, 5, 18), emis(0xffd23a, 1.6)); halo.rotation.x = Math.PI / 2; halo.position.set(0, y + .14, 0); parent.add(halo); parent.userData.halo = halo; }
 }
-function remakePet(k) { if (k === 'bloop') makePet(); else if (k === 'sparky') makeDragon(); else if (S.pets.active === k) makeCompanion(); }
+function remakePet(k) { if (k === 'mybot') makeMyBot(); else if (k === 'bloop') makePet(); else if (k === 'sparky') makeDragon(); else if (S.pets.active === k) makeCompanion(); }
 function petXP(n, only) {
   for (const k in PET_EVO) {
     if (only ? k !== only : !petWithYou(k)) continue;
@@ -4239,7 +4534,7 @@ function petXP(n, only) {
     if (petStage(k) > before) evolvePet(k);
   }
 }
-function petObj(k) { return k === 'bloop' ? pet.g : k === 'sparky' ? dragon.g : comp.kind === k ? comp.g : null; }
+function petObj(k) { return k === 'mybot' ? myBot.g : k === 'bloop' ? pet.g : k === 'sparky' ? dragon.g : comp.kind === k ? comp.g : null; }
 function evolvePet(k) {
   const st = petStage(k); S.stats.evolved = (S.stats.evolved || 0) + 1; if (st === 2) S.stats.megaPets = (S.stats.megaPets || 0) + 1;
   remakePet(k);
@@ -4270,8 +4565,8 @@ EXTRA_ACTIONS.feed = id => {
 };
 
 /* ---------------- treasure maps ---------------- */
-const ZONE_NAMES = { home: 'the Outpost', ice: 'Frostveil', ember: 'Emberfall', jungle: 'Verdantia', station: 'Nebula Station', cave: 'Crystal Caverns', sky: 'Skyreach', sea: 'Coral Deep', isles: 'the Sunny Isles' };
-const zoneVisited = z => z === 'home' || (z === 'ice' && S.stats.iceVisits) || (z === 'ember' && S.stats.emberVisits) || (z === 'jungle' && S.stats.jungleVisits) || (z === 'station' && S.stats.stationVisits) || (z === 'cave' && S.stats.caveVisits) || (z === 'sky' && S.stats.skyVisits) || (z === 'sea' && S.stats.seaVisits) || (z === 'isles' && S.stats.sails);
+const ZONE_NAMES = { home: 'the Outpost', ice: 'Frostveil', ember: 'Emberfall', jungle: 'Verdantia', station: 'Nebula Station', cave: 'Crystal Caverns', sky: 'Skyreach', sea: 'Coral Deep', isles: 'the Sunny Isles', clock: 'Clockwork Citadel' };
+const zoneVisited = z => z === 'home' || (z === 'ice' && S.stats.iceVisits) || (z === 'ember' && S.stats.emberVisits) || (z === 'jungle' && S.stats.jungleVisits) || (z === 'station' && S.stats.stationVisits) || (z === 'cave' && S.stats.caveVisits) || (z === 'sky' && S.stats.skyVisits) || (z === 'sea' && S.stats.seaVisits) || (z === 'isles' && S.stats.sails) || (z === 'clock' && S.stats.clockVisits);
 function assembleMap() {
   if (S.tmap.site >= 0 || S.tmap.pieces < 3) return;
   const opts = DIG_SITES.map((s, i) => i).filter(i => zoneVisited(DIG_SITES[i].zone) && !S.tmap.dug[i]);
@@ -4288,7 +4583,7 @@ function givePiece(pos, n = 1) {
   tone(520, .12, 'triangle', .06, 200); tone(780, .15, 'triangle', .05, 200, .1);
   assembleMap(); renderTmapBtn(); save();
 }
-const mapChance = (p, pos) => { if (Math.random() < p) givePiece(pos); };
+const mapChance = (p, pos) => { if (Math.random() < p * (S.mybot.built && S.mybot.gadget === 'scanner' ? 2.5 * petMul('mybot') : 1)) givePiece(pos); };
 function treasureHint() {
   const s = DIG_SITES[S.tmap.site]; if (!s) return '';
   if (P.zone !== s.zone && !(P.zone === 'mine' && s.zone === 'home')) return `🗺 Treasure is on ${ZONE_NAMES[s.zone]}`;
@@ -4486,6 +4781,182 @@ EXTRA_ACTIONS.dqbonus = () => {
 };
 
 /* ================================================================
+   ROBOT WORKSHOP, VILLAGERS, MINI-GAMES & DAY-AND-NIGHT MARKET
+   ================================================================ */
+// ---------------- custom robot pet ----------------
+const BOT_PARTS = {
+  head: [['dome', '🔵', 'Dome'], ['box', '🟦', 'Boxy'], ['tv', '📺', 'TV Screen']],
+  body: [['round', '⚪', 'Round'], ['boxy', '⬜', 'Square'], ['capsule', '💊', 'Capsule']],
+  wheels: [['wheels', '🛞', 'Wheels'], ['legs', '🦿', 'Legs'], ['hover', '🚀', 'Hover jets']],
+  gadget: [['laser', '🔫', 'Laser: zaps monsters'], ['magnet', '🧲', 'Magnet: extra loot from gathering'], ['healer', '💚', 'Healer: heals you'], ['scanner', '📡', 'Scanner: finds map pieces more often']],
+};
+const BOT_COLORS = ['#5ab8ff', '#ff7a5a', '#7dff8a', '#ffd23a', '#c88aff', '#ff7ae0', '#e8e8f0'];
+PET_EVO.mybot = { emoji: '🤖', get names() { const n = S.mybot.name || 'Robo Buddy'; return [n, 'Super ' + n, 'Mega ' + n]; }, what: 'gets a stronger gadget' };
+Object.defineProperty(RACE_LOOK, 'mybot', { get: () => ({ col: new THREE.Color(S.mybot.color).getHex(), e: '🤖', box: S.mybot.body === 'boxy' }), enumerable: true });
+EXTRA_MODALS.botshop = body => {
+  const m = S.mybot, built = m.built;
+  const row = k => `<h3>${k.toUpperCase()}</h3><div class="row2">${BOT_PARTS[k].map(([id, e, n]) => `<button class="sbtn ${m[k] === id ? 'sel' : 'alt'}" data-act="botpart" data-id="${k}:${id}">${e} ${n}</button>`).join('')}</div>`;
+  body.innerHTML = `<h2>🔧 Robot Workshop</h2><div class="lead">Design your very own robot pet! Pick a head, body, wheels and a special gadget. Your robot follows you everywhere, evolves like other pets, and can race at the track.</div>`
+    + row('head') + row('body') + row('wheels') + row('gadget')
+    + `<h3>COLOR</h3><div class="row2">${BOT_COLORS.map(c => `<button class="swb ${m.color === c ? 'on' : ''}" data-act="botcolor" data-id="${c}" style="background:${c}" aria-label="Robot color ${c}"></button>`).join('')}</div>
+    <label class="pr" for="botName">Name</label><input id="botName" class="tin" maxlength="14" autocomplete="off" spellcheck="false" value="${esc(m.name)}">
+    <div style="text-align:center;margin-top:12px">${built ? '<button class="sbtn big" data-act="botbuild">💾 Save my robot</button>' : `<button class="sbtn big" data-act="botbuild" ${canPay({ cog: 15, ore: 40, coins: 300 }) ? '' : 'disabled'}>🔧 Build it! ${ic('cog')}15 ${ic('ore')}40 ${ic('coins')}300</button>`}</div>`;
+};
+EXTRA_ACTIONS.botpart = id => { const [k, v] = id.split(':'); if (!BOT_PARTS[k] || !BOT_PARTS[k].some(p => p[0] === v)) return; const nm = $('botName') ? $('botName').value : null; S.mybot[k] = v; SFX.pick(); renderModal(); if (nm !== null && $('botName')) $('botName').value = nm; if (S.mybot.built) makeMyBot(); };
+EXTRA_ACTIONS.botcolor = c => { if (!BOT_COLORS.includes(c)) return; const nm = $('botName') ? $('botName').value : null; S.mybot.color = c; SFX.pick(); renderModal(); if (nm !== null && $('botName')) $('botName').value = nm; if (S.mybot.built) makeMyBot(); };
+EXTRA_ACTIONS.botbuild = () => {
+  const nm = cleanName($('botName') ? $('botName').value : ''); if (nm) S.mybot.name = nm;
+  if (!S.mybot.built) { const cost = { cog: 15, ore: 40, coins: 300 }; if (!canPay(cost)) return; for (const [r, v] of Object.entries(cost)) { if (r === 'coins') S.coins -= v; else S.store[r] -= v; } S.mybot.built = true; SFX.hatch(); toast(`🤖 Beep boop! ${esc(S.mybot.name)} is alive and follows you everywhere!`, 'big', 4500); }
+  else { SFX.buy(); toast(`🤖 ${esc(S.mybot.name)} looks great!`); }
+  makeMyBot(); renderRes(); checkQuest(); checkAch(); save(); closeModal();
+};
+
+// ---------------- villagers ----------------
+const VILLAGERS = [
+  { id: 'mira', name: 'Mira', job: 'Baker', e: '🥐', home: 'house1', col: 0xffb36b, hat: 'chef', hi: 'Mmm, smell that? Fresh bread for my favorite astronaut!', gift: () => { S.food.carrot = (S.food.carrot || 0) + 2; S.food.corn = (S.food.corn || 0) + 1; return '🥕×2 🌽×1'; },
+    quests: [{ t: 'bring', r: 'wood', n: 25, say: 'My oven needs firewood. Could you bring me 25 wood?' }, { t: 'stat', s: 'harvests', n: 3, say: 'Harvest 3 crops at the farm. I want to bake veggie pies!' }, { t: 'stat', s: 'cooked', n: 1, say: 'Cook something at the Kitchen. Let\'s swap recipes!' }, { t: 'bring', r: 'crystal', n: 4, say: 'Crystals make the best sparkly sprinkles. Bring 4?' }] },
+  { id: 'gus', name: 'Gus', job: 'Blacksmith', e: '🔨', home: 'house2', col: 0x8a9ab8, hat: 'helmet', hi: 'CLANG! Oh, hi there! Need anything forged?', gift: () => { S.store.ore += 8; return `${ic('ore')}×8`; },
+    quests: [{ t: 'bring', r: 'ore', n: 20, say: 'I\'m out of ore! Bring me 20 and I\'ll make something shiny.' }, { t: 'stat', s: 'kills', n: 8, say: 'Test your sword! Defeat 8 monsters for me.' }, { t: 'bring', r: 'cog', n: 5, say: 'Those brass cogs from the Citadel are amazing. Bring 5?' }, { t: 'bring', r: 'stone', n: 30, say: 'I need 30 stone for a new furnace.' }] },
+  { id: 'juni', name: 'Juniper', job: 'Gardener', e: '🌻', home: 'cottage1', col: 0x8ad25a, hat: 'flower', hi: 'Hello, sunshine! Have you smelled the flowers today?', gift: () => { S.food.berry = (S.food.berry || 0) + 2; return '🍓×2'; },
+    quests: [{ t: 'stat', s: 'planted', n: 6, say: 'Plant 6 seeds at the farm. Let\'s grow a garden together!' }, { t: 'stat', s: 'trees', n: 12, say: 'Chop 12 trees. Don\'t worry, they grow right back!' }, { t: 'bring', r: 'spore', n: 4, say: 'Spore crystals make plants glow. Could you bring 4?' }, { t: 'stat', s: 'harvests', n: 4, say: 'Harvest 4 crops. Fresh veggies for the whole outpost!' }] },
+  { id: 'tink', name: 'Tinker', job: 'Inventor', e: '🔧', home: 'cottage2', col: 0xc88aff, hat: 'goggles', hi: 'Eureka! Oh, sorry. Hi! I\'m inventing a self-folding sock.', gift: () => { S.store.cog += 3; return `${ic('cog')}×3`; },
+    quests: [{ t: 'bring', r: 'cog', n: 8, say: 'My invention needs 8 brass cogs. Pretty please?' }, { t: 'stat', s: 'jumps', n: 30, say: 'I\'m testing springs. Jump 30 times for science!' }, { t: 'bring', r: 'star', n: 4, say: 'Star cores! I need 4 to power my rocket socks.' }, { t: 'stat', s: 'vents', n: 2, say: 'Ride the Citadel steam vents 2 times and tell me how it feels!' }] },
+  { id: 'marina', name: 'Marina', job: 'Fisher', e: '🎣', home: 'cottage3', col: 0x5ab8ff, hat: 'cap', hi: 'Ahoy! The fish are biting today, I can feel it!', gift: () => { S.fish.bluegill = (S.fish.bluegill || 0) + 1; return '🐟 a Bluegill'; },
+    quests: [{ t: 'stat', s: 'fish', n: 3, say: 'Catch 3 fish anywhere. Let\'s see who\'s the better fisher!' }, { t: 'bring', r: 'pearl', n: 3, say: 'I collect pearls! Bring me 3 from Coral Deep?' }, { t: 'stat', s: 'sails', n: 1, say: 'Sail to the Sunny Isles and say hi to the dolphins for me!' }, { t: 'bring', r: 'wood', n: 20, say: 'My boat needs fixing. 20 wood, matey!' }] },
+];
+const vState = id => S.vill[id] || (S.vill[id] = { q: 0, base: null, hearts: 0, done: 0, giftDay: 0 });
+const vMovedIn = v => lvl(v.home) > 0;
+function vQuest(v) { const st = vState(v.id), q = v.quests[st.q % v.quests.length]; if (q.t === 'stat' && st.base === null) st.base = S.stats[q.s] || 0; return q; }
+const vProg = v => { const st = vState(v.id), q = vQuest(v); return q.t === 'bring' ? Math.min(q.n, S.store[q.r] || 0) : Math.min(q.n, (S.stats[q.s] || 0) - st.base); };
+EXTRA_MODALS.villager = body => {
+  const v = VILLAGERS.find(x => x.id === talkTo); if (!v) { body.innerHTML = ''; return; }
+  const st = vState(v.id), q = vQuest(v), p = vProg(v), giftReady = st.giftDay !== S.day;
+  body.innerHTML = `<h2>${v.e} ${v.name} the ${v.job}</h2><div class="lead">"${v.hi}"</div>
+  <div class="ach"><div class="ico">❤️</div><div class="info"><div class="nm">Friendship ${'❤️'.repeat(st.hearts)}${'🤍'.repeat(Math.max(0, 5 - st.hearts))}</div><div class="ds">${st.hearts >= 5 ? 'Best friends forever!' : 'Help with requests to become better friends.'}</div></div></div>
+  <h3>${v.name.toUpperCase()}'S REQUEST</h3><div class="ach"><div class="ico">📜</div><div class="info"><div class="nm">"${q.say}"</div><div class="ds">${p}/${q.n}${q.t === 'bring' ? ` ${RES_NAME[q.r]} in storage` : ''}</div><div class="bar"><i style="width:${p / q.n * 100}%"></i></div><div class="rw"><span>${ic('coins')}120</span><span>❤️ +1</span></div></div><button class="sbtn" data-act="vdone" ${p >= q.n ? '' : 'disabled'}>${q.t === 'bring' ? 'Give' : 'Done!'}</button></div>
+  <h3>DAILY GIFT</h3><div class="ach"><div class="ico">🎁</div><div class="info"><div class="nm">${giftReady ? `${v.name} has a little gift for you!` : 'Come back tomorrow for another gift.'}</div></div><button class="sbtn alt" data-act="vgift" ${giftReady ? '' : 'disabled'}>Open</button></div>`;
+};
+EXTRA_ACTIONS.vdone = () => {
+  const v = VILLAGERS.find(x => x.id === talkTo); if (!v) return; const st = vState(v.id), q = vQuest(v);
+  if (vProg(v) < q.n) return;
+  if (q.t === 'bring') S.store[q.r] -= q.n;
+  S.coins += 120; st.hearts = Math.min(5, st.hearts + 1); st.done++; st.q++; st.base = null; S.stats.villQuests++;
+  SFX.chest(); toast(`${v.e} ${v.name}: "Thank you so much!" ${ic('coins')}+120 ❤️`, 'big');
+  if (st.hearts === 5 && st.done === 5) setTimeout(() => toast(`💖 You and ${v.name} are now best friends!`, 'big', 4000), 900);
+  renderRes(); checkQuest(); checkAch(); save(); renderModal();
+};
+EXTRA_ACTIONS.vgift = () => { const v = VILLAGERS.find(x => x.id === talkTo); if (!v) return; const st = vState(v.id); if (st.giftDay === S.day) return; st.giftDay = S.day; S.coins += 20; const what = v.gift(); SFX.coin(); toast(`🎁 ${v.name} gave you ${what} and ${ic('coins')}20!`); renderRes(); save(); renderModal(); };
+let talkTo = null;
+$('talkBtn').addEventListener('click', () => { if (started && talkTo) openModal('villager'); });
+
+// ---------------- mini-game: target gallery ----------------
+const GAL = { on: false, t: 0, score: 0, cells: [], iv: null, spawnT: 0 };
+EXTRA_MODALS.gallery = body => {
+  body.innerHTML = `<h2>🎯 Target Gallery</h2><div class="lead">Tap the targets as fast as you can! 🎯 = 1 point, ⭐ = 3 points, but don't tap the 💣 bombs (−3). You have 30 seconds.</div>
+  <div class="row2" style="justify-content:space-between;font-weight:700;font-size:18px"><span>Score: <b id="galScore">${GAL.score}</b></span><span>⏱ <b id="galTime">${GAL.on ? Math.ceil(GAL.t) : 30}</b></span><span class="pr">Best: ${S.mg.galBest}</span></div>
+  <div class="galgrid">${Array.from({ length: 9 }, (_, i) => `<button class="galcell" data-act="galhit" data-id="${i}" aria-label="Target slot ${i + 1}"></button>`).join('')}</div>
+  <div style="text-align:center;margin-top:12px"><button class="sbtn big" id="galStart" data-act="galstart" ${GAL.on ? 'disabled' : ''}>${GAL.on ? 'Go go go!' : '🎯 Start!'}</button></div>`;
+};
+function galTick() {
+  if (modalKind !== 'gallery') { clearInterval(GAL.iv); GAL.on = false; GAL.iv = null; return; }
+  const dt = .05; GAL.t -= dt; GAL.spawnT -= dt;
+  const cells = document.querySelectorAll('.galcell');
+  GAL.cells.forEach((c, i) => { if (c && (c.life -= dt) <= 0) { GAL.cells[i] = null; if (cells[i]) cells[i].textContent = ''; } });
+  if (GAL.spawnT <= 0) {
+    GAL.spawnT = Math.max(.32, .7 - (30 - GAL.t) * .012);
+    const free = [0, 1, 2, 3, 4, 5, 6, 7, 8].filter(i => !GAL.cells[i]);
+    if (free.length) { const i = free[Math.random() * free.length | 0], r = Math.random(), k = r < .17 ? 'bomb' : r < .32 ? 'gold' : 'target'; GAL.cells[i] = { k, life: rand(.8, 1.25) }; if (cells[i]) cells[i].textContent = k === 'bomb' ? '💣' : k === 'gold' ? '⭐' : '🎯'; }
+  }
+  const tt = $('galTime'); if (tt) tt.textContent = Math.max(0, Math.ceil(GAL.t));
+  if (GAL.t <= 0) {
+    clearInterval(GAL.iv); GAL.iv = null; GAL.on = false;
+    const best = GAL.score > S.mg.galBest; if (best) S.mg.galBest = GAL.score; S.mg.played++;
+    const coins = Math.max(0, GAL.score) * 4 + (best ? 50 : 0); S.coins += coins;
+    SFX.victory(); toast(`🎯 Time! You scored ${GAL.score}${best ? ' — NEW RECORD!' : ''} ${ic('coins')}+${coins}`, 'big', 4500);
+    renderRes(); checkQuest(); checkAch(); save(); renderModal();
+  }
+}
+EXTRA_ACTIONS.galstart = () => { if (GAL.on) return; GAL.on = true; GAL.t = 30; GAL.score = 0; GAL.cells = []; GAL.spawnT = .3; renderModal(); clearInterval(GAL.iv); GAL.iv = setInterval(galTick, 50); tone(600, .15, 'square', .05, 200); };
+EXTRA_ACTIONS.galhit = id => {
+  const i = +id, c = GAL.cells[i]; if (!GAL.on || !c) return;
+  const pts = c.k === 'bomb' ? -3 : c.k === 'gold' ? 3 : 1; GAL.score += pts; GAL.cells[i] = null;
+  const cells = document.querySelectorAll('.galcell'); if (cells[i]) { cells[i].textContent = pts > 0 ? '💥' : '😵'; setTimeout(() => { if (!GAL.cells[i] && cells[i]) cells[i].textContent = ''; }, 150); }
+  if (pts > 0) tone(800 + pts * 100, .08, 'square', .05, 400); else { SFX.hurt(); }
+  const sc = $('galScore'); if (sc) sc.textContent = GAL.score;
+};
+
+// ---------------- mini-game: fishing tournament ----------------
+const TOURNEY = { on: false, end: 0, score: 0, n: 0, iv: null };
+EXTRA_MODALS.tourney = body => {
+  body.innerHTML = `<h2>🏆 Fishing Tournament</h2><div class="lead">You have 60 seconds to catch as many fish as you can! Fish bite faster during the tournament. Points: common 1, uncommon 2, rare 4, legendary 8.</div>
+  <div class="ach"><div class="ico">🥇</div><div class="info"><div class="nm">Best score: ${S.mg.fishBest}</div><div class="ds">Prize: ${ic('coins')}15 per point, +100 for a new record</div></div></div>
+  <div style="text-align:center;margin-top:12px"><button class="sbtn big" data-act="tstart" ${TOURNEY.on ? 'disabled' : ''}>🎣 Start the tournament!</button></div>`;
+};
+EXTRA_ACTIONS.tstart = () => { if (TOURNEY.on) return; TOURNEY.on = true; TOURNEY.end = performance.now() + 60000; TOURNEY.score = 0; TOURNEY.n = 0; clearInterval(TOURNEY.iv); TOURNEY.iv = setInterval(tourneyTick, 200); closeModal(); openModal('fish'); toast('🏆 GO! 60 seconds, catch everything!', 'big', 2000); };
+function tourneyCatch(fi) { if (!TOURNEY.on) return; const pts = [1, 2, 4, 8][fi.rar]; TOURNEY.score += pts; TOURNEY.n++; floatText(player.position.clone().setY(2.8), `🏆 +${pts}`, '#ffd23a'); }
+function tourneyTick() {
+  if (!TOURNEY.on) { clearInterval(TOURNEY.iv); return; }
+  const left = Math.max(0, (TOURNEY.end - performance.now()) / 1000), el = $('tourneyBar');
+  if (el) el.textContent = `🏆 Tournament: ${TOURNEY.score} pts · ${TOURNEY.n} fish · ⏱ ${Math.ceil(left)}s`;
+  if (left <= 0) {
+    TOURNEY.on = false; clearInterval(TOURNEY.iv);
+    const best = TOURNEY.score > S.mg.fishBest; if (best) S.mg.fishBest = TOURNEY.score; S.mg.played++;
+    const coins = TOURNEY.score * 15 + (best ? 100 : 0); S.coins += coins;
+    if (modalKind === 'fish') closeModal();
+    SFX.victory(); toast(`🏆 Tournament over! ${TOURNEY.n} fish, ${TOURNEY.score} points${best ? ' — NEW RECORD!' : ''} ${ic('coins')}+${coins}`, 'big', 5000);
+    renderRes(); checkQuest(); checkAch(); save();
+  }
+}
+const fishModalBase = EXTRA_MODALS.fish;
+EXTRA_MODALS.fish = body => { fishModalBase(body); if (TOURNEY.on) body.insertAdjacentHTML('afterbegin', `<div id="tourneyBar" class="toast big" style="margin-bottom:10px;animation:none">🏆 Tournament: ${TOURNEY.score} pts</div>`); };
+
+// ---------------- mini-game: parkour course ----------------
+EXTRA_MODALS.park = body => {
+  const inside = P.zone === 'park';
+  body.innerHTML = `<h2>🏃 Parkour Course</h2><div class="lead">Race across floating platforms: jump the gaps, ride the moving blocks and hop over the spinning bars! If you fall, you go back to the last green flag. Your timer starts when you leave the start platform.</div>
+  <div class="ach"><div class="ico">⏱</div><div class="info"><div class="nm">Best time: ${S.mg.parkBest ? fmtTime2(S.mg.parkBest) : 'not finished yet'}</div><div class="ds">Finish under 40 seconds for a trophy! ${lvl('boots') ? 'Your Rocket Boots let you double jump.' : 'Tip: Rocket Boots (double jump) make it easier.'}</div></div></div>
+  <div style="text-align:center;margin-top:12px">${inside ? '<button class="sbtn big" data-act="parkleave">🚪 Back to the outpost</button>' : '<button class="sbtn big" data-act="parkgo">🏃 Enter the course!</button>'}</div>`;
+};
+const fmtTime2 = s => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+EXTRA_ACTIONS.parkgo = () => { closeModal(); teleport(pkPos(0, 20), 'park', 'portal'); };
+EXTRA_ACTIONS.parkleave = () => { closeModal(); PARK.on = false; teleport(V(FAIR.park.x, 0, FAIR.park.z - 3.5), 'home', 'portal'); };
+const PARK = { on: false, t: 0, check: 0, fallT: 0, done: false, outT: 0 };
+
+// ---------------- day & night market ----------------
+const MARKET = {
+  day: [
+    { id: 'seeds', e: '🥕', n: 'Veggie Basket', ds: '3 carrots and 2 corn', cost: 40, max: 3, give: () => { S.food.carrot = (S.food.carrot || 0) + 3; S.food.corn = (S.food.corn || 0) + 2; } },
+    { id: 'crate', e: '📦', n: 'Builder Crate', ds: '30 wood and 20 stone', cost: 60, max: 3, give: () => { S.store.wood += 30; S.store.stone += 20; } },
+    { id: 'ore', e: '⛏', n: 'Ore Sack', ds: '15 ore', cost: 80, max: 3, give: () => { S.store.ore += 15; } },
+    { id: 'tonic', e: '☀️', n: 'Sun Tonic', ds: '+40% speed for 3 minutes', cost: 70, max: 2, give: () => { B.speed = Math.max(B.speed, 180); } },
+  ],
+  night: [
+    { id: 'stars', e: '⭐', n: 'Star Bundle', ds: '5 star cores', cost: 150, max: 2, give: () => { S.store.star += 5; } },
+    { id: 'map', e: '🗺', n: 'Torn Map Piece', ds: 'Part of a treasure map', cost: 180, max: 1, give: () => givePiece(player.position) },
+    { id: 'treat', e: '🍖', n: 'Moon Pet Treat', ds: '+60 XP for all your pets', cost: 120, max: 2, give: () => { for (const k in PET_EVO) if (petHave(k)) petXP(60, k); } },
+    { id: 'box', e: '🎁', n: 'Mystery Box', ds: 'Could be anything!', cost: 200, max: 1, give: () => { const r = Math.random(); if (r < .4) { const c = 50 + (Math.random() * 350 | 0); S.coins += c; toast(`🎁 Mystery Box: ${ic('coins')}+${c}!`, 'big'); } else if (r < .8) { const rs = ['crystal', 'frost', 'magma', 'spore', 'star', 'prism', 'feather', 'pearl', 'cog'][Math.random() * 9 | 0]; S.store[rs] += 8; toast(`🎁 Mystery Box: ${ic(rs)}+8!`, 'big'); } else { const miss = RELICS.filter(x => !S.relics[x.id] && !S.museum.relics[x.id]); if (miss.length) { const rl = miss[Math.random() * miss.length | 0]; S.relics[rl.id] = 1; toast(`🎁 Mystery Box: a relic! ${rl.emoji} ${rl.name}`, 'big'); } else { S.coins += 300; toast(`🎁 Mystery Box: ${ic('coins')}+300!`, 'big'); } } } },
+    { id: 'moon', e: '🌙', n: 'Moon Cape', ds: 'Rare suit, only sold at night', cost: 600, max: 1, cos: 'suit_moon' },
+    { id: 'crown', e: '🌟', n: 'Star Crown', ds: 'Rare hat, only sold at night', cost: 500, max: 1, cos: 'hat_starcrown' },
+  ],
+};
+EXTRA_MODALS.market = body => {
+  const night = isNight(), list = night ? MARKET.night : MARKET.day;
+  if (S.market.day !== S.day) S.market = { day: S.day, bought: {} };
+  body.innerHTML = `<h2>${night ? '🌙 Moon Market' : '☀️ Sun Market'}</h2><div class="lead">${night ? 'The Moon Merchant only comes out at night, selling rare and magical things. Hurry, the stall changes back at sunrise!' : 'Everyday goods for busy astronauts! Come back at night, when the Moon Merchant sells rare items instead.'} Stock refills every day.</div>
+  <div class="grid">${list.map(it => { const n = S.market.bought[it.id] || 0, own = it.cos && S.cos.owned[it.cos], left = it.max - n; return `<div class="item ${own ? 'on' : ''}"><div class="hat">${it.e}</div><div class="nm">${it.n}</div><div class="pr">${it.ds}</div>${own ? '<div class="pr">Owned ✓</div>' : `<button class="sbtn" data-act="mbuy" data-id="${it.id}" ${left > 0 && S.coins >= it.cost ? '' : 'disabled'}>${left > 0 ? `${ic('coins')} ${it.cost}` : 'Sold out'}</button><div class="pr">${left} left today</div>`}</div>`; }).join('')}</div>`;
+};
+EXTRA_ACTIONS.mbuy = id => {
+  const night = isNight(), it = (night ? MARKET.night : MARKET.day).find(x => x.id === id); if (!it) return;
+  if (S.market.day !== S.day) S.market = { day: S.day, bought: {} };
+  const n = S.market.bought[id] || 0; if (n >= it.max || S.coins < it.cost || (it.cos && S.cos.owned[it.cos])) return;
+  S.coins -= it.cost; S.market.bought[id] = n + 1;
+  if (it.cos) { S.cos.owned[it.cos] = true; const [kind, iid] = it.cos.split('_'); S.cos[kind] = iid; applyCosmetics(); toast(`${it.e} You got the ${it.n}!`, 'big'); }
+  else if (it.give) { it.give(); if (it.id !== 'box') toast(`${it.e} ${it.n}: ${it.ds}!`); }
+  if (night) S.stats.nightBuys++;
+  SFX.buy(); renderRes(); checkAch(); save(); renderModal();
+};
+
+/* ================================================================
    DAILY CHEST
    ================================================================ */
 const dayStr = (off = 0) => { const d = new Date(Date.now() - off * 864e5); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
@@ -4528,15 +4999,16 @@ const padPos = id => { const p = padById(id); return V(p.x, 0, p.z); };
 function route(zone, fn) {
   if (P.zone === zone) return fn();
   if (P.zone === 'isles') return ISL_HOME_PAD;
+  if (P.zone === 'park') return pkPos(-2.6, 22.6);
   if (zone === 'isles') { if (P.zone === 'home') return DOCK_SAIL; if (P.zone === 'mine') return MINE_EXIT; return SHIP_SPOTS[P.zone] ? SHIP_SPOTS[P.zone].pad : null; }
   if (P.zone === 'mine') return MINE_EXIT;
   if (P.zone === 'arena') return ARENA_EXIT;
-  if (zone === 'jungle' || P.zone === 'jungle' || zone === 'station' || P.zone === 'station' || zone === 'cave' || P.zone === 'cave' || zone === 'sky' || P.zone === 'sky' || zone === 'sea' || P.zone === 'sea') return SHIP_SPOTS[P.zone].pad;
+  if (zone === 'jungle' || P.zone === 'jungle' || zone === 'station' || P.zone === 'station' || zone === 'cave' || P.zone === 'cave' || zone === 'sky' || P.zone === 'sky' || zone === 'sea' || P.zone === 'sea' || zone === 'clock' || P.zone === 'clock') return SHIP_SPOTS[P.zone].pad;
   if (P.zone === 'ember') return EMB_PORTAL_T;
   if (P.zone === 'ice') return zone === 'ember' ? EP_ICE_T : ICE_PORTAL_T;
   return zone === 'mine' ? MINE_DOOR : HOME_PORTAL_T;
 }
-const home = fn => () => route('home', fn), mineQ = fn => () => route('mine', fn), ice = fn => () => route('ice', fn), emb = fn => () => route('ember', fn), jun = fn => () => route('jungle', fn), st = fn => () => route('station', fn), cv = fn => () => route('cave', fn), sk = fn => () => route('sky', fn), se = fn => () => route('sea', fn);
+const home = fn => () => route('home', fn), mineQ = fn => () => route('mine', fn), ice = fn => () => route('ice', fn), emb = fn => () => route('ember', fn), jun = fn => () => route('jungle', fn), st = fn => () => route('station', fn), cv = fn => () => route('cave', fn), sk = fn => () => route('sky', fn), se = fn => () => route('sea', fn), cw = fn => () => route('clock', fn);
 const nearJumper = kind => { let best = null, bd = 1e9; for (const j of jumpers) if (j.kind === kind) { const d = dist2(j.x, j.z, player.position.x, player.position.z); if (d < bd) { bd = d; best = j; } } return best ? V(best.x, 0, best.z) : null; };
 const QUESTS = [
   { id: 'trees', t: 'Chop down 3 trees', p: () => `${Math.min(S.stats.trees, 3)}/3 · walk up to a tree`, done: () => S.stats.trees >= 3, target: home(() => nearestNode('tree', 'home')), reward: { wood: 4 } },
@@ -4627,6 +5099,16 @@ const QUESTS = [
   { id: 'racetrack', t: 'Build the Pet Race Track', p: () => 'West of the Hall of Fame', done: () => lvl('racetrack') > 0, target: home(() => padPos('racetrack')), reward: { coins: 60 } },
   { id: 'race', t: 'Win a pet race', p: () => 'Tap 📣 Cheer! during the race to boost your champion', done: () => S.stats.raceWins > 0, target: home(() => padPos('raceui')), reward: { coins: 100 } },
   { id: 'daily', t: 'Finish a daily quest', p: () => 'Check the 📋 quest board near the workshop', done: () => S.stats.dailyDone > 0, target: home(() => padPos('qboardui')), reward: { coins: 60 } },
+  { id: 'citadel', t: 'Fly to Clockwork Citadel', p: () => 'A steampunk city on the Star Map!', done: () => S.stats.clockVisits > 0, target: () => P.zone === 'mine' ? MINE_EXIT : SHIP_SPOTS[P.zone] ? SHIP_SPOTS[P.zone].pad : null, reward: { coins: 150 } },
+  { id: 'vent', t: 'Ride a steam vent', p: () => 'Step on a ♨ vent to reach the upper floor', done: () => S.stats.vents > 0, target: cw(() => cwv(CW_VENTS[0].x, CW_VENTS[0].z)), reward: { coins: 60 } },
+  { id: 'cogs', t: 'Collect 5 brass cogs', p: () => `${Math.min(S.stats.cog, 5)}/5 · from cog piles (Pickaxe Lv 4) and windup robots`, done: () => S.stats.cog >= 5, target: cw(() => nearestNode('cogpile', 'clock')), reward: { cog: 3 } },
+  { id: 'garden', t: 'Ride the clock hand to the Bell Garden', p: () => 'Cross the bridge east of the plaza, then hop on the giant clock hand', done: () => S.stats.garden > 0, target: cw(() => cwv(CW_HAND.x, CW_HAND.z)), reward: { coins: 80 } },
+  { id: 'cdragon', t: 'Defeat the Clockwork Dragon', p: () => 'Up on the Belfry, the highest floor', done: () => S.stats.cdragon > 0, target: cw(() => CDRAGON_C), reward: { coins: 200 } },
+  { id: 'botshop', t: 'Build the Robot Workshop', p: () => 'West side of the outpost', done: () => lvl('botshop') > 0, target: home(() => padPos('botshop')), reward: { coins: 60 } },
+  { id: 'mybot', t: 'Build your own robot pet', p: () => 'Pick a head, body, wheels & a gadget', done: () => !!S.mybot.built, target: home(() => padPos('botui')), reward: { coins: 100 } },
+  { id: 'cottage', t: 'Build a cottage for a villager', p: () => 'East side of the outpost', done: () => lvl('cottage1') + lvl('cottage2') + lvl('cottage3') > 0, target: home(() => padPos('cottage1')), reward: { coins: 60 } },
+  { id: 'villager', t: 'Help a villager', p: () => 'Walk up to a villager and tap 💬 Talk', done: () => S.stats.villQuests > 0, target: () => null, reward: { coins: 80 } },
+  { id: 'minigame', t: 'Play a mini-game', p: () => 'Target Gallery, Fishing Tournament or Parkour Course', done: () => S.mg.played > 0, target: home(() => padPos(lvl('gallery') ? 'galui' : 'gallery')), reward: { coins: 60 } },
   { id: 'runes', t: 'Find the 5 hidden runes', p: () => `${runeCount()}/5 found · one on each older planet. Crew letters have hints!`, done: () => runeCount() >= 5, target: () => null, reward: { coins: 200 } },
   { id: 'shadow', t: 'Defeat the Shadow King', p: () => 'At the rune altar, deep in Crystal Caverns', done: () => S.stats.shadow > 0, target: cv(() => ALTAR) },
   { id: 'rush', t: 'Clear a Boss Rush', p: () => 'Obelisk at the outpost · opens every 7 days', done: () => S.stats.rushes > 0, target: home(() => padPos('rushui')) },
@@ -4730,6 +5212,7 @@ const ZONE_ENTER = {
   ember: '🌋 Welcome to <b style="color:#ffe08a">Emberfall</b>! Ride the moving stones over the lava, mine <b style="color:#ffe08a">magma cores</b>, and watch for eruptions…',
   jungle: '🍄 Welcome to <b style="color:#fff7a0">Verdantia</b>! Bounce on mushroom pads, swing on vines and mine <b style="color:#fff7a0">spore crystals</b>. The Queen Beetle rules here…',
   station: '🛰 Welcome to <b style="color:#fff27a">Nebula Station</b>! Low gravity — jump across gaps, ride the conveyors, dodge laser gates and mine <b style="color:#fff27a">star cores</b>…',
+  clock: '⚙ Welcome to <b style="color:#ffd36b">Clockwork Citadel</b>! Ride the spinning gears, time your jump onto the giant clock hand, take ♨ steam vents up to higher floors, and collect <b style="color:#ffd36b">brass cogs</b>…',
   sea: '🐠 Welcome to <b style="color:#7ae0ff">Coral Deep</b>! Watch your 🫧 oxygen and refill at bubble vents. Hold JUMP to swim up, ride the 🐢 sea turtles and find <b style="color:#f4ecff">pearls</b> in giant clams…',
   isles: '⛵ Welcome to the <b style="color:#ffe08a">Sunny Isles</b>! Sail between the little islands: palm trees, a lighthouse pier for fishing, and a treasure island with pearl clams.',
   sky: '☁ Welcome to <b style="color:#7ad8ff">Skyreach</b>! Cross rope bridges, ride the 🌬 wind currents and gather <b style="color:#7ad8ff">storm feathers</b>. Don\'t fall off the islands!',
@@ -4748,6 +5231,9 @@ function teleport(to, zone, sound = 'whoosh') {
     P.cart = null; if (rideCart) rideCart.visible = false; P.cartY = 0;
     P.skyY = 0; P.skyAir = false; P.gust = null; P.gustLock = null; P.autoGlide = false; P.glideOn = false;
     P.seaY = 0; P.turtle = null; P.turtleLock = null; P.onBoat = false; kraken.grabbed = null; player.rotation.x = 0;
+    P.cwFall = false; P.cwLaunch = null; P.cwLock = null; P.cwVy = 0; P.cwPrev.copy(to); P.cwY = zone === 'clock' ? (cwFloor(to.x, to.z) ?? 0) : 0; P.pkY = 0; if (zone !== 'clock') cdragon.slowmo = 0;
+    if (zone === 'clock') { S.stats.clockVisits++; if (S.stats.clockVisits === 1) toast(ZONE_ENTER.clock, 'big', 6500); else toastOnce('cw', '⚙ Back in Clockwork Citadel. Tick tock!', '', 10); }
+    if (zone === 'park') { PARK.on = false; PARK.done = false; PARK.check = 0; PARK.t = 0; PARK.fallT = 0; PARK.outT = 0; toastOnce('pk', '🏃 Parkour Course! Reach the checkered finish as fast as you can!', 'big', 10); }
     if (zone === 'sea') { P.oxy = 100; S.stats.seaVisits++; if (S.stats.seaVisits === 1) toast(ZONE_ENTER.sea, 'ice', 6500); else toastOnce('se', '🐠 Back in Coral Deep. Oxygen full!', '', 10); }
     if (zone === 'isles') { S.stats.sails++; if (S.stats.sails === 1) toast(ZONE_ENTER.isles, 'jungle', 6000); else toastOnce('isl', '⛵ Welcome back to the Sunny Isles!', '', 10); }
     if (zone === 'sky') { S.stats.skyVisits++; if (S.stats.skyVisits === 1) toast(ZONE_ENTER.sky, 'ice', 6000); else toastOnce('sk', '☁ Back in Skyreach', '', 10); }
@@ -4781,8 +5267,8 @@ function damagePlayer(dmg, fromX, fromZ, chill = 0, burn = 0) {
     if (RUSH.active) endRush(false);
     for (const r of RES) S.bag[r] = 0;
     renderRes();
-    const z = P.zone === 'mine' || P.zone === 'arena' ? 'home' : P.zone;
-    setTimeout(() => { S.hp = S.maxHp; P.chill = 0; P.burn = 0; P.air = null; teleport(z === 'ice' ? ICE_ARRIVE.clone() : z === 'ember' ? EMB_ARRIVE.clone() : z === 'jungle' ? JUN_ARRIVE.clone() : z === 'station' ? ST_ARRIVE.clone() : z === 'cave' ? CV_ARRIVE.clone() : z === 'sky' ? SK_ARRIVE.clone() : z === 'sea' ? SEA_ARRIVE.clone() : z === 'isles' ? ISL_ARRIVE.clone() : V(0, 0, 4), z); }, 900);
+    const z = P.zone === 'mine' || P.zone === 'arena' || P.zone === 'park' ? 'home' : P.zone;
+    setTimeout(() => { S.hp = S.maxHp; P.chill = 0; P.burn = 0; P.air = null; teleport(z === 'ice' ? ICE_ARRIVE.clone() : z === 'ember' ? EMB_ARRIVE.clone() : z === 'jungle' ? JUN_ARRIVE.clone() : z === 'station' ? ST_ARRIVE.clone() : z === 'cave' ? CV_ARRIVE.clone() : z === 'sky' ? SK_ARRIVE.clone() : z === 'sea' ? SEA_ARRIVE.clone() : z === 'isles' ? ISL_ARRIVE.clone() : z === 'clock' ? CW_ARRIVE.clone() : V(0, 0, 4), z); }, 900);
   }
 }
 
@@ -4792,8 +5278,8 @@ function breakNode(n) {
   const def = n.def, lv = S.tools[def.tool];
   const amt = (def.yield + (lv - def.req)) * (EV.golden > 0 ? 2 : 1);
   const got = addBag(def.res, amt);
-  const st = { tree: 'trees', rock: 'rocks', icerock: 'rocks', ftree: 'frostTrees', ore: 'ore', crystal: 'crystal', frost: 'frost', otree: 'obsTrees', basalt: 'rocks', magma: 'magma', jtree: 'trees', mossrock: 'rocks', spore: 'spore', planter: 'trees', scrap: 'ore', star: 'star', prism: 'prism', gemrock: 'rocks', cshroom: 'trees', feather: 'feather', cloudtree: 'trees', skyrock: 'rocks', kelp: 'trees', reefrock: 'rocks', clam: 'pearl' }[n.type];
-  S.stats[st]++; petXP(1); mapChance(.012, V(n.x, 0, n.z));
+  const st = { tree: 'trees', rock: 'rocks', icerock: 'rocks', ftree: 'frostTrees', ore: 'ore', crystal: 'crystal', frost: 'frost', otree: 'obsTrees', basalt: 'rocks', magma: 'magma', jtree: 'trees', mossrock: 'rocks', spore: 'spore', planter: 'trees', scrap: 'ore', star: 'star', prism: 'prism', gemrock: 'rocks', cshroom: 'trees', feather: 'feather', cloudtree: 'trees', skyrock: 'rocks', kelp: 'trees', reefrock: 'rocks', clam: 'pearl', crate: 'trees', cogpile: 'cog' }[n.type];
+  S.stats[st]++; petXP(1); mapChance(.012, V(n.x, 0, n.z)); botMagnet(n);
   burst(n.x, 1.2, n.z, def.chip, 14, 5, .9);
   for (let i = 0; i < got; i++) fly(V(n.x + rand(-.5, .5), 1 + rand(0, 1), n.z + rand(-.5, .5)), () => tmpV.copy(player.position).setY(1.2), RES_COL[def.res], () => SFX.pick(), i * .06);
   let html = `+${got} ${ic(def.res)}`;
@@ -4811,7 +5297,7 @@ function breakNode(n) {
   renderRes(); checkQuest();
 }
 
-const foes = () => { const f = enemies.filter(e => !e.dying && e.spawn >= 1); if (boss.state === 'fight') f.push(boss); if (serp.targetable()) f.push(serp); if (queen.state === 'fight') f.push(queen); if (aicore.targetable()) f.push(aicore); if (shadow.targetable()) f.push(shadow); if (roc.targetable()) f.push(roc); if (kraken.targetable()) f.push(kraken); return f; };
+const foes = () => { const f = enemies.filter(e => !e.dying && e.spawn >= 1); if (boss.state === 'fight') f.push(boss); if (serp.targetable()) f.push(serp); if (queen.state === 'fight') f.push(queen); if (aicore.targetable()) f.push(aicore); if (shadow.targetable()) f.push(shadow); if (roc.targetable()) f.push(roc); if (kraken.targetable()) f.push(kraken); if (cdragon.targetable()) f.push(cdragon); return f; };
 const foeR = f => f.isBoss ? (f.r || 1.9) : 0;
 function hitFoe(f, dmg, kb = 8, color = '#ffffff', show = true) {
   if (f.dying || (f.isBoss && !f.targetable())) return;
@@ -4856,7 +5342,7 @@ function killEnemy(e, drop) {
   if (e.dying) return;
   e.dying = .01; S.stats.kills++; petXP(3); if (drop && e.kind === 'gloom' && holiday() === 'pumpkin') { S.candy++; S.stats.treats++; floatText(e.g.position.clone().setY(2.6), '+1 🍬', '#ffb36b'); } if (drop) mapChance(e.kind === 'goblin' ? .5 : .03, e.g.position);
   SFX.kill();
-  burst(e.g.position.x, .8, e.g.position.z, { gloom: 0x8a5aff, crawl: 0xff6a5a, shard: 0xbfe6ff, magma: 0xff6a1a, goblin: 0x6bd04a, beetle: 0x3aff9a, sdrone: 0xff5a5a, bat: 0xc88aff, wisp: 0xfff27a, puffer: 0xffd23a }[e.kind], 16, 5, .8);
+  burst(e.g.position.x, .8, e.g.position.z, { gloom: 0x8a5aff, crawl: 0xff6a5a, shard: 0xbfe6ff, magma: 0xff6a1a, goblin: 0x6bd04a, beetle: 0x3aff9a, sdrone: 0xff5a5a, bat: 0xc88aff, wisp: 0xfff27a, puffer: 0xffd23a, clockbot: 0xd8a040 }[e.kind], 16, 5, .8);
   if (!drop) return;
   if (e.kind === 'goblin') {
     const c = 80 + (Math.random() * 71 | 0); S.coins += c;
@@ -4869,9 +5355,9 @@ function killEnemy(e, drop) {
   const coins = e.kind === 'gloom' ? 1 + (Math.random() * 2 | 0) : e.kind === 'crawl' ? 1 + (Math.random() * 3 | 0) : 2 + (Math.random() * 3 | 0);
   S.coins += coins;
   let html = `+${coins} ${ic('coins')}`;
-  const chance = e.kind === 'gloom' ? .6 : e.kind === 'crawl' ? .8 : e.kind === 'magma' ? .3 : e.kind === 'beetle' ? .25 : e.kind === 'sdrone' ? .2 : e.kind === 'bat' ? .15 : e.kind === 'wisp' ? .3 : e.kind === 'puffer' ? .25 : .4;
+  const chance = e.kind === 'gloom' ? .6 : e.kind === 'crawl' ? .8 : e.kind === 'magma' ? .3 : e.kind === 'beetle' ? .25 : e.kind === 'sdrone' ? .2 : e.kind === 'bat' ? .15 : e.kind === 'wisp' ? .3 : e.kind === 'puffer' ? .25 : e.kind === 'clockbot' ? .3 : .4;
   if (Math.random() < chance) {
-    const r = e.kind === 'puffer' ? 'pearl' : e.kind === 'wisp' ? 'feather' : e.kind === 'bat' ? 'prism' : e.kind === 'sdrone' ? 'star' : e.kind === 'beetle' ? 'spore' : e.kind === 'magma' ? 'magma' : e.kind === 'shard' ? 'frost' : e.kind === 'gloom' ? (Math.random() < .25 && S.tools.pick >= 3 ? 'crystal' : 'ore') : 'ore';
+    const r = e.kind === 'clockbot' ? 'cog' : e.kind === 'puffer' ? 'pearl' : e.kind === 'wisp' ? 'feather' : e.kind === 'bat' ? 'prism' : e.kind === 'sdrone' ? 'star' : e.kind === 'beetle' ? 'spore' : e.kind === 'magma' ? 'magma' : e.kind === 'shard' ? 'frost' : e.kind === 'gloom' ? (Math.random() < .25 && S.tools.pick >= 3 ? 'crystal' : 'ore') : 'ore';
     if (addBag(r, 1)) { fly(e.g.position.clone().setY(1), () => tmpV.copy(player.position).setY(1.2), RES_COL[r], () => SFX.pick()); html += ` +1 ${ic(r)}`; }
   }
   floatText(e.g.position.clone().setY(2), html, '#ffe9a0');
@@ -4898,6 +5384,8 @@ function killBoss() {
 
 /* ------------------------- update ------------------------- */
 function update(dt) {
+  cdragon.rdt = dt;
+  if (cdragon.slowmo > 0) { cdragon.slowmo -= dt; dt *= .45; if (cdragon.slowmo <= 0) toast('⏳ Time flows normally again!'); }
   const t = clock.elapsedTime;
   for (const s2 of stones) { const nx = s2.cx + Math.sin(t * s2.sp + s2.ph) * s2.amp; s2.dx = nx - s2.x; s2.x = nx; s2.m.position.x = nx; }
   updateEvents(dt, t);
@@ -4993,6 +5481,8 @@ function update(dt) {
   caveMove(dt);
   skyMove(dt);
   seaMove(dt);
+  cwMove(dt);
+  parkMove(dt);
   if (moving) P.face = Math.atan2(ix, iz);
 
   // ---- target: foes first, then nodes
@@ -5003,7 +5493,7 @@ function update(dt) {
   if (bestE) { target = bestE; tType = 'enemy'; }
   else {
     let bn = null, bd = 99;
-    for (const n of nodes) { if (!n.alive || n.zone !== P.zone) continue; if (P.zone === 'sea' && Math.abs(P.seaY - (n.h || 0)) > 1.8) continue; const d = dist2(n.x, n.z, player.position.x, player.position.z) - n.def.r; if (d < 1.25 && d < bd) { bd = d; bn = n; } }
+    for (const n of nodes) { if (!n.alive || n.zone !== P.zone) continue; if (P.zone === 'sea' && Math.abs(P.seaY - (n.h || 0)) > 1.8) continue; if (P.zone === 'clock' && Math.abs(P.cwY - (n.h || 0)) > 1.5) continue; const d = dist2(n.x, n.z, player.position.x, player.position.z) - n.def.r; if (d < 1.25 && d < bd) { bd = d; bn = n; } }
     if (bn) { target = bn; tType = 'node'; }
   }
   P.curNode = tType === 'node' ? target : null;
@@ -5043,7 +5533,7 @@ function update(dt) {
   P.armR.rotation.z = sliding && P.swing <= 0 ? 1.1 : 0;
   player.rotation.y = lerpAngle(player.rotation.y, P.face, 1 - Math.exp(-dt * 14));
   player.rotation.z = sliding ? Math.sin(t * 3) * .08 : 0;
-  player.position.y = (sliding ? 0 : Math.abs(Math.sin(P.walk)) * .08 * Math.min(1, sp / 4)) + (P.onStone ? .22 : 0) + (P.air ? P.airY : 0) + P.jumpY + (P.cartY || 0) + (P.zone === 'sky' ? P.skyY - P.jumpY : 0) + (P.zone === 'sea' ? P.seaY : 0) + (P.onBoat ? .18 : 0);
+  player.position.y = (sliding ? 0 : Math.abs(Math.sin(P.walk)) * .08 * Math.min(1, sp / 4)) + (P.onStone ? .22 : 0) + (P.air ? P.airY : 0) + P.jumpY + (P.cartY || 0) + (P.zone === 'sky' ? P.skyY - P.jumpY : 0) + (P.zone === 'sea' ? P.seaY : 0) + (P.onBoat ? .18 : 0) + (P.zone === 'clock' ? P.cwY : 0) + (P.zone === 'park' ? P.pkY : 0);
   P.hurtT -= dt;
   P.suit.emissive.setHex(P.hurtT > 0 ? 0xff0000 : P.burn > 0 ? 0x8a2a00 : P.chill > 0 ? 0x2266aa : 0x000000);
   if (sliding && Math.random() < dt * 12) burst(player.position.x, .1, player.position.z, 0xffffff, 1, 1.5, .4, .6);
@@ -5066,8 +5556,8 @@ function update(dt) {
   }
 
   // ---- deposit at base (outpost or Frostveil cargo pod — both feed the same storage)
-  const inTown = (P.zone === 'home' && Math.hypot(player.position.x, player.position.z) < TOWN_R) || (P.zone === 'ice' && dist2(player.position.x, player.position.z, CAMP.x, CAMP.z) < CAMP_R) || (P.zone === 'ember' && dist2(player.position.x, player.position.z, ECAMP.x, ECAMP.z) < CAMP_R) || (P.zone === 'jungle' && dist2(player.position.x, player.position.z, JCAMP.x, JCAMP.z) < CAMP_R) || (P.zone === 'station' && dist2(player.position.x, player.position.z, ST_CAMP.x, ST_CAMP.z) < CAMP_R) || (P.zone === 'cave' && dist2(player.position.x, player.position.z, CV_CAMP.x, CV_CAMP.z) < CAMP_R) || (P.zone === 'sky' && dist2(player.position.x, player.position.z, SK_CAMP.x, SK_CAMP.z) < CAMP_R) || (P.zone === 'sea' && dist2(player.position.x, player.position.z, SEA_CAMP.x, SEA_CAMP.z) < CAMP_R) || (P.zone === 'isles' && islandGround(player.position.x, player.position.z));
-  const depTo = P.zone === 'ice' ? ICE_STORE_POS : P.zone === 'ember' ? EMB_STORE_POS : P.zone === 'jungle' ? JUN_STORE_POS : P.zone === 'station' ? ST_STORE_POS : P.zone === 'cave' ? CV_STORE_POS : P.zone === 'sky' ? SK_STORE_POS : P.zone === 'sea' ? SEA_STORE_POS : P.zone === 'isles' ? ISL_STORE_POS : STORE_POS;
+  const inTown = (P.zone === 'home' && Math.hypot(player.position.x, player.position.z) < TOWN_R) || (P.zone === 'ice' && dist2(player.position.x, player.position.z, CAMP.x, CAMP.z) < CAMP_R) || (P.zone === 'ember' && dist2(player.position.x, player.position.z, ECAMP.x, ECAMP.z) < CAMP_R) || (P.zone === 'jungle' && dist2(player.position.x, player.position.z, JCAMP.x, JCAMP.z) < CAMP_R) || (P.zone === 'station' && dist2(player.position.x, player.position.z, ST_CAMP.x, ST_CAMP.z) < CAMP_R) || (P.zone === 'cave' && dist2(player.position.x, player.position.z, CV_CAMP.x, CV_CAMP.z) < CAMP_R) || (P.zone === 'sky' && dist2(player.position.x, player.position.z, SK_CAMP.x, SK_CAMP.z) < CAMP_R) || (P.zone === 'sea' && dist2(player.position.x, player.position.z, SEA_CAMP.x, SEA_CAMP.z) < CAMP_R) || (P.zone === 'isles' && islandGround(player.position.x, player.position.z)) || (P.zone === 'clock' && dist2(player.position.x, player.position.z, CW_CAMP.x, CW_CAMP.z) < CAMP_R);
+  const depTo = P.zone === 'ice' ? ICE_STORE_POS : P.zone === 'ember' ? EMB_STORE_POS : P.zone === 'jungle' ? JUN_STORE_POS : P.zone === 'station' ? ST_STORE_POS : P.zone === 'cave' ? CV_STORE_POS : P.zone === 'sky' ? SK_STORE_POS : P.zone === 'sea' ? SEA_STORE_POS : P.zone === 'isles' ? ISL_STORE_POS : P.zone === 'clock' ? CW_STORE_POS : STORE_POS;
   P.depT -= dt;
   if (inTown && bagCount() > 0 && P.depT <= 0 && S.hp > 0) {
     P.depT = .045;
@@ -5248,6 +5738,15 @@ function update(dt) {
           spawnEnemy('sdrone', x, z); break;
         }
       }
+    } else if (P.zone === 'clock' && cdragon.state !== 'fight' && !P.cwLaunch) {
+      P.spawnT = 4;
+      if (living.filter(e => e.kind === 'clockbot' && !e.summoned).length < (night ? 5 : 3)) {
+        for (let tries = 0; tries < 10; tries++) {
+          const a = rand(0, 6.28), r = rand(9, 16), x = player.position.x + Math.cos(a) * r, z = player.position.z + Math.sin(a) * r, h = cwStatic(x - CW_C.x, z - CW_C.z);
+          if (h === null || Math.abs(h - P.cwY) > .1 || dist2(x, z, CW_CAMP.x, CW_CAMP.z) < CAMP_R + 2 || dist2(x, z, CDRAGON_C.x, CDRAGON_C.z) < 13) continue;
+          const e = spawnEnemy('clockbot', x, z); e.cwY = h; break;
+        }
+      }
     } else if (P.zone === 'sea' && kraken.state !== 'fight' && !P.turtle) {
       P.spawnT = 4;
       if (living.filter(e => e.kind === 'puffer' && !e.summoned).length < (night ? 5 : 3)) {
@@ -5292,6 +5791,7 @@ function update(dt) {
     if (e.kind === 'gloom' && e.summoned && e.shadowMinion && shadow.state !== 'fight') { e.dying = .01; burst(g.position.x, 1, g.position.z, 0x9a5aff, 8, 3, .6); continue; }
     if (e.wings) e.wings.forEach((w, wi) => w.rotation.z = (wi ? -1 : 1) * Math.sin(t * 22 + e.hop) * .8);
     if (e.kind === 'sdrone' && e.summoned && aicore.state !== 'fight') { e.dying = .01; burst(g.position.x, 1, g.position.z, 0xff5a5a, 8, 3, .6); continue; }
+    if (e.kind === 'clockbot' && e.cdMinion && cdragon.state !== 'fight') { e.dying = .01; continue; }
     if (e.kind === 'puffer' && e.krakenMinion && kraken.state !== 'fight') { e.dying = .01; burst(g.position.x, 1, g.position.z, 0xffd23a, 8, 3, .6); continue; }
     if (e.kind === 'wisp' && !e.arena && (e.summoned ? roc.state !== 'fight' : !night)) { e.dying = .01; burst(g.position.x, 1.4, g.position.z, 0xffffff, 8, 3, .6); continue; }
     if (e.kind === 'gloom' && !night && !e.arena) { e.dying = .01; burst(g.position.x, .8, g.position.z, 0x3a2a63, 8, 3, .6); continue; }
@@ -5322,8 +5822,8 @@ function update(dt) {
     } else {
       g.position.x += (mx * spd * (.4 + hopK) + e.kx) * dt;
       g.position.z += (mz * spd * (.4 + hopK) + e.kz) * dt;
-      e.body.position.y = e.kind === 'goblin' ? .5 + hopK * .25 : e.kind === 'beetle' ? .38 + hopK * .08 : .6 + hopK * .35;
-      if (e.kind !== 'goblin' && e.kind !== 'beetle') e.body.scale.set(.75 + (1 - hopK) * .08, .6 - (1 - hopK) * .06, .75 + (1 - hopK) * .08);
+      e.body.position.y = e.kind === 'clockbot' ? .6 + hopK * .12 : e.kind === 'goblin' ? .5 + hopK * .25 : e.kind === 'beetle' ? .38 + hopK * .08 : .6 + hopK * .35;
+      if (e.kind !== 'goblin' && e.kind !== 'beetle' && e.kind !== 'clockbot') e.body.scale.set(.75 + (1 - hopK) * .08, .6 - (1 - hopK) * .06, .75 + (1 - hopK) * .08);
     }
     e.kx *= Math.exp(-dt * 8); e.kz *= Math.exp(-dt * 8);
     g.rotation.y = Math.atan2(mx, mz);
@@ -5334,7 +5834,7 @@ function update(dt) {
     resolveCollisions(g.position, .5);
     for (const o of enemies) if (o !== e && !o.dying) { const ox = g.position.x - o.g.position.x, oz = g.position.z - o.g.position.z, od = Math.hypot(ox, oz); if (od < 1 && od > 0) { g.position.x += ox / od * (1 - od) * .5; g.position.z += oz / od * (1 - od) * .5; } }
     e.cd -= dt;
-    if (d < 1.05 && e.cd <= 0 && S.hp > 0 && e.spawn >= 1 && e.dmg > 0 && P.jumpY < 1.2) { e.cd = 1; damagePlayer(e.dmg, g.position.x, g.position.z, e.kind === 'shard' ? 1.8 : 0, e.kind === 'magma' ? 2 : 0); }
+    if (d < 1.05 && e.cd <= 0 && S.hp > 0 && e.spawn >= 1 && e.dmg > 0 && P.jumpY < 1.2 && (P.zone !== 'clock' || Math.abs((e.cwY || 0) - P.cwY) < 1.5)) { e.cd = 1; damagePlayer(e.dmg, g.position.x, g.position.z, e.kind === 'shard' ? 1.8 : 0, e.kind === 'magma' ? 2 : 0); }
     const want = e.flash > 0 ? FLASH : e.burn > 0 && Math.sin(t * 20) > 0 ? FORGE_GLOW : BODY_MAT[e.kind];
     if (e.flash > 0) e.flash -= dt;
     if (e.body.material !== want) e.body.material = want;
@@ -5352,6 +5852,10 @@ function update(dt) {
   updateShadow(dt, t);
   updateRoc(dt, t);
   updateKraken(dt, t);
+  updateCDragon(dt, t);
+  updateClock(dt, t);
+  updateMyBot(dt, t);
+  updateVillagers(dt, t);
   updateSea(dt, t);
   updateIsles(dt, t);
   updateRace(dt, t);
@@ -5444,6 +5948,17 @@ function update(dt) {
     lantern.intensity = 3 + f * 26; lantern.distance = 6 + f * 12;
     plazaLight.intensity = 0;
     torchLights.forEach((tl, i) => { tl.L.position.set(CV_C.x + LAMPS[i][0], 2.6, CV_C.z + LAMPS[i][1]); tl.L.intensity = 28 + Math.sin(t * 7 + i) * 4; tl.L.color.setHex(0xffc27a); });
+  } else if (P.zone === 'clock') {
+    hemi.intensity = lerp(.7, 1.4, dn); hemi.color.setRGB(1, lerp(.7, .9, dn), lerp(.6, .78, dn)); hemi.groundColor.setHex(0x6a4a3a);
+    sun.intensity = lerp(.5, 2.2, dn); sun.color.setRGB(1, lerp(.7, .86, dn), lerp(.5, .66, dn));
+    scene.background.copy(CW_NIGHT).lerp(CW_DAY, dn); if (cdragon.slowmo > 0) scene.background.lerp(CW_TIME, .55); scene.fog.color.copy(scene.background); scene.fog.near = 60; scene.fog.far = 150;
+    lantern.intensity = nightK * 9; plazaLight.intensity = 0;
+    for (const tl of torchLights) tl.L.intensity = 0;
+  } else if (P.zone === 'park') {
+    hemi.intensity = 1.6; hemi.color.setHex(0xe8f0ff); hemi.groundColor.setHex(0x9a8ac8); sun.intensity = 2.4; sun.color.setHex(0xfff0d8);
+    scene.background.setHex(0x9ad8ff); scene.fog.color.setHex(0x9ad8ff); scene.fog.near = 70; scene.fog.far = 180;
+    lantern.intensity = 0; plazaLight.intensity = 0;
+    for (const tl of torchLights) tl.L.intensity = 0;
   } else if (P.zone === 'sea') {
     const ink = Math.min(1, kraken.ink / 4);
     hemi.intensity = lerp(.55, 1.05, dn); hemi.color.setHex(0x8ae8ff); hemi.groundColor.setHex(0x8a7a5a);
@@ -5591,6 +6106,7 @@ function safeZoneFor(kind) {
   if (kind === 'bat') return { x: CV_CAMP.x, z: CV_CAMP.z, r: CAMP_R };
   if (kind === 'wisp') return { x: SK_CAMP.x, z: SK_CAMP.z, r: CAMP_R };
   if (kind === 'puffer') return { x: SEA_CAMP.x, z: SEA_CAMP.z, r: CAMP_R };
+  if (kind === 'clockbot') return { x: CW_CAMP.x, z: CW_CAMP.z, r: CAMP_R };
   if (kind === 'gloom' && lvl('generator')) return { x: 0, z: 0, r: safeR(lvl('generator')) };
   if (kind === 'shard' && lvl('heater')) return { x: CAMP.x, z: CAMP.z, r: heatR(lvl('heater')) };
   return null;
@@ -5797,11 +6313,11 @@ function lavaAt(x, z) {
   return false;
 }
 function bossBar() {
-  const bf = boss.state === 'fight' ? boss : serp.state === 'fight' ? serp : queen.state === 'fight' ? queen : aicore.state === 'fight' ? aicore : shadow.state === 'fight' ? shadow : roc.state === 'fight' ? roc : kraken.state === 'fight' ? kraken : null;
+  const bf = boss.state === 'fight' ? boss : serp.state === 'fight' ? serp : queen.state === 'fight' ? queen : aicore.state === 'fight' ? aicore : shadow.state === 'fight' ? shadow : roc.state === 'fight' ? roc : kraken.state === 'fight' ? kraken : cdragon.state === 'fight' ? cdragon : null;
   $('boss').style.display = bf ? 'block' : 'none';
   if (bf) {
     $('boss').classList.toggle('fire', bf !== boss);
-    $('bossName').textContent = bf === boss ? '❄ ICE GOLEM' : bf === serp ? '🔥 MAGMAW, THE LAVA SERPENT' : bf === queen ? '🪲 THE QUEEN BEETLE' : bf === aicore ? `🤖 ROGUE AI CORE · PHASE ${aicore.phase}` : bf === roc ? '⚡ THE THUNDER ROC' : bf === kraken ? '🐙 THE KRAKEN' : '🌑 THE SHADOW KING';
+    $('bossName').textContent = bf === boss ? '❄ ICE GOLEM' : bf === serp ? '🔥 MAGMAW, THE LAVA SERPENT' : bf === queen ? '🪲 THE QUEEN BEETLE' : bf === aicore ? `🤖 ROGUE AI CORE · PHASE ${aicore.phase}` : bf === roc ? '⚡ THE THUNDER ROC' : bf === kraken ? '🐙 THE KRAKEN' : bf === cdragon ? `⚙ CLOCKWORK DRAGON · ${CD_MODES[cdragon.mode].name}` : '🌑 THE SHADOW KING';
     $('bossFill').style.width = Math.max(0, bf.hp / bf.max * 100) + '%';
   }
 }
@@ -5820,7 +6336,7 @@ function updateEmbers(dt, t) {
 }
 
 function updateEvents(dt, t) {
-  const bossOn = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' || kraken.state === 'fight' || RUSH.active || WAVES.active || P.zone === 'arena';
+  const bossOn = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' || kraken.state === 'fight' || cdragon.state === 'fight' || RUSH.active || WAVES.active || P.zone === 'arena';
   if (P.zone !== 'mine' && !bossOn && !fading && S.hp > 0) EV.t -= dt;
   if (EV.t <= 0) {
     EV.t = rand(100, 160);
@@ -5844,7 +6360,7 @@ function updateEvents(dt, t) {
   }
   if (EV.meteor > 0) {
     EV.meteor -= dt; EV.meteorT -= dt;
-    if (EV.meteorT <= 0 && P.zone !== 'mine' && P.zone !== 'cave' && P.zone !== 'sea') {
+    if (EV.meteorT <= 0 && P.zone !== 'mine' && P.zone !== 'cave' && P.zone !== 'sea' && P.zone !== 'park') {
       EV.meteorT = rand(.9, 1.6);
       const c = zoneCenter(P.zone);
       for (let k = 0; k < 8; k++) {
@@ -5975,7 +6491,7 @@ function updateDragon(dt, t) {
   dragon.flap += dt * 14;
   dragon.wings.forEach((w, i) => w.rotation.z = (i ? -1 : 1) * Math.sin(dragon.flap) * .7);
   const ry = player.rotation.y;
-  let gx = player.position.x - Math.cos(ry) * 1.2 - Math.sin(ry) * .4, gz = player.position.z + Math.sin(ry) * 1.2 - Math.cos(ry) * .4, gy = 2.3 + Math.sin(t * 2) * .2;
+  let gx = player.position.x - Math.cos(ry) * 1.2 - Math.sin(ry) * .4, gz = player.position.z + Math.sin(ry) * 1.2 - Math.cos(ry) * .4, gy = 2.3 + Math.sin(t * 2) * .2 + (P.zone === 'clock' ? P.cwY : P.zone === 'sea' ? P.seaY : 0);
   dragon.breathT -= dt;
   if (dragon.fireT > 0 && dragon.aim) {
     dragon.fireT -= dt;
@@ -6216,6 +6732,7 @@ function startRushStage() {
   else if (k === 'serpent') { resetSerpent(); serp.state = 'sleep'; teleport(V(LAVA_LAKE.x, 0, LAVA_LAKE.z + 12.5), 'ember', 'launch'); }
   else if (k === 'queen') { resetQueen(); queen.state = 'sleep'; teleport(V(QARENA.x, 0, QARENA.z + 9), 'jungle', 'launch'); }
   else if (k === 'aicore') { resetAICore(); aicore.state = 'sleep'; teleport(sv(0, -35), 'station', 'launch'); }
+  else if (k === 'cdragon') { resetCDragon(); cdragon.state = 'sleep'; teleport(V(CDRAGON_C.x, 0, CDRAGON_C.z + 7), 'clock', 'launch'); }
   else if (k === 'kraken') { resetKraken(); kraken.state = 'sleep'; teleport(V(KRAKEN_C.x, 0, KRAKEN_C.z + 13), 'sea', 'launch'); }
   else if (k === 'roc') { resetRoc(); roc.state = 'sleep'; teleport(V(ROC_NEST.x, 0, ROC_NEST.z + 9), 'sky', 'launch'); }
   else { resetShadow(); shadow.state = 'sleep'; teleport(V(ALTAR.x, 0, ALTAR.z + 8), 'cave', 'launch'); }
@@ -6369,6 +6886,12 @@ $('musicBtn').addEventListener('click', () => { musicOn = !musicOn; $('musicBtn'
 let musicGain = null, musicNext = 0, musicStep = 0, musicKey = null;
 const mf = m => 440 * Math.pow(2, (m - 69) / 12);
 const TRACKS = {
+  clock: { bpm: 108, lw: 'square', lv: .025, ld: .7, bw: 'triangle', bv: .07, bd: 1, hat: 1, kick: 1,
+    lead: [72, 0, 76, 79, 0, 76, 72, 0, 74, 0, 77, 81, 0, 77, 74, 0, 72, 0, 76, 79, 84, 79, 76, 0, 71, 0, 74, 77, 0, 74, 71, 0],
+    bass: [48, 0, 55, 0, 48, 0, 55, 0, 50, 0, 57, 0, 50, 0, 57, 0, 52, 0, 59, 0, 52, 0, 59, 0, 43, 0, 50, 0, 43, 0, 50, 0] },
+  park: { bpm: 132, lw: 'square', lv: .03, ld: .6, bw: 'sawtooth', bv: .045, bd: .8, hat: 1, kick: 1,
+    lead: [76, 79, 84, 79, 76, 0, 74, 76, 77, 81, 84, 81, 77, 0, 76, 74, 72, 76, 79, 76, 72, 0, 71, 72, 74, 79, 83, 86, 84, 0, 0, 0],
+    bass: [45, 45, 0, 45, 41, 41, 0, 41, 43, 43, 0, 43, 40, 40, 0, 40] },
   sea: { bpm: 72, lw: 'sine', lv: .05, ld: 3, bw: 'sine', bv: .07, bd: 6,
     lead: [69, 0, 0, 72, 0, 0, 76, 0, 74, 0, 0, 0, 72, 0, 69, 0, 67, 0, 0, 69, 0, 0, 72, 0, 71, 0, 0, 0, 0, 0, 0, 0],
     bass: [45, 0, 0, 0, 0, 0, 0, 0, 41, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0] },
@@ -6414,7 +6937,7 @@ function updateMusic() {
   const on = !muted && musicOn;
   musicGain.gain.value = on ? .55 : 0;
   if (!on) return;
-  const key = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' || kraken.state === 'fight' || P.zone === 'arena' ? 'boss' : P.zone;
+  const key = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' || kraken.state === 'fight' || cdragon.state === 'fight' || P.zone === 'arena' ? 'boss' : P.zone;
   const tr = TRACKS[key] || TRACKS.home;
   if (key !== musicKey) { musicKey = key; musicStep = 0; }
   const step = 60 / tr.bpm / 2;
@@ -6679,7 +7202,7 @@ function updateCompanion(dt, t) {
       comp.digT = 25 / petMul('robo');
       let html;
       if (Math.random() < .5) { const c = 10 + (Math.random() * 21 | 0); S.coins += c; html = `+${c} ${ic('coins')}`; }
-      else { const opts = ['wood', 'stone', 'ore']; if (S.tools.pick >= 3) opts.push('crystal'); if (S.stats.iceVisits) opts.push('frost'); if (S.stats.emberVisits) opts.push('magma'); if (S.stats.jungleVisits) opts.push('spore'); if (S.stats.stationVisits) opts.push('star'); if (S.stats.skyVisits) opts.push('feather'); if (S.stats.seaVisits) opts.push('pearl'); const r = opts[Math.random() * opts.length | 0], n = ['wood', 'stone', 'ore'].includes(r) ? 6 : 2; S.store[r] += n; html = `+${n} ${ic(r)}`; }
+      else { const opts = ['wood', 'stone', 'ore']; if (S.tools.pick >= 3) opts.push('crystal'); if (S.stats.iceVisits) opts.push('frost'); if (S.stats.emberVisits) opts.push('magma'); if (S.stats.jungleVisits) opts.push('spore'); if (S.stats.stationVisits) opts.push('star'); if (S.stats.skyVisits) opts.push('feather'); if (S.stats.seaVisits) opts.push('pearl'); if (S.stats.clockVisits) opts.push('cog'); const r = opts[Math.random() * opts.length | 0], n = ['wood', 'stone', 'ore'].includes(r) ? 6 : 2; S.store[r] += n; html = `+${n} ${ic(r)}`; }
       burst(g.position.x, .3, g.position.z, 0x8a6a4a, 10, 3, .5); SFX.coin();
       floatText(g.position.clone().setY(1.2), `🤖 ${html}`, '#bfe6ff'); renderRes();
     }
@@ -6699,7 +7222,7 @@ function updateCompanion(dt, t) {
 
 /* ---------------- Survival Waves ---------------- */
 function wavePool() {
-  const p2 = ['gloom']; if (lvl('mine')) p2.push('crawl'); if (S.stats.iceVisits) p2.push('shard'); if (S.stats.emberVisits) p2.push('magma'); if (S.stats.jungleVisits) p2.push('beetle'); if (S.stats.stationVisits) p2.push('sdrone'); if (S.stats.skyVisits) p2.push('wisp'); if (S.stats.seaVisits) p2.push('puffer');
+  const p2 = ['gloom']; if (lvl('mine')) p2.push('crawl'); if (S.stats.iceVisits) p2.push('shard'); if (S.stats.emberVisits) p2.push('magma'); if (S.stats.jungleVisits) p2.push('beetle'); if (S.stats.stationVisits) p2.push('sdrone'); if (S.stats.skyVisits) p2.push('wisp'); if (S.stats.seaVisits) p2.push('puffer'); if (S.stats.clockVisits) p2.push('clockbot');
   return p2;
 }
 function startWaves() {
@@ -7235,10 +7758,10 @@ function updateRoc(dt, t) {
 /* ---------------- treasure digging ---------------- */
 let digT = 0, chestFx = null;
 function openTreasure(s) {
-  const zi = ['home', 'ice', 'ember', 'jungle', 'station', 'cave', 'sky', 'isles', 'sea'].indexOf(s.zone), mult = 1 + zi * .25;
+  const zi = ['home', 'ice', 'ember', 'jungle', 'station', 'cave', 'sky', 'isles', 'sea', 'clock'].indexOf(s.zone), mult = 1 + zi * .25;
   const coins = Math.round((120 + Math.random() * 120) * mult);
   S.coins += coins;
-  const resPool = ['wood', 'stone', 'ore', 'crystal'].concat(S.stats.iceVisits ? ['frost'] : [], S.stats.emberVisits ? ['magma'] : [], S.stats.jungleVisits ? ['spore'] : [], S.stats.stationVisits ? ['star'] : [], S.stats.caveVisits ? ['prism'] : [], S.stats.skyVisits ? ['feather'] : [], S.stats.seaVisits ? ['pearl'] : []);
+  const resPool = ['wood', 'stone', 'ore', 'crystal'].concat(S.stats.iceVisits ? ['frost'] : [], S.stats.emberVisits ? ['magma'] : [], S.stats.jungleVisits ? ['spore'] : [], S.stats.stationVisits ? ['star'] : [], S.stats.caveVisits ? ['prism'] : [], S.stats.skyVisits ? ['feather'] : [], S.stats.seaVisits ? ['pearl'] : [], S.stats.clockVisits ? ['cog'] : []);
   const r = resPool[Math.min(resPool.length - 1, Math.floor(Math.random() * resPool.length))], n = ['wood', 'stone', 'ore'].includes(r) ? 15 : 5;
   S.store[r] += n;
   let extra = '';
@@ -7657,6 +8180,321 @@ function updateBubbles(dt, t) {
   snowGeo.attributes.position.needsUpdate = true;
 }
 
+/* ---------------- Clockwork Citadel: floors, gears, clock hand, steam vents ---------------- */
+P.cwY = 0; P.cwVy = 0; P.cwFall = false; P.cwLaunch = null; P.cwLock = null; P.cwPrev = V(); P.pkY = 0;
+function cwMove(dt) {
+  CW_HAND.ang = (CW_HAND.ang + Math.PI * 2 / CW_HAND.per * dt) % (Math.PI * 2);
+  if (P.zone !== 'clock' || fading) { if (P.zone !== 'clock') { P.cwY = 0; P.cwLaunch = null; P.cwFall = false; } return; }
+  if (P.cwLaunch) {
+    const L = P.cwLaunch; L.t += dt; const k = Math.min(1, L.t / L.dur);
+    player.position.x = lerp(L.from.x, L.to.x, k); player.position.z = lerp(L.from.z, L.to.z, k);
+    P.cwY = lerp(L.h0, L.h1, k) + Math.sin(k * Math.PI) * 5; P.vel.set(0, 0, 0); P.face = Math.atan2(L.to.x - L.from.x, L.to.z - L.from.z);
+    if (Math.random() < dt * 30) burst(player.position.x, P.cwY, player.position.z, 0xffffff, 1, 2, .6, .6);
+    if (k >= 1) { P.cwLaunch = null; P.cwY = L.h1; P.safePos.copy(player.position); burst(player.position.x, P.cwY + .2, player.position.z, 0xffffff, 10, 3, .6); SFX.whoosh(); }
+    P.cwPrev.copy(player.position); return;
+  }
+  const lx0 = player.position.x - CW_C.x, lz0 = player.position.z - CW_C.z;
+  if (P.jumpY === 0 && !P.cwFall && cwStatic(lx0, lz0) === null) {
+    const c = cwCarrier(lx0, lz0);
+    if (c) { const dx = lx0 - c.x, dz = lz0 - c.z, r = Math.hypot(dx, dz), a = Math.atan2(dx, dz) + c.w * dt; player.position.x = CW_C.x + c.x + Math.sin(a) * r; player.position.z = CW_C.z + c.z + Math.cos(a) * r; if (c.hand) S.stats.handRides = (S.stats.handRides || 0) + dt; }
+  }
+  if (cdragon.state === 'fight' && P.cwY > 7.5 && !P.cwLaunch) { const bf = CW_FLOORS[2], bx = CW_C.x + bf.x, bz = CW_C.z + bf.z, bd = dist2(player.position.x, player.position.z, bx, bz), lim = bf.r - .9; if (bd > lim) { player.position.x = bx + (player.position.x - bx) * lim / bd; player.position.z = bz + (player.position.z - bz) * lim / bd; } }
+  let f = cwFloor(player.position.x, player.position.z);
+  if (f !== null && f > P.cwY + .05 && !P.cwFall) {
+    if (P.jumpY > 0 && P.cwY + P.jumpY >= f - .1) { P.jumpY -= (f - P.cwY); P.cwY = f; }
+    else { player.position.copy(P.cwPrev); f = cwFloor(player.position.x, player.position.z); toastOnce('cwwall', '🧱 Too high to climb! Find a ♨ steam vent to reach the upper floors.', '', 20); }
+  }
+  if (!P.cwFall && P.jumpY === 0 && S.hp > 0) for (const v of CW_VENTS) {
+    const p = cwv(v.x, v.z), d = dist2(player.position.x, player.position.z, p.x, p.z);
+    if (d < 1.2 && Math.abs(P.cwY - v.h0) < .5) { if (P.cwLock !== v) { P.cwLock = v; P.cwLaunch = { from: player.position.clone(), to: cwv(v.tx, v.tz), h0: v.h0, h1: v.h1, t: 0, dur: 1.3 }; S.stats.vents++; noise(.7, .14, 500); tone(250, .5, 'sawtooth', .04, 400); toastOnce('vent', '♨ WHOOSH! The steam vent launches you to the next floor!', '', 20); checkQuest(); return; } }
+    else if (P.cwLock === v && d > 2) P.cwLock = null;
+  }
+  if (P.cwFall) {
+    P.cwVy -= 28 * dt; P.cwY += P.cwVy * dt;
+    if (f !== null && P.cwY <= f && P.cwY > f - 1.6) { P.cwY = f; P.cwVy = 0; P.cwFall = false; burst(player.position.x, f + .1, player.position.z, 0xd8c8a8, 8, 3, .5); if (cwStatic(player.position.x - CW_C.x, player.position.z - CW_C.z) !== null) P.safePos.copy(player.position); }
+    else if (P.cwY < -12 && S.hp > 0) {
+      P.cwFall = false; P.cwVy = 0; player.position.copy(P.safePos); P.cwY = cwFloor(P.safePos.x, P.safePos.z) ?? 0; P.vel.set(0, 0, 0);
+      damagePlayer(8, player.position.x, player.position.z); P.vel.set(0, 0, 0);
+      toastOnce('cwfell', '⚙ You fell off the Citadel! Watch your step on the gears.', 'danger', 6);
+    }
+  } else if (P.jumpY === 0) {
+    if (f === null || f < P.cwY - .05) { P.cwFall = true; P.cwVy = 0; }
+    else { P.cwY = f; if (cwStatic(player.position.x - CW_C.x, player.position.z - CW_C.z) !== null && S.hp > 0) P.safePos.copy(player.position); }
+  }
+  if (!S.stats.garden && dist2(player.position.x, player.position.z, CW_C.x + CW_FLOORS[4].x, CW_C.z + CW_FLOORS[4].z) < CW_FLOORS[4].r - 1 && !P.cwFall) { S.stats.garden = 1; toast('🔔 You reached the Bell Garden! Great timing on that clock hand.', 'big'); checkQuest(); }
+  P.cwPrev.copy(player.position);
+}
+function updateClock(dt, t) {
+  if (P.zone !== 'clock') { $('slowmo').style.opacity = 0; if (pet.g) pet.g.position.y = 0; if (comp.g) comp.g.position.y = 0; return; }
+  if (pet.g) pet.g.position.y = P.cwY; if (comp.g) comp.g.position.y = P.cwY;
+  for (const gm of cwGearMeshes) { gm.ang += gm.g.w * dt; gm.m.rotation.y = gm.ang; }
+  for (const bg of cwBgGears) bg.m.rotation.y += bg.w * dt;
+  const a = cwHandAngle(); if (cwHandMesh) cwHandMesh.rotation.y = a; if (cwMinute) cwMinute.rotation.y = a / 12;
+  for (const fx of cwVentFx) {
+    if (fx.chimney) { if (Math.random() < dt * 3) burst(fx.chimney.x, fx.chimney.y, fx.chimney.z, 0xd8d8e0, 1, .8, 1.6, .9, -3); continue; }
+    if (Math.random() < dt * 10) burst(fx.p.x + rand(-.5, .5), fx.v.h0 + .4, fx.p.z + rand(-.5, .5), 0xffffff, 1, 1.5, .8, .6, -7);
+  }
+  // clockbots walk on floors, can't climb walls
+  for (const e of enemies) {
+    if (e.kind !== 'clockbot' || e.dying) continue;
+    const f = cwFloor(e.g.position.x, e.g.position.z);
+    if (f === null) { e.dying = .01; continue; }
+    if (e.cwY !== undefined && f > e.cwY + .6 && e.prev) { e.g.position.x = e.prev.x; e.g.position.z = e.prev.z; }
+    else e.cwY = f;
+    e.g.position.y = e.cwY; e.prev = e.prev || V(); e.prev.copy(e.g.position);
+    if (e.g.userData.key) e.g.userData.key.rotation.z += dt * 6;
+  }
+  $('slowmo').style.opacity = cdragon.slowmo > 0 ? .55 : 0;
+}
+
+/* ---------------- the Clockwork Dragon ---------------- */
+function killCDragon() {
+  if (cdragon.state !== 'fight') return;
+  cdragon.state = 'dead'; cdragon.deadT = 0; cdragon.col.on = false; cdragon.slowmo = 0; clearCDHaz();
+  const first = !S.stats.cdragon;
+  S.stats.cdragon = (S.stats.cdragon || 0) + 1; S.cdragonDay = S.day;
+  const cg = first ? 30 : 15, coins = first ? 1800 : 700;
+  S.store.cog += cg; S.coins += coins;
+  SFX.boom(); setTimeout(() => SFX.victory(), 600); camShake = 1.2;
+  toast(`🏆 The Clockwork Dragon winds down! ${ic('cog')}+${cg} ${ic('coins')}+${coins}`, 'big', 5000);
+  if (first) setTimeout(() => toast('⚙ A golden Clockwork Dragon statue now stands in the Hall of Fame!', 'ice', 5000), 1600);
+  else if (!RUSH.active) setTimeout(() => toast('Tick tock… the dragon rewinds itself tomorrow.'), 1600);
+  for (const e of enemies) if (e.cdMinion) e.dying = .01;
+  renderRes(); checkQuest(); save(); rushNext('cdragon');
+}
+function cdSetMode(m) {
+  cdragon.mode = m; cdragon.modeT = m === 'time' ? 8 : 10; cdragon.atkT = 1.2; cdragon.breath = 0;
+  const c = CD_MODES[m].col; CD_CORE.color.setHex(c); CD_CORE.emissive.setHex(c);
+  burst(cdragon.g.position.x, 10, cdragon.g.position.z, c, 30, 6, 1); SFX.roar(); camShake = Math.max(camShake, .5);
+  toast(`⚙ The Clockwork Dragon switches to ${CD_MODES[m].name}!`, m === 'time' ? 'ice' : m === 'fire' ? 'fire' : 'big', 2600);
+  if (m === 'time') { cdragon.slowmo = 7; toastOnce('timetip', '⏳ Time slows down! Step out of the clock rings before they ring!', 'danger', 30); }
+  else if (m === 'gears') toastOnce('geartip', '⚙ Spinning saws! JUMP over them!', 'danger', 30);
+  else toastOnce('firetip', '🔥 Watch where the dragon looks: get out of the fire!', 'danger', 30);
+}
+function updateCDragon(dt, t) {
+  const g = cdragon.g, body = cdragon.body, rdt = cdragon.rdt || dt;
+  cdragon.tailGear.rotation.z += dt * 3; cdragon.wings.forEach((w, i) => { w.gm.rotation.x += dt * (i ? -2 : 2); });
+  if (cdragon.state === 'gone') { g.visible = false; if (S.day > S.cdragonDay) { resetCDragon(); cdragon.state = 'sleep'; } return; }
+  if (cdragon.state === 'dead') {
+    cdragon.deadT += dt; body.rotation.z = Math.min(1.4, cdragon.deadT); body.position.y = -Math.max(0, cdragon.deadT - 1) * 1.5;
+    if (Math.random() < dt * 25) burst(g.position.x + rand(-2, 2), 8 + rand(.5, 4), g.position.z + rand(-2, 2), Math.random() < .5 ? 0xd8a040 : 0xffffff, 2, 4, .8);
+    if (cdragon.deadT > 2.5) { cdragon.state = 'gone'; g.visible = false; }
+    return;
+  }
+  const px = player.position.x, pz = player.position.z, dN = dist2(px, pz, CDRAGON_C.x, CDRAGON_C.z);
+  if (cdragon.state === 'sleep') {
+    g.visible = P.zone === 'clock'; cdragon.col.on = false; body.position.y = Math.sin(t * 1.2) * .05; cdragon.head.rotation.y = Math.sin(t * .5) * .5;
+    if (P.zone === 'clock' && P.cwY >= 7.5 && dN < 13 && S.hp > 0 && !fading && !P.cwLaunch) {
+      resetCDragon(); cdragon.state = 'fight'; g.visible = true; cdragon.col.on = true; cdSetMode('fire');
+      toast('⚙ THE CLOCKWORK DRAGON WAKES UP!', 'danger', 3500);
+    }
+    return;
+  }
+  if (P.zone !== 'clock' || P.cwY < 7 || dN > 25 || S.hp <= 0) {
+    cdragon.state = 'sleep'; resetCDragon();
+    for (const e of enemies) if (e.cdMinion) e.dying = .01;
+    if (P.zone === 'clock' && S.hp > 0) toast('The Clockwork Dragon goes back to sleep… tick, tock.');
+    return;
+  }
+  const enr = cdragon.hp < cdragon.max * .5, tm = (cdragon.slow > 0 ? .6 : 1) * (enr ? 1.3 : 1);
+  if (cdragon.burn > 0) { cdragon.burn -= dt; cdragon.hp -= dt * 2.5; if (cdragon.hp <= 0) { killCDragon(); return; } }
+  cdragon.slow = Math.max(0, cdragon.slow - dt);
+  cdragon.modeT -= rdt;
+  if (cdragon.modeT <= 0) cdSetMode(cdragon.mode === 'fire' ? 'gears' : cdragon.mode === 'gears' ? 'time' : 'fire');
+  const dx = px - g.position.x, dz = pz - g.position.z, d = Math.hypot(dx, dz) || 1;
+  let face = Math.atan2(dx, dz);
+  if (cdragon.mode !== 'time' && cdragon.breath <= 0 && d > 5) { g.position.x += dx / d * 1.4 * tm * dt; g.position.z += dz / d * 1.4 * tm * dt; cdragon.walk += dt * 6; }
+  const R = CW_FLOORS[2].r - 2.5, cx = CW_C.x + CW_FLOORS[2].x, cz = CW_C.z + CW_FLOORS[2].z, cd = dist2(g.position.x, g.position.z, cx, cz);
+  if (cd > R) { g.position.x = cx + (g.position.x - cx) * R / cd; g.position.z = cz + (g.position.z - cz) * R / cd; }
+  cdragon.legs.forEach((l, i) => l.rotation.x = Math.sin(cdragon.walk + i * Math.PI) * .4);
+  body.position.y = Math.sin(t * 2) * .1; cdragon.clockHand.rotation.z -= dt * (cdragon.mode === 'time' ? 12 : 1.5);
+  cdragon.atkT -= dt * tm;
+  const mouthW = () => { cdragon.mouth.getWorldPosition(tmpV); return tmpV.clone(); };
+  if (cdragon.mode === 'fire') {
+    if (cdragon.breath > 0) {
+      cdragon.breath -= dt; face = cdragon.breathA;
+      const charging = cdragon.breath > 1.3;
+      if (!charging) {
+        const from = mouthW(); fireStream(from, V(g.position.x + Math.sin(face) * 9, 8.3, g.position.z + Math.cos(face) * 9), 2, 12);
+        cdragon.tick -= dt;
+        if (cdragon.tick <= 0) { cdragon.tick = .25; const pa = Math.atan2(dx, dz), da = Math.abs(((pa - face + Math.PI * 3) % (Math.PI * 2)) - Math.PI); if (d < 9.5 && da < .4 && S.hp > 0) damagePlayer(5, g.position.x, g.position.z, 0, 2); }
+      } else CD_CORE.emissiveIntensity = 1.4 + Math.sin(t * 30) * .8;
+    } else if (cdragon.atkT <= 0) {
+      cdragon.atkT = enr ? 2.2 : 3; cdragon.breath = 1.9; cdragon.breathA = Math.atan2(dx, dz); cdragon.tick = 0; SFX.fire();
+      for (let i = 0; i < (enr ? 4 : 2); i++) { const x = px + (i ? rand(-3, 3) : 0), z = pz + (i ? rand(-3, 3) : 0); const m = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.7, 24), new THREE.MeshBasicMaterial({ color: 0xff5a1a, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 8.06, z); scene.add(m); cdragon.bombs.push({ m, x, z, t: 1.3 }); }
+    }
+  } else if (cdragon.mode === 'gears') {
+    if (cdragon.atkT <= 0) {
+      cdragon.atkT = enr ? 1.3 : 1.8; const n = enr ? 9 : 6, off = rand(0, 6.28);
+      for (let i = 0; i < n; i++) { const an = off + i / n * Math.PI * 2, m = new THREE.Mesh(SAW_GEO, SAW_MAT); m.position.set(g.position.x, 8.45, g.position.z); m.rotation.x = Math.PI / 2; scene.add(m); cdragon.saws.push({ m, x: g.position.x, z: g.position.z, vx: Math.sin(an) * 6.5, vz: Math.cos(an) * 6.5, life: 3.2, hit: false }); }
+      tone(300, .3, 'sawtooth', .04, 600);
+    }
+  } else {
+    if (cdragon.atkT <= 0) {
+      cdragon.atkT = enr ? 1.6 : 2.1;
+      for (let i = 0; i < (enr ? 3 : 2); i++) {
+        const x = px + (i ? rand(-3.5, 3.5) : 0), z = pz + (i ? rand(-3.5, 3.5) : 0), grp = new THREE.Group(); grp.position.set(x, 8.06, z); scene.add(grp);
+        const ring = new THREE.Mesh(new THREE.RingGeometry(2, 2.25, 32), new THREE.MeshBasicMaterial({ color: 0x5ab8ff, transparent: true, opacity: .85, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; grp.add(ring);
+        const fill = new THREE.Mesh(new THREE.CircleGeometry(2, 32), new THREE.MeshBasicMaterial({ color: 0x5ab8ff, transparent: true, opacity: .25, side: THREE.DoubleSide, depthWrite: false })); fill.rotation.x = -Math.PI / 2; grp.add(fill);
+        const hand = new THREE.Mesh(G.box, new THREE.MeshBasicMaterial({ color: 0xffffff })); hand.scale.set(.12, .05, 1.8); hand.position.z = .9; const hh = new THREE.Group(); hh.add(hand); hh.position.y = .05; grp.add(hh);
+        cdragon.rings.push({ m: grp, fill, hh, x, z, t: 2.4, max: 2.4 });
+      }
+      tone(1200, .08, 'square', .04, 0);
+    }
+  }
+  // hazards
+  for (let i = cdragon.bombs.length - 1; i >= 0; i--) { const b2 = cdragon.bombs[i]; b2.t -= dt; b2.m.scale.setScalar(.6 + (1.3 - b2.t) * .4); if (Math.random() < dt * 8) burst(b2.x, 13 - (1.3 - b2.t) * 4, b2.z, 0xff8a3a, 1, 1, .4, .5); if (b2.t <= 0) { burst(b2.x, 8.3, b2.z, 0xff6a1a, 18, 5, .7); SFX.boom(); if (dist2(px, pz, b2.x, b2.z) < 1.8 && S.hp > 0) damagePlayer(10, b2.x, b2.z, 0, 2); scene.remove(b2.m); cdragon.bombs.splice(i, 1); } }
+  for (let i = cdragon.saws.length - 1; i >= 0; i--) { const s2 = cdragon.saws[i]; s2.life -= dt; s2.x += s2.vx * dt; s2.z += s2.vz * dt; s2.m.position.set(s2.x, 8.45, s2.z); s2.m.rotation.z += dt * 14; if (!s2.hit && dist2(px, pz, s2.x, s2.z) < .95 && P.jumpY < .7 && S.hp > 0) { s2.hit = true; damagePlayer(9, s2.x, s2.z); } if (s2.life <= 0 || cwFloor(s2.x, s2.z) === null) { scene.remove(s2.m); cdragon.saws.splice(i, 1); } }
+  for (let i = cdragon.rings.length - 1; i >= 0; i--) { const r = cdragon.rings[i]; r.t -= dt; const k = 1 - r.t / r.max; r.fill.scale.setScalar(Math.max(.01, k)); r.hh.rotation.y = -k * Math.PI * 2; if (r.t <= 0) { burst(r.x, 8.4, r.z, 0x5ab8ff, 20, 5, .7); tone(1400, .2, 'triangle', .06, -600); if (dist2(px, pz, r.x, r.z) < 2.2 && P.jumpY < .8 && S.hp > 0) damagePlayer(12, r.x, r.z); scene.remove(r.m); cdragon.rings.splice(i, 1); } }
+  if (enr && Math.random() < dt / 12) { for (let i = 0; i < 2; i++) { const a2 = rand(0, 6.28); const e = spawnEnemy('clockbot', g.position.x + Math.cos(a2) * 4, g.position.z + Math.sin(a2) * 4); e.summoned = true; e.arena = true; e.cdMinion = true; e.cwY = 8; } toastOnce('cdsum', '⚙ Windup minions march out!', 'danger', 12); }
+  g.rotation.y = lerpAngle(g.rotation.y, face, 1 - Math.exp(-dt * 5));
+  cdragon.col.x = g.position.x; cdragon.col.z = g.position.z;
+  if (cdragon.flash > 0) cdragon.flash -= dt;
+  CD_BODY.emissiveIntensity = cdragon.flash > 0 ? 1.2 : .2 + (enr ? .2 : 0);
+}
+
+/* ---------------- parkour course ---------------- */
+function pkRespawn() {
+  const [x, z] = PK_CHECKS[PARK.check]; player.position.copy(pkPos(x, z)); P.pkY = 0; P.vel.set(0, 0, 0); P.jumpY = 0; P.vy = 0; P.jumps = 0; PARK.fallT = 0;
+}
+function parkMove(dt) {
+  const t = clock.elapsedTime;
+  PK_MOVING.forEach((mv, i) => { const nx = mv.x + Math.sin(t * mv.sp + mv.ph) * mv.ax; mv.dx = nx - mv.cx; mv.cx = nx; pkMeshes[i].position.copy(pkPos(nx, mv.z)); });
+  PK_SPIN.forEach((sp, i) => { pkSpinMeshes[i].rotation.y = t * sp.sp; });
+  const chip = $('pkChip');
+  if (P.zone !== 'park') { P.pkY = 0; chip.hidden = true; return; }
+  chip.hidden = false; chip.textContent = PARK.done ? `🏁 Finished: ${fmtTime2(PARK.t)}` : PARK.on ? `⏱ ${fmtTime2(PARK.t)}${S.mg.parkBest ? ` · best ${fmtTime2(S.mg.parkBest)}` : ''}` : `🏃 Leave the start to begin!${S.mg.parkBest ? ` · best ${fmtTime2(S.mg.parkBest)}` : ''}`;
+  if (fading) return;
+  if (PARK.outT > 0) { PARK.outT -= dt; if (PARK.outT <= 0) { PARK.done = false; teleport(V(FAIR.park.x, 0, FAIR.park.z - 3.5), 'home', 'portal'); } }
+  if (PARK.on) PARK.t += dt;
+  if (PARK.fallT > 0) { PARK.fallT -= dt; P.pkY -= dt * 14; if (PARK.fallT <= 0) pkRespawn(); return; }
+  const lx = player.position.x - PK_C.x, lz = player.position.z - PK_C.z, gnd = pkGround(player.position.x, player.position.z);
+  if (gnd && gnd.mv && P.jumpY === 0) player.position.x += gnd.mv.dx;
+  if (!gnd && P.jumpY === 0 && S.hp > 0) { PARK.fallT = .55; P.vel.set(0, 0, 0); toastOnce('pkfall', '😵 Whoops! Back to the last green flag.', '', 3); noise(.4, .1, 600); return; }
+  if (P.jumpY < .7) for (const sp of PK_SPIN) {
+    const a = t * sp.sp, ex = Math.sin(a) * sp.len, ez = Math.cos(a) * sp.len;
+    if (segDist(lx, lz, sp.x - ex, sp.z - ez, sp.x + ex, sp.z + ez) < .5 && dist2(lx, lz, sp.x, sp.z) > .45) { toast('💥 Bonk! Jump over the spinning bars!', 'danger', 1500); SFX.hurt(); pkRespawn(); return; }
+  }
+  PK_CHECKS.forEach(([cx, cz], i) => { if (i > PARK.check && dist2(lx, lz, cx, cz) < 3.2) { PARK.check = i; toast(`🚩 Checkpoint ${i}!`, '', 1200); tone(700, .15, 'triangle', .06, 300); } });
+  const onStart = Math.abs(lx) < 4 && Math.abs(lz - 20) < 4;
+  if (!PARK.on && !PARK.done && !onStart) { PARK.on = true; PARK.t = 0; tone(900, .2, 'square', .05, 0); }
+  if (PARK.on && Math.abs(lx) < 4 && Math.abs(lz + 61) < 4) {
+    PARK.on = false; PARK.done = true; PARK.outT = 4.5;
+    const tm = Math.round(PARK.t * 10) / 10, first = !S.mg.parkBest, best = first || tm < S.mg.parkBest;
+    if (best) S.mg.parkBest = tm; S.mg.played++; S.stats.parkRuns++;
+    const coins = first ? 150 : best ? 90 : 40; S.coins += coins;
+    SFX.victory(); for (let i = 0; i < 4; i++) setTimeout(() => burst(player.position.x, 2, player.position.z, [0xffd23a, 0x7dff8a, 0xff7ae0, 0x5ab8ff][i], 20, 6, 1), i * 150);
+    toast(`🏁 FINISH! ${fmtTime2(tm)}${best ? ' — NEW BEST TIME!' : ''} ${ic('coins')}+${coins}`, 'big', 4500);
+    renderRes(); checkQuest(); checkAch(); save();
+  }
+}
+
+/* ---------------- custom robot pet ---------------- */
+const myBot = { g: null, b: null, bob: 0, zapT: 2, wheels: [] };
+function makeMyBot() {
+  if (myBot.g) { scene.remove(myBot.g); myBot.g = null; }
+  if (!S.mybot.built) return;
+  const m = S.mybot, mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(m.color), flatShading: true }), dark = new THREE.MeshLambertMaterial({ color: 0x3a3a4a, flatShading: true });
+  const gcol = { laser: 0xff4a4a, magnet: 0xff7a3a, healer: 0x7dff8a, scanner: 0x5ab8ff }[m.gadget], glow = emis(gcol, 1.6);
+  const g = new THREE.Group(), b = new THREE.Group(); g.add(b); myBot.b = b; myBot.wheels = [];
+  const add = (geo, mt, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(geo, mt); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; b.add(o); return o; };
+  if (m.body === 'round') add(G.sph, mat, 0, .45, 0, .32, .3, .3);
+  else if (m.body === 'boxy') add(G.box, mat, 0, .45, 0, .55, .45, .45);
+  else { add(G.cyl8, mat, 0, .45, 0, .24, .45, .24); add(G.sph, mat, 0, .68, 0, .24, .12, .24); add(G.sph, mat, 0, .22, 0, .24, .12, .24); }
+  add(G.box, glow, 0, .45, .3, .2, .1, .03);
+  if (m.head === 'dome') { add(new THREE.SphereGeometry(1, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xbfe6ff, transparent: true, opacity: .75 }), 0, .78, 0, .25, .25, .25); add(G.cyl6, dark, 0, 1.1, 0, .015, .15, .015); add(G.sph, glow, 0, 1.2, 0, .045, .045, .045); }
+  else if (m.head === 'box') { add(G.box, mat, 0, .92, 0, .38, .3, .34); add(G.box, glow, 0, .94, .18, .3, .07, .02); }
+  else { add(G.box, dark, 0, .95, 0, .46, .34, .22); add(G.box, glow, 0, .95, .115, .36, .24, .01); for (const sx of [-1, 1]) { const ear = add(G.cyl6, dark, sx * .1, 1.25, 0, .012, .2, .012); ear.rotation.z = -sx * .4; } }
+  if (m.wheels === 'wheels') for (const sx of [-1, 1]) { const w = add(G.cyl8, dark, sx * .28, .13, 0, .13, .06, .13); w.rotation.z = Math.PI / 2; myBot.wheels.push(w); }
+  else if (m.wheels === 'legs') for (const sx of [-1, 1]) myBot.wheels.push(add(G.box, dark, sx * .13, .12, 0, .09, .24, .12));
+  else { add(G.cone6, glow, 0, .08, 0, .14, .2, .14).rotation.x = Math.PI; add(new THREE.TorusGeometry(1, .15, 5, 16), dark, 0, .2, 0, .22, .22, .22).rotation.x = Math.PI / 2; }
+  if (m.gadget === 'laser') { const bl = add(G.cyl6, dark, .3, .55, .1, .04, .3, .04); bl.rotation.x = Math.PI / 2; add(G.sph, glow, .3, .55, .26, .05, .05, .05); }
+  else if (m.gadget === 'magnet') { const t2 = add(new THREE.TorusGeometry(1, .3, 6, 12, Math.PI), new THREE.MeshLambertMaterial({ color: 0xff3a3a }), -.32, .55, 0, .1, .1, .1); t2.rotation.z = Math.PI / 2; }
+  else if (m.gadget === 'healer') { add(G.box, glow, -.3, .55, 0, .04, .16, .05); add(G.box, glow, -.3, .55, 0, .04, .05, .16); }
+  else { const dish = add(new THREE.ConeGeometry(1, .5, 10, 1, true), new THREE.MeshLambertMaterial({ color: 0xd8d8e8, side: THREE.DoubleSide }), 0, 1.15, -.1, .15, .15, .15); dish.rotation.x = -.6; }
+  evoDecor(b, 'mybot', m.head === 'dome' ? 1.32 : 1.2);
+  g.position.set(player.position.x - 1.5, 0, player.position.z); scene.add(g); myBot.g = g;
+}
+function botMagnet(n) { if (S.mybot.built && S.mybot.gadget === 'magnet' && Math.random() < .3 * petMul('mybot')) { const got = addBag(n.def.res, 1); if (got) floatText(V(n.x, 2.2, n.z), `🧲 +1 ${ic(n.def.res)}`, '#ff9a8a'); } }
+function updateMyBot(dt, t) {
+  if (!S.mybot.built) return; if (!myBot.g) makeMyBot();
+  const g = myBot.g, b = myBot.b, m = S.mybot; g.visible = !fading; g.scale.setScalar(petScale('mybot'));
+  const ry = player.rotation.y, gx = player.position.x - Math.sin(ry) * 1.5 - Math.cos(ry) * 1.1, gz = player.position.z - Math.cos(ry) * 1.5 + Math.sin(ry) * 1.1;
+  const dx = gx - g.position.x, dz = gz - g.position.z, d = Math.hypot(dx, dz);
+  if (d > 25) g.position.set(gx, 0, gz); else { const k = 1 - Math.exp(-dt * 6); g.position.x += dx * k; g.position.z += dz * k; }
+  g.position.y = P.zone === 'sky' ? Math.max(0, P.skyY) : P.zone === 'sea' ? P.seaY : P.zone === 'clock' ? P.cwY : 0;
+  g.rotation.y = lerpAngle(g.rotation.y, d > .3 ? Math.atan2(dx, dz) : ry, .12);
+  myBot.bob += dt * (d > .3 ? 10 : 3);
+  if (m.wheels === 'hover') b.position.y = .25 + Math.sin(t * 3) * .08;
+  else if (m.wheels === 'legs') { b.position.y = Math.abs(Math.sin(myBot.bob)) * .06; myBot.wheels.forEach((l, i) => l.rotation.x = Math.sin(myBot.bob + i * Math.PI) * .5); }
+  else { b.position.y = 0; myBot.wheels.forEach(w => w.rotation.x += dt * d * 8); }
+  if (b.userData.halo) b.userData.halo.rotation.z += dt * 2;
+  const mul = petMul('mybot');
+  if (m.gadget === 'laser') {
+    myBot.zapT -= dt;
+    if (myBot.zapT <= 0) {
+      myBot.zapT = 2.2 / Math.sqrt(mul);
+      let best = null, bd = 7;
+      for (const f of foes()) { const dd = dist2(f.g.position.x, f.g.position.z, player.position.x, player.position.z) - foeR(f); if (dd < bd) { bd = dd; best = f; } }
+      if (best) { const from = g.position.clone().setY(g.position.y + .6 * petScale('mybot')); bolt(from, best.g.position.clone().setY(best.isBoss ? (best === cdragon ? 10 : 2.5) : 1), 0xff4a4a); hitFoe(best, 2.5 * mul, 3, '#ff9a9a'); tone(1100, .06, 'square', .03, -400); }
+    }
+  } else if (m.gadget === 'healer' && S.hp > 0 && S.hp < maxHp()) { S.hp = Math.min(maxHp(), S.hp + dt * 2 * mul); if (Math.random() < dt * 4) burst(player.position.x + rand(-.4, .4), .6 + g.position.y, player.position.z + rand(-.4, .4), 0x7dff8a, 1, 1, .5, .6, -3); }
+  else if (m.gadget === 'scanner' && Math.random() < dt * 2) burst(g.position.x, g.position.y + 1.3, g.position.z, 0x5ab8ff, 1, .5, .4, .4);
+}
+
+/* ---------------- villagers ---------------- */
+const villMeshes = {};
+function villDoor(v) { const b = buildings[v.home]; const r = b.g.rotation.y; return V(b.x + Math.sin(r) * 3, 0, b.z + Math.cos(r) * 3); }
+function makeVillager(v) {
+  const g = new THREE.Group(), b = new THREE.Group(); g.add(b);
+  const mat = new THREE.MeshLambertMaterial({ color: v.col, flatShading: true }), light = new THREE.MeshLambertMaterial({ color: new THREE.Color(v.col).lerp(new THREE.Color(0xffffff), .45), flatShading: true });
+  const add = (geo, mt, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(geo, mt); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; b.add(o); return o; };
+  add(G.sph, mat, 0, .72, 0, .38, .45, .34); add(G.sph, light, 0, .66, .18, .26, .32, .2);
+  add(G.sph, light, 0, 1.38, 0, .3, .28, .28);
+  for (const sx of [-1, 1]) { add(G.sph, new THREE.MeshBasicMaterial({ color: 0x1a1030 }), sx * .11, 1.42, .25, .06, .08, .04); add(G.sph, new THREE.MeshBasicMaterial({ color: 0xff9ab8 }), sx * .18, 1.32, .22, .05, .03, .02); add(G.sph, mat, sx * .42, .78, 0, .1, .2, .1); }
+  const legs = [-1, 1].map(sx => add(G.cyl6, mat, sx * .14, .18, 0, .08, .36, .08));
+  if (v.hat === 'chef') { add(G.cyl8, new THREE.MeshLambertMaterial({ color: 0xffffff }), 0, 1.7, 0, .22, .22, .22); add(G.sph, new THREE.MeshLambertMaterial({ color: 0xffffff }), 0, 1.86, 0, .28, .16, .28); }
+  else if (v.hat === 'helmet') { add(new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x8a8a9a, flatShading: true }), 0, 1.5, 0, .32, .26, .32); add(G.box, new THREE.MeshLambertMaterial({ color: 0x5a5a6a }), 0, 1.52, .26, .3, .05, .12); }
+  else if (v.hat === 'flower') { for (let i = 0; i < 5; i++) { const a = i / 5 * 6.28; add(G.sph, new THREE.MeshLambertMaterial({ color: 0xffd23a }), Math.cos(a) * .1, 1.68, Math.sin(a) * .1, .07, .03, .07); } add(G.sph, new THREE.MeshLambertMaterial({ color: 0xff7a3a }), 0, 1.69, 0, .05, .03, .05); }
+  else if (v.hat === 'goggles') { add(new THREE.TorusGeometry(1, .2, 5, 16), new THREE.MeshLambertMaterial({ color: 0x5a4a3a }), 0, 1.5, 0, .3, .3, .3).rotation.x = Math.PI / 2; for (const sx of [-1, 1]) add(G.cyl8, emis(0x9ae0ff, .6), sx * .12, 1.52, .26, .08, .04, .08).rotation.x = Math.PI / 2; }
+  else { add(new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a6aff }), 0, 1.52, 0, .3, .18, .3); add(G.box, new THREE.MeshLambertMaterial({ color: 0x2a4aaa }), 0, 1.53, .3, .26, .03, .2); }
+  const door = villDoor(v); g.position.copy(door); scene.add(g);
+  const tag = document.createElement('div'); tag.className = 'nametag'; tag.style.color = '#ffe9a0'; tag.textContent = `${v.e} ${v.name}`; $('labels').appendChild(tag);
+  return { g, b, legs, tag, door, tx: door.x, tz: door.z, wait: rand(1, 3), walk: 0 };
+}
+function updateVillagers(dt, t) {
+  let near = null, nd = 2.4;
+  for (const v of VILLAGERS) {
+    let vm = villMeshes[v.id];
+    if (vMovedIn(v) && !vm) {
+      vm = villMeshes[v.id] = makeVillager(v);
+      const st = vState(v.id); if (!st.arrived) { st.arrived = 1; vQuest(v); if (started) setTimeout(() => toast(`🏡 ${v.e} ${v.name} the ${v.job} moved into your outpost! Go say hi.`, 'big', 4500), 800); save(); }
+    }
+    if (!vm) continue;
+    const show = P.zone === 'home' && !fading; vm.g.visible = show;
+    if (!show) { vm.tag.style.display = 'none'; continue; }
+    const g = vm.g, d = dist2(g.position.x, g.position.z, player.position.x, player.position.z);
+    if (d < 3) { g.rotation.y = lerpAngle(g.rotation.y, Math.atan2(player.position.x - g.position.x, player.position.z - g.position.z), 1 - Math.exp(-dt * 6)); vm.b.position.y = Math.abs(Math.sin(t * 3)) * .04; vm.legs.forEach(l => l.rotation.x = 0); }
+    else {
+      vm.wait -= dt;
+      if (vm.wait <= 0) { const a = rand(0, 6.28), r = rand(.5, 3.5); vm.tx = vm.door.x + Math.cos(a) * r; vm.tz = vm.door.z + Math.sin(a) * r; vm.wait = rand(3, 6); }
+      const dx = vm.tx - g.position.x, dz = vm.tz - g.position.z, dd = Math.hypot(dx, dz);
+      if (dd > .2) { g.position.x += dx / dd * 1.3 * dt; g.position.z += dz / dd * 1.3 * dt; g.rotation.y = lerpAngle(g.rotation.y, Math.atan2(dx, dz), 1 - Math.exp(-dt * 6)); vm.walk += dt * 9; vm.legs.forEach((l, i) => l.rotation.x = Math.sin(vm.walk + i * Math.PI) * .5); vm.b.position.y = Math.abs(Math.sin(vm.walk)) * .05; }
+      else vm.legs.forEach(l => l.rotation.x = 0);
+      resolveCollisions(g.position, .4);
+    }
+    if (d < nd) { nd = d; near = v; }
+    if (d < 13) { vm.tag.style.display = ''; const st = vState(v.id); const ready = vProg(v) >= vQuest(v).n, txt = `${v.e} ${v.name}${ready ? ' ❗' : st.giftDay !== S.day ? ' 🎁' : ''}`; if (vm.tag.textContent !== txt) vm.tag.textContent = txt; project(g.position, vm.tag, 2.2); }
+    else vm.tag.style.display = 'none';
+  }
+  if (modalKind !== 'villager') talkTo = near ? near.id : null;
+  const tb = $('talkBtn'), on = !!near && started && !fading;
+  tb.hidden = !on; if (on) { const txt = `💬 Talk to ${near.name}`; if (tb.textContent !== txt) tb.textContent = txt; }
+  // day / night market look
+  const mk = buildings.market;
+  if (mk && mk.awning) { const night = isNight(); mk.awning.material.color.setHex(night ? 0x5a3aaa : 0xff9a3a); mk.moon.visible = night; mk.lamps.forEach(l => l.material.emissiveIntensity = night ? 2.2 : .3); if (night && P.zone === 'home' && Math.random() < dt * 2) burst(mk.x + rand(-1.5, 1.5), 3.6, mk.z + rand(-1, 1), 0xd8d8ff, 1, .5, .6, .5, -1); }
+}
+
 const lerpAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI; if (d < -Math.PI) d += Math.PI * 2; return a + d * t; };
 const easeOutBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
 
@@ -7676,9 +8514,9 @@ function project(v, el, yOff = 0) {
 function updateCamera(dt) {
   if (PHOTO.on) { photoCamera(dt); return; }
   const portrait = innerWidth < innerHeight;
-  const z = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' || kraken.state === 'fight' ? 1.4 : 1;
+  const z = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' || kraken.state === 'fight' || cdragon.state === 'fight' ? 1.4 : 1;
   const off = portrait ? [0, 14 * z, 15 * z] : [0, 10 * z, 12.5 * z];
-  const cy = P.zone === 'sky' ? Math.max(-5, P.skyY) * .85 : P.zone === 'sea' ? P.seaY * .75 : 0;
+  const cy = P.zone === 'sky' ? Math.max(-5, P.skyY) * .85 : P.zone === 'sea' ? P.seaY * .75 : P.zone === 'clock' ? P.cwY * .85 : 0;
   const want = tmpV.set(player.position.x + off[0], off[1] + cy, player.position.z + off[2]);
   camPos.lerp(want, 1 - Math.exp(-dt * 6));
   camera.position.copy(camPos);
@@ -7713,7 +8551,7 @@ function updateLabels(dt) {
 }
 function updateHUD() {
   const narrow = innerWidth < 600;
-  const zn = P.zone === 'mine' ? (narrow ? '⛏ ' : '⛏ Mine · ') : P.zone === 'ice' ? (narrow ? '❄ ' : '❄ Frostveil · ') : P.zone === 'ember' ? (narrow ? '🌋 ' : '🌋 Emberfall · ') : P.zone === 'jungle' ? (narrow ? '🍄 ' : '🍄 Verdantia · ') : P.zone === 'station' ? (narrow ? '🛰 ' : '🛰 Nebula Station · ') : P.zone === 'arena' ? (narrow ? '🏟 ' : '🏟 Arena · ') : P.zone === 'cave' ? (narrow ? '💎 ' : '💎 Crystal Caverns · ') : P.zone === 'sky' ? (narrow ? '☁ ' : '☁ Skyreach · ') : P.zone === 'sea' ? (narrow ? '🐠 ' : '🐠 Coral Deep · ') : P.zone === 'isles' ? (narrow ? '⛵ ' : '⛵ Sunny Isles · ') : '';
+  const zn = P.zone === 'mine' ? (narrow ? '⛏ ' : '⛏ Mine · ') : P.zone === 'ice' ? (narrow ? '❄ ' : '❄ Frostveil · ') : P.zone === 'ember' ? (narrow ? '🌋 ' : '🌋 Emberfall · ') : P.zone === 'jungle' ? (narrow ? '🍄 ' : '🍄 Verdantia · ') : P.zone === 'station' ? (narrow ? '🛰 ' : '🛰 Nebula Station · ') : P.zone === 'arena' ? (narrow ? '🏟 ' : '🏟 Arena · ') : P.zone === 'cave' ? (narrow ? '💎 ' : '💎 Crystal Caverns · ') : P.zone === 'sky' ? (narrow ? '☁ ' : '☁ Skyreach · ') : P.zone === 'sea' ? (narrow ? '🐠 ' : '🐠 Coral Deep · ') : P.zone === 'isles' ? (narrow ? '⛵ ' : '⛵ Sunny Isles · ') : P.zone === 'clock' ? (narrow ? '⚙ ' : '⚙ Clockwork Citadel · ') : P.zone === 'park' ? (narrow ? '🏃 ' : '🏃 Parkour · ') : '';
   $('dayTxt').textContent = `${zn}Day ${S.day}${P.zone === 'ice' && W.bliz ? ' · 🌨' : ''}${P.zone === 'ember' && ERU.on ? ' · 🔥' : ''}${EV.golden > 0 ? ' · ✨' : ''}${P.zone === 'home' && RAIN.on ? (seasonIdx() === 3 ? ' · 🌨' : ' · 🌧') : ''}${P.zone === 'home' || P.zone === 'mine' ? ' · ' + SEASONS[seasonIdx()].e : ''}${holiday() ? ' · ' + HOLIDAYS[holiday()].e : ''}`;
   $('day').classList.toggle('night', isNight());
   $('day').classList.toggle('storm', (P.zone === 'ice' && W.bliz) || (P.zone === 'ember' && ERU.on));
@@ -7760,6 +8598,7 @@ else if (S.zone === 'ember' && S.stats.emberVisits) { P.zone = 'ember'; player.p
 else if (S.zone === 'jungle' && S.stats.jungleVisits) { P.zone = 'jungle'; player.position.copy(JUN_ARRIVE); }
 else if (S.zone === 'station' && S.stats.stationVisits) { P.zone = 'station'; player.position.copy(ST_ARRIVE); }
 else if (S.zone === 'cave' && S.stats.caveVisits) { P.zone = 'cave'; player.position.copy(CV_ARRIVE); }
+else if (S.zone === 'clock' && S.stats.clockVisits) { P.zone = 'clock'; player.position.copy(CW_ARRIVE); }
 else if (S.zone === 'sea' && S.stats.seaVisits) { P.zone = 'sea'; player.position.copy(SEA_ARRIVE); }
 else if (S.zone === 'isles' && S.stats.sails) { P.zone = 'isles'; player.position.copy(ISL_ARRIVE); }
 else if (S.zone === 'sky' && S.stats.skyVisits) { P.zone = 'sky'; player.position.copy(SK_ARRIVE); P.safePos.copy(SK_ARRIVE); }
@@ -7779,6 +8618,7 @@ initAICore();
 initShadow();
 initRoc();
 initKraken();
+initCDragon();
 makeCompanion();
 refreshBoots();
 makeCrew();
@@ -7788,6 +8628,7 @@ farmOffline();
 applySeason(false);
 renderTmapBtn();
 dqEnsure();
+makeMyBot();
 buildFarmVis();
 renderTools(); renderRes(); renderQuest(); updateHUD();
 if (hasSave) { $('play').textContent = 'Continue'; $('newgame').style.display = ''; }
@@ -7799,7 +8640,7 @@ $('play').addEventListener('click', () => {
     setTimeout(() => toast('🚀 Crash landing! This planet looks… abandoned.', 'big', 4000), 300);
     setTimeout(() => toast('Follow the <b style="color:var(--warn)">yellow arrow</b> to your goal.', '', 4500), 2600);
   } else {
-    toast(`Hi ${esc(S.profile.name)}! Welcome back${P.zone === 'ice' ? ' to Frostveil' : P.zone === 'ember' ? ' to Emberfall' : P.zone === 'jungle' ? ' to Verdantia' : P.zone === 'station' ? ' to Nebula Station' : P.zone === 'cave' ? ' to Crystal Caverns' : P.zone === 'sky' ? ' to Skyreach' : P.zone === 'sea' ? ' to Coral Deep' : P.zone === 'isles' ? ' to the Sunny Isles' : ''}! Day ${S.day}`, 'big');
+    toast(`Hi ${esc(S.profile.name)}! Welcome back${P.zone === 'ice' ? ' to Frostveil' : P.zone === 'ember' ? ' to Emberfall' : P.zone === 'jungle' ? ' to Verdantia' : P.zone === 'station' ? ' to Nebula Station' : P.zone === 'cave' ? ' to Crystal Caverns' : P.zone === 'sky' ? ' to Skyreach' : P.zone === 'sea' ? ' to Coral Deep' : P.zone === 'isles' ? ' to the Sunny Isles' : P.zone === 'clock' ? ' to Clockwork Citadel' : ''}! Day ${S.day}`, 'big');
     if (offlineMsg) setTimeout(() => toast(offlineMsg, 'big', 5500), 2800);
     if (chestReady()) setTimeout(() => toast('🎁 Your daily chest is ready at the outpost!'), 1500);
   }
@@ -7811,7 +8652,7 @@ $('newgame').addEventListener('click', () => {
   try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
   location.reload();
 });
-window.__game = { kraken, killKraken, SEA_C, SEA_ARRIVE, KRAKEN_C, ISL_C, ISL_ARRIVE, turtles, seaVents, seaFloor, islandGround, startRace, RACE, holiday, HOLI, dqEnsure, DQ_POOL, DOCK_SAIL, RACE_POS, QBOARD_POS, FEST_POS, wreckWorld, roc, SK_C, SK_ARRIVE, ROC_NEST, skyGround, skyGusts, skyDrafts, DIG_SITES, RELICS, givePiece, assembleMap, openTreasure, petXP, petStage, applySeason, seasonIdx, SEASONS, CROPS, MUSEUM, killRoc, shadow, RUNES, rails, cartStops, PHOTO, RAIN, enterPhoto, exitPhoto, newLetter, CV_ARRIVE, ALTAR, CAVERNS, aicore, WAVES, doJump, startWaves, endWaves, comp, makeCompanion, ST_ARRIVE, CORE_C, AR_C, lasers, stBelts, deckGroup, queen, RUSH, B, FISHING, crewBots, jumpers, startRush, fishReel, makeCrew, JUN_ARRIVE, QARENA, JCAMP, serp, dragon, EV, ERU, stones, openModal, closeModal, modalAction, arcDrop, spawnEnemy, EMB_ARRIVE, LAVA_LAKE, SHIP_SPOTS, ECAMP, EP_ICE_T, S, P, W, player, nodes, pads, enemies, buildings, boss, pet, update, teleport, claimChest, initBoss, refreshBuilding, makePet, renderRes, renderTools, ICE_ARRIVE, ARENA, CAMP };
+window.__game = { cdragon, killCDragon, CW_C, CW_ARRIVE, CDRAGON_C, CW_VENTS, CW_HAND, cwFloor, cwHandAngle, PK_C, pkPos, PARK, GAL, TOURNEY, VILLAGERS, villMeshes, makeMyBot, myBot, FAIR, COTTAGES, BOTSHOP_POS, MARKET, kraken, killKraken, SEA_C, SEA_ARRIVE, KRAKEN_C, ISL_C, ISL_ARRIVE, turtles, seaVents, seaFloor, islandGround, startRace, RACE, holiday, HOLI, dqEnsure, DQ_POOL, DOCK_SAIL, RACE_POS, QBOARD_POS, FEST_POS, wreckWorld, roc, SK_C, SK_ARRIVE, ROC_NEST, skyGround, skyGusts, skyDrafts, DIG_SITES, RELICS, givePiece, assembleMap, openTreasure, petXP, petStage, applySeason, seasonIdx, SEASONS, CROPS, MUSEUM, killRoc, shadow, RUNES, rails, cartStops, PHOTO, RAIN, enterPhoto, exitPhoto, newLetter, CV_ARRIVE, ALTAR, CAVERNS, aicore, WAVES, doJump, startWaves, endWaves, comp, makeCompanion, ST_ARRIVE, CORE_C, AR_C, lasers, stBelts, deckGroup, queen, RUSH, B, FISHING, crewBots, jumpers, startRush, fishReel, makeCrew, JUN_ARRIVE, QARENA, JCAMP, serp, dragon, EV, ERU, stones, openModal, closeModal, modalAction, arcDrop, spawnEnemy, EMB_ARRIVE, LAVA_LAKE, SHIP_SPOTS, ECAMP, EP_ICE_T, S, P, W, player, nodes, pads, enemies, buildings, boss, pet, update, teleport, claimChest, initBoss, refreshBuilding, makePet, renderRes, renderTools, ICE_ARRIVE, ARENA, CAMP };
 frame();
 </script>
 </body>
