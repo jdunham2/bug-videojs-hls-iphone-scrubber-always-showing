@@ -96,6 +96,13 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Catching little birds**: sparrows scatter if you walk or run up to them, but sneak (hold C, or push the
   stick gently) and you can creep right up and pounce (E). Robins, pigeons and blackbirds can be caught
   the same way. The bird sits in your paws for a moment, then flutters off unharmed.
+- **Bandit, the rival raccoon**: a scruffy brown raccoon in a red bandana with a den (a tipped-over dustbin)
+  at the other end of the road. All day he sneaks about stealing loose things and hauling them back to his
+  den. Chitter at him and he drops whatever he's carrying, press E right next to him to snatch it out of his
+  paws, or raid his den to take things back. Every minute or so a golden acorn turns up (look for the glinting
+  beam, or the gold dot on the minimap) and it's a race: whoever gets it back to their own hideout first wins
+  (+2 shinies for you). If you're carrying it he chases you and can snatch it, so run, hide, or chitter to make
+  him let go. Race results are on the end-of-day card.
 - **Pond and river life** (any village with open water, not in winter): a kingfisher that perches on the
   bank and dives for fish (sneak close to watch it), a beaver who hauls sticks to build up its dam (steal
   one and it slaps its tail at you), newts by the water's edge to sneak up on and catch, and a shy water
@@ -248,7 +255,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 314 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 318 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -345,6 +352,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   pond life, zoo escape, storms and breezes: `spawnPondLife()`, `spawnZoo()` / `returnZooAnimal()`, `updatePondZoo()`
   / `pzScare()` / `drawPondZoo()`, `updateStormsBreeze()` (ice skids, flooded roads, kites, blowing washing),
   `drawCloudburst()`, `drawKite()`, `blowDandelion()`, `placeBreezyItems()`;
+  Bandit the rival raccoon: `buildRivalDen()` (called from `buildMap()`), `placeRivalDen()`, `spawnRival()`,
+  `updateRival()` (hauling, fleeing, racing), `startRace()` / `endRace()`, `rivalScare()`, `rivalSnatch()`,
+  `rivalPickUp()`, `drawRival()`, `drawRaceMarker()`, `drawRivalMini()`;
   ski, vineyard, pleasure pier and lantern festival: `buildSkiEarly()` / `placeSki()` / `drawPiste()`,
   `buildVineyardEarly()` / `placeVineyard()`, `buildFunPier()`, `placeLanterns()` / `spawnDragon()`, `placeFestItems()`,
   `festAction()` / `festNear()` / `updateFestRide()` (ski lift, ski run, tractor, claw, penny falls, deckchairs),

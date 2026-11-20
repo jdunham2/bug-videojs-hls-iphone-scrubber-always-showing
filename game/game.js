@@ -176,6 +176,7 @@
     reserve(Math.floor(hx) - 3, roadY - 5, 7, 5);
     markSolid(Math.floor(hx) - 1, roadY - 3, 3, 1);
     HIDEOUT = { x: hx * TILE, y: (roadY - 1.2) * TILE, rx: 50, ry: 28 };
+    buildRivalDen(reserve, markSolid); // Bandit's den at the other end of the road
 
     // Roads + plaza
     for (let x = 2; x < MW - 2; x++) for (let y = roadY; y <= roadY + 1; y++) setT(x, y, PATH);
@@ -2447,6 +2448,7 @@
     if (it.beaverStick) { it.beaverStick = false; completeTask('beaver'); const bv = critters.find((c) => c.type === 'beaver'); if (bv) { bv.angry = 2.5; bv.bubble = { text: 'SLAP! SLAP!', t: 1 }; sfx('splat'); } }
     if (it.blownWash) { it.blownWash = false; completeTask('washingblown'); }
     festPickUp(it);
+    rivalPickUp(it);
     if (it.kind === 'coins') completeTask('smugglers');
     if (it.kind === 'medal') completeTask('medal');
     if (it.kind === 'stardust') { // make a wish...
@@ -3681,6 +3683,7 @@
     { id: 'punchjudy', tier: 'Easy', text: 'Heckle the Punch and Judy show', hint: 'chitter at it', req: ['pjshow'] },
     { id: 'skylantern', tier: 'Easy', text: 'Send up a sky lantern', hint: 'pick one up, then let go', req: ['ltable'] },
     { id: 'dumpling', tier: 'Easy', text: 'Swipe food from a festival stall', req: ['feststalls'] },
+    { id: 'rivaldrop', tier: 'Easy', text: 'Make Bandit drop his loot', hint: 'chitter at him, or snatch it (E)', req: ['rival'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3816,6 +3819,8 @@
     { id: 'deckchair', tier: 'Medium', text: 'Collapse a deckchair with someone in it', hint: 'barge into it, or fiddle with it (E)', req: ['chairs'] },
     { id: 'sausages', tier: 'Medium', text: 'Steal Mr Punch’s sausages', req: ['pjshow'] },
     { id: 'dragondance', tier: 'Medium', text: 'Join the dragon dance', hint: 'follow close behind its tail', req: ['lanternfest'] },
+    { id: 'beatrival', tier: 'Medium', text: 'Beat Bandit in a race for the golden acorn', hint: 'get it to your hideout first', req: ['rival'] },
+    { id: 'raidrival', tier: 'Medium', text: 'Pinch something back from Bandit’s den', req: ['rival'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3859,6 +3864,7 @@
     { id: 'mazeescape', tier: 'Hard', text: 'Shake off a chaser in the hedge maze', req: ['maze'] },
     { id: 'zoo', tier: 'Hard', text: 'Round up all four escaped zoo animals', goal: 4, hint: 'kangaroo: from behind!', req: ['zoovan'] },
     { id: 'lanterns3', tier: 'Hard', text: 'Send up 3 sky lanterns', goal: 3, req: ['ltable'] },
+    { id: 'rival3', tier: 'Hard', text: 'Win 3 golden acorn races against Bandit', goal: 3, req: ['rival'] },
     { id: 'hens', tier: 'Hard', text: 'Get every hen squawking at once' },
     { id: 'eggs3', tier: 'Hard', text: 'Find 3 painted eggs', goal: 3, req: ['spring'] },
     { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
@@ -4000,6 +4006,7 @@
       for (const [rq, ty] of [['geese', 'goose'], ['peacock', 'peacock'], ['donkey', 'donkey'], ['turkey', 'turkey'], ['magpie', 'magpie'], ['moths', 'moth']]) if (r === rq && !critters.some((c) => c.type === ty)) return false;
       if (r === 'wasps' && !L.waspNest) return false;
       if (r === 'school' && !L.school) return false;
+      if (r === 'rival' && !L.rivalDen) return false;
       if (r === 'skislope' && !L.ski) return false;
       if (r === 'chaletc' && !L.chalet) return false;
       if (r === 'vines' && !(L.vines && grapeSeason())) return false;
@@ -4175,6 +4182,7 @@
       ['Tasks done', `${run.done.size} / ${run.tasks.length}`],
       ['Shinies from tasks', `+${run.earned}`],
     ];
+    if (L && L.rival && (L.rival.won || L.rival.lost)) rows.push(['Golden acorn races', `You ${L.rival.won} – ${L.rival.lost} Bandit`]);
     if (win) rows.push(['Time left bonus', `+${timeBonus}`], [`Day ${run.day} bonus`, `+${dayBonus}`]);
     rows.push(['Shinies earned', `+${total} ✦`]);
     const kept = items.filter(inHideout).length + (L.buried || []).length;
@@ -4221,7 +4229,7 @@
     document.getElementById('rc-season').textContent = `${cap(L.season)}${L.weather !== 'clear' ? ', ' + WEATHER_LABEL[L.weather].toLowerCase() : ''} \u00b7 ${KIND_LABEL[L.harbour ? 'harbour' : L.clifftop ? 'clifftop' : L.funpier ? 'funpier' : L.kind]} village${L.event ? ' \u00b7 ' + EVENT_LABEL[L.event] + '!' : ''}${L.night ? ' \u00b7 Night raid!' : ''}`;
     const later = (L.weatherPlan || []).slice(1).find((s) => s.w !== L.weather);
     const forecast = later ? `Forecast: ${later.w === 'clear' ? 'clearing up' : WEATHER_LABEL[later.w].toLowerCase()} later.` : '';
-    document.getElementById('rc-tip').textContent = [L.eclipse && !L.night ? 'Stargazers say there’ll be a solar eclipse today!' : '', L.night ? 'Night raid! Most villagers are asleep in bed: walk, don’t run, near them. The night watchman’s lantern sees far.' : '', L.pest ? 'The pest controller is in town: he follows your trail and has set cage traps on the paths.' : '', EVENT_TIP[L.event], KIND_TIP[L.harbour ? 'harbour' : L.clifftop ? 'clifftop' : L.funpier ? 'funpier' : L.kind], WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season]].filter(Boolean).join(' ');
+    document.getElementById('rc-tip').textContent = [run.day === 1 && L.rivalDen ? 'Watch out for Bandit, a rival raccoon with a den at the other end of the road. When a golden acorn turns up, race him for it!' : '', L.eclipse && !L.night ? 'Stargazers say there’ll be a solar eclipse today!' : '', L.night ? 'Night raid! Most villagers are asleep in bed: walk, don’t run, near them. The night watchman’s lantern sees far.' : '', L.pest ? 'The pest controller is in town: he follows your trail and has set cage traps on the paths.' : '', EVENT_TIP[L.event], KIND_TIP[L.harbour ? 'harbour' : L.clifftop ? 'clifftop' : L.funpier ? 'funpier' : L.kind], WEATHER_TIP[L.weather], forecast, SEASON_TIP[L.season]].filter(Boolean).join(' ');
     const m = Math.floor(run.timeTotal / 60), s = run.timeTotal % 60;
     document.getElementById('rc-tasks').textContent = `${run.tasks.length} tasks`;
     document.getElementById('rc-time').textContent = `${m}:${String(s).padStart(2, '0')} until sunset`;
@@ -6054,6 +6062,7 @@
     spawnSkiers();
     spawnSunbathers();
     spawnDragon();
+    spawnRival();
   }
 
   // Something scary happened near (x, y): birds and frogs bolt (see also farmNightScare)
@@ -6066,6 +6075,7 @@
       if (FY_TYPES.has(c.type)) { skyScare(c, x, y, r); continue; }
       if (PZ_TYPES.has(c.type)) { pzScare(c, x, y, r); continue; }
       if (FS_TYPES.has(c.type)) { fsScare(c, x, y, r); continue; }
+      if (c.type === 'rival') { rivalScare(c, x, y, r); continue; }
       if (WD_TYPES.has(c.type)) { wildScare(c, x, y, r); continue; }
       if (SN_TYPES.has(c.type)) { snowScare(c, x, y, r); continue; }
       if (RN_TYPES.has(c.type)) { rainScare(c, x, y, r); continue; }
@@ -6119,6 +6129,7 @@
       if (c.type === 'kid') { updateKid(c, dt); continue; }
       if (PZ_TYPES.has(c.type)) { updatePondZoo(c, dt); continue; }
       if (FS_TYPES.has(c.type)) { updateFestCritter(c, dt); continue; }
+      if (c.type === 'rival') { updateRival(c, dt); continue; }
 
       if (c.type === 'duck') {
         c.panic = Math.max(0, c.panic - dt);
@@ -6273,6 +6284,7 @@
     if (c.type === 'kid') { drawKid(ctx, c); return; }
     if (PZ_TYPES.has(c.type)) { drawPondZoo(ctx, c, t); return; }
     if (FS_TYPES.has(c.type)) { drawFestCritter(ctx, c, t); return; }
+    if (c.type === 'rival') { drawRival(ctx, c, t); return; }
     if (c.type === 'frog' && c.gone > 0) return;
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -11345,7 +11357,7 @@
     buildHarbour();
     placeMarsh();
     placeSchool(); placeSprings(); buildClifftop(); placeSports();
-    placeSki(); placeVineyard(); buildFunPier(); placeLanterns();
+    placeSki(); placeVineyard(); buildFunPier(); placeLanterns(); placeRivalDen();
   }
 
   // ---------------------------------------------------------------------------
@@ -11914,6 +11926,7 @@
 
   // --- Rides: swing, slide, roundabout, zipline ----------------------------------------------------
   function playAction() {
+    if (rivalSnatch()) return true;
     if (festAction()) return true;
     if (!L || player.ride || (player.held && player.held.type.heavy)) return false;
     const near = (P, r) => P && Math.hypot(player.x - P.x, player.y - P.y) < r;
@@ -11925,6 +11938,7 @@
     return false;
   }
   const playNear = () => {
+    { const rn = rivalNear(); if (rn) return rn; }
     { const fn = festNear(); if (fn) return fn; }
     if (!L || player.ride) return null;
     const near = (P, r) => P && Math.hypot(player.x - P.x, player.y - P.y) < r;
@@ -12760,6 +12774,244 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Bandit, the rival raccoon. He has a den at the far end of the road and spends
+  // the day hauling loose things back to it. Every so often a golden acorn turns
+  // up and it's a race: whoever gets it back to their own hideout first wins.
+  // Chitter at him to make him drop what he's carrying, snatch it (E), or raid
+  // his den.
+  // ---------------------------------------------------------------------------
+  ITEM.goldacorn = { name: 'golden acorn', h: 10, r: 4, draw(c, it, t) {
+    c.fillStyle = '#a0703f'; roundRect(c, -4.4, -11, 8.8, 4.4, 2, true); c.fillStyle = '#7a5230'; c.fillRect(-0.6, -13.5, 1.2, 3);
+    c.fillStyle = '#f2c14e'; ellipse(c, 0, -5, 3.8, 4.6); c.fillStyle = '#fff3a8'; ellipse(c, -1.2, -6.4, 1.2, 1.8);
+    const tt = t || 0; if (Math.sin(tt * 5 + (it ? it.ph0 : 0)) > 0.7) { c.fillStyle = '#ffffff'; circle(c, 2.6, -8, 1); }
+  } };
+  const RIVAL_FUR = { FUR: '#7a5a4a', FUR_DARK: '#4a3428', FUR_LIGHT: '#b89a86', RING: '#33241c' };
+  const rivalLines = { steal: ['Mine now!', 'Finders keepers!', 'Ooh, shiny!', 'Heh heh heh.'], home: ['Another one for the pile!', 'Ha! Beat you to it!'], race: ['Last one there’s a rotten egg!', 'That acorn’s MINE!', 'Race you!'], drop: ['Eek! Fine, have it!', 'Hey! Rude!', 'Okay, okay!'], snatch: ['Gimme that!', 'Mine!', 'Too slow!'], lose: ['Grr! Next time!', 'No fair!', 'Hmph!'], win: ['Ha! Bandit wins!', 'Too slow, stripy!', 'Better luck next time!'] };
+
+  function buildRivalDen(reserve2, markSolid) { // called from buildMap, right after the hideout
+    const rx = L.hideSide === 'W' ? MW - 4.8 : 4.8;
+    reserve2(Math.floor(rx) - 3, L.roadY - 5, 7, 5);
+    markSolid(Math.floor(rx) - 1, L.roadY - 3, 2, 1);
+    L.rivalDen = { x: rx * TILE, y: (L.roadY - 1.2) * TILE, rx: 44, ry: 24 };
+  }
+  const inRivalDen = (x, y) => { const D = L && L.rivalDen; if (!D) return false; const dx = (x - D.x) / D.rx, dy = (y - D.y) / D.ry; return dx * dx + dy * dy <= 1; };
+  function makeRivalDen(D) {
+    const x = D.x, y = D.y - 30;
+    return { kind: 'rivalden', x, y, hitbox: box(x - 22, y - 10, 34, 11), bounds: { l: x - 50, r: x + 50, t: y - 60, b: D.y + D.ry }, draw(ctx, t) {
+      // a tipped-over dustbin with a pile of junk and a little flag
+      ctx.fillStyle = 'rgba(70,50,30,0.35)'; ellipse(ctx, D.x, D.y, D.rx, D.ry);
+      ctx.fillStyle = '#5a6068'; ctx.save(); ctx.translate(x - 4, y - 8); ctx.rotate(-0.12); roundRect(ctx, -20, -12, 36, 20, 4, true); ctx.fillStyle = '#1a1612'; ellipse(ctx, 16, -2, 4, 10); ctx.fillStyle = '#6c737c'; for (let k = 0; k < 4; k++) ctx.fillRect(-16 + k * 8, -12, 2, 20); ctx.restore();
+      ctx.fillStyle = '#4a5058'; ellipse(ctx, x - 30, y + 2, 10, 4); // the lid
+      ctx.fillStyle = '#7a5230'; ctx.fillRect(x + 18, y - 40, 2, 40);
+      const wave = Math.sin(t * 4) * 2;
+      ctx.fillStyle = '#2b2d33'; poly(ctx, [[x + 20, y - 40], [x + 38, y - 36 + wave], [x + 20, y - 30]]); ctx.fill();
+      ctx.fillStyle = '#f4f2ee'; circle(ctx, x + 27, y - 35.5 + wave * 0.5, 2); ctx.fillRect(x + 25.5, y - 34 + wave * 0.5, 3, 1.5);
+      ctx.fillStyle = '#f4e3b8'; roundRect(ctx, x - 30, y - 34, 42, 10, 2, true); ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('BANDIT’S', x - 9, y - 27);
+    } };
+  }
+  function placeRivalDen() { if (L.rivalDen) objects.push(makeRivalDen(L.rivalDen)); }
+  function spawnRival() {
+    if (!L.rivalDen) return;
+    const D = L.rivalDen;
+    L.rival = { won: 0, lost: 0, haul: 0, race: null, raceT: rr(30, 45), toldHaul: false };
+    critters.push({ type: 'rival', carrier: true, x: D.x + 10, y: D.y + 8, z: 9, dir: 'left', ddir: 'down', walk: 0, ph: rand() * 6, speed: 0, hop: 0, hopV: 0, state: 'idle', wait: rr(4, 8), carry: null, flee: 0, path: null, pi: 0, goal: null, repath: 0, snatchCD: 0, lostT: 0 });
+  }
+  const rivalCritter = () => critters.find((c) => c.type === 'rival');
+
+  // --- moving along a path -------------------------------------------------------------------------
+  function rivalStep(c, tx, ty, sp, dt) {
+    const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy);
+    if (d < 1) return true;
+    const st = Math.min(d, sp * dt);
+    c.x += dx / d * st; c.y += dy / d * st; c.speed = sp; c.walk += dt * sp * 0.12;
+    if (Math.abs(dx) > 0.5) c.dir = dx > 0 ? 'right' : 'left';
+    c.ddir = Math.abs(dx) > Math.abs(dy) ? c.dir : dy > 0 ? 'down' : 'up';
+    return st >= d;
+  }
+  function rivalGo(c, gx, gy, sp, dt, every = 1.5) {
+    c.repath -= dt;
+    if (!c.path || c.repath <= 0 || !c.goal || Math.hypot(c.goal.x - gx, c.goal.y - gy) > 28) {
+      c.path = findPath(c.x, c.y, gx, gy) || [{ x: gx, y: gy }]; c.pi = 0; c.goal = { x: gx, y: gy }; c.repath = every;
+    }
+    const w = c.path[c.pi];
+    if (!w) return Math.hypot(gx - c.x, gy - c.y) < 12 || rivalStep(c, gx, gy, sp, dt);
+    if (rivalStep(c, w.x, w.y, sp, dt)) c.pi++;
+    return c.pi >= c.path.length && Math.hypot(gx - c.x, gy - c.y) < 12;
+  }
+  function rivalGrab(c, it) {
+    Object.assign(it, { held: true, heldBy: c, air: false, floating: false, planted: false, ghost: false, vx: 0, vy: 0, vz: 0 });
+    c.carry = it; c.path = null; c.hopV = 90; c.hop = 0.01;
+  }
+  function rivalRelease(c, pop) {
+    const it = c.carry;
+    if (!it) return null;
+    c.carry = null;
+    Object.assign(it, { held: false, heldBy: null, x: c.x + (c.dir === 'right' ? 10 : -10), y: c.y + 2, z: 10, air: true, vz: pop ? 90 : 0, vx: pop ? rr(-30, 30) : 0, vy: pop ? rr(-10, 20) : 0, spin: pop ? rr(-6, 6) : 0, ghost: false });
+    return it;
+  }
+  function rivalFlee(c, text) {
+    c.flee = 2.4; c.fa = Math.atan2(c.y - player.y, c.x - player.x); c.path = null; c.state = 'idle'; c.wait = rr(3, 5);
+    c.bubble = { text, t: 1.2 }; c.hopV = 120; c.hop = 0.01; sfx('squeak');
+  }
+  function rivalTargets(c) {
+    const out = [];
+    for (const it of items) {
+      if (it.held || it.air || it.planted || it.floating || it.rising || it.type.heavy || it.z > 20 || it.kind === 'goldacorn') continue;
+      if (it.y > WORLD_H || areaOf(it.x, it.y) !== 0 || inHideout(it) || inRivalDen(it.x, it.y) || tileAt(it.x, it.y) === WATER) continue;
+      if (Math.hypot(it.x - player.x, it.y - player.y) < 70) continue; // not right under the player's nose
+      out.push({ it, d: Math.hypot(it.x - c.x, it.y - c.y) });
+    }
+    out.sort((a, b) => a.d - b.d);
+    return out.slice(0, 6).map((o) => o.it);
+  }
+
+  // --- the golden acorn race --------------------------------------------------------------------
+  function startRace(c) {
+    const R = L.rival, D = L.rivalDen;
+    let spot = null;
+    for (let n = 0; n < 120 && !spot; n++) {
+      const x = rr(6, MW - 6) * TILE, y = rr(6, MH - 6) * TILE;
+      if (navBlockedPt(x, y) || areaOf(x, y) !== 0 || isWaterish(x, y) || inHideoutPt(x, y) || inRivalDen(x, y)) continue;
+      const dp = Math.hypot(x - HIDEOUT.x, y - HIDEOUT.y), dr = Math.hypot(x - D.x, y - D.y);
+      if (Math.abs(dp - dr) > Math.max(dp, dr) * 0.3 || Math.hypot(x - player.x, y - player.y) < 260 || Math.hypot(x - c.x, y - c.y) < 220) continue;
+      if (!findPath(player.x, player.y, x, y) || !findPath(c.x, c.y, x, y)) continue;
+      spot = { x, y };
+    }
+    if (!spot) { const P = L.plaza; spot = { x: (P.x + P.w / 2) * TILE, y: (P.y + P.h / 2) * TILE }; }
+    if (c.carry) rivalRelease(c, false);
+    const it = addItem('goldacorn', spot.x, spot.y); it.raceAcorn = true;
+    R.race = { it, t: 75 };
+    c.state = 'race'; c.path = null; c.bubble = { text: rpick(rivalLines.race), t: 1.6 };
+    sfx('fanfare');
+    toast('Bandit’s spotted a golden acorn! Get it back to your hideout before he gets it to his den.', 'Race!', true);
+  }
+  function endRace(playerWon) {
+    const R = L.rival, c = rivalCritter();
+    if (!R.race) return;
+    const it = R.race.it; it.raceAcorn = false; R.race = null; R.raceT = rr(55, 80);
+    if (c) { c.state = 'idle'; c.wait = rr(4, 7); c.path = null; }
+    if (playerWon) {
+      R.won++; run.earned += 2; updateRunBar(); sfx('fanfare');
+      toast(`+2 ✦ · You ${R.won} – ${R.lost} Bandit`, 'You won the race!', true);
+      if (c) c.bubble = { text: rpick(rivalLines.lose), t: 1.6 };
+      completeTask('beatrival'); setProgress('rival3', R.won);
+    } else {
+      R.lost++; sfx('hmph'); it.rivalLoot = true;
+      toast(`You ${R.won} – ${R.lost} Bandit. Raid his den to get it back!`, 'Bandit won the race', true);
+      if (c) c.bubble = { text: rpick(rivalLines.win), t: 1.6 };
+    }
+  }
+
+  // --- per frame ------------------------------------------------------------------------------------
+  function updateRival(c, dt) {
+    const R = L.rival, D = L.rivalDen, outside = areaOf(player.x, player.y) === 0, pd = Math.hypot(player.x - c.x, player.y - c.y);
+    c.speed = 0; c.snatchCD = Math.max(0, c.snatchCD - dt);
+    if (c.hop > 0 || c.hopV) { c.hopV -= 500 * dt; c.hop = Math.max(0, c.hop + c.hopV * dt); if (c.hop <= 0) { c.hop = 0; c.hopV = 0; } }
+    if (started && !paused && !R.race) { R.raceT -= dt; if (R.raceT <= 0 && c.flee <= 0) startRace(c); }
+    if (c.flee > 0) {
+      c.flee -= dt;
+      for (let k = 0; k < 6; k++) { const nx = c.x + Math.cos(c.fa) * 30, ny = c.y + Math.sin(c.fa) * 30; if (!navBlockedPt(nx, ny) && nx > 40 && nx < WORLD_W - 40 && ny > 40 && ny < WORLD_H - 40) break; c.fa += 0.9; }
+      rivalStep(c, c.x + Math.cos(c.fa) * 30, c.y + Math.sin(c.fa) * 30, 120, dt);
+      return;
+    }
+    // the race
+    if (R.race) {
+      const A = R.race.it;
+      R.race.t -= dt;
+      if (inHideout(A)) { endRace(true); return; }
+      if (A.heldBy === c && inRivalDen(c.x, c.y)) { rivalRelease(c, false); A.x = D.x + rr(-20, 20); A.y = D.y + rr(-8, 8); A.air = false; A.z = 0; endRace(false); return; }
+      if (R.race.t <= 0 && !A.held) { const i = items.indexOf(A); if (i >= 0) items.splice(i, 1); R.race = null; R.raceT = rr(50, 70); c.state = 'idle'; toast('The golden acorn rolled away down a drain.', 'Race off', true); return; }
+      if (A.heldBy === c) { rivalGo(c, D.x, D.y, 108, dt); return; }
+      if (player.held === A) {
+        if (!outside || player.hidden) { c.lostT += dt; if (c.lostT > 0.5 && !c.bubble) c.bubble = { text: 'Where’d he go?!', t: 1.2 }; return; }
+        c.lostT = 0;
+        rivalGo(c, player.x, player.y, 126, dt, 0.4);
+        if (pd < 16 && c.snatchCD <= 0 && !player.ride) {
+          dropHeld(false); rivalGrab(c, A); c.snatchCD = 2.5; knockPlayer(c.x, c.y, 120);
+          c.bubble = { text: rpick(rivalLines.snatch), t: 1.2 }; sfx('snatch');
+        }
+        return;
+      }
+      if (!A.held) {
+        if (rivalGo(c, A.x, A.y, 120, dt) || Math.hypot(A.x - c.x, A.y - c.y) < 10) { if (!A.air) { rivalGrab(c, A); c.bubble = { text: 'Got it!', t: 1 }; } }
+        return;
+      }
+      return; // someone else has it (a villager, the dog): wait it out
+    }
+    // ordinary days: haul loot home
+    if (c.carry) {
+      if (c.carry.heldBy !== c) { c.carry = null; c.state = 'idle'; return; }
+      if (rivalGo(c, D.x + rr(-4, 4), D.y, 92, dt)) {
+        const it = rivalRelease(c, false); it.x = D.x + rr(-26, 26); it.y = D.y + rr(-10, 10); it.air = false; it.z = 0; it.rivalLoot = true;
+        R.haul++; c.state = 'idle'; c.wait = rr(6, 12); c.bubble = { text: rpick(rivalLines.home), t: 1.4 };
+        if (!R.toldHaul && Math.hypot(player.x - D.x, player.y - D.y) < 500) { R.toldHaul = true; toast('Bandit is stashing loot in his den. Pinch it back!', 'Rival raccoon', true); }
+      }
+      return;
+    }
+    if (c.state === 'fetch') {
+      const it = c.target;
+      if (!it || it.held || it.air || inHideout(it) || items.indexOf(it) < 0) { c.state = 'idle'; c.wait = rr(1, 3); return; }
+      if (rivalGo(c, it.x, it.y, 92, dt) || Math.hypot(it.x - c.x, it.y - c.y) < 10) { rivalGrab(c, it); c.bubble = { text: rpick(rivalLines.steal), t: 1.2 }; sfx('snatch'); }
+      return;
+    }
+    c.wait -= dt;
+    if (c.wait <= 0) {
+      const ts = rivalTargets(c);
+      if (ts.length) { c.target = pick(ts); c.state = 'fetch'; c.path = null; }
+      else c.wait = rr(3, 6);
+    }
+    if (Math.random() < dt * 0.04 && pd < 220) c.bubble = { text: rpick(['Heh heh.', 'What’s that, stripy?', '*sniff sniff*']), t: 1 };
+  }
+  function rivalScare(c, x, y, r) {
+    if (r > 2000 || Math.hypot(c.x - x, c.y - y) > r || c.flee > 0) return;
+    if (c.carry) { rivalRelease(c, true); completeTask('rivaldrop'); }
+    rivalFlee(c, rpick(rivalLines.drop));
+  }
+  // E right by him: take what he's carrying
+  function rivalSnatch() {
+    if (!L || player.held || player.ride || areaOf(player.x, player.y) !== 0) return false;
+    const c = rivalCritter();
+    if (!c || !c.carry || Math.hypot(player.x - c.x, player.y - c.y) > 28) return false;
+    const it = c.carry; c.carry = null; it.held = false; it.heldBy = null;
+    pickUp(it); rivalFlee(c, rpick(['HEY! That was mine!', 'Thief!', 'Give it back!']));
+    player.bubble = { text: 'gotcha!', t: 1 }; completeTask('rivaldrop');
+    return true;
+  }
+  const rivalNear = () => { const c = rivalCritter(); return c && c.carry && !player.held && Math.hypot(player.x - c.x, player.y - c.y) < 28 ? 'snatch it from Bandit' : null; };
+  function rivalPickUp(it) {
+    if (it.rivalLoot) { it.rivalLoot = false; if (L.rival) L.rival.haul = Math.max(0, L.rival.haul - 1); completeTask('raidrival'); const c = rivalCritter(); if (c && Math.hypot(c.x - player.x, c.y - player.y) < 300) c.bubble = { text: 'Oi! Out of my den!', t: 1.4 }; }
+  }
+  function drawRival(ctx, c, t) {
+    const save = { FUR, FUR_DARK, FUR_LIGHT, RING };
+    ({ FUR, FUR_DARK, FUR_LIGHT, RING } = RIVAL_FUR);
+    const p = { x: c.x, y: c.y, speed: c.speed, walk: c.walk, hop: c.hop, dir: c.ddir || c.dir, tummy: 0, eating: null, flour: 0, mud: 0 };
+    drawRaccoon(ctx, p, t);
+    ({ FUR, FUR_DARK, FUR_LIGHT, RING } = save);
+    // his red bandana
+    const side = p.dir === 'left' || p.dir === 'right', sx = p.dir === 'left' ? -1 : 1;
+    ctx.fillStyle = '#d23a2c';
+    if (side) { ellipse(ctx, c.x + sx * 7, c.y - 13 - c.hop, 3.6, 4.4); poly(ctx, [[c.x + sx * 4, c.y - 15 - c.hop], [c.x - sx * 2, c.y - 13 - c.hop + Math.sin(t * 8) * 1.5], [c.x + sx * 4, c.y - 11 - c.hop]]); ctx.fill(); }
+    else { ellipse(ctx, c.x, c.y - 12 - c.hop, 7, 2.4); if (p.dir === 'up') { poly(ctx, [[c.x - 2, c.y - 12 - c.hop], [c.x + 2, c.y - 12 - c.hop], [c.x + Math.sin(t * 8) * 2, c.y - 6 - c.hop]]); ctx.fill(); } }
+  }
+  function drawRaceMarker(ctx, t) { // a glinting beam over the golden acorn so you can find it
+    const R = L && L.rival;
+    if (!R || !R.race || R.race.it.held) return;
+    const A = R.race.it, a = 0.25 + Math.sin(t * 5) * 0.12;
+    const g = ctx.createLinearGradient(0, A.y - 120, 0, A.y); g.addColorStop(0, 'rgba(255,220,100,0)'); g.addColorStop(1, `rgba(255,220,100,${a})`);
+    ctx.fillStyle = g; ctx.fillRect(A.x - 6, A.y - 120, 12, 120);
+  }
+  function drawRivalMini(ctx, mx, my, mw, mh) {
+    const D = L && L.rivalDen;
+    if (!D) return;
+    const P = (x, y) => [mx + x / WORLD_W * mw, my + y / WORLD_H * mh];
+    let [x, y] = P(D.x, D.y);
+    ctx.fillStyle = '#7a5a4a'; ctx.strokeStyle = '#2b1a10'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d23a2c'; circle(ctx, x, y, 1.3);
+    const R = L.rival;
+    if (R && R.race) { [x, y] = P(R.race.it.x, R.race.it.y); ctx.fillStyle = '#f2c14e'; ctx.strokeStyle = '#5a3a20'; ctx.beginPath(); ctx.arc(x, y, 2.8 + Math.sin(time * 6) * 0.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -13087,7 +13339,7 @@
       o.draw(ctx, t, fade);
     }
 
-    if (!indoors) { drawSkyWorld(ctx, left, top, viewW, viewH, t); drawBolt(ctx, top); drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); drawLantern(ctx, t); drawKite(ctx, t); }
+    if (!indoors) { drawSkyWorld(ctx, left, top, viewW, viewH, t); drawBolt(ctx, top); drawWhirl(ctx, t); drawSpits(ctx); drawLasers(ctx, t); drawLantern(ctx, t); drawKite(ctx, t); drawRaceMarker(ctx, t); }
     if (player.roof) drawPlayerWithHeld(ctx, t);
     // Indoors: black out everything beyond this room's walls (other rooms share the strip)
     if (indoors) {
@@ -13196,6 +13448,7 @@
       ctx.fillStyle = '#ffb547'; ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 3.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#24170e'; circle(ctx, mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 1.4);
+      drawRivalMini(ctx, mx, my, mw, mh);
       for (const r of online.peers.values()) {
         const rp = outdoorPos(r.x, r.y);
         ctx.fillStyle = (r.by && online.colors[r.by]) || '#7fe3ff';
