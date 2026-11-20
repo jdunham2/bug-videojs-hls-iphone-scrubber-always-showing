@@ -96,6 +96,18 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Catching little birds**: sparrows scatter if you walk or run up to them, but sneak (hold C, or push the
   stick gently) and you can creep right up and pounce (E). Robins, pigeons and blackbirds can be caught
   the same way. The bird sits in your paws for a moment, then flutters off unharmed.
+- **Hot-air balloon**: tethered in a field. Climb in (E) and you float up over the village: steer with the
+  arrow keys, throw (F) to drop whatever you're holding on whoever's below (aim with the shadow), and press E
+  to head home. Villagers point and stare as you drift over them.
+- **Skittles on the green**: nine pins at the end of a lane with a ball beside it. Throw the ball (or kick it
+  by running into it) to knock them down; get all nine in one go for a strike. The pins reset after a bit.
+- **The village artist**: she's at her easel by the water, painting the view, and the picture fills in as the
+  day goes on. Stand in front of her for a moment to photobomb it (she'll notice), and once it's finished,
+  steal the masterpiece off the easel. If you photobombed it, you're in the painting.
+- **The busker**: strumming his guitar by the plaza with his hat out. Chitter three times near him to dance
+  for the crowd (tips!), or run off with his hat of coins, but he'll chase you to get it back.
+- **Bin day**: wheelie bins outside the houses. Rummage in one (E) for leftovers, or run into them to knock
+  them flying.
 - **Mischief combos**: make someone jump, smash something or finish a task, then do it again within five
   seconds to build a combo (shown above your head with a timer bar). Every x5 earns a bonus shiny.
 - **Cardboard boxes**: a couple of empty boxes sit outside houses. Wear one (G) and keep still and nobody can
@@ -268,7 +280,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   bushes and curl into a ball when startled, an owl on a tree hoots an alarm if it spots you, and fireflies
   drift about to be caught.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 326 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 336 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -365,6 +377,9 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   pond life, zoo escape, storms and breezes: `spawnPondLife()`, `spawnZoo()` / `returnZooAnimal()`, `updatePondZoo()`
   / `pzScare()` / `drawPondZoo()`, `updateStormsBreeze()` (ice skids, flooded roads, kites, blowing washing),
   `drawCloudburst()`, `drawKite()`, `blowDandelion()`, `placeBreezyItems()`;
+  balloon, skittles, artist, busker and bins: `placeFunStuff()` / `spawnFunFolk()` / `placeFunItems()`,
+  `funAction()` / `funNear()`, `updateBalloon()` / `balloonDrop()`, `funChitter()`, `funPickUp()`, `updateFunFolk()` /
+  `drawFunFolk()` / `drawFolk()` / `drawCanvasArt()`, `updateFunStuff()` (pins, bombs from the balloon, bins);
   combos, boxes, treasure, bubbles and the paper: `mischief()` / `drawCombo()`, `drawBox()` / `updateBox()` /
   `boxStill()`, `placeTreasure()` / `readMap()` / `digTreasure()`, `placeExtras()` / `extraAction()` (bubble machine,
   poster), `watchingBubbles()`, `recordNews()` / `renderNews()`, `wantedLevel()`, `updateExtras()`;

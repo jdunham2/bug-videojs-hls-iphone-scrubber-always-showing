@@ -1552,6 +1552,7 @@
     fairyCheck();
     tugCheck();
     festChitter();
+    funChitter();
     puddleJump();
     if (duskK >= 0.4 && critters.some((c) => c.type === 'bat' && Math.hypot(c.x - player.x, c.y - player.y) < 180)) { for (const c of critters) if (c.type === 'bat') c.scatter = 3; sfx('squeak'); completeTask('bats'); }
     caveEcho();
@@ -2400,6 +2401,7 @@
     if (player.inWardrobe) { exitWardrobe(); return; }
     if (boatAction()) return;
     if (sledAction()) return;
+    if (funAction()) return; // balloon and bins come before climbing trees and roofs
     if (treeAction()) return;
     if (roofAction()) return;
     if (leverAction()) return;
@@ -2451,6 +2453,7 @@
     festPickUp(it);
     rivalPickUp(it);
     extraPickUp(it);
+    funPickUp(it);
     if (it.kind === 'coins') completeTask('smugglers');
     if (it.kind === 'medal') completeTask('medal');
     if (it.kind === 'stardust') { // make a wish...
@@ -2515,6 +2518,7 @@
   }
 
   function throwHeld() {
+    if (balloonDrop()) return;
     if (player.tree) { dropFromTree(); return; }
     if (player.roof) { dropFromRoof(); return; }
     const it = player.held;
@@ -3692,6 +3696,12 @@
     { id: 'combo3', tier: 'Easy', text: 'Pull off a x3 mischief combo', hint: 'frights, smashes and tasks in quick succession' },
     { id: 'bubbles', tier: 'Easy', text: 'Pop 10 bubbles', goal: 10, hint: 'switch on the bubble machine (E)', req: ['bubbler'] },
     { id: 'wanted', tier: 'Easy', text: 'Tear down your wanted poster', req: ['poster'] },
+    { id: 'balloon', tier: 'Easy', text: 'Take a ride in the hot-air balloon', req: ['balloon'] },
+    { id: 'skittles', tier: 'Easy', text: 'Knock down a skittle', req: ['skittlelane'] },
+    { id: 'photobomb', tier: 'Easy', text: 'Photobomb the artist’s painting', hint: 'stand in front of her easel', req: ['artist'] },
+    { id: 'dance', tier: 'Easy', text: 'Dance to the busker’s music', hint: 'chitter three times near him', req: ['busker'] },
+    { id: 'binraid', tier: 'Easy', text: 'Rummage in a wheelie bin', req: ['bins'] },
+    { id: 'bintip', tier: 'Easy', text: 'Knock over 3 wheelie bins', goal: 3, hint: 'run into them', req: ['bins'] },
     { id: 'quack', tier: 'Easy', text: 'Make a duck quack', req: ['ducks'] },
     { id: 'birds', tier: 'Easy', text: 'Scatter a flock of sparrows', req: ['sparrows'] },
     { id: 'squirrel', tier: 'Easy', text: 'Chase a squirrel up a tree' },
@@ -3832,6 +3842,10 @@
     { id: 'combo5', tier: 'Medium', text: 'Pull off a x5 mischief combo', hint: 'keep the chaos coming' },
     { id: 'treasure', tier: 'Medium', text: 'Dig up the treasure from the map', hint: 'find the map first, then dig (B) at the X', req: ['tmap'] },
     { id: 'bubblesneak', tier: 'Medium', text: 'Steal from someone while they watch the bubbles', req: ['bubbler'] },
+    { id: 'balloonbomb', tier: 'Medium', text: 'Drop something on someone from the balloon', hint: 'throw (F) while flying over them', req: ['balloon'] },
+    { id: 'strike', tier: 'Medium', text: 'Bowl a strike at skittles', hint: 'throw or kick the ball at the pins', req: ['skittlelane'] },
+    { id: 'stealpainting', tier: 'Medium', text: 'Steal the artist’s finished masterpiece', req: ['artist'] },
+    { id: 'buskhat', tier: 'Medium', text: 'Run off with the busker’s hat of coins', req: ['busker'] },
     { id: 'feedducks', tier: 'Medium', text: 'Feed the ducks', hint: 'drop some food near them', req: ['ducks'] },
     { id: 'frog', tier: 'Medium', text: 'Startle a frog into the water', req: ['frogs'] },
     { id: 'gullsnack', tier: 'Medium', text: 'Lose a snack to a seagull', req: ['seaside'] },
@@ -3926,7 +3940,7 @@
   const chitterRadius = () => 95 * (1 + 0.35 * lvl('chitter'));
 
   function setupRun(day) {
-    Object.assign(run, { day, combo: null, frights: 0, smashed: 0, bubblesPopped: 0, eaten: 0, tobyHits: 0, prints: 0, painted: 0, birdsCaught: 0, crows: 0, fireflies: 0, puddles: 0, eggs: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
+    Object.assign(run, { day, binsTipped: 0, combo: null, frights: 0, smashed: 0, bubblesPopped: 0, eaten: 0, tobyHits: 0, prints: 0, painted: 0, birdsCaught: 0, crows: 0, fireflies: 0, puddles: 0, eggs: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
     run.maxStrikes = 3 + lvl('fur');
     run.timeTotal = Math.min(600, 420 + 30 * (day - 1)) + 60 * lvl('day'); // the bigger village takes a little longer to ransack
     run.timeLeft = run.timeTotal;
@@ -4017,6 +4031,11 @@
       for (const [rq, ty] of [['geese', 'goose'], ['peacock', 'peacock'], ['donkey', 'donkey'], ['turkey', 'turkey'], ['magpie', 'magpie'], ['moths', 'moth']]) if (r === rq && !critters.some((c) => c.type === ty)) return false;
       if (r === 'wasps' && !L.waspNest) return false;
       if (r === 'school' && !L.school) return false;
+      if (r === 'balloon' && !L.balloon) return false;
+      if (r === 'skittlelane' && !L.skittles) return false;
+      if (r === 'artist' && !L.artist) return false;
+      if (r === 'busker' && !L.busker) return false;
+      if (r === 'bins' && !(L.bins && L.bins.length >= 3)) return false;
       if (r === 'cardbox' && !items.some((i) => i.kind === 'cardbox')) return false;
       if (r === 'tmap' && !L.treasure) return false;
       if (r === 'bubbler' && !L.bubbler) return false;
@@ -4545,6 +4564,7 @@
     if (player.inWardrobe) return false;
     if (boxStill() && Math.hypot(v.x - player.x, v.y - player.y) > 18) return false; // just a box
     if (watchingBubbles(v)) return false; // ooh, bubbles
+    if (player.ride && player.ride.kind === 'balloon' && player.rideZ > 30) return false; // up in the balloon
 
     if (!canSee(v, player.x, player.y - 6)) return false;
     return !player.hidden || Math.hypot(v.x - player.x, v.y - player.y) < 20;
@@ -6085,6 +6105,7 @@
     spawnSunbathers();
     spawnDragon();
     spawnRival();
+    spawnFunFolk();
   }
 
   // Something scary happened near (x, y): birds and frogs bolt (see also farmNightScare)
@@ -6098,6 +6119,7 @@
       if (PZ_TYPES.has(c.type)) { pzScare(c, x, y, r); continue; }
       if (FS_TYPES.has(c.type)) { fsScare(c, x, y, r); continue; }
       if (c.type === 'rival') { rivalScare(c, x, y, r); continue; }
+      if (FN2_TYPES.has(c.type)) continue;
       if (WD_TYPES.has(c.type)) { wildScare(c, x, y, r); continue; }
       if (SN_TYPES.has(c.type)) { snowScare(c, x, y, r); continue; }
       if (RN_TYPES.has(c.type)) { rainScare(c, x, y, r); continue; }
@@ -6152,6 +6174,7 @@
       if (PZ_TYPES.has(c.type)) { updatePondZoo(c, dt); continue; }
       if (FS_TYPES.has(c.type)) { updateFestCritter(c, dt); continue; }
       if (c.type === 'rival') { updateRival(c, dt); continue; }
+      if (FN2_TYPES.has(c.type)) { updateFunFolk(c, dt); continue; }
 
       if (c.type === 'duck') {
         c.panic = Math.max(0, c.panic - dt);
@@ -6307,6 +6330,7 @@
     if (PZ_TYPES.has(c.type)) { drawPondZoo(ctx, c, t); return; }
     if (FS_TYPES.has(c.type)) { drawFestCritter(ctx, c, t); return; }
     if (c.type === 'rival') { drawRival(ctx, c, t); return; }
+    if (FN2_TYPES.has(c.type)) { drawFunFolk(ctx, c, t); return; }
     if (c.type === 'frog' && c.gone > 0) return;
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -7867,6 +7891,7 @@
     placeBreezyItems();
     placeFestItems();
     placeExtraItems();
+    placeFunItems();
     if (L.rail) for (let k = 0; k < 3; k++) placeFree('suitcase', L.rail.station.x - 90 + k * 22, L.rail.station.y - 4, { owner: 'percy' });
     if (L.castleChest) addItem('chest', L.castleChest.x, L.castleChest.y);
     if (L.plinths) ['crown', 'gem', 'goldvase'].forEach((k, i) => { const p = L.plinths[i]; addItem(k, p.x, p.y - 2, { z: 18, owner: 'guard' }).museum = true; });
@@ -10469,6 +10494,7 @@
     player.vx = player.vy = 0; player.speed = 0;
     if (player.bubble) { player.bubble.t -= dt; if (player.bubble.t <= 0) player.bubble = null; }
     if (updatePlayRide(R, dt)) return;
+    if (R.kind === 'balloon') { updateBalloon(R, dt, input); return; }
     if (R.kind === 'cable') {
       const C = L.cable;
       R.t = clamp(R.t + R.dir * dt / 4, 0, 1);
@@ -11382,7 +11408,7 @@
     buildHarbour();
     placeMarsh();
     placeSchool(); placeSprings(); buildClifftop(); placeSports();
-    placeSki(); placeVineyard(); buildFunPier(); placeLanterns(); placeRivalDen(); placeExtras();
+    placeSki(); placeVineyard(); buildFunPier(); placeLanterns(); placeRivalDen(); placeExtras(); placeFunStuff();
   }
 
   // ---------------------------------------------------------------------------
@@ -11951,6 +11977,7 @@
 
   // --- Rides: swing, slide, roundabout, zipline ----------------------------------------------------
   function playAction() {
+    if (funAction()) return true;
     if (rivalSnatch()) return true;
     if (extraAction()) return true;
     if (festAction()) return true;
@@ -11964,6 +11991,7 @@
     return false;
   }
   const playNear = () => {
+    { const un = funNear(); if (un) return un; }
     { const rn = rivalNear(); if (rn) return rn; }
     { const en = extraNear(); if (en) return en; }
     { const fn = festNear(); if (fn) return fn; }
@@ -13292,6 +13320,344 @@
   }
 
   // ---------------------------------------------------------------------------
+  // A hot-air balloon to fly (and drop things from), skittles on the green, the
+  // village artist at her easel, a busker on the plaza, and wheelie bins out for
+  // bin day.
+  // ---------------------------------------------------------------------------
+  const FN2_TYPES = new Set(['artist', 'busker']);
+  Object.assign(ITEM, {
+    bowlball: { name: 'skittles ball', h: 9, r: 5, draw(c) { c.fillStyle = '#2b2d33'; circle(c, 0, -4.6, 4.6); c.fillStyle = '#4a4e58'; circle(c, -1.4, -6, 1.4); c.fillStyle = '#111'; circle(c, 1.2, -5.2, 0.6); circle(c, 2.4, -4, 0.6); circle(c, 0.8, -3.4, 0.6); } },
+    buskhat: { name: 'busker’s hat of coins', h: 7, r: 6, draw(c) { c.fillStyle = '#2b2d33'; ellipse(c, 0, -1, 7, 2.6); roundRect(c, -4.6, -6, 9.2, 5, 2, true); c.fillStyle = '#f2c14e'; for (const [x, y] of [[-2, -6], [0.5, -6.6], [2.6, -5.8], [-0.6, -7.2]]) circle(c, x, y, 1.3); } },
+    painting: { name: 'masterpiece', h: 14, r: 7, draw(c, it) { drawCanvasArt(c, 0, -8, 14, 11, 1, it && it.raccoon); c.strokeStyle = '#c9a33a'; c.lineWidth = 1.6; c.strokeRect(-7, -13.5, 14, 11); } },
+  });
+  // The picture on the artist's canvas: sky, water, a tree, and maybe a raccoon
+  function drawCanvasArt(c, cx, cy, w, h, p, raccoon) {
+    const x = cx - w / 2, y = cy - h / 2;
+    c.fillStyle = '#f8f4ec'; c.fillRect(x, y, w, h);
+    if (p > 0.1) { c.fillStyle = '#9fd3e8'; c.fillRect(x, y, w, h * 0.45 * Math.min(1, p / 0.3)); }
+    if (p > 0.3) { c.fillStyle = '#6fae4b'; c.fillRect(x, y + h * 0.45, w, h * 0.55 * Math.min(1, (p - 0.3) / 0.3)); }
+    if (p > 0.6) { c.fillStyle = '#4f93c7'; ellipse(c, cx + w * 0.12, y + h * 0.72, w * 0.28, h * 0.12); }
+    if (p > 0.8) { c.fillStyle = '#2f6b2a'; circle(c, x + w * 0.22, y + h * 0.4, w * 0.13); c.fillStyle = '#ffd166'; circle(c, x + w * 0.8, y + h * 0.18, w * 0.07); }
+    if (raccoon) { c.fillStyle = '#8b909a'; circle(c, cx - w * 0.05, y + h * 0.62, w * 0.12); c.fillStyle = '#2b2d33'; c.fillRect(cx - w * 0.15, y + h * 0.58, w * 0.2, h * 0.07); c.fillStyle = '#ffffff'; circle(c, cx - w * 0.1, y + h * 0.6, w * 0.025); circle(c, cx, y + h * 0.6, w * 0.025); }
+  }
+  // A simple person (the artist and the busker aren't villagers, so they get their own drawing)
+  function drawFolk(ctx, x, y, o, t) {
+    ctx.save(); ctx.translate(x, y); if (o.dir === 'left') ctx.scale(-1, 1);
+    const step = o.moving ? Math.sin(o.walk * 2) * 2 : 0;
+    ctx.fillStyle = 'rgba(20,30,10,0.22)'; ellipse(ctx, 0, 0, 7, 2.5);
+    ctx.fillStyle = o.pants; ctx.fillRect(-4 + step * 0.4, -10, 3.2, 10); ctx.fillRect(1 - step * 0.4, -10, 3.2, 10);
+    ctx.fillStyle = o.shirt; roundRect(ctx, -6, -23, 12, 14, 4, true);
+    ctx.fillStyle = o.skin; circle(ctx, 0, -28, 5.6);
+    ctx.fillStyle = '#1d1d22'; circle(ctx, 2.6, -28.4, 0.8);
+    if (o.hat === 'beret') { ctx.fillStyle = '#c0392b'; ellipse(ctx, -0.5, -33, 6.6, 2.6); circle(ctx, 1, -35.6, 1); }
+    if (o.hat === 'trilby') { ctx.fillStyle = '#3a3530'; ellipse(ctx, 0, -32.4, 7.6, 2); roundRect(ctx, -4.4, -38, 8.8, 6, 2, true); ctx.fillStyle = '#c0392b'; ctx.fillRect(-4.4, -33.6, 8.8, 1.4); }
+    ctx.restore();
+  }
+
+  // --- Placement -------------------------------------------------------------------------------------
+  function placeFunStuff() {
+    const T = TILE, P = L.plaza;
+    // the balloon, tethered in a field
+    L.balloon = null;
+    const quads = shuffled([L.pondQ, L.gardenQ, ...L.homeQs]);
+    for (const q of quads) { const r = fitRect(q, 4, 4, 40); if (r) { reserve(r.x, r.y, 4, 4); L.balloon = { x: (r.x + 2) * T, y: (r.y + 2.6) * T }; break; } }
+    if (L.balloon) objects.push(makeBalloon(L.balloon));
+    // skittles lane
+    L.skittles = null;
+    const s = freeSpotNear(P.x - 9, P.y + P.h + 3, 7, 2, 10) || randomFreeSpot(7, 2);
+    if (s) {
+      const px = (s[0] + 5.6) * T, py = (s[1] + 1) * T, pins = [];
+      for (const [col, n] of [[0, 1], [1, 2], [2, 3], [3, 2], [4, 1]]) for (let k = 0; k < n; k++) pins.push({ x: px + col * 8, y: py + (k - (n - 1) / 2) * 9, down: 0, fall: 0, a: 0 });
+      L.skittles = { x: px, y: py, sx: (s[0] + 0.8) * T, pins, firstT: 0, byItem: false, resetT: 0 };
+      objects.push(makeSkittles(L.skittles));
+    }
+  }
+  function spawnFunFolk() {
+    const T = TILE;
+    // the artist's easel, looking out over the water
+    L.artist = null;
+    if (L.pond) for (let n = 0; n < 24 && !L.artist; n++) {
+      const a = rand() * Math.PI * 2, sp = shorePoint(a), cx = L.pond.cx * T, cy = L.pond.cy * T, d = Math.hypot(sp.x - cx, sp.y - cy) || 1;
+      const x = sp.x + (sp.x - cx) / d * 90, y = sp.y + (sp.y - cy) / d * 60;
+      if (x < 3 * T || x > WORLD_W - 3 * T || y < 3 * T || y > WORLD_H - 3 * T || navBlockedPt(x, y) || navBlockedPt(x + 16, y) || areaOf(x, y) !== 0 || isWaterish(x, y) || inHideoutPt(x, y)) continue;
+      L.artist = { x, y, ex: x + (cx > x ? 14 : -14), ey: y - 1, look: Math.atan2(cy - y, cx - x), p: rr(0, 0.25), raccoon: false, done: false, bombT: 0 };
+    }
+    if (L.artist) objects.push(makeEasel(L.artist));
+    // wheelie bins outside the houses
+    L.bins = [];
+    for (const h of L.houses) {
+      const y = (h.y + h.h + 0.35) * T, dx = [2.5, -1.5, 3.5, -2.5].find((d) => { const x = (h.doorX + d) * T; return Math.abs(x - ((h.x + h.w) * T - 4)) > 36 && !navBlockedPt(x, y + 4) && !navBlockedPt(x, y - 2) && !isWaterish(x, y) && !objects.some((o) => o.hitbox && Math.abs(o.x - x) < 14 && Math.abs(o.y - y) < 10); });
+      if (dx === undefined) continue;
+      const x = (h.doorX + dx) * T;
+      const B = { x, y, tipped: false, raided: false, col: pick(['#3f7f3a', '#4a5058', '#3b6fb5']), owner: h.owner || null, ang: 0 };
+      L.bins.push(B); objects.push(makeBin(B));
+    }
+    const A = L.artist;
+    if (A) critters.push({ type: 'artist', x: A.x, y: A.y, z: 0, dir: Math.cos(A.look) > 0 ? 'right' : 'left', walk: 0, ph: 0, moving: false });
+    const P = L.plaza;
+    let bx = (P.x + 1.6) * T, by = (P.y + P.h - 1.4) * T;
+    if (navBlockedPt(bx, by)) { const f = freeSpotNear(P.x - 1, P.y + P.h - 2, 1, 1, 4); if (f) { bx = (f[0] + 0.5) * T; by = (f[1] + 0.6) * T; } else bx = null; }
+    L.busker = bx === null ? null : { x: bx, y: by, hat: { x: bx + 16, y: by + 6 }, claps: [], danced: false };
+    if (L.busker) critters.push({ type: 'busker', x: bx, y: by, z: 0, dir: 'right', walk: 0, ph: 0, chase: 0, moving: false });
+    if (L.busker) { const it = addItem('buskhat', L.busker.hat.x, L.busker.hat.y); it.buskHat = true; }
+  }
+  function placeFunItems() {
+    if (L.skittles) L.skittles.ball = addItem('bowlball', L.skittles.sx, L.skittles.y + 2);
+  }
+
+  // --- Objects ----------------------------------------------------------------------------------------
+  function makeBalloon(B) {
+    const riding = () => player.ride && player.ride.kind === 'balloon';
+    return { kind: 'balloon', get x() { return riding() ? player.x : B.x; }, get y() { return riding() ? player.y + 3 : B.y; },
+      get bounds() { const x = riding() ? player.x : B.x, y = riding() ? player.y : B.y; return { l: x - 50, r: x + 50, t: y - 230, b: y + 10 }; },
+      draw(ctx, t) {
+        const R = riding(), x = R ? player.x : B.x, y = R ? player.y : B.y, z = R ? player.rideZ : 0;
+        if (R) { ctx.fillStyle = 'rgba(20,30,10,0.18)'; ellipse(ctx, x, y, 22, 7); } // its shadow on the ground
+        else { ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.lineTo(x - 26, y + 6); ctx.moveTo(x + 12, y); ctx.lineTo(x + 26, y + 6); ctx.stroke(); ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 28, y + 4, 4, 4); ctx.fillRect(x + 24, y + 4, 4, 4); }
+        const by = y - z, sway = Math.sin(t * 1.3) * 2;
+        // envelope
+        const ey = by - 74 + sway * 0.5;
+        const cols = ['#e8453c', '#f2c14e', '#e8453c', '#f2c14e', '#e8453c', '#f2c14e'];
+        for (let k = 0; k < 6; k++) { ctx.fillStyle = cols[k]; ctx.beginPath(); ctx.moveTo(x - 10 + k * 4, by - 30); ctx.quadraticCurveTo(x - 40 + k * 16, ey + 4, x - 24 + k * 9.6, ey - 30); ctx.lineTo(x - 24 + (k + 1) * 9.6, ey - 30); ctx.quadraticCurveTo(x - 40 + (k + 1) * 16, ey + 4, x - 10 + (k + 1) * 4, by - 30); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle = 'rgba(255,255,255,0.18)'; ellipse(ctx, x - 12, ey - 14, 7, 14);
+        ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(x - 10, by - 30); ctx.lineTo(x - 11, by - 12); ctx.moveTo(x + 14, by - 30); ctx.lineTo(x + 11, by - 12); ctx.stroke();
+        if (R && Math.sin(t * 7) > 0.3) { ctx.fillStyle = 'rgba(255,170,60,0.85)'; poly(ctx, [[x - 2, by - 28], [x + 2, by - 28], [x, by - 38 - Math.random() * 4]]); ctx.fill(); } // the burner
+        // basket (in front of the raccoon's legs)
+        ctx.fillStyle = '#a0703f'; roundRect(ctx, x - 12, by - 12, 24, 14, 3, true); ctx.fillStyle = '#7a5230'; for (let k = 0; k < 4; k++) ctx.fillRect(x - 12, by - 10 + k * 3.4, 24, 1); ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 13, by - 13, 26, 2.4);
+      } };
+  }
+  function makeSkittles(S) {
+    return { kind: 'skittles', x: S.x, y: S.y + 30, bounds: { l: S.sx - 20, r: S.x + 50, t: S.y - 40, b: S.y + 34 }, draw(ctx) {
+      ctx.fillStyle = 'rgba(200,180,120,0.35)'; roundRect(ctx, S.sx - 14, S.y - 26, S.x - S.sx + 56, 52, 10, true);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(S.sx + 12, S.y - 24); ctx.lineTo(S.sx + 12, S.y + 24); ctx.stroke();
+      for (const p of [...S.pins].sort((a, b) => a.y - b.y)) {
+        ctx.save(); ctx.translate(p.x, p.y);
+        if (p.down) { ctx.rotate(p.a); ctx.fillStyle = '#f4f2ee'; roundRect(ctx, -1.8, -12 * Math.min(1, p.fall * 5) * 0 - 2, 12, 4, 2, true); ctx.fillStyle = '#e8453c'; ctx.fillRect(4, -2, 1.4, 4); }
+        else { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ellipse(ctx, 0, 0, 3, 1.2); ctx.fillStyle = '#f4f2ee'; ctx.beginPath(); ctx.moveTo(-2, 0); ctx.quadraticCurveTo(-3.4, -6, -1.4, -8); ctx.lineTo(1.4, -8); ctx.quadraticCurveTo(3.4, -6, 2, 0); ctx.fill(); circle(ctx, 0, -10, 1.8); ctx.fillStyle = '#e8453c'; ctx.fillRect(-1.6, -8.4, 3.2, 1.2); }
+        ctx.restore();
+      }
+      ctx.fillStyle = '#f4e3b8'; roundRect(ctx, S.sx - 12, S.y - 40, 40, 10, 2, true); ctx.fillStyle = '#5a3a20'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('SKITTLES', S.sx + 8, S.y - 33);
+    } };
+  }
+  function makeEasel(A) {
+    return { kind: 'easel', x: A.ex, y: A.ey + 2, bounds: { l: A.ex - 16, r: A.ex + 16, t: A.ey - 40, b: A.ey + 6 }, draw(ctx) {
+      const x = A.ex, y = A.ey;
+      ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x - 7, y); ctx.lineTo(x, y - 30); ctx.lineTo(x + 7, y); ctx.moveTo(x, y - 30); ctx.lineTo(x + 1, y + 1); ctx.stroke();
+      if (!A.taken) { drawCanvasArt(ctx, x, y - 22, 18, 14, A.p, A.raccoon); ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 1; ctx.strokeRect(x - 9, y - 29, 18, 14); }
+      ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 10, y - 15, 20, 1.6);
+    } };
+  }
+  function makeBin(B) {
+    return { kind: 'wheeliebin', x: B.x, y: B.y, bounds: { l: B.x - 18, r: B.x + 18, t: B.y - 30, b: B.y + 8 }, draw(ctx) {
+      ctx.save(); ctx.translate(B.x, B.y);
+      if (B.tipped) {
+        ctx.fillStyle = '#6a5a40'; for (const [dx, dy, r] of [[14, 2, 3], [19, -1, 2], [11, 5, 2.4], [22, 4, 1.8]]) circle(ctx, dx, dy, r);
+        ctx.fillStyle = '#e8e2d2'; ctx.fillRect(16, 3, 4, 2.4); ctx.fillStyle = '#c0392b'; ctx.fillRect(9, -2, 3, 2);
+        ctx.rotate(1.45);
+      }
+      ctx.fillStyle = 'rgba(20,30,10,0.2)'; ellipse(ctx, 0, 0, 8, 2.6);
+      ctx.fillStyle = '#1d1d22'; circle(ctx, -5, -1.5, 2); circle(ctx, 5, -1.5, 2);
+      ctx.fillStyle = B.col; poly(ctx, [[-7, -2], [7, -2], [8, -22], [-8, -22]]); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(-7, -10, 15, 1);
+      ctx.fillStyle = B.col; roundRect(ctx, -9, B.tipped ? -24 : -25, 18, 4, 1.5, true); ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(-8, -24.5, 16, 1);
+      ctx.restore();
+    } };
+  }
+
+  // --- Actions -------------------------------------------------------------------------------------------
+  function funAction() {
+    if (!L) return false;
+    const R = player.ride;
+    if (R && R.kind === 'balloon') { if (R.phase === 'fly' || R.phase === 'up') { R.phase = 'home'; player.bubble = { text: 'take us home!', t: 1.2 }; } return true; }
+    if (R || (player.held && player.held.type.heavy)) return false;
+    const B = L.balloon;
+    if (B && Math.hypot(player.x - B.x, player.y - (B.y + 8)) < 26) {
+      player.ride = { kind: 'balloon', t: 0, phase: 'up', x: B.x, y: B.y };
+      Object.assign(player, { x: B.x, y: B.y, vx: 0, vy: 0 }); sfx('whoosh');
+      toast('Steer with the arrow keys. Throw (F) to drop what you’re holding. E to head home.', 'Up, up and away!', true);
+      return true;
+    }
+    for (const b of L.bins || []) if (!b.tipped && !b.raided && !player.held && Math.hypot(player.x - b.x, player.y - (b.y + 8)) < 20 && !(target && itemReach(target) < 10)) {
+      b.raided = true; sfx('rustle'); sfx('bonk'); b.ang = 0.3;
+      const it = addItem(pick(['bread', 'cheese', 'apple', 'bone', 'fish', 'sandwich']), b.x + rr(-6, 6), b.y + 10); Object.assign(it, { air: true, z: 20, vz: 110, vy: 20 });
+      player.bubble = { text: rpick(['ooh, leftovers!', 'one raccoon’s rubbish...', 'bin dinner!']), t: 1.2 };
+      completeTask('binraid'); mischief('bin');
+      return true;
+    }
+    return false;
+  }
+  const funNear = () => {
+    if (!L) return null;
+    if (player.ride && player.ride.kind === 'balloon') return player.ride.phase === 'home' || player.ride.phase === 'down' ? null : 'head home';
+    if (player.ride) return null;
+    const B = L.balloon;
+    if (B && Math.hypot(player.x - B.x, player.y - (B.y + 8)) < 26) return 'climb into the hot-air balloon';
+    if (!player.held && (L.bins || []).some((b) => !b.tipped && !b.raided && Math.hypot(player.x - b.x, player.y - (b.y + 8)) < 20)) return 'rummage in the bin';
+    return null;
+  };
+  function updateBalloon(R, dt, input) {
+    const B = L.balloon, M = 3 * TILE;
+    R.t += dt;
+    if (R.phase === 'up') { player.rideZ = Math.min(110, player.rideZ + 40 * dt); if (player.rideZ >= 110) R.phase = 'fly'; }
+    if (R.phase === 'up' || R.phase === 'fly') {
+      const sp = 75;
+      player.x = clamp(player.x + (input.x * sp + WIND() * 0.25) * dt, M, WORLD_W - M);
+      player.y = clamp(player.y + input.y * sp * 0.8 * dt, M + 60, WORLD_H - M);
+      if (input.x) player.dir = input.x > 0 ? 'right' : 'left';
+      if (R.t > 3) completeTask('balloon');
+      if (R.t > 40) { R.phase = 'home'; player.bubble = { text: 'running out of gas...', t: 1.4 }; }
+    }
+    if (R.phase === 'home') {
+      const d = Math.hypot(B.x - player.x, B.y - player.y);
+      if (d < 4) R.phase = 'down';
+      else { const st = Math.min(d, 120 * dt); player.x += (B.x - player.x) / d * st; player.y += (B.y - player.y) / d * st; player.dir = B.x > player.x ? 'right' : 'left'; }
+    }
+    if (R.phase === 'down') { player.rideZ = Math.max(0, player.rideZ - 50 * dt); if (player.rideZ <= 0) endPlay(B.x + 30, B.y + 14, 'what a trip!'); }
+    // drifting over people makes them look up
+    if (player.rideZ > 60 && Math.random() < dt * 0.6) for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - player.x, v.y - player.y) < 70 && (v.balloonCD || 0) < time) { v.balloonCD = time + 15; say(v, rpick(['Is that a raccoon in a balloon?!', 'Look! Up there!', 'Well I never!']), 1.8); }
+  }
+  // Throw (F) from the balloon: let go and it falls on whoever's below
+  function balloonDrop() {
+    const R = player.ride;
+    if (!R || R.kind !== 'balloon') return false;
+    const it = player.held;
+    if (!it) return true;
+    player.held = null;
+    Object.assign(it, { held: false, heldBy: null, x: player.x, y: player.y + 2, z: player.rideZ + 4, vx: rr(-10, 10), vy: rr(-5, 5), vz: 0, air: true, ghost: false, bomb: true, thrownByPlayer: true, spin: rr(-8, 8) });
+    sfx('throw'); player.bubble = { text: 'bombs away!', t: 1 };
+    return true;
+  }
+  function funChitter() {
+    const K = L && L.busker, c = critters.find((q) => q.type === 'busker');
+    if (K && c && !c.chase && Math.hypot(player.x - c.x, player.y - c.y) < 90) {
+      K.claps = K.claps.filter((tt) => time - tt < 6); K.claps.push(time);
+      if (K.claps.length >= 3 && !K.danced) {
+        K.danced = true; c.bubble = { text: 'A dancing raccoon! Ladies and gentlemen!', t: 2 };
+        for (const v of villagers) if (areaOf(v.x, v.y) === 0 && Math.hypot(v.x - c.x, v.y - c.y) < 320) say(v, rpick(['Bravo!', 'Encore!', 'Look at it go!']), 1.6);
+        run.earned += 1; updateRunBar(); for (let k = 0; k < 8; k++) sparkle(player.x + rr(-12, 12), player.y, rr(8, 24));
+        toast('+1 ✦ in tips', 'What a performance!', true);
+        completeTask('dance');
+      } else if (!K.danced) player.bubble = { text: rpick(['*shimmy*', '*twirl*', '*wiggle*']), t: 0.8 };
+    }
+    const A = L && L.artist;
+    if (A && !A.done && Math.hypot(player.x - A.x, player.y - A.y) < 80) { const ar = critters.find((q) => q.type === 'artist'); if (ar) ar.bubble = { text: 'Shh! I’m concentrating!', t: 1.2 }; }
+  }
+  function funPickUp(it) {
+    if (it.buskHat) { it.buskHat = false; completeTask('buskhat'); mischief('hat'); const c = critters.find((q) => q.type === 'busker'); if (c) { c.chase = 6; c.bubble = { text: 'OI! My takings!', t: 1.4 }; sfx('alert'); } }
+    if (it.kind === 'painting' && it.artistPainting) { it.artistPainting = false; completeTask('stealpainting'); mischief('painting'); const ar = critters.find((q) => q.type === 'artist'); if (ar) ar.bubble = { text: 'My MASTERPIECE!', t: 1.6 }; }
+  }
+
+  // --- Critters: the artist and the busker -----------------------------------------------------------------
+  function updateFunFolk(c, dt) {
+    const pd = Math.hypot(player.x - c.x, player.y - c.y), outside = areaOf(player.x, player.y) === 0;
+    c.moving = false;
+    if (c.type === 'artist') {
+      const A = L.artist;
+      if (A.done) { if (!A.taken && Math.random() < dt * 0.1) c.bubble = { text: rpick(['Magnifique!', 'My best work yet.', '*admiring sigh*']), t: 1.2 }; return; }
+      A.p = Math.min(1, A.p + dt / 50);
+      // standing in front of her, in the picture?
+      const dx = player.x - A.x, dy = player.y - A.y, d = Math.hypot(dx, dy);
+      let diff = Math.abs(Math.atan2(dy, dx) - A.look); if (diff > Math.PI) diff = Math.PI * 2 - diff;
+      if (outside && !player.hidden && d > 28 && d < 230 && diff < 0.4 && !A.raccoon) {
+        A.bombT += dt; if (A.bombT > 0.4 && Math.random() < dt * 2) player.bubble = { text: '*strikes a pose*', t: 1 };
+        if (A.bombT > 1.6) { A.raccoon = true; c.bubble = { text: 'Is that... a RACCOON in my painting?!', t: 2 }; sfx('hmph'); completeTask('photobomb'); mischief('photobomb'); }
+      } else A.bombT = Math.max(0, A.bombT - dt);
+      if (Math.random() < dt * 0.06) c.bubble = { text: rpick(['Hmm, a little more blue...', 'The light is perfect.', '*dab dab*']), t: 1.2 };
+      if (A.p >= 1) {
+        A.done = true; A.taken = true;
+        const it = addItem('painting', A.ex, A.ey + 1, { z: 14 }); it.raccoon = A.raccoon; it.artistPainting = true;
+        c.bubble = { text: 'Finished! My masterpiece!', t: 2 };
+      }
+      return;
+    }
+    if (c.type === 'busker') {
+      const K = L.busker;
+      if (c.chase > 0) {
+        c.chase -= dt;
+        if (outside && !player.hidden) { critterMove(c, player.x, player.y, 112, dt); c.moving = true; }
+        if (pd < 14 && player.held && player.held.kind === 'buskhat') { const h = player.held; dropHeld(true); knockPlayer(c.x, c.y, 160); c.chase = 0; h.buskHat = true; Object.assign(h, { x: K.hat.x, y: K.hat.y, z: 0, air: false, vx: 0, vy: 0, vz: 0 }); c.bubble = { text: 'I’ll have that back, thank you!', t: 1.6 }; }
+        if (c.chase <= 0 && c.bubble == null) c.bubble = { text: 'Hmph. Thieving raccoon.', t: 1.4 };
+        return;
+      }
+      if (Math.hypot(c.x - K.x, c.y - K.y) > 4) { critterMove(c, K.x, K.y, 70, dt); c.moving = true; return; }
+      c.dir = 'right';
+      if (Math.random() < dt * 0.4 && pd < 400) sfx('ding');
+      return;
+    }
+  }
+  function drawFunFolk(ctx, c, t) {
+    if (c.type === 'artist') {
+      drawFolk(ctx, c.x, c.y, { dir: c.dir, moving: false, walk: 0, pants: '#3a3530', shirt: '#f4f2ee', skin: '#e8b996', hat: 'beret' }, t);
+      if (!L.artist.done) { const s = c.dir === 'left' ? -1 : 1, a = Math.sin(t * 6) * 0.4; ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(c.x + s * 5, c.y - 18); ctx.lineTo(c.x + s * (11 + Math.cos(a) * 2), c.y - 22 + Math.sin(a) * 3); ctx.stroke(); ctx.fillStyle = '#4f93c7'; circle(ctx, c.x + s * (11 + Math.cos(a) * 2), c.y - 22 + Math.sin(a) * 3, 1); }
+      return;
+    }
+    if (c.type === 'busker') {
+      drawFolk(ctx, c.x, c.y, { dir: c.dir, moving: c.moving, walk: c.walk, pants: '#4a3428', shirt: '#7a4f8f', skin: '#c99a72', hat: 'trilby' }, t);
+      if (!c.chase) {
+        const strum = Math.sin(t * 10) * 1.5;
+        ctx.fillStyle = '#c0782a'; ellipse(ctx, c.x + 3, c.y - 14, 6, 4.4); ctx.fillStyle = '#3a2418'; circle(ctx, c.x + 3, c.y - 14, 1.4); ctx.fillStyle = '#7a5230'; ctx.save(); ctx.translate(c.x + 3, c.y - 14); ctx.rotate(-0.5); ctx.fillRect(4, -1, 12, 2); ctx.restore();
+        ctx.fillStyle = '#c99a72'; circle(ctx, c.x + 1, c.y - 13 + strum, 1.6);
+        for (let k = 0; k < 2; k++) { const u = (t * 0.6 + k * 0.5) % 1; ctx.globalAlpha = 1 - u; ctx.fillStyle = '#3a2a1a'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(k ? '♫' : '♪', c.x + 10 + Math.sin(u * 6 + k) * 6, c.y - 36 - u * 22); ctx.globalAlpha = 1; }
+      }
+    }
+  }
+
+  // --- Once a frame ------------------------------------------------------------------------------------------
+  function updateFunStuff(dt) {
+    if (!L || !started || paused) return;
+    const outside = areaOf(player.x, player.y) === 0;
+    // skittles
+    const S = L.skittles;
+    if (S) {
+      let fell = 0;
+      for (const p of S.pins) {
+        if (p.down) { p.fall += dt; continue; }
+        let hit = null;
+        for (const it of items) if (!it.held && (it.air || Math.hypot(it.vx, it.vy) > 30) && it.z < 18 && Math.hypot(it.x - p.x, it.y - p.y) < 7.5) { hit = it; break; }
+        const byPlayer = !hit && outside && player.speed > 120 && Math.hypot(player.x - p.x, player.y - p.y) < 8;
+        const byPin = !hit && !byPlayer && S.pins.some((q) => q.down && q.fall < 0.3 && Math.hypot(q.x - p.x, q.y - p.y) < 10.5 && Math.random() < dt * 9);
+        if (hit || byPlayer || byPin) {
+          p.down = 1; p.fall = 0; fell++;
+          const src = hit ? { x: hit.x - hit.vx, y: hit.y - hit.vy } : byPlayer ? player : S;
+          p.a = Math.atan2(p.y - src.y, p.x - src.x) + rr(-0.5, 0.5);
+          if (!S.firstT) { S.firstT = time; S.byItem = !!hit; }
+          if (hit) { hit.vx *= 0.85; hit.vy *= 0.85; }
+        }
+      }
+      if (fell) { sfx('bonk'); completeTask('skittles'); }
+      const down = S.pins.filter((p) => p.down).length;
+      if (down === S.pins.length && S.firstT && !S.cleared) {
+        S.cleared = true;
+        if (S.byItem && time - S.firstT < 2.5) { sfx('fanfare'); toast('All nine down!', 'STRIKE!', true); completeTask('strike'); mischief('strike'); }
+      }
+      if (S.firstT && time - S.firstT > 7) { for (const p of S.pins) { p.down = 0; p.fall = 0; } S.firstT = 0; S.cleared = false; if (Math.hypot(player.x - S.x, player.y - S.y) < 300) sfx('tap'); }
+      // the ball can be kicked like a beach ball
+      const b = S.ball;
+      if (b && !b.held && b.z < 6 && player.speed > 20 && outside && Math.hypot(b.x - player.x, b.y - player.y) < 12) {
+        const a = Math.atan2(b.y - player.y, b.x - player.x), k = 60 + player.speed * 1.1;
+        Object.assign(b, { vx: Math.cos(a) * k, vy: Math.sin(a) * k, vz: 30, air: true, kicker: null }); sfx('bounce');
+      }
+    }
+    // things dropped from the balloon bonk whoever's underneath
+    for (const it of items) {
+      if (!it.bomb) continue;
+      if (!it.air) { it.bomb = false; continue; }
+      if (it.z > 34) continue;
+      const v = villagers.find((q) => areaOf(q.x, q.y) === 0 && Math.hypot(q.x - it.x, q.y - it.y) < 26);
+      if (v) { it.bomb = false; sfx('bonk'); startleV(v, rpick(['BONK! From the SKY?!', 'OW! It’s raining... boots?!', 'What on EARTH?!'])); completeTask('balloonbomb'); }
+    }
+    // knock wheelie bins over by running into them
+    if (outside) for (const b of L.bins || []) {
+      if (b.tipped || player.speed < 130 || Math.hypot(player.x - b.x, player.y - b.y) > 13) continue;
+      b.tipped = true; sfx('crash');
+      for (let k = 0; k < 8; k++) particles.push({ kind: 'shard', col: pick(['#6a5a40', '#e8e2d2', '#c0392b', '#8a8e96']), x: b.x + 10, y: b.y, z: 8, vx: rr(10, 70), vy: rr(-30, 30), vz: rr(30, 90), life: 0.8, max: 0.8 });
+      run.binsTipped = (run.binsTipped || 0) + 1; setProgress('bintip', run.binsTipped);
+      lookTowards(b.x, b.y, 220, () => rpick(['Who knocked my bin over?!', 'Not again!', 'Foxes, I bet.']));
+      mischief('bin');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -13787,6 +14153,7 @@
       updateStormsBreeze(dt);
       updateFestivals(dt);
       updateExtras(dt);
+      updateFunStuff(dt);
       updateWeatherFx(dt);
       updateSeason(dt);
       updateHiding(dt);
@@ -13805,7 +14172,7 @@
     target = paused ? null : findTarget();
     syncTouchButtons();
     // camera eases toward the player, with a little look-ahead
-    const lx = player.x + player.vx * 0.25, ly = player.y - 10 + player.vy * 0.25;
+    const lx = player.x + player.vx * 0.25, ly = player.y - 10 + player.vy * 0.25 - (player.ride && player.ride.kind === 'balloon' ? player.rideZ * 1.1 : 0);
     cam.x = lerp(cam.x, lx, 1 - Math.pow(0.002, dt));
     cam.y = lerp(cam.y, ly, 1 - Math.pow(0.002, dt));
     render(time);
@@ -13875,7 +14242,7 @@
   }
 
   // Handy for poking at the game from the browser console
-  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get critters() { return critters; }, fx, setWeather, get duskK() { return duskK; }, online, dailySeed, get cat() { return cat; }, get hideBushes() { return hideBushes; }, butterflies, getT };
+  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get critters() { return critters; }, fx, setWeather, get duskK() { return duskK; }, online, dailySeed, get cat() { return cat; }, get hideBushes() { return hideBushes; }, butterflies, getT, get navBlockedPt() { return navBlockedPt; } };
 
   const hot = window.claude?.hot;
   if (hot?.ready) hot.ready(() => boot()); else boot();
