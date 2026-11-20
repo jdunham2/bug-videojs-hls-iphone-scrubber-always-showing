@@ -119,6 +119,15 @@ kbd{font-family:var(--f-pixel);font-size:.72em;opacity:.85;border:1px solid curr
 .pad3{display:flex;flex-direction:column;gap:6px}
 .pad3 button{width:68px;height:44px;background:var(--walnut-2);color:var(--parch);border:2px solid var(--walnut-3);font-family:var(--f-pixel);font-size:14px;touch-action:none}
 .pad3 button.on,.pad3 button:active{background:var(--walnut-3)}
+.tools{display:flex;gap:6px}.tools button{font-family:var(--f-pixel);font-size:12px;background:transparent;color:var(--parch);border:1px solid var(--ink-soft);padding:3px 8px;cursor:pointer}
+.slots{display:grid;gap:8px;margin:12px 0 6px}.slot{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;padding:8px 10px;border:2px solid var(--ink-soft);background:#f4ead3;flex-wrap:wrap}.slot.cur{border-color:var(--ink)}
+.sl-info{display:flex;flex-direction:column;min-width:0}.sl-info span{font-size:14px;color:var(--ink-soft)}.sl-btns{display:flex;gap:6px}.sl-btns .btn{padding:6px 12px;font-size:14px}
+.cloudnote,.small{font-size:13px;color:var(--ink-soft)}
+.creator{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}#prevCv{image-rendering:pixelated;background:#cbb88f;border:2px solid var(--ink);width:108px;height:132px;flex:none}
+.cfields{flex:1;min-width:200px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0 14px}.cfields .field{margin-top:6px}.cfields .sw{width:28px;height:28px}.cfields .swatches{gap:6px}.creator #prevCv{width:90px;height:110px}.cfields .field input{font-size:17px;width:100%}.opts{display:flex;gap:6px;flex-wrap:wrap}.opts .opt{padding:4px 10px}.opts .opt[aria-pressed="true"]{border-color:var(--madder);background:#fbeedd;box-shadow:0 0 0 2px var(--madder)}
+.swatches{flex-wrap:wrap}details.later{margin-top:12px}details.later summary{cursor:pointer;font-family:var(--f-pixel);font-size:13px;color:var(--ink-soft)}
+.tree{margin-top:8px}.tgen{display:flex;gap:10px;align-items:flex-start;padding:6px 8px;border:2px solid var(--ink-soft);background:#f4ead3}.tgen.you{border-color:var(--madder)}.tgen ul{margin:4px 0;font-size:14px}
+.tpor{image-rendering:pixelated;width:54px;height:66px;background:#cbb88f;border:1px solid var(--ink);flex:none}.tline{height:12px;border-left:3px solid var(--ink-soft);margin-left:34px}
 @media (hover:none) and (pointer:coarse){.pad{display:flex}.hint{display:none}}
 @media (prefers-reduced-motion:reduce){.dialog .more,.stat.bump,.lake span{animation:none}.toast{transition:none}}
 </style>
@@ -144,10 +153,10 @@ kbd{font-family:var(--f-pixel);font-size:.72em;opacity:.85;border:1px solid curr
     <div class="overlay mini" id="mini" hidden><div class="panel" id="miniPanel"></div></div>
     <div class="overlay screen" id="screen" hidden><div class="panel card" id="screenPanel"></div></div>
   </div>
-  <div class="below"><div class="obj" id="obj"><b>Now</b><span id="objTxt"></span></div><div class="hint">Move: WASD or arrows · Act: E or Space · Choose: 1–3</div></div>
+  <div class="below"><div class="obj" id="obj"><b>Now</b><span id="objTxt"></span></div><div class="hint">Move: WASD or arrows · Act: E or Space · Choose: 1–3</div><div class="tools"><button id="treeBtn" type="button">Family (T)</button><button id="sndBtn" type="button" aria-pressed="true">♪ Sound on</button></div></div>
   <div class="pad" id="pad">
     <div class="dpad"><button class="u" data-k="arrowup" aria-label="Up">▲</button><button class="l" data-k="arrowleft" aria-label="Left">◀</button><button class="r" data-k="arrowright" aria-label="Right">▶</button><button class="d" data-k="arrowdown" aria-label="Down">▼</button></div>
-    <div class="pad3" id="pad3" hidden><button id="bBlock" type="button">Block</button><button id="bTalk" type="button">Talk</button><button id="bHeal" type="button">Eat</button></div>
+    <div class="pad3" id="pad3" hidden><button id="bBlock" type="button">Block</button><button id="bDodge" type="button">Dodge</button><button id="bHeavy" type="button">Heavy</button><button id="bTalk" type="button">Talk</button><button id="bHeal" type="button">Eat</button></div>
     <button class="abtn" id="abtn" aria-label="Act">A</button>
   </div>
 </div>
@@ -265,6 +274,7 @@ const LOOK={
 };
 const isM=id=>S.ch===2&&!!S.master&&MASTERS[S.master].npc===id;
 const mflag=id=>isM(id)&&S.period===0&&!S.done.shift;
+const CHX={};
 const npcs=[
   {id:'mother',name:'Mother',tx:7,ty:26,get L(){try{return S&&S.ch>=5?LOOK.motherOld:LOOK.mother}catch(e){return LOOK.mother}},vis:()=>S.ch<9,act:talkMother,get label(){try{return S&&S.ch===6?'Talk to Grandma':'Talk to Mother'}catch(e){return 'Talk to Mother'}},
     flag:()=>S.ch===6?(S.flags.water6==='full'):S.ch===5?(S.day===1&&!S.flags.gp):S.ch===4?(!S.flags.home4||S.period>=2):S.ch===2?((S.day===1&&!S.flags.momIntro)||S.period>=2):((S.day===1&&S.flags.water!=='done')||S.period>=2)},
@@ -291,7 +301,7 @@ const npcs=[
   {id:'bonfire',name:'The bonfire',tx:24,ty:17,model:'bonfire',L:LOOK.v1,vis:()=>(S.ch===4||S.ch===9)&&S.day===4&&S.period>=2,act:()=>S.ch===9?talk9('bonfire'):say(N(),'Sparks climb into the dark. Someone starts the old harvest song, badly, and the whole square joins in.'),get label(){try{return S&&S.ch===9&&!S.flags.fire?'Light the founders\u2019 bonfire':'Warm your hands'}catch(e){return 'Warm your hands'}},flag:()=>false},
   {id:'child',name:'A child',tx:17,ty:14,L:LOOK.child,vis:()=>S.ch===4&&S.period<3,act:talkChild,label:'Talk to the child',flag:()=>S.items.includes('childsword')&&!S.flags.gaveSword},
   {id:'wil',name:'Wil',tx:19,ty:10,get L(){try{return S&&S.ch>=10?LOOK.wilOld:S&&S.ch===9?LOOK.wilA:LOOK.wil}catch(e){return LOOK.wil}},vis:()=>(S.ch===5||S.ch===9||S.ch===10||S.ch===11||(S.ch===6&&!S.flags.wilWith))&&S.period<3,act:()=>S.ch===11?talk11('wil'):S.ch===10?talk10('wil'):S.ch===9?talk9('wil'):S.ch===6?talk6('wil'):talk5('wil'),label:'Talk to Wil',flag:()=>S.ch===6||petFlag('wil')||(S.ch===11&&S.day===2&&!!S.c11&&S.c11.events.skip===undefined)},
-  {id:'agnes',name:'Goodwife Agnes',tx:6,ty:14,L:LOOK.agnes,vis:()=>S.ch>=5&&S.period<3,act:()=>S.ch===13?talk13('agnes'):S.ch===11?talk11('agnes'):S.ch===10?talk10('agnes'):S.ch===9?talk9('agnes'):S.ch===6?talk6('agnes'):talk5('agnes'),get label(){try{return S&&S.ch>=9?'Talk to Agna':'Talk to Goodwife Agnes'}catch(e){return 'Talk to Goodwife Agnes'}},flag:()=>S.ch===11?(S.day===2&&!!S.c11&&S.c11.events.geese===undefined):S.ch===10?(!S.done.geese&&S.period<3):S.ch===9?petFlag('agnes'):!S.done.geese&&!S.flags.hiding},
+  {id:'agnes',name:'Goodwife Agnes',tx:6,ty:14,L:LOOK.agnes,vis:()=>S.ch>=5&&S.period<3,act:()=>CHX[S.ch]?CHX[S.ch].talk('agnes'):S.ch===13?talk13('agnes'):S.ch===11?talk11('agnes'):S.ch===10?talk10('agnes'):S.ch===9?talk9('agnes'):S.ch===6?talk6('agnes'):talk5('agnes'),get label(){try{return S&&S.ch>=9?'Talk to Agna':'Talk to Goodwife Agnes'}catch(e){return 'Talk to Goodwife Agnes'}},flag:()=>S.ch===11?(S.day===2&&!!S.c11&&S.c11.events.geese===undefined):S.ch===10?(!S.done.geese&&S.period<3):S.ch===9?petFlag('agnes'):!S.done.geese&&!S.flags.hiding},
   {id:'kidhide',name:'Your child',get tx(){try{return HIDE[S.flags.hideIdx].t[0]}catch(e){return 0}},get ty(){try{return HIDE[S.flags.hideIdx].t[1]}catch(e){return 0}},get L(){return kidLook()},vis:()=>S.ch===5&&!!S.flags.hiding,act:findKid,get label(){try{return 'Found you, '+S.kid.name+'!'}catch(e){return 'Found you!'}},flag:()=>false},
   {id:'parent',name:'Your parent',get tx(){try{return parentSpot()[0]}catch(e){return 0}},get ty(){try{return parentSpot()[1]}catch(e){return 0}},get L(){return parentLook()},vis:()=>S.ch===6||S.ch===9||S.ch===11,act:()=>S.ch===11?talk11('parent'):S.ch===9?talk9('parent'):talk6('parent'),get label(){try{return 'Talk to '+S.parent.name}catch(e){return 'Talk'}},flag:()=>S.ch===11?(S.day===3&&!!S.flags.lamp&&!S.flags.marble11):S.ch===9?false:(S.day===1&&S.flags.water6==='none')||(S.c6.stage===4&&!S.c6.spade)},
   {id:'lady9',name:'Lady Aumery',tx:23,ty:14,L:LOOK.lady,vis:()=>S.ch===9&&((S.day===1&&!S.flags.ceremony)||S.day===4)&&S.period<3&&!S.flags.storm,act:()=>talk9('lady9'),label:'Talk to Lady Aumery',flag:()=>S.day===1&&!S.flags.ceremony},
@@ -310,13 +320,18 @@ const npcs=[
   {id:'nell13',name:'Keeper Nell',tx:23,ty:14,L:LOOK.nell13,vis:()=>S.ch===13&&!S.c13war&&S.period<3,act:()=>talk13('nell13'),label:'Talk to Keeper Nell',flag:()=>!!S.flags.news&&!S.flags.granary},
   {id:'cobb13',name:'Farmer Cobb',tx:3,ty:23,L:LOOK.v1,vis:()=>S.ch===13&&!S.c13war&&S.period<3,act:()=>talk13('cobb13'),label:'Talk to Farmer Cobb',flag:()=>!!S.flags.news&&!S.flags.thresh},
   {id:'bryony13',name:'Bryony',tx:42,ty:17,L:LOOK.elsbeth4,vis:()=>S.ch===13&&!S.c13war&&S.period<3,act:()=>talk13('bryony13'),label:'Talk to Bryony',flag:()=>!!S.flags.news&&!S.flags.apples},
+  {id:'baker99',name:'The baker',tx:24,ty:11,ip:[24,12],L:LOOK.mira,ch:99,vis:()=>S.period<3,act:()=>CHX[99].talk('baker'),label:'Talk to the baker',flag:()=>!S.done.baker},
+  {id:'smith99',name:'The smith',tx:12,ty:12,L:LOOK.bram,ch:99,vis:()=>S.period<3,act:()=>CHX[99].talk('smith'),label:'Talk to the smith',flag:()=>!S.done.smith},
+  {id:'goose99',name:'The goose-herd',tx:6,ty:14,L:LOOK.agnes,ch:99,vis:()=>S.period<3,act:()=>CHX[99].talk('goose'),label:'Talk to the goose-herd',flag:()=>!S.done.goose},
+  {id:'scribe99',name:'The chapel scribe',tx:30,ty:10,L:LOOK.tamA,ch:99,vis:()=>S.period<3,act:()=>CHX[99].talk('scribe'),label:'Talk to the chapel scribe',flag:()=>!S.done.scribe},
   {id:'tobyn13',name:'Tobyn',tx:19,ty:10,L:LOOK.wilA,vis:()=>S.ch===13&&!S.c13war&&S.period<3,act:()=>talk13('tobyn13'),label:'Talk to Tobyn',flag:()=>false},
 ];
+for(const n of npcs){const v=n.vis;n.vis=()=>{const X=S&&CHX[S.ch];if(n.ch!==undefined)return !!X&&(n.ch===S.ch||(!!n.chs&&n.chs.includes(S.ch)))&&v();if(X)return (X.keep||[]).includes(n.id)&&v();return v();};}
 for(const n of npcs){for(let j=n.ty-1;j<=n.ty+1;j++)for(let i=n.tx-1;i<=n.tx+1;i++)if(RES[j]&&RES[j][i]!==undefined)RES[j][i]=1;}
 for(let j=22;j<=27;j++)for(let i=30;i<=34;i++)RES[j][i]=1;
 const hotspots=[
   {id:'well',tx:18,ty:13,r:22,label:()=>S.ch===10?(S.c10&&S.c10.stage===1&&((S.c9&&S.c9.riddle)||0)===0?'Search the well':'Draw water with '+(S.gc?S.gc.name:'your grandchild')):S.ch===6?(S.flags.water6==='need'?'Draw water for Grandma':S.c6&&S.c6.stage===1?'Look down the well':'Look into the well'):S.ch===5?(S.kid?'Draw water with '+S.kid.name:'Look into the well'):S.day===1&&S.flags.water==='need'?'Draw water':'Look into the well',act:useWell},
-  {id:'hesk',tx:26,ty:25,r:24,label:()=>S.ch===5||(S.ch===4&&S.flags.house)?'Your house':S.flags.bread?'Deliver the loaf':'Knock',act:heskDoor},
+  {id:'hesk',tx:26,ty:25,r:24,label:()=>CHX[S.ch]&&CHX[S.ch].houseLabel?CHX[S.ch].houseLabel():S.ch===5||(S.ch===4&&S.flags.house)?'Your house':S.flags.bread?'Deliver the loaf':'Knock',act:heskDoor},
   {id:'homedoor',tx:8,ty:25,r:18,label:()=>'Go inside',act:homeDoor},
   {id:'board',tx:26,ty:18,r:22,label:()=>S.ch===2?'Read the odd-jobs board':'Look at the notice board',act:useBoard},
 ];
@@ -429,6 +444,10 @@ function drawPerson(c,x,y,L,dir,step,extra){
   if(L.tonsure){P(L.hair,-3,hy+1,6,2);P(L.hair,-3,hy+3,1,2);P(L.hair,2,hy+3,1,2);}
   else if(dir==='up')P(L.hair,-3,hy,6,5);
   else{P(L.hair,-3,hy,6,2);if(dir==='down'){P(L.hair,-3,hy+2,1,2);P(L.hair,2,hy+2,1,2);}else if(dir==='left')P(L.hair,1,hy,2,4);else P(L.hair,-3,hy,2,4);}
+  if(L.style&&!L.tonsure){const H=L.hair;
+    if(L.style==='long'){if(dir==='up')P(H,-3,hy+5,6,3);else if(dir==='down'){P(H,-3,hy+4,1,3);P(H,2,hy+4,1,3);}else P(H,dir==='left'?2:-3,hy+4,1,3);}
+    else if(L.style==='braid'){if(dir==='up')P(H,-1,hy+5,2,4);else if(dir!=='down')P(H,dir==='left'?3:-4,hy+3,1,5);}
+    else if(L.style==='curly'){P(H,-4,hy-1,8,2);if(dir!=='up'){P(H,-4,hy+1,1,3);P(H,3,hy+1,1,3);}}}
   if(L.beard&&dir!=='up')P(L.beard,-3,hy+4,6,2);
   if(dir!=='up'){const e='#1d1410';if(dir==='down'){P(e,-2,hy+3,1,1);P(e,1,hy+3,1,1);}else if(dir==='left')P(e,-2,hy+3,1,1);else P(e,1,hy+3,1,1);}
   if(L.kerchief)P(L.kerchief,-3,hy-1,6,2);
@@ -441,23 +460,37 @@ function drawPerson(c,x,y,L,dir,step,extra){
 /* ---------- STATE ---------- */
 const SAVE_KEY='brindlemoor-slice-v1';
 let S=null;
-function newState(name,top){return{name,top,ch:1,age:8,day:1,period:0,stats:{str:1,wits:1,charm:1,coin:0,arms:0},flags:{water:'none'},done:{},log:[],history:[],items:[],quizUsed:[],x:8*TS+8,y:26*TS+12,dir:'down'};}
-function save(){try{if(S){const c=JSON.parse(JSON.stringify(S));if(c.flags.bread)c.flags.bread=null;if(c.flags.letters)c.flags.letters=null;localStorage.setItem(SAVE_KEY,JSON.stringify(c));}}catch(e){}}
-function load(){try{const s=localStorage.getItem(SAVE_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
-function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
-const playerLook=()=>({skin:'#ebbd94',hair:S.ch===10?'#c8c2b6':'#5a3a22',top:S.top,bot:'#5b4a36',kid:S.ch===1||S.ch===6,teen:S.ch===2||S.ch===11});
-function norm(x){if(!x)return x;x.ch=x.ch||1;x.age=x.age||(x.ch===13?35:x.ch===12?21:x.ch===11?14:x.ch===10?60:x.ch===9?40:x.ch===8?25:x.ch===7?16:x.ch===6?10:x.ch===5?32:x.ch===4?20:x.ch===3?16:x.ch===2?12:8);x.war=x.war||{};x.past=x.past||{};if((x.ch===3||x.ch===7||x.ch===8||x.ch===12||x.ch===13)&&!x.c3)x.c3={scene:0,flags:{},bread:2,startBread:2};if(x.stats.arms===undefined)x.stats.arms=0;x.flags=x.flags||{};return x;}
+const DEFLOOK={skin:'#ebbd94',hair:'#5a3a22',style:'short'};
+function newState(name,top){return{name,top,look:{skin:CREATE.skin,hair:CREATE.hair,style:CREATE.style},pet:newPet(),line:[],ch:1,age:8,day:1,period:0,stats:{str:1,wits:1,charm:1,coin:0,arms:0},flags:{water:'none'},done:{},log:[],history:[],items:[],quizUsed:[],x:8*TS+8,y:26*TS+12,dir:'down'};}
+let SLOT=0;try{SLOT=Math.max(0,Math.min(2,+(localStorage.getItem('brindlemoor-slot')||0)||0));}catch(e){}
+const slotKey=i=>i===0?SAVE_KEY:'brindlemoor-slot-'+(i+1);
+const CLOUD={db:null,uid:null,cache:{},pend:{},t:0,warned:false,ready:false};
+function setSlot(i){SLOT=i;try{localStorage.setItem('brindlemoor-slot',String(i));}catch(e){}}
+function save(){try{if(!S)return;
+  const src=S.free&&S.freeSnap?Object.assign({},S.freeSnap,{roam:S.roam,stats:S.stats,pet:S.pet,line:S.line}):S;
+  const c=JSON.parse(JSON.stringify(src));if(c.flags&&c.flags.bread)c.flags.bread=null;if(c.flags&&c.flags.letters)c.flags.letters=null;delete c.freeSnap;
+  const j=JSON.stringify(c);let okL=true;try{localStorage.setItem(slotKey(SLOT),j);}catch(e){okL=false;}
+  CLOUD.cache[SLOT]=c;const okC=cloudPut(SLOT,j);
+  if(!okL&&!CLOUD.warned){CLOUD.warned=true;toast(okC?'Browser storage is full, so your game is saving to the cloud instead.':'Browser storage is full and cloud saving is not available here, so progress may not be kept.');}
+}catch(e){}}
+function loadSlot(i){let s=null;try{s=localStorage.getItem(slotKey(i));}catch(e){}if(s){try{return JSON.parse(s);}catch(e){}}return CLOUD.cache[i]?JSON.parse(JSON.stringify(CLOUD.cache[i])):null;}
+function load(){return loadSlot(SLOT);}
+function clearSave(){try{localStorage.removeItem(slotKey(SLOT));}catch(e){}delete CLOUD.cache[SLOT];cloudPut(SLOT,null);}
+const ageHair=()=>{const h=(S.look||DEFLOOK).hair;return S.age>=58?'#c8c2b6':S.age>=46?'#9a948c':h;};
+const playerLook=()=>({skin:(S.look||DEFLOOK).skin,hair:ageHair(),style:(S.look||DEFLOOK).style,top:S.top,bot:'#5b4a36',kid:S.ch===1||S.ch===6,teen:S.ch===2||S.ch===11});
+function norm(x){if(!x)return x;x.ch=x.ch||1;x.age=x.age||(x.ch===13?35:x.ch===12?21:x.ch===11?14:x.ch===10?60:x.ch===9?40:x.ch===8?25:x.ch===7?16:x.ch===6?10:x.ch===5?32:x.ch===4?20:x.ch===3?16:x.ch===2?12:8);x.war=x.war||{};x.past=x.past||{};if((x.ch===3||x.ch===7||x.ch===8||x.ch===12||x.ch===13)&&!x.c3)x.c3={scene:0,flags:{},bread:2,startBread:2};if(x.stats.arms===undefined)x.stats.arms=0;x.flags=x.flags||{};x.look=x.look||{...DEFLOOK};return x;}
 
 /* ---------- HUD ---------- */
 const STATNAME={str:'Strength',wits:'Wits',charm:'Charm',coin:'Pennies',arms:'Arms'};
 function hud(){
   if(!S)return;
-  $('#whenTxt').textContent=S.ch===3?'Ch. III · Age 16':S.ch===7?'Ch. VII · Age 16':S.ch===8?'Ch. VIII · Age 25':S.ch===12?'Ch. XII · Age 21':(S.ch===13&&S.c13war)?'Ch. XIII · Age 35':`${S.ch===2?'Ch. II · ':S.ch===4?'Ch. IV · ':S.ch===5?'Ch. V · ':S.ch===6?'Ch. VI · ':S.ch===9?'Ch. IX · ':S.ch===10?'Ch. X · ':S.ch===11?'Ch. XI · ':S.ch===13?'Ch. XIII · ':''}Day ${S.day} · Age ${S.age}`;
-  $('#st-arms').hidden=S.ch<2||S.ch===6||S.ch>=10;$('#dots').hidden=S.ch===3||S.ch===7||S.ch===8||S.ch===12||(S.ch===13&&!!S.c13war);
-  $('.hint').textContent=C3.sailing()?'Sail: W and S · Steer: A and D · Camera: drag or Z/C':(S.ch===3||S.ch===7||S.ch===8||S.ch===12||(S.ch===13&&!!S.c13war))?'Move: WASD · Swing: Space or click · Block: hold Shift · Talk: E · Eat: H · Camera: drag or Z/C':C3.isTown()?'Move: WASD · Act: E or Space · Camera: drag or Z/C · Choose: 1–3':'Move: WASD or arrows · Act: E or Space · Choose: 1–3';
-  $('#periodTxt').textContent=(S.ch===3||S.ch===7||S.ch===8||S.ch===12||(S.ch===13&&!!S.c13war))?C3.sceneName():PERIODS[S.period];
+  $('#whenTxt').textContent=CHX[S.ch]?CHX[S.ch].when():S.ch===3?'Ch. III · Age 16':S.ch===7?'Ch. VII · Age 16':S.ch===8?'Ch. VIII · Age 25':S.ch===12?'Ch. XII · Age 21':(S.ch===13&&S.c13war)?'Ch. XIII · Age 35':`${S.ch===2?'Ch. II · ':S.ch===4?'Ch. IV · ':S.ch===5?'Ch. V · ':S.ch===6?'Ch. VI · ':S.ch===9?'Ch. IX · ':S.ch===10?'Ch. X · ':S.ch===11?'Ch. XI · ':S.ch===13?'Ch. XIII · ':''}Day ${S.day} · Age ${S.age}`;
+  $('#st-arms').hidden=S.ch<2||S.ch===6||S.ch>=10;$('#dots').hidden=inC3();
+  $('.hint').textContent=C3.sailing()?'Sail: W and S · Steer: A and D · Camera: drag or Z/C':(inC3())?'Move: WASD · Swing: Space or click · Block: hold Shift · Dodge: Q · Heavy: F · Talk: E · Eat: H · Camera: drag or Z/C':C3.isTown()?'Move: WASD · Act: E or Space · Camera: drag or Z/C · Choose: 1–3':'Move: WASD or arrows · Act: E or Space · Choose: 1–3';
+  $('#periodTxt').textContent=(inC3())?C3.sceneName():PERIODS[S.period];
   [...$('#dots').children].forEach((d,i)=>d.className=i===S.period?'on':i<S.period?'past':'');
   for(const k in STATNAME)$('#st-'+k+' b').textContent=S.stats[k]||0;
+  if(hud.lc!==undefined&&(S.stats.coin||0)>hud.lc)sfx('coin');hud.lc=S.stats.coin||0;
   $('#objTxt').textContent=objective();
 }
 function bump(k){const el=$('#st-'+k);el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');}
@@ -466,6 +499,7 @@ function gain(k,n){S.stats[k]+=n;bump(k);floaters.push({t:0,text:(n>0?'+':'')+n+
 let toastT=0;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);}
 function objective(){
+  if(CHX[S.ch]&&!S.c3on)return CHX[S.ch].objective();
   if(S.ch===13&&!S.c13war)return objective13();
   if(S.ch===11)return objective11();
   if(S.ch===10)return objective10();
@@ -473,7 +507,7 @@ function objective(){
   if(S.ch===6)return objective6();
   if(S.ch===5)return objective5();
   if(S.ch===4)return objective4();
-  if(S.ch===3||S.ch===7||S.ch===8||S.ch===12||(S.ch===13&&!!S.c13war))return C3.objective();
+  if(inC3())return C3.objective();
   if(S.ch===2)return objective2();
   if(S.flags.bread){const left=Math.max(0,Math.ceil((S.flags.bread.until-performance.now())/1000));return left>0?`Run the loaf to Widow Hesk’s red-roofed house, east of the big road. Still warm for ${left}s.`:'The loaf has gone cold. Deliver it to Widow Hesk anyway.';}
   if(S.day===1&&S.flags.water==='none')return'Mother is calling from outside the house.';
@@ -515,12 +549,17 @@ D.el.addEventListener('click',()=>{if(mode==='dialog')dAction();});
 const mini={el:$('#mini'),panel:$('#miniPanel'),action:null,pick:null,key:null};
 function openMini(html){mode='mini';mini.action=null;mini.pick=null;mini.key=null;mini.panel.innerHTML=html;mini.el.hidden=false;return mini.panel;}
 function closeMini(){mini.el.hidden=true;mini.action=null;mini.pick=null;mini.key=null;mode='play';}
-function screen(html,btn,alt){
+async function screen(html,btn,alt){
+  const end=/eyebrow">Next chapter<\/span>/.test(html)&&!!S&&!S.free;
+  for(;;){const r=await screen0(html,btn,alt,end?'Free roam for a while':null);if(end&&r===2){await freeRoam();continue;}return r;}
+}
+function screen0(html,btn,alt,extra){
   return new Promise(res=>{
-    mode='screen';const p=$('#screenPanel');p.innerHTML=html+`<div class="btns"><button class="btn primary" type="button">${btn}</button>${alt?`<button class="btn ghost alt" type="button">${alt}</button>`:''}</div>`;
+    mode='screen';sfx(/Next chapter<\/span>/.test(html)?'win':'ui');const p=$('#screenPanel');p.innerHTML=html+`<div class="btns"><button class="btn primary" type="button">${btn}</button>${alt?`<button class="btn ghost alt" type="button">${alt}</button>`:''}${extra?`<button class="btn ghost ex" type="button">${extra}</button>`:''}</div>`;
     $('#screen').hidden=false;
     p.querySelector('.primary').onclick=()=>{$('#screen').hidden=true;res(0)};
     if(alt)p.querySelector('.alt').onclick=()=>{$('#screen').hidden=true;res(1)};
+    if(extra)p.querySelector('.ex').onclick=()=>{$('#screen').hidden=true;res(2)};
   });
 }
 
@@ -609,6 +648,7 @@ function miniSkip(RV){RV=RV||'Tobin';return new Promise(res=>{
 
 /* ---------- SCRIPTS ---------- */
 const N=()=>S.name;
+function inC3(){return !!S&&(S.ch===3||S.ch===7||S.ch===8||S.ch===12||(S.ch===13&&!!S.c13war)||(S.ch>=14&&S.ch<99&&!!S.c3on));}
 async function runScript(fn){if(busy)return;busy=true;try{await fn();}catch(e){console.error(e);}busy=false;if(mode!=='screen')mode='play';hud();save();}
 const done=k=>!!S.done[k];
 const late=()=>S.period>=3;
@@ -648,6 +688,7 @@ async function talkMother(){
 }
 
 async function useWell(){
+  if(CHX[S.ch])return CHX[S.ch].talk('well');
   if(S.ch===13)return talk13('well');
   if(S.ch===11)return talk11('well');
   if(S.ch===10)return talk10('well');
@@ -723,6 +764,7 @@ async function talkMae(){
 }
 
 async function heskDoor(){
+  if(CHX[S.ch])return CHX[S.ch].talk('house');
   if(S.ch===13)return talk13('house');
   if(S.ch===11)return talk11('house');
   if(S.ch===10)return talk10('house');
@@ -742,6 +784,7 @@ async function heskDoor(){
 }
 
 async function talkPell(){
+  if(CHX[S.ch])return CHX[S.ch].talk('pell');
   if(S.ch===13)return talk13('pell');
   if(S.ch===11)return talk11('pell');
   if(S.ch===10)return talk10('pell');
@@ -804,6 +847,7 @@ async function climbOak(){
 }
 
 async function talkGuard(){
+  if(CHX[S.ch])return CHX[S.ch].talk('guard');
   if(S.ch===13)return talk13('guard');
   if(S.ch===11)return talk11('guard');
   if(S.ch===10)return talk10('guard');
@@ -831,6 +875,7 @@ async function talkHerald(){
 }
 
 async function homeDoor(){
+  if(CHX[S.ch])return CHX[S.ch].talk('homedoor');
   if(S.period>=2){await say(N(),'Mother is outside, by the door. Talk to her when you’re ready for bed.');return;}
   await say(N(),'The house smells of woodsmoke and onions. Nothing to do in here while the sun is up.');
 }
@@ -1071,6 +1116,7 @@ async function talkMaster2(id){
 
 /* ---- odd jobs ---- */
 async function useBoard(){
+  if(CHX[S.ch])return CHX[S.ch].talk('board');
   if(S.ch===13)return talk13('board');
   if(S.ch===11)return talk11('board');
   if(S.ch===10)return talk10('board');
@@ -1274,6 +1320,8 @@ function ok(){
   if(pb){const on=e=>{e.preventDefault();padBlock=true;pb.classList.add('on');},off=()=>{padBlock=false;pb.classList.remove('on');};pb.addEventListener('pointerdown',on);pb.addEventListener('pointerup',off);pb.addEventListener('pointercancel',off);pb.addEventListener('pointerleave',off);}
   $('#bTalk')&&$('#bTalk').addEventListener('pointerdown',e=>{e.preventDefault();if(mode==='dialog')dAction();else talk();});
   $('#bHeal')&&$('#bHeal').addEventListener('pointerdown',e=>{e.preventDefault();heal();});
+  $('#bDodge')&&$('#bDodge').addEventListener('pointerdown',e=>{e.preventDefault();dodge();});
+  $('#bHeavy')&&$('#bHeavy').addEventListener('pointerdown',e=>{e.preventDefault();heavyAttack();});
   return true;
 }
 function resize3(){
@@ -1349,6 +1397,9 @@ function figure(L,o){
   head.add(BOX(.4,.42,.4,L.skin));
   const hr=BOX(.43,.13,.43,L.hair);hr.position.y=.19;head.add(hr);const hb=BOX(.43,.32,.1,L.hair);hb.position.set(0,.05,-.17);head.add(hb);
   [-.09,.09].forEach(x=>{const m=new THREE.Mesh(new THREE.BoxGeometry(.06,.06,.02),M('#1d1410'));m.position.set(x,.03,.205);head.add(m);});
+  if(L.style==='long'&&!L.helm){const lh=BOX(.43,.42,.1,L.hair);lh.position.set(0,-.2,-.18);head.add(lh);[-.2,.2].forEach(x=>{const sd=BOX(.06,.36,.3,L.hair);sd.position.set(x,-.05,-.04);head.add(sd);});}
+  if(L.style==='braid'){const br=BOX(.1,.5,.1,L.hair);br.position.set(0,-.3,-.26);head.add(br);const tie=BOX(.13,.08,.13,'#9c3b28');tie.position.set(0,-.52,-.26);head.add(tie);}
+  if(L.style==='curly'&&!L.helm&&!L.hat){const cu=BOX(.5,.2,.5,L.hair);cu.position.y=.25;head.add(cu);}
   if(L.beard){const b=BOX(.42,.16,.12,L.beard);b.position.set(0,-.15,.17);head.add(b);}
   if(L.helm){const h=BOX(.46,.2,.46,L.helm);h.position.y=.2;head.add(h);const n=BOX(.06,.17,.05,L.helm);n.position.set(0,.03,.23);head.add(n);}
   if(L.kerchief){const k=BOX(.45,.12,.45,L.kerchief);k.position.y=.23;head.add(k);}
@@ -1385,7 +1436,7 @@ function animate(e,dt){
   const f=e.f;
   if(e.flash>0)e.flash-=dt;
   const em=f.topM.emissive;
-  if(e.flash>0)em.setRGB(.7,.7,.7);else if(e.wind>0)em.setRGB(.55+Math.sin(performance.now()/60)*.25,.08,0);else em.setRGB(0,0,0);
+  if(e.flash>0)em.setRGB(.7,.7,.7);else if(e.wind>0&&e.unblock)em.setRGB(.42+Math.sin(performance.now()/50)*.22,.05,.62);else if(e.wind>0)em.setRGB(.55+Math.sin(performance.now()/60)*.25,.08,0);else if(e.heavy&&e.atkT>0&&e.atkT<.6)em.setRGB(.5,.36,0);else if(e.iframe>0)em.setRGB(.25,.3,.4);else em.setRGB(0,0,0);
   if(e.dead){e.deadT+=dt;const k=Math.min(1,e.deadT*3);if(e.beast){f.hip.rotation.z=1.45*k;f.hip.position.y=.55-.3*k;return;}f.hip.rotation.x=-1.45*k;f.hip.position.y=(e.team==='d'?0:.92)-(e.team==='d'?0:.62*k);return;}
   if(e.team==='d')return;
   if(e.beast){const sp=Math.hypot(e.vx,e.vz);e.walk+=dt*sp*3.2;const k=Math.min(1,sp/2.5),sw=Math.sin(e.walk)*.8*k;f.legL.rotation.x=sw;f.armR.rotation.x=sw;f.legR.rotation.x=-sw;f.armL.rotation.x=-sw;f.hip.position.y=(e.team==='n'?.45:.55)+Math.abs(Math.sin(e.walk))*.06*k;
@@ -1400,7 +1451,7 @@ function animate(e,dt){
   let ar=.12-sw*.5;const lerp=(a,b,t)=>a+(b-a)*Math.max(0,Math.min(1,t));
   if(e.wind>0)ar=lerp(.12,-2.85,(1-e.wind/e.windMax)*2.2);
   else if(e.swing>0)ar=lerp(-2.85,-.25,1-e.swing/.2);
-  else if(e.atkT>0){const t=e.atkT;ar=t<.14?lerp(.12,-2.8,t/.14):t<.28?lerp(-2.8,-.25,(t-.14)/.14):lerp(-.25,.12,(t-.28)/.17);}
+  else if(e.atkT>0){const t=e.heavy?(e.atkT<.5?e.atkT/.5*.14:e.atkT<.62?.14+(e.atkT-.5)/.12*.14:.28+(e.atkT-.62)/.2*.17):e.atkT;ar=t<.14?lerp(.12,-2.8,t/.14):t<.28?lerp(-2.8,-.25,(t-.14)/.14):lerp(-.25,.12,(t-.28)/.17);}
   else if(e.ranged)ar=-1.45;
   f.armR.rotation.x=ar;
 }
@@ -1409,15 +1460,18 @@ function animate(e,dt){
 function sparks(e,color,n){for(let i=0;i<n;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(.07,.07,.07),new THREE.MeshBasicMaterial({color}));m.position.set(e.x,Hf(e.x,e.z)+1.3,e.z);scene.add(m);fx.push({m,vx:(Math.random()-.5)*5,vy:2+Math.random()*3,vz:(Math.random()-.5)*5,life:.45});}}
 function hurt(t,dmg,src){
   if(t.dead||t.invuln)return;
+  if(t.iframe>0){if(t===P)tinyToast('Dodged!');return;}
   let blocked=false;
-  if(t.blocking&&facing(t,src)>.3){dmg*=t===P?.12:.3;blocked=true;}
-  else if(t.team==='e'&&t.f.shield&&t.wind<=0&&t.swing<=0&&facing(t,src)>.4&&Math.random()<.28){dmg*=.25;blocked=true;}
+  if(t.blocking&&facing(t,src)>.3&&!src.unblock&&!src.heavyHit){dmg*=t===P?.12:.3;blocked=true;}
+  else if(t.team==='e'&&t.f.shield&&!src.heavyHit&&t.wind<=0&&t.swing<=0&&facing(t,src)>.4&&Math.random()<(t.style==='guard'?.7:.28)){dmg*=.25;blocked=true;}
   if(blocked){sparks(t,0xffe08a,8);if(t===P&&src.team==='e'){src.stag=.7;src.wind=0;}}
   else sparks(t,t.team==='d'?0xd9c27a:0xfff4e0,4);
+  sfx(blocked?'block':t===P?'hurt':'hit');if(blocked&&src===P&&t.style==='guard')tinyToast('A shieldbearer! Break the guard with a heavy attack (F).');
   t.hp-=dmg;t.flash=.14;
-  const dx=t.x-src.x,dz=t.z-src.z,d=Math.hypot(dx,dz)||1,kb=(src.big?7:3.5)*(blocked?.5:1);
+  const dx=t.x-src.x,dz=t.z-src.z,d=Math.hypot(dx,dz)||1,kb=(src.big?7:src.heavyHit?6.5:3.5)*(blocked?.5:1);
   if(!t.static){t.kbx=dx/d*kb;t.kbz=dz/d*kb;}
-  if(t!==P&&!blocked&&!t.big&&Math.random()<.55){t.wind=0;t.stag=.35;}
+  if(t!==P&&!blocked&&src.heavyHit){t.wind=0;t.stag=t.big?.35:.8;}
+  else if(t!==P&&!blocked&&!t.big&&Math.random()<.55){t.wind=0;t.stag=.35;}
   if(t===P){shake=blocked?.12:.32;if(sc&&sc.spar&&P.hp<1)P.hp=1;hud3();if(blocked)tinyToast('Blocked!');}
   if(t.spar&&t.hp<1)t.hp=1;
   if(t.hp<=0&&t!==P){t.dead=true;t.vx=t.vz=0;t.wind=0;if(sc&&sc.onDeath)sc.onDeath(t);}
@@ -1432,11 +1486,21 @@ function shoot(e,tg){
 }
 function attack(){
   if(!active||mode!=='play'||busy||!P||P.dead||P.atkT>0||P.cd>0)return;
-  P.atkT=.001;P.hitDone=false;P.cd=.48;P.blocking=false;
+  P.atkT=.001;P.hitDone=false;P.cd=.48;P.blocking=false;P.heavy=false;sfx('swing');
+}
+function heavyAttack(){
+  if(!active||mode!=='play'||busy||!P||P.dead||P.atkT>0||P.cd>0||(sc&&sc.sail))return;
+  P.atkT=.001;P.hitDone=false;P.cd=1.05;P.blocking=false;P.heavy=true;
+}
+function dodge(){
+  if(!active||mode!=='play'||busy||!P||P.dead||(sc&&sc.sail)||P.atkT>0||(P.dodgeCd||0)>0)return;
+  let f=0,r=0;if(keys.w||keys.arrowup)f++;if(keys.s||keys.arrowdown)f--;if(keys.d||keys.arrowright)r++;if(keys.a||keys.arrowleft)r--;
+  let dx,dz;if(!f&&!r){dx=-Math.sin(P.h);dz=-Math.cos(P.h);}else{const sy=Math.sin(camYaw),cy=Math.cos(camYaw);dx=f*sy-r*cy;dz=f*cy+r*sy;const m=Math.hypot(dx,dz)||1;dx/=m;dz/=m;}
+  P.dvx=dx;P.dvz=dz;P.dodgeT=.3;P.dodgeCd=.85;P.iframe=.3;sfx('dodge');
 }
 function playerHit(){
   const reach=S.master==='forge'?2.45:2.2;
-  for(const e of ents){if(e.dead||(e.team!=='e'&&e.team!=='d'))continue;if(dist(P,e)<reach+.3&&facing(P,e)>.3)hurt(e,P.dmg*(.9+Math.random()*.2),P);}
+  for(const e of ents){if(e.dead||(e.team!=='e'&&e.team!=='d'))continue;if(dist(P,e)<reach+(P.heavy?.6:.3)&&facing(P,e)>(P.heavy?.15:.3)){P.heavyHit=!!P.heavy;hurt(e,P.dmg*(P.heavy?2.2:1)*(.9+Math.random()*.2),P);P.heavyHit=false;}}
 }
 function heal(){
   if(!active||mode!=='play'||!P||P.dead)return;
@@ -1446,7 +1510,7 @@ function heal(){
 }
 let target=null;
 function talk(){if(!active||mode!=='play'||busy||!target)return;const t=target;if(t.e)t.e.h=ang(t.e,P);runScript(t.act);}
-function keydown(k){if(k===' '||k==='j')attack();else if(k==='e'||k==='enter')talk();else if(k==='h')heal();}
+function keydown(k){if(k===' '||k==='j')attack();else if(k==='e'||k==='enter')talk();else if(k==='h')heal();else if(k==='q'||k==='l')dodge();else if(k==='f'||k==='u')heavyAttack();}
 
 /* ---- AI ---- */
 function pickTarget(e){let best=null,bd=e.sight||16;for(const o of ents){if(o.dead||o.invuln&&o.team!=='a'||!hostile(e,o))continue;let d=dist(e,o);if(o===P&&e.team==='e')d-=2.5;if(e.focus&&o===e.focus)d-=100;if(e.team==='a'&&o.tobinFoe&&!e.isTobin)d+=6;if(d<bd){bd=d;best=o;}}return best;}
@@ -1476,7 +1540,7 @@ function ai(e,dt){
   const d=dist(e,t),a=ang(e,t);e.h=turnTo(e.h,a,dt*6);
   if(e.ranged){const want=d<9?-1:d>17?1:0;e.vx=Math.sin(a)*want*2.4;e.vz=Math.cos(a)*want*2.4;if(e.cd<=0&&d<26){shoot(e,t);e.cd=2.3+Math.random()*1.3;}return;}
   if(d>e.reach*.8){const sp=e.speed*(Hf(e.x,e.z)<-.25?.7:1);e.vx=Math.sin(a)*sp;e.vz=Math.cos(a)*sp;}
-  else{e.vx=e.vz=0;if(e.cd<=0){e.windMax=e.wind=e.windT*((t===P&&S.master==='scribe')?1.35:1)*(.9+Math.random()*.3);e.cd=e.cdT+Math.random()*.9;}}
+  else{e.vx=e.vz=0;if(e.cd<=0){e.windMax=e.wind=e.windT*((t===P&&S.master==='scribe')?1.35:1)*(.9+Math.random()*.3);e.cd=e.cdT+Math.random()*.9;if(e.unblock&&t===P&&!S.tipBrute){S.tipBrute=1;toast(TOUCH?'Purple glow: a blow you can’t block. Tap Dodge!':'Purple glow: a blow you can’t block. Dodge with Q!');}}}
 }
 function physics(dt){
   for(const e of ents){
@@ -1491,13 +1555,16 @@ function physics(dt){
 }
 function controlPlayer(dt){
   if(P.dead)return;
+  P.dodgeCd=(P.dodgeCd||0)-dt;
+  if(P.dodgeT>0){P.dodgeT-=dt;P.iframe=P.dodgeT;P.vx=P.dvx*10;P.vz=P.dvz*10;P.blocking=false;P.cd-=dt;if(manualCam>0)manualCam-=dt;return;}
+  P.iframe=0;
   let f=0,r=0;if(keys.w||keys.arrowup)f++;if(keys.s||keys.arrowdown)f--;if(keys.d||keys.arrowright)r++;if(keys.a||keys.arrowleft)r--;
   if(keys.z){camYaw+=dt*2.2;manualCam=1;}if(keys.c){camYaw-=dt*2.2;manualCam=1;}
   P.blocking=!!(keys.shift||keys.k||padBlock)&&P.atkT<=0;
   const sy=Math.sin(camYaw),cy=Math.cos(camYaw);let dx=f*sy-r*cy,dz=f*cy+r*sy;const m=Math.hypot(dx,dz);
   const sp=(P.blocking?1.9:4.5)*(Hf(P.x,P.z)<-.25?.65:1);
   if(m>0){dx/=m;dz/=m;P.vx=dx*sp;P.vz=dz*sp;if(P.atkT<=0)P.h=turnTo(P.h,Math.atan2(dx,dz),dt*12);}else{P.vx=P.vz=0;}
-  if(P.atkT>0){P.atkT+=dt;P.vx*=.3;P.vz*=.3;if(!P.hitDone&&P.atkT>=.2){P.hitDone=true;playerHit();}if(P.atkT>.45)P.atkT=0;}
+  if(P.atkT>0){const hv=P.heavy;P.atkT+=dt;P.vx*=hv?.12:.3;P.vz*=hv?.12:.3;if(!P.hitDone&&P.atkT>=(hv?.6:.2)){P.hitDone=true;if(hv){sfx('heavy');shake=Math.max(shake,.15);}playerHit();}if(P.atkT>(hv?.82:.45)){P.atkT=0;P.heavy=false;}}
   P.cd-=dt;
   if(manualCam>0)manualCam-=dt;else if(m>0&&f>0)camYaw=turnTo(camYaw,P.h,dt*1.5);
 }
@@ -1555,7 +1622,7 @@ function setObj(s){if(sc)sc.obj=s;hud();}
 
 /* ---- player ---- */
 function makePlayer(x,z,h){
-  const L={skin:'#ebbd94',hair:'#5a3a22',top:S.top||'#9c3b28',sleeve:'#b9a77f',bot:'#5b4a36',helm:S.ch===3&&sceneIdx>0?'#8a9098':null,armor:S.c3.flags.armour?'#7d838c':null};
+  const PL=playerLook(),L={skin:PL.skin,hair:PL.hair,style:PL.style,top:S.top||'#9c3b28',sleeve:'#b9a77f',bot:'#5b4a36',helm:S.ch===3&&sceneIdx>0?'#8a9098':null,armor:S.c3.flags.armour?'#7d838c':null};
   const st=S.stats;
   P=spawn({x,z,h,team:'p',L,weapon:S.master==='forge'?'blade':'sword',shield:'#8a2f2a',hp:100+st.str*8+(S.c3.flags.armour?25:0)+(S.c3.flags.jack?15:0),rad:.4});
   P.dmg=18+(st.arms||0)*4+st.str*2+(S.master==='forge'?6:0);
@@ -1563,7 +1630,10 @@ function makePlayer(x,z,h){
   return P;
 }
 function ally(o){return spawn(Object.assign({team:'a',L:LK.soldier,weapon:'spear',shield:'#8a2f2a',hp:85,dmg:9,speed:3.6,reach:2.2,windT:.7,cdT:1.5},o));}
-function raider(x,z,o){return spawn(Object.assign({x,z,h:Math.PI,team:'e',L:LK.raider,weapon:Math.random()<.5?'axe':'sword',shield:Math.random()<.5?'#5a6a5a':null,hp:52,dmg:12,speed:3.1,reach:1.95,sight:15},o||{}));}
+function raider(x,z,o){o=o||{};const e=spawn(Object.assign({x,z,h:Math.PI,team:'e',L:LK.raider,weapon:Math.random()<.5?'axe':'sword',shield:Math.random()<.5?'#5a6a5a':null,hp:52,dmg:12,speed:3.1,reach:1.95,sight:15},o));styleFoe(e,o);return e;}
+function styleFoe(e,o){if(o.style===null||e.big||o.name||e.spar)return;let st=o.style;if(!st){const r=Math.random();st=r<.15?'brute':r<.35?'quick':e.f.shield?'guard':'';}e.style=st;
+  if(st==='brute'){e.hp=e.maxhp=Math.round(e.hp*1.5);e.dmg=Math.round(e.dmg*1.5);e.windT=1.05;e.cdT=2;e.speed*=.85;e.unblock=true;e.f.g.scale.multiplyScalar(1.12);}
+  else if(st==='quick'){e.hp=e.maxhp=Math.round(e.hp*.7);e.dmg=Math.round(e.dmg*.7);e.windT=.42;e.cdT=.85;e.speed*=1.25;e.f.g.scale.multiplyScalar(.92);}}
 
 /* ================= SCENE 1: HARROW FIELD ================= */
 function buildCamp(){
@@ -1821,7 +1891,7 @@ const PER=[
   {sky:0x141c30,sun:0x7080b0,si:.14,hi:.2,dir:[-20,40,-10]},
 ];
 const STORM9={sky:0x262c3a,sun:0x8090a8,si:.18,hi:.28,dir:[-20,40,-10]};
-function look3(L){return{skin:L.skin,hair:L.hair,top:L.top,sleeve:L.top,bot:L.robe?L.top:L.bot,beard:L.beard,helm:L.helm,apron:L.apron,kerchief:L.kerchief,hat:L.hat,robe:L.robe,crutch:L.crutch,feather:L.feather};}
+function look3(L){return{style:L.style,skin:L.skin,hair:L.hair,top:L.top,sleeve:L.top,bot:L.robe?L.top:L.bot,beard:L.beard,helm:L.helm,apron:L.apron,kerchief:L.kerchief,hat:L.hat,robe:L.robe,crutch:L.crutch,feather:L.feather};}
 function townFigure(L,extra){const f=figure(look3(L),Object.assign({weapon:L.spear?'spear':'none',scale:L.kid?.62:L.teen?.82:1},extra||{}));if(L.kid)f.head.scale.setScalar(1.2);f.ht=(L.kid?.62:L.teen?.82:1)*2.3;return f;}
 function spriteTex(kind){
   const c=document.createElement('canvas');c.width=64;c.height=80;const x=c.getContext('2d');
@@ -1982,7 +2052,7 @@ function townTick(dt,t){
     o.h=turnTo(o.h,DIRH[w.ax==='x'?(w.dir<0?'left':'right'):(w.dir<0?'up':'down')],dt*6);walkAnim(o.f,o,sp,dt);o.f.g.position.set(x,0,z);o.f.g.rotation.y=o.h;});
   let fx0=0,fz0=0;
   if(S){
-    const key=S.ch+'|'+S.top+'|'+(S.items||[]).join(',')+'|'+S.master+'|'+(S.flags&&S.flags.passed?1:0);
+    const key=S.ch+'|'+S.age+'|'+JSON.stringify(S.look||0)+'|'+S.top+'|'+(S.items||[]).join(',')+'|'+S.master+'|'+(S.flags&&S.flags.passed?1:0);
     if(TB.pkey!==key){if(TB.player)scene.remove(TB.player.f.g);TB.player=playerFig();TB.pkey=key;}
     const dk=S.ch+'-'+S.day;if(TB.dayKey!==dk){TB.dayKey=dk;camYaw=Math.PI;TB.player.h=Math.PI;manualCam=0;const X0=WX(player.x),Z0=WZ(player.y);cam.position.set(X0,6,Z0+7);}
     const o=TB.player,x=WX(player.x),z=WZ(player.y);let sp=o.px!==undefined?Math.hypot(x-o.px,z-o.pz)/Math.max(dt,1e-3):0;if(sp>12)sp=0;o.px=x;o.pz=z;
@@ -2012,6 +2082,10 @@ function townTick(dt,t){
     const o=TB.kid,x=WX(KID.x),z=WZ(KID.y);let sp=o.px!==undefined?Math.hypot(x-o.px,z-o.pz)/Math.max(dt,1e-3):0;if(sp>12)sp=0;o.px=x;o.pz=z;
     if(KID.moving)o.h=turnTo(o.h,Math.atan2(KID.mvx,KID.mvy),dt*10);walkAnim(o.f,o,Math.min(sp,6),dt);o.f.g.position.set(x,0,z);o.f.g.rotation.y=o.h;o.f.g.visible=true;}
   else if(TB.kid)TB.kid.f.g.visible=false;
+  if(S&&PET.on&&S.pet){const st=petStage(S.pet),pk=S.pet.kind+st+S.pet.name;if(!TB.pet||TB.pet.key!==pk){if(TB.pet)scene.remove(TB.pet.g);TB.pet=petFig(S.pet.kind,st);TB.pet.key=pk;scene.add(TB.pet.g);}
+    const o=TB.pet,x=WX(PET.x),z=WZ(PET.y);if(PET.moving)o.h=turnTo(o.h,Math.atan2(PET.mvx,PET.mvy),dt*10);o.w+=dt*(PET.moving?14:0);
+    o.g.position.set(x,PET.moving?Math.abs(Math.sin(o.w))*.07:0,z);o.g.rotation.y=o.h;if(o.tail)o.tail.rotation.y=Math.sin(t*(PET.moving?14:5))*.6;o.legs.forEach((l,i)=>l.rotation.x=PET.moving?Math.sin(o.w+(i%2?Math.PI:0))*.6:0);o.g.visible=true;}
+  else if(TB.pet)TB.pet.g.visible=false;
   if(TB.rain){TB.rain.visible=storm;if(storm){const a=TB.rain.geometry.attributes.position;for(let i=0;i<a.count;i++){let y=a.getY(i)-dt*16;if(y<0)y+=18;a.setY(i,y);}a.needsUpdate=true;TB.rain.position.set(cam.position.x,0,cam.position.z);if(Math.random()<dt*.3)hemi.intensity=1.5;}}
   TB.env.forEach(s=>s.visible=false);
   if(S&&((S.ch===6&&S.c6&&S.parent)||(S.ch===10&&S.c10)||(S.ch===11&&S.c11))){const m6=S.ch===11?c11Target():S.ch===10?c10Target():c6Target();if(m6){const s6=TB.env[2];s6.visible=true;s6.position.set(TXw(m6[0])+U/2,(m6[2]||2.9)+Math.sin(t*4)*.1,TZw(m6[1])+U/2);}}
@@ -2022,13 +2096,21 @@ function townTick(dt,t){
   if(TB.forgeLight)TB.forgeLight.intensity=.7+Math.sin(t*9)*.15;
   flags3.forEach((fg,i)=>fg.rotation.y=Math.sin(t*1.6+i)*.25);
 }
+function petFig(kind,st){const g=new THREE.Group(),legs=[];let tail=null;
+  if(kind==='goose'){const c=st==='young'?'#e8d870':st==='old'?'#d8d4c8':'#f1ede2';const b=BOX(.36,.3,.56,c);b.position.y=.38;g.add(b);const n=BOX(.1,.42,.1,c);n.position.set(0,.68,.24);g.add(n);const h=BOX(.14,.13,.2,c);h.position.set(0,.9,.28);g.add(h);const bk=BOX(.08,.06,.14,'#e0902a');bk.position.set(0,.88,.43);g.add(bk);
+    [-.09,.09].forEach(x=>{const l=new THREE.Group();l.position.set(x,.24,0);const m=BOX(.04,.24,.04,'#e0902a');m.position.y=-.12;l.add(m);g.add(l);legs.push(l);});tail=new THREE.Group();tail.position.set(0,.45,-.28);tail.add(BOX(.2,.1,.12,c));g.add(tail);}
+  else{const c=st==='old'?'#a08a70':'#8a5a2c',dk=st==='old'?'#7a6a58':'#5a3a1c';const b=BOX(.34,.3,.7,c);b.position.y=.42;g.add(b);const h=BOX(.3,.28,.3,c);h.position.set(0,.64,.42);g.add(h);const sn=BOX(.16,.12,.14,st==='old'?'#d8d0c4':dk);sn.position.set(0,.58,.62);g.add(sn);
+    [-.12,.12].forEach(x=>{const e=BOX(.07,.14,.06,dk);e.position.set(x,.8,.38);g.add(e);});
+    [[-.11,.25],[.11,.25],[-.11,-.25],[.11,-.25]].forEach(([x,z])=>{const l=new THREE.Group();l.position.set(x,.3,z);const m=BOX(.09,.3,.09,dk);m.position.y=-.15;l.add(m);g.add(l);legs.push(l);});
+    tail=new THREE.Group();tail.position.set(0,.52,-.35);const tm=BOX(.06,.06,.26,dk);tm.position.z=-.12;tm.rotation.x=.5;tail.add(tm);g.add(tail);}
+  g.scale.setScalar(st==='young'?.6:1);return{g,legs,tail,h:0,w:0};}
 function town(){if(!ok())return false;townMode=true;if(!TB)buildTown();show(true);resize3();startLoop();return true;}
 function camRel(dx,dy){const f=-dy,r=dx,sy=Math.sin(camYaw),cy=Math.cos(camYaw);return[f*sy-r*cy,f*cy+r*sy];}
 
 /* ================= CHAPTER VII · BEYOND THE WALLS (3D) ================= */
 let spinners=[];
 const NAMES7=['The road to Coldwater','The Ashen Ford','The high pass'];
-function curNames(){return S&&S.ch===13?NAMES13:S&&S.ch===12?NAMES12:S&&S.ch===8?NAMES8:S&&S.ch===7?NAMES7:NAMES;}
+function curNames(){return S&&SNAMES[S.ch]?SNAMES[S.ch]:S&&S.ch===13?NAMES13:S&&S.ch===12?NAMES12:S&&S.ch===8?NAMES8:S&&S.ch===7?NAMES7:NAMES;}
 const LK7={
   wil:{skin:'#e9bb92',hair:'#d8b34a',top:'#3d5f6b',sleeve:'#3d5f6b',bot:'#6b4f33'},
   bandit:{skin:'#d9a57c',hair:'#3a2a1c',top:'#5a4a2a',sleeve:'#5a4a2a',bot:'#3a3028',fur:'#4a3a24'},
@@ -2791,6 +2873,7 @@ async function ending13(){
   else{S.stats={...S.ch13Start.stats};S.stats.str-=1;S.stats.wits-=1;S.stats.charm-=1;S.ch=12;S.c3={flags:{future12:S.c12f}};await startCh13();}
 }
 
+const SCENES={},SNAMES={};
 /* ---- flow ---- */
 async function endScene(next){
   const cards=[null,['The north road','Dawn. Your company marches out of Harrow Field: forty spears, two wagons, and a sergeant who never seems to sleep. By midday the road climbs into the Thornwood. Scouts say northern raiders are about.'],['The Ashen Ford','You camp on the ridge above the Ashen Ford. Below, the river runs shallow over stones. On the far bank, the northern host is lighting its cookfires. At dawn, they will cross.']];
@@ -2801,7 +2884,7 @@ async function endScene(next){
 }
 function startScene(i){
   sceneIdx=i;S.c3.scene=i;
-  (S.ch===13?[startC13a,startC13b]:S.ch===12?[startC12a,startC12b,startC12c,startC12d]:S.ch===8?[startC8a,startC8b,startC8c]:S.ch===7?[startC7a,startC7b,startC7c]:[startCamp,startRoad,startFord])[i]();
+  (SCENES[S.ch]?SCENES[S.ch]:S.ch===13?[startC13a,startC13b]:S.ch===12?[startC12a,startC12b,startC12c,startC12d]:S.ch===8?[startC8a,startC8b,startC8c]:S.ch===7?[startC7a,startC7b,startC7c]:[startCamp,startRoad,startFord])[i]();
   hud3();hud();mode='play';save();
 }
 async function playerDown(){
@@ -2815,7 +2898,7 @@ function show(on){
 }
 function begin(){if(!ok())return false;townMode=false;TB=null;show(true);resize3();startLoop();startScene(S.c3.scene||0);return true;}
 function stop(){show(false);}
-return{town,isTown:()=>active&&townMode,camRel,end13:()=>ending13(),sailing:()=>!!(active&&!townMode&&sc&&sc.sail),ok,begin,stop,keydown,attack,talk,heal,objective:()=>sc?sc.obj||'':'',sceneName:()=>curNames()[sceneIdx]||'',active:()=>active};
+return{X:()=>({P,ents,sc,R,props,scene,sun,hemi,setMarker:v=>{markerT=v;},setObj,spawn,ally,raider,wolf,newScene,terrain,makePlayer,campfire,forest,rock,tent,hash,BOX,mesh,mixC,hud3}),town,isTown:()=>active&&townMode,camRel,end13:()=>ending13(),sailing:()=>!!(active&&!townMode&&sc&&sc.sail),ok,begin,stop,keydown,attack,talk,heal,objective:()=>sc?sc.obj||'':'',sceneName:()=>curNames()[sceneIdx]||'',active:()=>active};
 })();
 
 async function startCh3(){
@@ -3016,6 +3099,7 @@ async function talkChild(){
   await say('A child',pickOne(['Are you the one who held the gap? Was it scary? Did you cry? I wouldn’t cry.','I’m eight. I’m nearly a grown-up.','My mother says I can’t go to war. I’m going to skip stones instead.']));
 }
 async function readMemorial(){
+  if(CHX[S.ch])return CHX[S.ch].talk('memorial');
   if(S.ch===13)return talk13('memorial');
   if(S.ch===11)return talk11('memorial');
   if(S.ch===10)return talk10('memorial');
@@ -3134,7 +3218,7 @@ async function startCh5(){
   S.x=26*TS+8;S.y=26*TS+12;S.dir='down';player.x=S.x;player.y=S.y;
   C3.town();hud();
   const k=await kidScreen();
-  S.kid={name:k.name,look:{skin:'#efc4a0',hair:'#5a3a22',top:k.top,bot:'#5b4a36',kid:true},str:1,wits:1,charm:1,bond:0};
+  S.kid={name:k.name,look:{skin:(S.look||DEFLOOK).skin,hair:(S.look||DEFLOOK).hair,style:STYLES[Math.floor(Math.random()*4)],top:k.top,bot:'#5b4a36',kid:true},str:1,wits:1,charm:1,bond:0};
   S.ch5Start={stats:{...S.stats},items:S.items.slice(),kid:JSON.parse(JSON.stringify(S.kid))};
   kidReset();
   const job={guard:'You are Captain of Lord Aumery’s guard',trade:`You are master of ${MASTERS[S.master].name}`,steward:'You are Steward of Brindlemoor',land:'You farm your strip of land by the east orchard'}[S.c4f];
@@ -3344,8 +3428,8 @@ function objective6(){
   return'';
 }
 async function startCh6(){
-  if(S.ch===5){S.parent={name:S.name,top:S.top,master:S.master,c4f:S.c4f,bond:S.kid.bond};S.name=S.kid.name;S.top=S.kid.look.top;S.stats={str:S.kid.str,wits:S.kid.wits,charm:S.kid.charm,coin:2,arms:0};S.c5={...S.flags};}
-  S.parent.look={skin:'#ebbd94',hair:'#5a3a22',top:S.parent.top,bot:'#5b4a36'};
+  if(S.ch===5){S.parent={name:S.name,top:S.top,master:S.master,c4f:S.c4f,bond:S.kid.bond};S.parent.lk=S.look;S.line=(S.line||[]).filter(q=>q.gen!==1).concat([{gen:1,name:S.parent.name,look:{skin:(S.look||DEFLOOK).skin,hair:'#c8c2b6',style:(S.look||DEFLOOK).style,top:S.parent.top,bot:'#5b4a36'}}]);S.look={skin:S.kid.look.skin,hair:S.kid.look.hair,style:S.kid.look.style||'short'};S.gen=2;S.name=S.kid.name;S.top=S.kid.look.top;S.stats={str:S.kid.str,wits:S.kid.wits,charm:S.kid.charm,coin:2,arms:0};S.c5={...S.flags};}
+  S.parent.look={skin:(S.parent.lk||DEFLOOK).skin,hair:(S.parent.lk||DEFLOOK).hair,style:(S.parent.lk||DEFLOOK).style,top:S.parent.top,bot:'#5b4a36'};
   S.ch=6;S.age=10;S.day=1;S.period=0;S.done={};S.log=[];S.flags={water6:'none'};S.history=[];S.c6={stage:0};
   S.items=S.items.filter(i=>i==='marble');
   S.ch6Start={stats:{...S.stats},items:S.items.slice()};
@@ -3812,7 +3896,7 @@ async function startCh10(){
   S.x=26*TS+8;S.y=26*TS+12;S.dir='down';player.x=S.x;player.y=S.y;KID.on=false;
   C3.town();hud();
   const g=await gcScreen();
-  S.gc={name:g.name,look:{skin:'#efc4a0',hair:'#5a3a22',top:g.top,bot:'#5b4a36',kid:true},bond:0};
+  S.gc={name:g.name,look:{skin:(S.look||DEFLOOK).skin,hair:(S.parent&&S.parent.lk||S.look||DEFLOOK).hair,style:STYLES[Math.floor(Math.random()*4)],top:g.top,bot:'#5b4a36',kid:true},bond:0};
   kidReset();
   await screen(`<div class="eyebrow">Chapter X · Age 60</div><h2>${S.gc.name}</h2>
   <p>${S.parent.name} died peacefully last winter, at eighty-two, still telling anyone who would listen about the bucket in the well. Tobin went the spring before, laughing at his own joke. Elsbeth’s daughter runs the orchard now.</p>
@@ -4056,7 +4140,7 @@ const DAYCARD11=[
   ['Founders’ night','The day after the games. Tonight, as every year, the great lamp on the keep is lit for the founders.'],
 ];
 async function startCh11(){
-  if(S.ch===10){S.c10f={succ:S.flags.successor||'tam',bond:S.gc?S.gc.bond:4};S.parent={name:S.name,top:S.top,master:S.master,c4f:S.c4f,bond:S.gc?S.gc.bond:4};S.name=S.gc?S.gc.name:'Ivy';S.top=S.gc?S.gc.look.top:TOPS[2];S.stats={str:2,wits:2,charm:2,coin:4,arms:0};}
+  if(S.ch===10){S.gp=S.parent;const lk0=S.look;S.line=(S.line||[]).filter(q=>q.gen!==2).concat([{gen:2,name:S.name,look:{skin:(lk0||DEFLOOK).skin,hair:'#c8c2b6',style:(lk0||DEFLOOK).style,top:S.top,bot:'#5b4a36'}}]);S.c10f={succ:S.flags.successor||'tam',bond:S.gc?S.gc.bond:4};S.parent={name:S.name,top:S.top,master:S.master,c4f:S.c4f,bond:S.gc?S.gc.bond:4};S.parent.lk=lk0;if(S.gc)S.look={skin:S.gc.look.skin,hair:S.gc.look.hair,style:S.gc.look.style||'short'};S.gen=3;S.name=S.gc?S.gc.name:'Ivy';S.top=S.gc?S.gc.look.top:TOPS[2];S.stats={str:2,wits:2,charm:2,coin:4,arms:0};}
   S.c10f=S.c10f||{succ:'tam',bond:5};
   if(!S.parent)S.parent={name:'Wren',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};
   S.parent.look={skin:'#ebbd94',hair:'#d8d2c6',top:S.parent.top,bot:'#5b4a36'};S.parent.look9=S.parent.look;
@@ -4305,6 +4389,312 @@ async function sleep13(){
   S.x=26*TS+8;S.y=26*TS+12;S.dir='down';player.x=S.x;player.y=S.y;save();await dayCard13();
 }
 
+/* ================= SYSTEMS: SLOTS, CREATOR, FAMILY, PET, SOUND ================= */
+const SKINS=['#f3d0b0','#ebbd94','#d29a6c','#a8704a','#7a4e32'];
+const HAIRS=['#2a1c14','#5a3a22','#8a5a2c','#c8843a','#e0c070','#9a3a22'];
+const STYLES=['short','long','braid','curly'],STYLENAME={short:'Short',long:'Long',braid:'Braid',curly:'Curly'};
+const PETNAMES={dog:['Biscuit','Pip','Bramble','Tuck','Nutmeg','Rook'],goose:['Honk','Duchess','Pudding','Sir Waddle','Clover','Gander']};
+const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII'];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function isWarSave(s){return s.ch===3||s.ch===7||s.ch===8||s.ch===12||(s.ch===13&&!!s.c13war)||(s.ch>=14&&s.ch<99&&!!s.c3on);}
+function chLabel(s){if(s.free)return'Free roam · Age '+s.age;return'Chapter '+(ROMAN[s.ch-1]||s.ch)+(isWarSave(s)?'':', day '+s.day)+' · Age '+s.age;}
+
+/* ---- cloud backup (artifact db), used when browser storage is full or missing ---- */
+function cloudFlush(){
+  if(!CLOUD.db)return;const jobs=CLOUD.pend;CLOUD.pend={};
+  for(const k in jobs){const ref=CLOUD.db.collection('data/users/'+CLOUD.uid).doc('save'+k);const j=jobs[k];
+    (j===null?ref.delete():ref.set({json:j,t:Date.now()})).catch(()=>{});}
+}
+function cloudPut(i,json){if(!CLOUD.db)return false;CLOUD.pend[i]=json;clearTimeout(CLOUD.t);CLOUD.t=setTimeout(cloudFlush,2500);return true;}
+async function cloudInit(){
+  try{
+    if(!window.claude||typeof window.claude.use!=='function')return;
+    const db=await window.claude.use('db');const user=await window.claude.use('user');if(!db||!user)return;
+    const uid=await user.id();if(!uid)return;CLOUD.db=db;CLOUD.uid=uid;
+    for(let i=0;i<3;i++){try{const d=await db.collection('data/users/'+uid).doc('save'+i).get();if(d.exists){const v=d.data();if(v&&typeof v.json==='string')CLOUD.cache[i]=JSON.parse(v.json);}}catch(e){}}
+    CLOUD.ready=true;
+    if(!S&&document.querySelector('#slotList'))titleScreen();
+  }catch(e){}
+}
+addEventListener('pagehide',()=>{clearTimeout(CLOUD.t);cloudFlush();});
+
+/* ---- title: save slots ---- */
+async function titleScreen(){
+  C3.town();mode='screen';S=null;
+  const p=$('#screenPanel');
+  const rows=[0,1,2].map(i=>({i,s:norm(loadSlot(i))}));
+  p.innerHTML=`<div class="eyebrow">A life, one day at a time</div><h2 class="big">Brindlemoor</h2>
+  <p>Grow up in a walled town under a lord’s castle, one day at a time. Do chores at eight, work for wages at twelve, go to war at sixteen, and one day raise a child of your own. Then play as them.</p>
+  <div class="slots" id="slotList">${rows.map(({i,s})=>`<div class="slot${i===SLOT?' cur':''}"><div class="sl-info"><b>Slot ${i+1}</b><span>${s?esc(s.name)+' · '+chLabel(s):'Empty'}</span></div><div class="sl-btns">${s?`<button class="btn primary" id="cont${i}" type="button">Continue</button><button class="btn ghost" id="del${i}" type="button">Delete</button>`:`<button class="btn primary" id="slotNew${i}" type="button">New life</button>`}</div></div>`).join('')}</div>
+  <p class="cloudnote">${CLOUD.db?'Your saves are also backed up to the cloud.':'Saves are kept in this browser.'} Sound: ${SND.on?'on':'off'} (press M).</p>`;
+  $('#screen').hidden=false;
+  rows.forEach(({i,s})=>{
+    if(s){$('#cont'+i).onclick=()=>{setSlot(i);contSaved(s);};
+      const d=$('#del'+i);d.onclick=()=>{if(d.dataset.sure){try{localStorage.removeItem(slotKey(i));}catch(e){}delete CLOUD.cache[i];cloudPut(i,null);titleScreen();}else{d.dataset.sure=1;d.textContent='Really delete?';}};}
+    else $('#slotNew'+i).onclick=()=>{setSlot(i);creatorScreen();};
+  });
+}
+function contSaved(saved){
+  S=saved;
+  if(S.free){S.free=false;}
+  if(isWarSave(S)){$('#screen').hidden=true;hud();if(!C3.begin()){S=null;titleScreen();}return;}
+  S.flags.bread=null;S.flags.letters=null;C3.town();player.x=S.x;player.y=S.y;$('#screen').hidden=true;hud();mode='play';toast(`Day ${S.day}. ${PERIODS[S.period]}.`);
+}
+function drawPortrait(cv,L,pet){const c=cv.getContext('2d');c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,cv.width,cv.height);const k=cv.width/18;c.setTransform(k,0,0,k,0,0);c.imageSmoothingEnabled=false;drawPerson(c,pet?7:9,21,L,'down',0);if(pet)drawPet2D(c,14,21,pet,'left',0);c.setTransform(1,0,0,1,0,0);}
+const CREATE={skin:SKINS[1],hair:HAIRS[1],style:'short',top:null,pet:'dog',petName:'Biscuit'};
+function creatorScreen(){
+  mode='screen';const p=$('#screenPanel');CREATE.top=CREATE.top||TOPS[0];
+  const sw=(arr,key,lab)=>`<div class="swatches">${arr.map((c,i)=>`<button type="button" class="sw" style="background:${c}" data-k="${key}" data-c="${c}" aria-label="${lab} ${i+1}" aria-pressed="${CREATE[key]===c}"></button>`).join('')}</div>`;
+  const opt=(arr,key,names)=>`<div class="opts">${arr.map(v=>`<button type="button" class="opt" data-k="${key}" data-c="${v}" aria-pressed="${CREATE[key]===v}">${names[v]}</button>`).join('')}</div>`;
+  p.innerHTML=`<div class="eyebrow">Slot ${SLOT+1} · A new life</div><h2>Who are you?</h2>
+  <div class="creator"><canvas id="prevCv" width="108" height="132" aria-label="Your character"></canvas><div class="cfields">
+  <div class="field"><label for="nameIn">Your name</label><input id="nameIn" maxlength="14" value="Wren" autocomplete="off"></div>
+  <div class="field"><label>Skin</label>${sw(SKINS,'skin','Skin tone')}</div>
+  <div class="field"><label>Hair colour</label>${sw(HAIRS,'hair','Hair colour')}</div>
+  <div class="field"><label>Hair style</label>${opt(STYLES,'style',STYLENAME)}</div>
+  <div class="field"><label>Tunic</label>${sw(TOPS,'top','Tunic colour')}</div>
+  <div class="field"><label>Companion</label>${opt(['dog','goose','none'],'pet',{dog:'A puppy',goose:'A gosling',none:'No pet'})}</div>
+  <div class="field" id="petNameF"${CREATE.pet==='none'?' hidden':''}><label for="petIn">Pet’s name</label><input id="petIn" maxlength="12" value="${esc(CREATE.petName)}" autocomplete="off"></div>
+  </div></div>
+  <p class="small">Your children and grandchildren will inherit your looks.</p>
+  <div class="btns"><button class="btn primary" id="begin" type="button">Begin at age 8</button><button class="btn ghost" id="backSlots" type="button">Back</button></div>
+  <details class="later"><summary>Or start at a later chapter</summary><div class="btns">
+  <button class="btn ghost" id="jump2" type="button">Age 12 · Chapter II</button><button class="btn ghost" id="jump3" type="button">Age 16 · Chapter III</button><button class="btn ghost" id="jump4" type="button">Age 20 · Chapter IV</button><button class="btn ghost" id="jump5" type="button">Age 32 · Chapter V</button><button class="btn ghost" id="jump6" type="button">Play as your child · Chapter VI</button><button class="btn ghost" id="jump7" type="button">Age 16 · Chapter VII</button><button class="btn ghost" id="jump8" type="button">Age 25 · Chapter VIII</button><button class="btn ghost" id="jump9" type="button">Age 40 · Chapter IX</button><button class="btn ghost" id="jump10" type="button">Age 60 · Chapter X</button><button class="btn ghost" id="jump11" type="button">Play as your grandchild · Chapter XI</button><button class="btn ghost" id="jump12" type="button">Age 21 · Chapter XII</button><button class="btn ghost" id="jump13" type="button">Age 35 · Chapter XIII</button>
+  <button class="btn ghost" id="jump14" type="button">Age 50 · Chapter XIV</button><button class="btn ghost" id="jump15" type="button">A Sunward child · Chapter XV</button><button class="btn ghost" id="jump16" type="button">Age 12 · Chapter XVI</button><button class="btn ghost" id="jump17" type="button">Age 14 · Chapter XVII</button><button class="btn ghost" id="jump18" type="button">Age 18 · Chapter XVIII</button>
+  </div></details>`;
+  $('#screen').hidden=false;
+  const prev=$('#prevCv');
+  const redraw=()=>drawPortrait(prev,{skin:CREATE.skin,hair:CREATE.hair,style:CREATE.style,top:CREATE.top,bot:'#5b4a36',kid:true},CREATE.pet==='none'?null:{kind:CREATE.pet,bornAge:8,_age:0});
+  redraw();
+  p.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k;CREATE[k]=b.dataset.c;p.querySelectorAll(`[data-k="${k}"]`).forEach(x=>x.setAttribute('aria-pressed',x===b));
+    if(k==='pet'){$('#petNameF').hidden=CREATE.pet==='none';const pi=$('#petIn');if(CREATE.pet!=='none'&&(PETNAMES.dog.includes(pi.value)||PETNAMES.goose.includes(pi.value)||!pi.value))pi.value=PETNAMES[CREATE.pet][0];}
+    redraw();});
+  $('#petIn').oninput=e=>{CREATE.petName=e.target.value;};
+  $('#backSlots').onclick=()=>titleScreen();
+  bindJumps(()=>CREATE.top);
+}
+function newPet(){if(CREATE.pet==='none')return null;const pn=(($('#petIn')&&$('#petIn').value)||CREATE.petName||PETNAMES[CREATE.pet][0]).trim().slice(0,12)||PETNAMES[CREATE.pet][0];return{kind:CREATE.pet,name:pn,bornAge:null,n:1};}
+
+/* ---- family tree ---- */
+const M_T=k=>MASTERS[k]?MASTERS[k].title.toLowerCase():'';
+function genOf(ch){return ch<=5?1:ch<=10?2:ch<=14?3:4;}
+function genNotes(g){
+  const n=[],ch=S.free?(S.freeFrom||S.ch):S.ch,past=c=>ch>c;
+  if(g===1){
+    if(S.master)n.push('Apprenticed as the town '+M_T(S.master)+'’s helper at twelve');
+    if(past(3)||ch>5)n.push('Marched to the Ashen Ford at sixteen'+(S.war&&S.war.tobinSaved?' and brought Tobin home':''));
+    if(past(4)||ch>5){const f={trade:'Came home and mastered the trade',guard:'Became captain of the watch',land:'Took up the land and the orchard',steward:'Kept the town’s ledgers as steward'}[S.c4f||'trade'];n.push(f);}
+    if(S.kid&&(ch>=5))n.push('Raised a child named '+esc(S.kid.name));
+  }else if(g===2){
+    if(ch>=7||past(6))n.push('Grew up in Brindlemoor, a keeper’s apprentice');
+    if(S.c7f&&ch>7)n.push({sea:'Walked all the way to the sea at sixteen',home:'Came home over the pass with a story',tower:'Rebuilt an old watchtower in the hills'}[S.c7f]||'Went beyond the walls at sixteen');
+    if(S.c8f&&ch>8)n.push({home:'Sailed home from the Sunward Isle',stay:'Spent a long summer on the Sunward Isle',sail:'Sailed past the edge of every chart'}[S.c8f]||'Saw the wide world');
+    if(S.c9&&ch>9)n.push('Keeper of Brindlemoor: “'+esc(S.c9.title)+'”');
+    if(S.gc&&ch>=10)n.push('Grandparent to '+esc(S.gc.name));
+    else if(ch>10)n.push('Passed the keeper’s lantern on');
+  }else if(g===3){
+    if(ch>=11)n.push('Grew up running the riverbank with Nell');
+    if(S.c11f&&ch>11)n.push(S.c11f.champ==='you'?'Won the great river race':'Ran the great river race');
+    if(S.c12f&&ch>12)n.push({ferry:'Captained the Lantern on the Sunward run',beyond:'Sailed the Lantern past every chart',fleet:'Built a second ship, the Marble'}[S.c12f]||'Captain of the Lantern');
+    if(S.c13f&&ch>13)n.push({north:'Settled in the house with the red door',south:'Built a house under the Sunward beacon',both:'Made the sea between the two shores home'}[S.c13f]||'Fed the Sunward Isle through a hard winter');
+    if(S.c14f&&ch>14)n.push({one:'Kept both lights as one, from the bridge of the Lantern',pass:'Handed the island light to Kai’s daughter',build:'Built a third light on the Middle Rock'}[S.c14f]||'Keeper of two lights');
+    if(S.g4&&ch>=15)n.push('Parent to '+esc(S.g4.name));
+  }else if(g===4){
+    if(ch>=15)n.push('Born on the Sunward Isle');
+    if(S.c15f&&ch>15)n.push('First saw Brindlemoor at eight'+(S.c15f.friend?', and made a friend in '+esc(S.c15f.friend):''));
+    if(S.c16f&&ch>16)n.push(S.c16f==='solved'?'Solved the mystery of Lord Aumery’s crypt':'Served as a page in Brindlemoor castle');
+    if(S.c17f&&ch>17)n.push(S.c17f==='won'?'Won the ice race at the winter festival':'Lit the lanterns at the winter festival');
+    if(S.c18f)n.push({peace:'Carried a peace to the people beyond Coldwater',trade:'Opened a road north past Coldwater',home:'Came home from the far north with a friend'}[S.c18f]||'Went north past Coldwater');
+  }
+  return n;
+}
+function treeData(){
+  const ch=S.free?(S.freeFrom||S.ch):S.ch,cur=S.gen||genOf(ch),line=(S.line||[]).slice();
+  const curLook=()=>({skin:(S.look||DEFLOOK).skin,hair:playerLook().hair,style:(S.look||DEFLOOK).style,top:S.top,bot:'#5b4a36',kid:S.age<12,teen:S.age>=12&&S.age<16});
+  const gens=[];
+  for(let g=1;g<=cur;g++){
+    const saved=line.find(x=>x.gen===g);
+    if(g===cur)gens.push({gen:g,name:S.name,look:curLook(),notes:genNotes(g),you:true});
+    else if(saved)gens.push(Object.assign({},saved,{notes:genNotes(g)}));
+    else{const src=g===cur-1?S.parent:g===cur-2?S.gp:null;gens.push({gen:g,name:src?src.name:'(remembered in stories)',look:{skin:((src&&src.lk)||DEFLOOK).skin,hair:'#c8c2b6',style:((src&&src.lk)||DEFLOOK).style,top:src?src.top:'#7a6a55',bot:'#5b4a36'},notes:genNotes(g)});}
+  }
+  return gens;
+}
+async function showTree(){
+  if(!S||mode!=='play'||busy)return;
+  busy=true;const gens=treeData();sfx('ui');
+  const GN=['','First generation · Chapters I–V','Second generation · Chapters VI–X','Third generation · Chapters XI–XIV','Fourth generation · Chapters XV–XVIII'];
+  const html=`<div class="eyebrow">Family tree</div><h2>The ${esc(gens[0].name)} line</h2><div class="tree">${gens.map((g,i)=>`<div class="tgen${g.you?' you':''}"><canvas class="tpor" width="54" height="66" data-i="${i}"></canvas><div><div class="eyebrow">${GN[g.gen]}${g.you?' · You':''}</div><b>${esc(g.name)}</b><ul>${g.notes.map(x=>`<li>${x}</li>`).join('')||'<li>Just getting started.</li>'}</ul></div></div>`).join('<div class="tline"></div>')}</div>${S.pet?`<p class="small">Companion: ${esc(S.pet.name)} the ${S.pet.kind}${S.pet.n>1?' (the '+['','first','second','third','fourth','fifth','sixth'][S.pet.n]+' of that name)':''}, ${petAgeTxt()}.</p>`:''}`;
+  const pr=screen(html,'Close');
+  document.querySelectorAll('#screenPanel .tpor').forEach(cv=>{const g=gens[+cv.dataset.i];drawPortrait(cv,Object.assign({bot:'#5b4a36'},g.look),null);});
+  await pr;mode='play';busy=false;hud();
+}
+
+/* ---- pet ---- */
+const PET={x:0,y:0,on:false,moving:false,mvx:0,mvy:1,sit:0,dir:'left'};
+function petAge(){if(!S||!S.pet)return 0;if(S.pet.bornAge==null)S.pet.bornAge=S.age;return Math.max(0,S.age-S.pet.bornAge);}
+function petAgeTxt(){const a=petAge();return a<1?'still a baby':a===1?'one year old':a+' years old';}
+function petStage(p){const a=p._age!==undefined?p._age:petAge();return a<2?'young':a>=10?'old':'adult';}
+function petAllowed(){return !!(S&&S.pet&&!isWarSave(S)&&!(S.ch===11&&S.race&&S.race.on));}
+function petTick(dt){
+  if(!petAllowed()){PET.on=false;return;}
+  if(!PET.on){PET.on=true;PET.x=player.x-10;PET.y=player.y+6;}
+  const dx=player.x-PET.x,dy=player.y-PET.y,d=Math.hypot(dx,dy);
+  if(d>160){PET.x=player.x-10;PET.y=player.y+6;return;}
+  const old=petStage(S.pet)==='old';
+  if(d>18){const sp=Math.min(d-14,(d>50?80:old?40:58)*dt);const nx=PET.x+dx/d*sp,ny=PET.y+dy/d*sp;
+    if(!solidTile(nx,ny-2)||d>60){PET.x=nx;PET.y=ny;}else{if(!solidTile(nx,PET.y-2))PET.x=nx;else if(!solidTile(PET.x,ny-2))PET.y=ny;}
+    PET.moving=true;PET.mvx=dx/d;PET.mvy=dy/d;PET.dir=dx<0?'left':'right';PET.sit=0;}
+  else{PET.moving=false;PET.sit+=dt;}
+  if(petAge()>=(S.pet.kind==='goose'?18:14)&&mode==='play'&&!busy&&!S.petPassing){S.petPassing=1;runScript(petPass);}
+}
+async function petPass(){
+  const p=S.pet,nm=PETNAMES[p.kind].filter(x=>x!==p.name);
+  await screen(`<div class="eyebrow">${esc(p.name)}</div><h2>A good, long life</h2><p>Old ${esc(p.name)} has been slower this year, and sleepier, and happiest in the sun by the door. One morning ${esc(p.name)} does not wake up.</p><p>You bury your friend under the oak by the river. The whole street comes. Someone has carved a little ${p.kind==='goose'?'goose':'dog'} into the stone.</p><p>A week later, a ${p.kind==='goose'?'gosling':'puppy'} turns up at your door, one of ${esc(p.name)}’s ${p.kind==='goose'?'grand-goslings':'grand-pups'}. It already knows the way to your kitchen.</p>`,'Name them '+esc(nm[(p.n||1)%nm.length]));
+  S.pet={kind:p.kind,name:nm[(p.n||1)%nm.length],bornAge:S.age,n:1,prev:(p.prev||[]).concat([p.name])};S.petPassing=0;mode='play';save();
+}
+async function patPet(){
+  const p=S.pet,st=petStage(p);sfx(p.kind==='goose'?'honk':'woof');
+  const lines=p.kind==='goose'?{young:'Peep! Peep! (The gosling tries to climb into your pocket.)',adult:'HONK. (A friendly honk. Mostly friendly.)',old:'Honk… (The old goose leans against your leg and closes their eyes.)'}:{young:'Yip! (The puppy bites your sleeve and runs in a circle.)',adult:'Woof! (Your dog wags so hard their whole back half wiggles.)',old:'Wuff. (The old dog thumps their tail and leans on your knee.)'};
+  await say(p.name,lines[st]);
+  if(!S.flags.petted){S.flags.petted=1;gain('charm',1);}
+}
+function drawPet2D(c,x,y,p,dir,step){
+  x=Math.round(x);y=Math.round(y);const st=petStage(p),P=(col,a,b,w,h)=>{c.fillStyle=col;c.fillRect(x+a,y+b,w,h)};const l=dir==='left';
+  P('rgba(0,0,0,.25)',-4,-1,8,2);
+  if(p.kind==='goose'){const body=st==='young'?'#e8d870':st==='old'?'#d8d4c8':'#f1ede2';const s=st==='young'?.7:1;
+    P(body,-3,-Math.round(4*s),Math.round(7*s),Math.round(4*s));P(body,l?-4:Math.round(2*s),-Math.round(8*s),2,Math.round(4*s));P('#e0902a',l?-6:Math.round(4*s),-Math.round(7*s),2,1);P('#1d1410',l?-4:Math.round(2*s)+1,-Math.round(7*s),1,1);P('#e0902a',-1,0,1,1);P('#e0902a',1,0,1,1);return;}
+  const col=st==='old'?'#a08a70':'#8a5a2c',dk=st==='old'?'#7a6a58':'#5a3a1c',sm=st==='young';
+  const bw=sm?5:7,bh=sm?3:4;P(col,-Math.floor(bw/2),-bh-2,bw,bh);
+  const lg=step?1:0;P(dk,-Math.floor(bw/2),-2,1,2-lg);P(dk,Math.floor(bw/2)-1,-2,1,2);
+  const hx=l?-Math.floor(bw/2)-2:Math.floor(bw/2)-1;P(col,hx,-bh-4,3,3);P(dk,l?hx:hx+2,-bh-4,1,2);P('#1d1410',l?hx:hx+2,-bh-3,1,1);
+  if(st==='old')P('#d8d0c4',l?hx-1:hx+2,-bh-2,1,1);
+  P(dk,l?Math.floor(bw/2):-Math.floor(bw/2)-1,-bh-3+(step?1:0),1,2);
+}
+
+/* ---- sound and music (synthesised; starts after the first tap or key) ---- */
+const SND={ctx:null,on:true,mus:null,master:null,mood:'',pat:null,step:0,next:0,lb:0};
+try{SND.on=localStorage.getItem('brindlemoor-sound')!=='off';}catch(e){}
+function sndInit(){if(SND.ctx)return;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  try{SND.ctx=new AC();SND.master=SND.ctx.createGain();SND.master.gain.value=SND.on?.5:0;SND.master.connect(SND.ctx.destination);SND.mus=SND.ctx.createGain();SND.mus.gain.value=.5;SND.mus.connect(SND.master);}catch(e){SND.ctx=null;}}
+function sndResume(){sndInit();if(SND.ctx&&SND.ctx.state==='suspended')SND.ctx.resume().catch(()=>{});}
+addEventListener('pointerdown',sndResume,true);addEventListener('keydown',sndResume,true);
+function setSound(on){SND.on=on;try{localStorage.setItem('brindlemoor-sound',on?'on':'off');}catch(e){}if(SND.master)SND.master.gain.value=on?.5:0;const b=$('#sndBtn');if(b){b.textContent=on?'♪ Sound on':'♪ Sound off';b.setAttribute('aria-pressed',on);}toast(on?'Sound on.':'Sound off.');}
+function tone(f,d,type,vol,when,dest,slide){const c=SND.ctx;if(!c||!SND.on)return;const t=c.currentTime+Math.max(0,when||0);const o=c.createOscillator(),g=c.createGain();o.type=type||'square';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+d);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol||.15,t+.012);g.gain.exponentialRampToValueAtTime(.0008,t+d);o.connect(g);g.connect(dest||SND.master);o.start(t);o.stop(t+d+.05);}
+let noiseBuf=null;
+function noise(d,vol,when,freq,dest){const c=SND.ctx;if(!c||!SND.on)return;if(!noiseBuf){noiseBuf=c.createBuffer(1,c.sampleRate*.5,c.sampleRate);const a=noiseBuf.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=Math.random()*2-1;}
+  const t=c.currentTime+Math.max(0,when||0),s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();s.buffer=noiseBuf;f.type='bandpass';f.frequency.value=freq||1000;g.gain.setValueAtTime(vol||.2,t);g.gain.exponentialRampToValueAtTime(.0008,t+d);s.connect(f);f.connect(g);g.connect(dest||SND.master);s.start(t);s.stop(t+d+.05);}
+function sfx(n){if(!SND.on||!SND.ctx)return;try{switch(n){
+  case'blip':tone(480+Math.random()*90,.035,'square',.035);break;
+  case'ui':tone(660,.07,'triangle',.1);break;
+  case'coin':tone(988,.07,'square',.07);tone(1319,.16,'square',.07,.07);break;
+  case'hit':noise(.12,.3,0,700);tone(150,.12,'sawtooth',.1,0,null,60);break;
+  case'block':tone(1250,.07,'square',.08);tone(1870,.14,'triangle',.06,.02);break;
+  case'swing':noise(.09,.1,0,2600);break;
+  case'heavy':noise(.18,.18,0,900);tone(90,.2,'sawtooth',.12,0,null,45);break;
+  case'hurt':tone(230,.2,'sawtooth',.12,0,null,110);break;
+  case'dodge':noise(.14,.09,0,1600);break;
+  case'win':[523,659,784,1047].forEach((f,i)=>tone(f,.3,'triangle',.12,i*.11));break;
+  case'woof':tone(320,.07,'square',.08,0,null,200);tone(280,.09,'square',.08,.11,null,180);break;
+  case'honk':tone(420,.16,'sawtooth',.07,0,null,340);break;
+}}catch(e){}}
+const MOODS={
+  town:{root:146.83,scale:[0,2,3,5,7,9,10,12,14],bpm:100,lead:'triangle',vol:.07,bass:[0,0,5,7]},
+  night:{root:130.81,scale:[0,3,5,7,10,12],bpm:66,lead:'sine',vol:.06,bass:[0,8,5,7]},
+  war:{root:110,scale:[0,2,3,5,7,8,10,12],bpm:128,lead:'sawtooth',vol:.035,bass:[0,0,8,7],drum:true},
+  sea:{root:164.81,scale:[0,2,4,7,9,12,14],bpm:84,lead:'sine',vol:.07,bass:[0,5,0,7]},
+  snow:{root:174.61,scale:[0,2,4,7,9,12,16],bpm:76,lead:'triangle',vol:.06,bass:[0,9,5,7],bell:true},
+};
+function makePat(m){let i=Math.floor(m.scale.length/2),p=[];for(let k=0;k<16;k++){i=Math.max(0,Math.min(m.scale.length-1,i+[-2,-1,-1,0,1,1,2][Math.floor(Math.random()*7)]));p.push(Math.random()<.2&&k%4?-1:i);}p[0]=0;p[15]=-1;return p;}
+function curMood(){if(!S)return'town';if(C3.sailing())return'sea';if(isWarSave(S)&&C3.active()&&!C3.isTown())return'war';if(S.snow)return'snow';if(S.period>=3)return'night';return'town';}
+function musicTick(){
+  const c=SND.ctx;if(!c||!SND.on||document.hidden||c.state!=='running')return;
+  const mood=curMood(),m=MOODS[mood];
+  if(mood!==SND.mood){SND.mood=mood;SND.pat=[makePat(m),makePat(m),makePat(m)];SND.step=0;SND.next=c.currentTime+.15;}
+  const sd=60/m.bpm/2;if(SND.next<c.currentTime)SND.next=c.currentTime+.05;
+  while(SND.next<c.currentTime+.35){
+    const s=SND.step,w=SND.next-c.currentTime,bar=Math.floor(s/16)%4,pat=SND.pat[bar===3?2:bar%2],n=pat[s%16];
+    if(n>=0)tone(m.root*2*Math.pow(2,m.scale[n]/12),sd*(m.bell?3:1.7),m.lead,m.vol,w,SND.mus);
+    if(m.bell&&n>=0&&s%4===0)tone(m.root*4*Math.pow(2,m.scale[n]/12),sd*4,'sine',m.vol*.5,w,SND.mus);
+    if(s%8===0)tone(m.root/2*Math.pow(2,m.bass[bar]/12),sd*7.5,'triangle',m.vol*1.4,w,SND.mus);
+    if(m.drum){if(s%4===0)tone(80,.15,'sine',.12,w,SND.mus,40);if(s%8===4)noise(.08,.06,w,1800,SND.mus);}
+    SND.step++;SND.next+=sd;
+  }
+}
+setInterval(musicTick,120);
+
+/* ================= FREE ROAM (after any chapter) ================= */
+const SECRETS=[
+  {id:'oak',tx:32,ty:27,name:'the old oak by the river',hint:'Where the river bends, the oldest tree keeps a hollow.',find:'In a hollow of the old oak you find a tin box. Inside: three marbles, a dried flower, and a note in a child’s hand. “If you find this, you are my friend now.”',item:'A tin of marbles'},
+  {id:'chapel',tx:33,ty:7,name:'behind the chapel',hint:'Behind the house of bells, a loose stone.',find:'A loose stone behind the chapel slides out. Somebody has scratched every bell-ringer’s name inside it for two hundred years. You add yours, very small.',item:'Your name in the bell stone'},
+  {id:'scarecrow',tx:3,ty:24,name:'the west field scarecrow',hint:'The straw man in the west field has something in his pocket.',find:'The scarecrow’s coat pocket holds a wooden whistle. When you blow it, every crow in the field takes off at once.',item:'A crow whistle'},
+  {id:'orchard',tx:40,ty:23,name:'the east orchard',hint:'Out past the bridge, one apple tree is older than the town.',find:'Under the oldest apple tree, roots have grown around a rusted horseshoe. You pull it free. It is enormous. Whatever wore it was the size of a house.',item:'A giant’s horseshoe'},
+  {id:'wall',tx:8,ty:3,name:'the castle wall',hint:'Along the west side of the castle, one stone is a different colour.',find:'One stone in the castle wall is carved with a tiny door, no bigger than your hand. Someone has left a crumb of cake in front of it. You leave a penny.',item:'The tiny door'},
+  {id:'bridge',tx:36,ty:16,name:'under the east bridge',hint:'Water hides what bridges see. Look by the east bridge.',find:'Wedged between the bridge stones is a bottle with a message: “Whoever reads this, the fish here are enormous. — W.” You know exactly who wrote it.',item:'Wil’s message in a bottle'},
+];
+const FREE={done:null};
+function secretsLeft(){return SECRETS.filter(q=>!S.roam.secrets[q.id]);}
+SECRETS.forEach(q=>hotspots.push({id:'sec_'+q.id,tx:q.tx,ty:q.ty,r:18,on:()=>S.ch===99&&!S.roam.secrets[q.id],label:()=>'Look closer',act:()=>findSecret(q)}));
+async function findSecret(q){
+  S.roam.secrets[q.id]=1;S.items=S.items||[];
+  await say(N(),q.find);
+  gain('coin',2);S.log.push('Found a secret: '+q.name+'.');toast(`Secret found: ${q.item} (${SECRETS.length-secretsLeft().length} of ${SECRETS.length})`);
+  if(!secretsLeft().length){gain('charm',2);await say(N(),'That’s every secret in Brindlemoor. Or at least every one you know about. You feel like the town has let you in on something.');}
+}
+async function freeRoam(){
+  const wasBusy=busy,wasMode=mode;
+  S.freeSnap=JSON.parse(JSON.stringify(Object.assign({},S,{freeSnap:null})));
+  S.roam=S.roam||{secrets:{},jobs:0,days:0};
+  S.freeFrom=S.ch;S.free=true;S.ch=99;S.c3on=false;S.day=1;S.period=0;S.done={};S.log=[];S.flags={};S.race=null;
+  S.x=26*TS+8;S.y=26*TS+12;S.dir='down';player.x=S.x;player.y=S.y;KID.on=false;
+  C3.town();hud();
+  await screen(`<div class="eyebrow">Free roam · Age ${S.age}</div><h2>A few ordinary days</h2><p>The story can wait. Brindlemoor is full of work that pays, and full of secrets nobody has found in years.</p><ul><li>The baker, the smith, the goose-herd, the chapel scribe and the gate captain all have a job for you, once a day.</li><li>Six secrets are hidden around town. The notice board has clues.</li><li>Sleep at home to start a new day. When you are ready, read the notice board and return to the story.</li></ul><p class="small">Secrets found so far: ${SECRETS.length-secretsLeft().length} of ${SECRETS.length}.</p>`,'Begin');
+  mode='play';busy=false;hud();
+  await new Promise(res=>{FREE.done=res;});
+  const snap=S.freeSnap,keep={roam:S.roam,stats:S.stats,pet:S.pet,items:S.items};
+  S=Object.assign(snap,keep,{free:false});delete S.freeSnap;delete S.freeFrom;
+  busy=wasBusy;mode=wasMode;save();
+}
+CHX[99]={
+  keep:['guard','memorial','pell'],
+  when:()=>`Free roam · Day ${S.day} · Age ${S.age}`,
+  houseLabel:()=>'Your house',
+  objective(){if(S.period===3)return'Night. Go home to sleep.';const n=SECRETS.length-secretsLeft().length;return`Free roam. Jobs pay pennies; secrets hide around town (${n} of ${SECRETS.length} found). Read the notice board to return to the story.`;},
+  async dayCard(){await screen(`<div class="eyebrow">Free roam · Day ${S.day}</div><h2>${['A bright morning','Market day','Rain, then sun','A lazy morning','Washing day'][(S.day-1)%5]}</h2><p>${S.roam.jobs} jobs done so far. ${secretsLeft().length?secretsLeft().length+' secrets still hidden.':'Every secret found.'}</p>`,'Begin the day');mode='play';hud();},
+  async sleep(){S.roam.days++;const log=S.log.length?S.log:['A quiet day.'];await screen(`<div class="eyebrow">Night · Free roam day ${S.day}</div><h2>You sleep well</h2><ul>${log.map(l=>`<li>${l}</li>`).join('')}</ul>${statline()}`,'Sleep');
+    floaters.length=0;S.day++;S.period=0;S.done={};S.log=[];S.flags={};S.x=26*TS+8;S.y=26*TS+12;player.x=S.x;player.y=S.y;save();await this.dayCard();},
+  async job(id,who,run){
+    if(S.done[id]){await say(who,'That’s enough for today. Come back tomorrow.');return;}
+    if(late()){await say(who,'It’s late. Go home and sleep.');return;}
+    const pay=await run();S.done[id]=1;S.roam.jobs++;gain('coin',pay);advance();
+  },
+  async talk(w){
+    const k=N();
+    if(w==='house'){if(S.period<2){await say(k,'Home. The bed looks very inviting, but there is still daylight.');const c=await say(k,'Sleep anyway?',['Sleep until tomorrow','Not yet']);if(c!==0)return;}return this.sleep();}
+    if(w==='homedoor'){await say(k,'Your family’s old house. Someone else’s washing hangs by the door now.');return;}
+    if(w==='board'){
+      const left=secretsLeft();
+      await say('The notice board',left.length?'Pinned among the notices, a page of riddles in faded ink: '+left.map(q=>'“'+q.hint+'”').join(' '):'Someone has pinned up a note: “Congratulations, secret-finder. Now go and make some new ones.”');
+      const c=await say(k,'What now?',['Return to the story','Stay a little longer']);
+      if(c===0){FREE.done&&FREE.done();FREE.done=null;}
+      return;}
+    if(w==='well')return this.job('well','A neighbour',async()=>{const h=await miniTiming({title:'Water for the neighbours',intro:'Haul the bucket up when the marker crosses the green.',btn:'Haul',need:3,tries:5,zone:.24,speed:2.6,shrink:.03,hit:['Full!','Another.','That’s the street done.'],miss:['Splash.','Slipped.']});await say('A neighbour','Bless you. My back thanks you.');return 1+Math.min(2,Math.floor(h/2));});
+    if(w==='guard')return this.job('archery','The gate captain',async()=>{await say('The gate captain','The archery butts need someone to test them. Paid, of course.');const sc=await miniArchery('Archery at the gate',S.day%2===0);await say('The gate captain',sc>=32?'Ha! Straight down the middle. Take your pay and a bit extra.':'Not bad. Not good, either. Here.');return sc>=32?4:2;});
+    if(w==='pell'){
+      const items=[['hat','A feathered festival hat',5],['flute','A tin flute',3],['kite','A paper kite with a dragon on it',4]].filter(i=>!S.items.includes(i[0]));
+      if(!items.length){await say('Pell’s stall','You have bought one of everything. The stallkeeper salutes you.');return;}
+      const c=await say('Pell’s stall','Toys and trinkets! What will it be?',items.map(i=>`${i[1]} (${i[2]} pennies)`).concat(['Nothing today']));
+      if(c<0||c>=items.length)return;const it=items[c];if(S.stats.coin<it[2]){await say('Pell’s stall','Not enough pennies. Do some work first!');return;}
+      S.stats.coin-=it[2];S.items.push(it[0]);gain('charm',1);S.log.push('Bought '+it[1].toLowerCase()+'.');await say('Pell’s stall','A fine choice.');return;}
+    if(w==='memorial'){await say(k,'The memorial stone has more names on it than you remember, and fresh flowers at the bottom. Someone always brings flowers.');return;}
+    if(w==='baker')return this.job('baker','The baker',async()=>{const h=await miniTiming({title:'Knead the dough',intro:'Push the dough when the marker crosses the green. Three good pushes.',btn:'Knead',need:3,tries:5,zone:.22,speed:2.5,shrink:.03,hit:['Squish.','Lovely.','Perfect loaf!'],miss:['Too soon.','Too late.']});await say('The baker',h>=3?'Beautiful. You have the hands for it.':'Well, it’ll be bread. Probably.');return h>=3?3:2;});
+    if(w==='smith')return this.job('smith','The smith',async()=>{const sc=await miniHammer();await say('The smith',sc>=3?'Good, even blows. You could do this for a living.':'Bit wobbly. It’ll hold.');if(sc>=3&&!S.flags.smithStr){S.flags.smithStr=1;gain('str',1);}return 3;});
+    if(w==='goose')return this.job('goose','The goose-herd',async()=>{const n=await miniGeese();await say('The goose-herd',n>=5?'Every goose in the pen! You’re a natural.':'Most of them. The rest will come home for supper.');return n>=5?3:2;});
+    if(w==='scribe')return this.job('scribe','The chapel scribe',async()=>{const r=await miniQuiz(3);await say('The chapel scribe',r>=2?'Neatly copied. Thank you.':'A few blots, but it will do.');if(r>=3&&!S.flags.scribeW){S.flags.scribeW=1;gain('wits',1);}return 2+Math.min(1,r>>1);});
+    await say(k,'Nothing to do here right now.');
+  }
+};
+
 /* ---------- DAYS ---------- */
 const DAYCARD=[
   ['Early spring','You wake to roosters and the smell of woodsmoke. Mother is calling from outside.'],
@@ -4312,6 +4702,7 @@ const DAYCARD=[
   ['The horn','A horn sounded from the castle before sunrise. Something in Brindlemoor has changed.'],
 ];
 async function dayCard(){
+  if(CHX[S.ch])return CHX[S.ch].dayCard();
   if(S.ch===13)return dayCard13();
   if(S.ch===11)return dayCard11();
   if(S.ch===10)return dayCard10();
@@ -4326,6 +4717,7 @@ async function dayCard(){
 }
 function statline(){return`<div class="statline"><span>Strength ${S.stats.str}</span><span>Wits ${S.stats.wits}</span><span>Charm ${S.stats.charm}</span><span>Pennies ${S.stats.coin}</span></div>`;}
 async function sleep(){
+  if(CHX[S.ch])return CHX[S.ch].sleep();
   if(S.ch===13)return sleep13();
   if(S.ch===11)return sleep11();
   if(S.ch===10)return sleep10();
@@ -4366,54 +4758,45 @@ async function ending(){
 
 /* ---------- TITLE ---------- */
 const TOPS=['#9c3b28','#3d5f6b','#6d8a3c','#8a6a2a'];
-async function titleScreen(){
-  C3.town();mode='screen';const saved=norm(load());
-  const p=$('#screenPanel');
-  p.innerHTML=`<div class="eyebrow">A life, one day at a time</div><h2 class="big">Brindlemoor</h2>
-  <p>Grow up in a walled town under a lord’s castle, one day at a time. At eight you do chores, learn letters and make friends. At twelve you work for wages, at sixteen you go to war, and one day you raise a child of your own.</p>
-  <div class="field"><label for="nameIn">Your name</label><input id="nameIn" maxlength="14" value="${saved?saved.name:'Wren'}" autocomplete="off"></div>
-  <div class="field"><label>Tunic</label><div class="swatches">${TOPS.map((c,i)=>`<button type="button" class="sw" style="background:${c}" data-c="${c}" aria-label="Tunic colour ${i+1}" aria-pressed="${i===0}"></button>`).join('')}</div></div>
-  <div class="btns"><button class="btn primary" id="begin" type="button">Begin at age 8</button><button class="btn ghost" id="jump2" type="button">Age 12 · Chapter II</button><button class="btn ghost" id="jump3" type="button">Age 16 · Chapter III</button><button class="btn ghost" id="jump4" type="button">Age 20 · Chapter IV</button><button class="btn ghost" id="jump5" type="button">Age 32 · Chapter V</button><button class="btn ghost" id="jump6" type="button">Play as your child · Chapter VI</button><button class="btn ghost" id="jump7" type="button">Age 16 · Chapter VII</button><button class="btn ghost" id="jump8" type="button">Age 25 · Chapter VIII</button><button class="btn ghost" id="jump9" type="button">Age 40 · Chapter IX</button><button class="btn ghost" id="jump10" type="button">Age 60 · Chapter X</button><button class="btn ghost" id="jump11" type="button">Play as your grandchild · Chapter XI</button><button class="btn ghost" id="jump12" type="button">Age 21 · Chapter XII</button><button class="btn ghost" id="jump13" type="button">Age 35 · Chapter XIII</button>${saved?`<button class="btn ghost" id="cont" type="button">Continue: Chapter ${['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII'][saved.ch-1]}${saved.ch===3||saved.ch===7||saved.ch===8||saved.ch===12||(saved.ch===13&&saved.c13war)?'':', day '+saved.day}</button>`:''}</div>`;
-  $('#screen').hidden=false;
-  let top=TOPS[0];
-  p.querySelectorAll('.sw').forEach(b=>b.onclick=()=>{top=b.dataset.c;p.querySelectorAll('.sw').forEach(x=>x.setAttribute('aria-pressed',x===b));});
-  $('#begin').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);player.x=S.x;player.y=S.y;$('#screen').hidden=true;save();hud();await dayCard();};
-  $('#jump2').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:2,wits:2,charm:2,coin:3,arms:0};$('#screen').hidden=true;await startCh2();};
-  $('#jump3').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:3,wits:3,charm:3,coin:6,arms:2};S.items=['marble'];$('#screen').hidden=true;
+function bindJumps(){
+  $('#begin').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);player.x=S.x;player.y=S.y;$('#screen').hidden=true;save();hud();await dayCard();};
+  $('#jump2').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:2,wits:2,charm:2,coin:3,arms:0};$('#screen').hidden=true;await startCh2();};
+  $('#jump3').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:3,wits:3,charm:3,coin:6,arms:2};S.items=['marble'];$('#screen').hidden=true;
     const i=await choose('<div class="eyebrow">Chapter III · Age 16</div><h2>Your trade</h2><p>Before the muster called your name, where did you serve your apprenticeship? Each trade helps in its own way at war.</p>',MKEYS.map(k=>`<b>${MASTERS[k].title}</b> with ${MASTERS[k].who}`));S.master=MKEYS[i];await startCh3();};
-  $('#jump4').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:4,wits:4,charm:4,coin:8,arms:4};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={kind:1};$('#screen').hidden=true;
+  $('#jump4').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:4,wits:4,charm:4,coin:8,arms:4};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={kind:1};$('#screen').hidden=true;
     const i=await choose('<div class="eyebrow">Chapter IV · Age 20</div><h2>Your trade</h2><p>Before the war, where did you serve your apprenticeship?</p>',MKEYS.map(k=>`<b>${MASTERS[k].title}</b> with ${MASTERS[k].who}`));S.master=MKEYS[i];await startCh4();};
-  $('#jump5').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:5,wits:5,charm:5,coin:10,arms:4};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={kind:1,poultice:1};$('#screen').hidden=true;
+  $('#jump5').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:5,wits:5,charm:5,coin:10,arms:4};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={kind:1,poultice:1};$('#screen').hidden=true;
     const i=await choose('<div class="eyebrow">Chapter V · Age 32</div><h2>Your trade</h2><p>Which trade did you learn, all those years ago? You are its master now.</p>',MKEYS.map(k=>`<b>${MASTERS[k].title}</b> with ${MASTERS[k].who}`));S.master=MKEYS[i];S.c4f='trade';await startCh5();};
-  $('#jump6').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:2,wits:2,charm:2,coin:2,arms:0};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={};$('#screen').hidden=true;
+  $('#jump6').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:2,wits:2,charm:2,coin:2,arms:0};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={};$('#screen').hidden=true;
     const i=await choose(`<div class="eyebrow">Chapter VI · Age 10</div><h2>Your parent</h2><p>You play as ${nm}, ten years old. Your parent held the gap at the Ashen Ford before you were born. What is their trade?</p>`,['The town smith','The town scribe','The town baker']);
     S.master=MKEYS[i];S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:MKEYS[i],c4f:'trade',bond:6};await startCh6();};
-  $('#jump7').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:3,wits:3,charm:3,coin:4,arms:0};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={};S.master='forge';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:6};$('#screen').hidden=true;await startCh7();};
-  $('#jump8').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:4,wits:4,charm:4,coin:6,arms:2};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={};S.master='forge';S.c7f='sea';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:6};$('#screen').hidden=true;await startCh8();};
-  $('#jump9').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:5,wits:5,charm:5,coin:10,arms:3};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={};S.master='forge';S.c8f='home';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:6};$('#screen').hidden=true;await startCh9();};
-  $('#jump10').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:5,wits:6,charm:6,coin:12,arms:3};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={rent:'paid'};S.master='forge';S.c4f='trade';S.c7f='sea';S.c8f='home';S.c6={letter:{want:'explore',friend:'Wil',msg:'Be brave.'}};S.c9={title:'A good keeper',riddle:0,score:16};S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:6};$('#screen').hidden=true;await startCh10();};
-  $('#jump11').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:2,wits:2,charm:2,coin:4,arms:0};S.items=['marble'];S.master='forge';S.c10f={succ:'tam',bond:5};S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh11();};
-  $('#jump12').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:3,wits:3,charm:3,coin:6,arms:1};S.items=['marble'];S.master='forge';S.c11f={champ:'you'};S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh12();};
-  $('#jump13').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,top);S.stats={str:4,wits:4,charm:4,coin:8,arms:2};S.items=['marble'];S.master='forge';S.c12f='ferry';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh13();};
-  if(saved)$('#cont').onclick=()=>{S=saved;if(S.ch===3||S.ch===7||S.ch===8||S.ch===12||(S.ch===13&&!!S.c13war)){$('#screen').hidden=true;hud();if(!C3.begin()){S=null;titleScreen();}return;}S.flags.bread=null;S.flags.letters=null;C3.town();player.x=S.x;player.y=S.y;$('#screen').hidden=true;hud();mode='play';toast(`Day ${S.day}. ${PERIODS[S.period]}.`);};
+  $('#jump7').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:3,wits:3,charm:3,coin:4,arms:0};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={};S.master='forge';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:6};$('#screen').hidden=true;await startCh7();};
+  $('#jump8').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:4,wits:4,charm:4,coin:6,arms:2};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={};S.master='forge';S.c7f='sea';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:6};$('#screen').hidden=true;await startCh8();};
+  $('#jump9').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:5,wits:5,charm:5,coin:10,arms:3};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={};S.master='forge';S.c8f='home';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:6};$('#screen').hidden=true;await startCh9();};
+  $('#jump10').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:5,wits:6,charm:6,coin:12,arms:3};S.items=['marble'];S.war={tobinSaved:1,aldric:1,aldricKnows:1};S.past={rent:'paid'};S.master='forge';S.c4f='trade';S.c7f='sea';S.c8f='home';S.c6={letter:{want:'explore',friend:'Wil',msg:'Be brave.'}};S.c9={title:'A good keeper',riddle:0,score:16};S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:6};$('#screen').hidden=true;await startCh10();};
+  $('#jump11').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:2,wits:2,charm:2,coin:4,arms:0};S.items=['marble'];S.master='forge';S.c10f={succ:'tam',bond:5};S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh11();};
+  $('#jump12').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:3,wits:3,charm:3,coin:6,arms:1};S.items=['marble'];S.master='forge';S.c11f={champ:'you'};S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh12();};
+  $('#jump13').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:4,wits:4,charm:4,coin:8,arms:2};S.items=['marble'];S.master='forge';S.c12f='ferry';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh13();};
+  for(let n=14;n<=18;n++){const b=$('#jump'+n);if(!b)continue;if(!JUMPX[n]){b.hidden=true;continue;}b.onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);$('#screen').hidden=true;await JUMPX[n](nm);};}
 }
-
+const JUMPX={};
 /* ---------- INPUT ---------- */
 const keys={};
 function doAction(){
   if(mode==='dialog')dAction();
   else if(mode==='mini'){mini.action&&mini.action();}
-  else if(mode==='play'){if(S&&(S.ch===3||S.ch===7||S.ch===8||S.ch===12||(S.ch===13&&!!S.c13war)))C3.attack();else interact();}
+  else if(mode==='play'){if(S&&(inC3()))C3.attack();else interact();}
 }
 addEventListener('keydown',e=>{
   if(e.target&&e.target.tagName==='INPUT'){if(e.key==='Enter'){const b=$('#begin');b&&b.click();}return;}
   const k=e.key.toLowerCase();
   if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)&&mode!=='screen')e.preventDefault();
   keys[k]=true;
+  if(mode!=='mini'&&!e.repeat){if(k==='m'){setSound(!SND.on);return;}if(k==='t'&&mode==='play'&&S&&!busy){showTree();return;}}
   const act=k==='e'||k===' '||k==='enter';
   if(mode==='dialog'){if(act){e.preventDefault();if(!e.repeat)dAction();}else if(k==='arrowup'||k==='w')dMove(-1);else if(k==='arrowdown'||k==='s')dMove(1);else if(/^[1-4]$/.test(k))dPick(+k-1);}
   else if(mode==='mini'){if(act){e.preventDefault();if(!e.repeat&&mini.action)mini.action();}else if(/^[1-4]$/.test(k)&&mini.pick)mini.pick(+k-1);else if(mini.key)mini.key(k);}
-  else if(mode==='play'){if(S&&(S.ch===3||S.ch===7||S.ch===8||S.ch===12||(S.ch===13&&!!S.c13war))){if(!e.repeat)C3.keydown(k);}else if(act&&!e.repeat){e.preventDefault();interact();}}
+  else if(mode==='play'){if(S&&(inC3())){if(!e.repeat)C3.keydown(k);}else if(act&&!e.repeat){e.preventDefault();interact();}}
 });
 addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
@@ -4437,6 +4820,7 @@ function findTarget(){
   for(const n of npcs){if(!n.vis())continue;const p=n.ip?{x:n.ip[0]*TS+8,y:n.ip[1]*TS+8}:npcPos(n);const r=n.ip?24:22;const d=Math.hypot(p.x-player.x,p.y-6-player.y+6);if(d<r&&d<bd){bd=d;best={label:n.label,act:n.act,npc:n};}}
   for(const h of hotspots){if(h.on&&!h.on())continue;const d0=Math.hypot(h.tx*TS+8-player.x,h.ty*TS+8-player.y),d=d0-(h.prio||0);if(d0<h.r&&d<bd){bd=d;best={label:h.label(),act:h.act};}}
   if(KID.on&&(S.ch===5||S.ch===6||S.ch===10)){const d=Math.hypot(KID.x-player.x,KID.y-player.y)+6;if(d<32&&d<bd){bd=d;best={label:'Talk to '+(S.ch===10?S.gc.name:S.ch===6?'Wil':S.kid.name),act:S.ch===10?()=>talk10('gc'):S.ch===6?()=>talk6('wil'):talkKid};}}
+  if(!best&&PET.on&&S.pet&&Math.hypot(PET.x-player.x,PET.y-player.y)<22)best={label:'Pat '+S.pet.name,act:patPet};
   for(const w of wanderers){if(S.period>=3||best)break;const d=Math.hypot(w.x-player.x,w.y-player.y);if(d<16&&d<bd){bd=d;best={label:'Talk',act:()=>say('A townsperson',w.lines[S.day%w.lines.length])}; }}
   return best;
 }
@@ -4458,7 +4842,7 @@ function update(dt){
     if(dy){const ny=player.y+dy*sp;if(!blocked(player.x,ny))player.y=ny;}
     if(dx||dy)player.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?'left':'right'):(dy<0?'up':'down');
     if(player.moving){player.anim+=dt*8;player.step=[0,1,0,2][Math.floor(player.anim)%4];}else player.step=0;
-    S.x=player.x;S.y=player.y;S.dir=player.dir;kidTick(dt);
+    S.x=player.x;S.y=player.y;S.dir=player.dir;kidTick(dt);petTick(dt);
     target=findTarget();
   }else{target=null;}
   for(const n of npcs){if(n.face&&mode==='play'&&!busy){n.faceT=(n.faceT||0)+dt;if(n.faceT>2){n.face=null;n.faceT=0;}}}
@@ -4498,6 +4882,7 @@ function render(time,dt){
     if(S.period<3)for(const w of wanderers){list.push({y:w.y,f:()=>drawPerson(ctx,w.x-cx,w.y-cy,w.L,w.ax==='x'?(w.dir<0?'left':'right'):(w.dir<0?'up':'down'),w.step)});}
     if(S.ch===2&&S.day>=3){for(const [tx,ty] of [[31,25],[34,25]])list.push({y:ty*TS+15,f:()=>drawTent(tx*TS-cx,ty*TS-cy)});list.push({y:26*TS+10,f:()=>drawFire(32*TS+8-cx,26*TS+12-cy,t)});}
     if(KID.on)list.push({y:KID.y,f:()=>drawPerson(ctx,KID.x-cx,KID.y-cy,kidLook(),'down',KID.moving?1:0)});
+    if(PET.on)list.push({y:PET.y,f:()=>drawPet2D(ctx,PET.x-cx,PET.y-cy,S.pet,PET.dir,PET.moving?Math.floor(time/110)%2:0)});
     list.push({y:player.y,f:()=>drawPerson(ctx,player.x-cx,player.y-cy,playerLook(),player.dir,player.step,{sword:S.items.includes('sword'),bread:!!S.flags.bread})});
   }else{
     for(const w of wanderers){list.push({y:w.y,f:()=>drawPerson(ctx,w.x-cx,w.y-cy,w.L,w.ax==='x'?(w.dir<0?'left':'right'):(w.dir<0?'up':'down'),w.step)});}
@@ -4534,7 +4919,7 @@ function updatePrompt(){
 let last=performance.now(),hudT=0,saveT=0;
 function loop(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
-  if(D.typing){D.shown+=dt*55;D.txt.textContent=D.full.slice(0,Math.floor(D.shown));if(D.shown>=D.full.length)dShowChoices();}
+  if(D.typing){if(Math.floor(D.shown/3)!==SND.lb){SND.lb=Math.floor(D.shown/3);sfx('blip');}D.shown+=dt*55;D.txt.textContent=D.full.slice(0,Math.floor(D.shown));if(D.shown>=D.full.length)dShowChoices();}
   if(C3.active()){if(C3.isTown()){update(dt);updatePrompt();}}
   else{update(dt);render(now,dt);}
   hudT+=dt;if(hudT>.5&&S){hudT=0;if(S.flags.bread||S.flags.letters||(S.race&&S.race.on))$('#objTxt').textContent=objective();}
@@ -4542,6 +4927,7 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+$('#treeBtn').onclick=()=>showTree();$('#sndBtn').onclick=()=>setSound(!SND.on);$('#sndBtn').textContent=SND.on?'♪ Sound on':'♪ Sound off';$('#sndBtn').setAttribute('aria-pressed',SND.on);cloudInit();
 titleScreen();
 })();
 </script>
