@@ -17,7 +17,7 @@
   --warn:#ffd36b;
   --bad:#ff5d7a;
   --wood:#c27a3e; --stone:#9a86e0; --ore:#ff9a3c; --crystal:#5ff3ff; --frost:#8fb8ff; --coin:#ffd23a;
-  --ice:#bfe6ff; --magma:#ff5a2a; --spore:#6affc8; --star:#fff27a; --prism:#e0a8ff;
+  --ice:#bfe6ff; --magma:#ff5a2a; --spore:#6affc8; --star:#fff27a; --prism:#e0a8ff; --feather:#7ad8ff;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 html,body{height:100%;overflow:hidden;background:#1b2350;color:var(--text);font-family:'Fredoka',system-ui,sans-serif}
@@ -36,6 +36,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 .ic.spore{background:linear-gradient(135deg,#bfffe8,#6affc8 45%,#ff7ae0);border-radius:50% 50% 4px 4px;transform:none}
 .ic.star{background:radial-gradient(circle,#fff,#fff27a 50%,#ffb020);clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);transform:none;box-shadow:none;border-radius:0}
 .ic.prism{background:linear-gradient(135deg,#ff8a8a,#ffd36b 25%,#7dff8a 50%,#5fb8ff 75%,#c88aff);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);transform:none;box-shadow:none;border-radius:0}
+.ic.feather{background:linear-gradient(160deg,#fff 0%,#7ad8ff 40%,#3a6aff 80%);border-radius:90% 10% 90% 10%;transform:rotate(-20deg)}
 .ic.coins{background:radial-gradient(circle at 35% 35%,#fff3a8,var(--coin) 45%,#c98a12);border-radius:50%;transform:none;box-shadow:inset -2px -2px 0 rgba(0,0,0,.2)}
 #bag{padding:6px 10px;min-width:170px;font-size:13px;font-weight:700}
 #bag .bar{height:8px;border-radius:5px;background:rgba(255,255,255,.15);margin-top:4px;overflow:hidden}
@@ -203,6 +204,10 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
 .mail .ttl{font-weight:700;font-size:16px;margin:2px 0}
 .mail .bd{font-size:14px;color:var(--muted);line-height:1.4}
 .mail .acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+#tmapBtn{position:absolute;right:12px;bottom:222px;pointer-events:auto;font-family:inherit;font-size:13px;font-weight:700;color:#fff;padding:7px 11px;cursor:pointer}
+#tmapBtn[hidden],#tmHint[hidden]{display:none}
+#tmapBtn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#tmHint{padding:6px 10px;font-size:13px;font-weight:700}
 .nameprev{margin-top:14px;text-align:center;font-size:26px;font-weight:700;text-shadow:0 2px 0 rgba(0,0,0,.5)}
 @media (max-width:600px){
   .planets{grid-template-columns:1fr}
@@ -220,6 +225,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
   .toast.big,.toast.ice,.toast.fire,.toast.jungle{font-size:17px}
   #musicBtn{bottom:88px}
   #photoBtn{bottom:164px}
+  #tmapBtn{bottom:202px}
   .pb{font-size:13px;padding:7px 10px}
   #profileBtn{bottom:126px}
   #tools{max-width:calc(100vw - 190px)}
@@ -247,6 +253,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
     <div id="quest" class="panel"><div class="h">★ GOAL</div><div class="t" id="qT"></div><div class="p" id="qP"></div></div>
     <div id="buffs"></div>
     <div id="rushChip" class="panel" hidden></div>
+    <div id="tmHint" class="panel" hidden></div>
   </div>
   <div id="boss" class="panel"><div class="nm" id="bossName">❄ ICE GOLEM</div><div class="bar"><div class="fill" id="bossFill"></div></div></div>
   <div id="res">
@@ -261,6 +268,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
       <div class="chip panel" id="r-spore"><i class="ic spore"></i><b>0</b></div>
       <div class="chip panel" id="r-star"><i class="ic star"></i><b>0</b></div>
       <div class="chip panel" id="r-prism"><i class="ic prism"></i><b>0</b></div>
+      <div class="chip panel" id="r-feather"><i class="ic feather"></i><b>0</b></div>
     </div>
     <div id="bag" class="panel"><div>🎒 BAG <span id="bagTxt">0/20</span></div><div class="bar"><div class="fill" id="bagFill"></div></div><div class="contents" id="bagC"></div></div>
   </div>
@@ -271,6 +279,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
   <button id="musicBtn" class="panel">🎵 Music</button>
   <button id="profileBtn" class="panel">👤 Name</button>
   <button id="photoBtn" class="panel">📷 Photo</button>
+  <button id="tmapBtn" class="panel" hidden>🗺 Treasure</button>
   <button id="jumpBtn" class="panel" aria-label="Jump">⤒<span>JUMP</span></button>
 </div>
 <div id="joy"><div class="k"></div></div>
@@ -292,7 +301,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
     <p>Your ship crash-landed on a forgotten planet. Gather wood, stone, ore and crystals, rebuild the abandoned outpost, and survive the Gloomers that crawl out at night.</p>
     <button class="btn" id="play">Play</button><br>
     <button class="btn ghost" id="newgame" style="display:none">Start over</button><br>
-    <span class="new">NEW: Crystal Caverns, a secret boss, farming &amp; photo mode</span>
+    <span class="new">NEW: Skyreach, the Thunder Roc, pet evolution, treasure maps, a museum &amp; seasons</span>
     <div class="keys">Move: <b>WASD</b> / arrows · drag on phone · <b>Space</b> jump · <b>Q</b> switch weapon<br>Walk up to trees &amp; rocks to harvest · stand on glowing pads to build</div>
   </div>
 </div>
@@ -314,10 +323,10 @@ const lerp = (a, b, t) => a + (b - a) * t;
 let seed = 1337;
 const srand = () => (seed = (seed * 16807) % 2147483647, (seed - 1) / 2147483646);
 const sr = (a, b) => a + srand() * (b - a);
-const RES = ['wood', 'stone', 'ore', 'crystal', 'frost', 'magma', 'spore', 'star', 'prism'];
+const RES = ['wood', 'stone', 'ore', 'crystal', 'frost', 'magma', 'spore', 'star', 'prism', 'feather'];
 const COST_KEYS = ['coins', ...RES];
-const RES_NAME = { wood: 'Wood', stone: 'Stone', ore: 'Ore', crystal: 'Crystal', frost: 'Frost Gems', magma: 'Magma Cores', spore: 'Spore Crystals', star: 'Star Cores', prism: 'Prism Shards', coins: 'Coins' };
-const RES_COL = { wood: 0xc27a3e, stone: 0x9a86e0, ore: 0xff9a3c, crystal: 0x5ff3ff, frost: 0x8fb8ff, magma: 0xff5a2a, spore: 0x6affc8, star: 0xfff27a, prism: 0xe0a8ff, coins: 0xffd23a };
+const RES_NAME = { wood: 'Wood', stone: 'Stone', ore: 'Ore', crystal: 'Crystal', frost: 'Frost Gems', magma: 'Magma Cores', spore: 'Spore Crystals', star: 'Star Cores', prism: 'Prism Shards', feather: 'Storm Feathers', coins: 'Coins' };
+const RES_COL = { wood: 0xc27a3e, stone: 0x9a86e0, ore: 0xff9a3c, crystal: 0x5ff3ff, frost: 0x8fb8ff, magma: 0xff5a2a, spore: 0x6affc8, star: 0xfff27a, prism: 0xe0a8ff, feather: 0x7ad8ff, coins: 0xffd23a };
 const ic = r => `<i class="ic ${r}"></i>`;
 const dist2 = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -330,11 +339,11 @@ const SAVE_KEY = 'lost-outpost-save-v1';
 const OLD_Q = ['trees', 'rocks', 'deposit', 'workshop', 'pick2', 'mine', 'ore', 'generator', 'turret', 'house', 'pick3', 'crystals', 'portal'];
 function freshState() {
   return {
-    store: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0, spore: 0, star: 0, prism: 0 },
-    bag: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0, spore: 0, star: 0, prism: 0 },
+    store: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0, spore: 0, star: 0, prism: 0, feather: 0 },
+    bag: { wood: 0, stone: 0, ore: 0, crystal: 0, frost: 0, magma: 0, spore: 0, star: 0, prism: 0, feather: 0 },
     tools: { axe: 1, pick: 1, sword: 1, bag: 1 },
     built: {}, paid: {},
-    stats: { trees: 0, rocks: 0, ore: 0, crystal: 0, kills: 0, deposits: 0, frostTrees: 0, frost: 0, golem: 0, sold: 0, iceVisits: 0, obsTrees: 0, magma: 0, serpent: 0, crossed: 0, emberVisits: 0, goblins: 0, meteors: 0, flights: 0, cosBought: 0, hatched: 0, fish: 0, legendFish: 0, cooked: 0, bounces: 0, swings: 0, queen: 0, jungleVisits: 0, rushes: 0, recruited: 0, jobs: 0, spore: 0, jumps: 0, stationGap: 0, stationVisits: 0, aicore: 0, star: 0, fameVisit: 0, prism: 0, shadow: 0, carts: 0, caveVisits: 0, harvests: 0, planted: 0, photos: 0, lettersRead: 0, mailQuests: 0 },
+    stats: { trees: 0, rocks: 0, ore: 0, crystal: 0, kills: 0, deposits: 0, frostTrees: 0, frost: 0, golem: 0, sold: 0, iceVisits: 0, obsTrees: 0, magma: 0, serpent: 0, crossed: 0, emberVisits: 0, goblins: 0, meteors: 0, flights: 0, cosBought: 0, hatched: 0, fish: 0, legendFish: 0, cooked: 0, bounces: 0, swings: 0, queen: 0, jungleVisits: 0, rushes: 0, recruited: 0, jobs: 0, spore: 0, jumps: 0, stationGap: 0, stationVisits: 0, aicore: 0, star: 0, fameVisit: 0, prism: 0, shadow: 0, carts: 0, caveVisits: 0, harvests: 0, planted: 0, photos: 0, lettersRead: 0, mailQuests: 0, skyVisits: 0, feather: 0, gusts: 0, drafts: 0, roc: 0, evolved: 0, megaPets: 0, donated: 0, pieces: 0, fed: 0 },
     day: 1, time: 0.08, hp: 100, maxHp: 100,
     coins: 0, weapons: { sword: true }, weapon: 'sword',
     daily: { last: null, streak: 0, claims: 0 },
@@ -343,6 +352,7 @@ function freshState() {
     crew: [], fish: {}, rushDay: 0, rushBest: 0, queenDay: 0, lastSeen: 0,
     profile: { name: 'Pip', color: '#ffffff', named: 0 }, pets: { owned: {}, active: null }, waveBest: 0, coreDay: 0,
     runes: {}, tree: {}, mail: { letters: [], seq: 0, t: 25 }, farm: { plots: [null, null, null, null, null, null] }, food: { carrot: 0, corn: 0, pumpkin: 0 }, shadowDay: 0,
+    rocDay: 0, petxp: {}, tmap: { pieces: 0, site: -1, dug: {}, chests: 0, last: -1 }, relics: {}, museum: { fish: {}, gems: {}, relics: {}, done: {} }, seasonHarv: 0,
     cos: { owned: { suit_orange: true, hat_none: true }, suit: 'orange', hat: 'none' },
   };
 }
@@ -376,6 +386,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
+const SKY_REACH_DAY = new THREE.Color(0x8ac8ff), SKY_REACH_NIGHT = new THREE.Color(0x1a2a5a), SKY_REACH_STORM = new THREE.Color(0x4a5a7a);
 const SKY_DAY = new THREE.Color(0x1d2a63), SKY_NIGHT = new THREE.Color(0x060818), SKY_MINE = new THREE.Color(0x07040d);
 const ICE_DAY = new THREE.Color(0x3c6fae), ICE_NIGHT = new THREE.Color(0x0a1534), ICE_STORM = new THREE.Color(0xcfe3f5);
 const JUN_DAY = new THREE.Color(0x2f6a5a), JUN_NIGHT = new THREE.Color(0x061612);
@@ -489,7 +500,7 @@ const CHASMS = [{ z0: -6, z1: -1 }, { z0: -22, z1: -17 }];
 const LAGOON = jv(-19, 18), LAGOON_R = 6;
 const POND = V(20, 0, 22), POND_R = 3.8;
 const CREW_POS = V(-17, 0, 13), KITCHEN_POS = V(16, 0, 15), OBELISK_POS = V(8, 0, -21);
-const MAXLV = { workshop: 1, generator: 3, house1: 2, house2: 2, turret1: 3, turret2: 3, trading: 1, petden: 3, shop: 1, forge: 1, heater: 3, nest: 3, crew: 3, kitchen: 1, petcenter: 1, farm: 1 };
+const MAXLV = { workshop: 1, generator: 3, house1: 2, house2: 2, turret1: 3, turret2: 3, trading: 1, petden: 3, shop: 1, forge: 1, heater: 3, nest: 3, crew: 3, kitchen: 1, petcenter: 1, farm: 1, museum: 1, glider: 1 };
 // Nebula Station (space station) & the Survival arena
 const ST_C = V(1000, 0, -1000);
 const sv = (x, z) => V(ST_C.x + x, 0, ST_C.z + z);
@@ -508,6 +519,16 @@ const ALTAR = cvv(4, -54);
 const LAMPS = [[-8, 16], [8, 6], [40, -5], [-7, -45], [15, -50]];
 const RAIL_PTS = [[[11, 0, 6], [17, .5, 3], [22, 2.5, -2], [26, 1, -6], [29, 0, -10], [31, 0, -12]], [[-2, 0, -1], [-6, 1, -8], [-4, 3, -15], [2, -1, -21], [4, 1, -26], [2, 0, -32]], [[36, 0, -25], [33, 2, -31], [27, 3.5, -36], [21, 1, -42], [17, 0, -44]]];
 const MAIL_POS = V(4.6, 0, -6.2), TABLE_POS = V(-4.6, 0, -6.2), FARM_POS = V(-18, 0, 23), FARM_ROT = 2.48;
+// Skyreach (floating sky islands) + the museum
+const SK_C = V(1000, 0, 1000);
+const skv = (x, z) => V(SK_C.x + x, 0, SK_C.z + z);
+const SKY_ISLES = [{ x: 0, z: 16, r: 13 }, { x: -32, z: -6, r: 10 }, { x: 32, z: -8, r: 10 }, { x: 0, z: -16, r: 7 }, { x: 0, z: -50, r: 15 }];
+const SKY_BRIDGES = [[-9, 9, -25, -1], [0, 4, 0, -10], [-24, -9, -6, -15]];
+const SKY_GUSTS = [{ x: 8, z: 9, tx: 27, tz: -4 }, { x: 26, z: -12, tx: 5, tz: 11 }, { x: 0, z: -37.5, tx: 0, tz: -12.5 }];
+const SKY_DRAFTS = [{ x: 0, z: -20.5 }, { x: 36, z: -13 }, { x: -6, z: 22 }];
+const SK_CAMP = skv(0, 18), SK_ARRIVE = skv(1, 17), SK_STORE_POS = skv(-5, 20).setY(1);
+const ROC_NEST = skv(0, -54);
+const MUSEUM_POS = V(24, 0, 2);
 const ECAMP = ev(0, 12);
 const EMB_PORTAL_T = ev(0, 5.4);
 const EMB_ARRIVE = ev(0, 8.8);
@@ -518,12 +539,12 @@ const BRIDGE_X = -6;
 const EP_ON_ICE = iv(20, 8);
 const EP_ICE_T = iv(20, 10.2);
 const ICE_FROM_EMB = iv(20, 13.4);
-const SHIP_SPOTS = { home: { pad: V(-.6, 0, 14), arrive: V(1.6, 0, 11.4) }, ice: { pad: iv(6.8, 20.3), arrive: iv(4.4, 18.2) }, ember: { pad: ev(8, 13.5), arrive: ev(5.6, 11.2) }, jungle: { pad: jv(3.6, 17), arrive: jv(1, 14.2) }, station: { pad: sv(5.5, 13.5), arrive: sv(2, 11) }, arena: { pad: ARENA_EXIT, arrive: ARENA_EXIT }, cave: { pad: cvv(5, 18.5), arrive: cvv(1, 15) } };
+const SHIP_SPOTS = { home: { pad: V(-.6, 0, 14), arrive: V(1.6, 0, 11.4) }, ice: { pad: iv(6.8, 20.3), arrive: iv(4.4, 18.2) }, ember: { pad: ev(8, 13.5), arrive: ev(5.6, 11.2) }, jungle: { pad: jv(3.6, 17), arrive: jv(1, 14.2) }, station: { pad: sv(5.5, 13.5), arrive: sv(2, 11) }, arena: { pad: ARENA_EXIT, arrive: ARENA_EXIT }, cave: { pad: cvv(5, 18.5), arrive: cvv(1, 15) }, sky: { pad: skv(5.5, 20.5), arrive: skv(1, 17) } };
 const SHOP_POS = V(5, 0, 16.5);
 const ORIGIN = V(0, 0, 0);
-const zoneOf = (x, z) => z > 700 ? 'cave' : z > 300 ? 'mine' : x > 700 ? (z < -700 ? 'station' : 'ice') : x < -700 ? (z < -700 ? 'arena' : 'ember') : z < -700 ? 'jungle' : 'home';
-const zoneCenter = z => z === 'mine' ? MINE_C : z === 'ice' ? ICE_C : z === 'ember' ? EMB_C : z === 'jungle' ? JUN_C : z === 'station' ? ST_C : z === 'arena' ? AR_C : z === 'cave' ? CV_C : ORIGIN;
-const zoneRadius = z => z === 'mine' ? 25 : z === 'ice' ? ICE_R - 3 : z === 'ember' ? EMB_R - 3 : z === 'jungle' ? JUN_R - 3 : z === 'station' ? 64 : z === 'arena' ? 20 : z === 'cave' ? 64 : ISLAND_R - 3;
+const zoneOf = (x, z) => z > 700 ? (x > 700 ? 'sky' : 'cave') : z > 300 ? 'mine' : x > 700 ? (z < -700 ? 'station' : 'ice') : x < -700 ? (z < -700 ? 'arena' : 'ember') : z < -700 ? 'jungle' : 'home';
+const zoneCenter = z => z === 'mine' ? MINE_C : z === 'ice' ? ICE_C : z === 'ember' ? EMB_C : z === 'jungle' ? JUN_C : z === 'station' ? ST_C : z === 'arena' ? AR_C : z === 'cave' ? CV_C : z === 'sky' ? SK_C : ORIGIN;
+const zoneRadius = z => z === 'mine' ? 25 : z === 'ice' ? ICE_R - 3 : z === 'ember' ? EMB_R - 3 : z === 'jungle' ? JUN_R - 3 : z === 'station' ? 64 : z === 'arena' ? 20 : z === 'cave' ? 64 : z === 'sky' ? 80 : ISLAND_R - 3;
 
 const colliders = [];
 function addCol(x, z, r) { const c = { x, z, r, on: true }; colliders.push(c); return c; }
@@ -580,6 +601,7 @@ function island(center, radius, colA, colB, colC, underCol, rimCol) {
   um.position.set(center.x, -23.6, center.z); scene.add(um);
   const rim = new THREE.Mesh(new THREE.CylinderGeometry(radius + 4, radius + 3, 2, 64, 1, true), new THREE.MeshLambertMaterial({ color: rimCol, flatShading: true }));
   rim.position.set(center.x, -1.6, center.z); scene.add(rim);
+  return ground;
 }
 function floatingRocks(center, rockCol, capCol) {
   for (let i = 0; i < 14; i++) {
@@ -595,7 +617,8 @@ function floatingRocks(center, rockCol, capCol) {
     scene.add(g); floaters.push(g);
   }
 }
-island(V(0, 0, 0), ISLAND_R, 0x9ad24a, 0x84c23c, 0xb3dd5a, 0x6b57a8, 0x8a6a4a);
+const SEASON_REF = {};
+SEASON_REF.ground = island(V(0, 0, 0), ISLAND_R, 0x9ad24a, 0x84c23c, 0xb3dd5a, 0x6b57a8, 0x8a6a4a);
 floatingRocks(V(0, 0, 0), 0x7a66c4, 0x9ad24a);
 
 function cliffRing(center, radius, count, colors, scale = 1) {
@@ -618,7 +641,7 @@ cliffRing(V(0, 0, 0), ISLAND_R, 44, [0x7d69c8, 0x8f7ad6, 0x6c5bb5]);
     part(G.cone4, 0x95d64a, .12, .3, .05, -.1, 0, -.35, .1, .6, .1),
     part(G.cone4, 0x6fb534, -.1, .28, -.06, .15, 0, .1, .1, .55, .1),
   ]);
-  const N = 700, im = new THREE.InstancedMesh(tuft, VCMAT, N);
+  const N = 700, im = new THREE.InstancedMesh(tuft, SEASON_REF.tuftMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), N);
   const fl = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.13, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), 140);
   const d = new THREE.Object3D(), fc = [0xff7a2a, 0xffd23a, 0xff5fa8, 0xffffff];
   let k = 0, f = 0;
@@ -633,7 +656,7 @@ cliffRing(V(0, 0, 0), ISLAND_R, 44, [0x7d69c8, 0x8f7ad6, 0x6c5bb5]);
     }
   }
   fl.count = f;
-  scene.add(im, fl);
+  scene.add(im, fl); SEASON_REF.fl = fl; SEASON_REF.tuft = im;
 }
 
 /* ================================================================
@@ -829,6 +852,9 @@ const NODE_DEF = {
   prism:   { res: 'prism', hp: 12, yield: 2, tool: 'pick', req: 5, respawn: 60, r: 1.0, sfx: 'crystal', chip: 0xe0a8ff },
   gemrock: { res: 'stone', hp: 5, yield: 3, tool: 'pick', req: 1, respawn: 30, r: 1.1, sfx: 'mine', chip: 0x6a5a7a },
   cshroom: { res: 'wood', hp: 4, yield: 3, tool: 'axe', req: 1, respawn: 30, r: .8, sfx: 'chop', chip: 0x7affd8 },
+  feather: { res: 'feather', hp: 12, yield: 2, tool: 'axe', req: 4, respawn: 60, r: .9, sfx: 'crystal', chip: 0x7ad8ff },
+  cloudtree: { res: 'wood', hp: 4, yield: 3, tool: 'axe', req: 1, respawn: 30, r: .7, sfx: 'chop', chip: 0xffffff },
+  skyrock: { res: 'stone', hp: 5, yield: 3, tool: 'pick', req: 1, respawn: 30, r: 1.1, sfx: 'mine', chip: 0xd8cfe8 },
 };
 const TOOL_NAME = { axe: 'Axe', pick: 'Pickaxe', sword: 'Sword', bag: 'Backpack' };
 
@@ -1021,10 +1047,39 @@ function makeCaveShroom() {
   g.add(mesh(parts)); const cm = new THREE.Mesh(mergeGeometries(caps), emis(col, 1)); cm.castShadow = true; g.add(cm);
   return g;
 }
+const FEATHER_MATS = [0x7ad8ff, 0xfff27a, 0xb8a8ff].map(c => new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: .7, flatShading: true }));
+function makeFeatherNest() {
+  const g = new THREE.Group(), parts = [];
+  for (let i = 0; i < 14; i++) { const a = i / 14 * 6.28; parts.push(part(G.cyl6, [0xa0703c, 0x8a5a3c][i % 2], Math.cos(a) * .55, .22, Math.sin(a) * .55, Math.PI / 2, -a + sr(-.3, .3), 0, .06, .7, .06)); }
+  parts.push(part(G.cyl8, 0x6a4430, 0, .1, 0, 0, 0, 0, .55, .2, .55));
+  g.add(mesh(parts));
+  const n = 3 + Math.floor(srand() * 3);
+  for (let i = 0; i < n; i++) {
+    const a = i / n * 6.28 + sr(-.3, .3), f = new THREE.Group(); f.position.set(Math.cos(a) * .25, .25, Math.sin(a) * .25); f.rotation.set(Math.sin(a) * .35, 0, -Math.cos(a) * .35);
+    const vane = new THREE.Mesh(G.sph, FEATHER_MATS[i % 3]); vane.scale.set(.13, .55, .04); vane.position.y = .55; vane.castShadow = true; f.add(vane);
+    const quill = new THREE.Mesh(G.box, new THREE.MeshLambertMaterial({ color: 0xffffff })); quill.scale.set(.025, 1.1, .025); quill.position.y = .5; f.add(quill);
+    g.add(f);
+  }
+  return g;
+}
+function makeCloudTree() {
+  const g = new THREE.Group(), h = sr(1.8, 2.6);
+  g.add(mesh([part(G.cyl6, 0xe8dcc8, 0, h / 2, 0, 0, 0, 0, .16, h, .16), part(G.cyl6, 0xd8ccb8, .2, h * .55, 0, 0, 0, -.6, .07, .8, .07)]));
+  const c = [], col = [0xffffff, 0xfff0f8, 0xf0f6ff][Math.floor(srand() * 3)];
+  for (let i = 0; i < 5; i++) { const a = i * 1.3; c.push(part(G.ico1, i % 2 ? col : 0xffffff, Math.cos(a) * sr(.3, .6), h + sr(-.1, .5), Math.sin(a) * sr(.3, .6), 0, 0, 0, sr(.55, .8))); }
+  c.push(part(G.ico1, col, 0, h + .7, 0, 0, 0, 0, .6));
+  const cm = new THREE.Mesh(mergeGeometries(c), new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xc8d8ff, emissiveIntensity: .25, flatShading: true })); cm.castShadow = true; g.add(cm);
+  return g;
+}
+function makeSkyRock() {
+  const g = new THREE.Group();
+  g.add(mesh([part(jitter(G.dode, .35), [0xd8cfe8, 0xc4b8dc, 0xe4dcf0][Math.floor(srand() * 3)], 0, .5, 0, 0, sr(0, 3), 0, 1.1, .8, 1.05), part(G.cyl6, 0x9ae07a, 0, .95, 0, 0, sr(0, 3), 0, .7, .14, .65), part(jitter(G.dode, .3), 0xb0a4cc, sr(.5, .8), .25, sr(-.4, .4), 0, 0, 0, .45)]));
+  return g;
+}
 const OSTUMP_GEO = mergeGeometries([part(G.cyl6, 0x2a2030, 0, .2, 0, 0, 0, 0, .25, .4, .25), part(G.cyl6, 0xff8a3a, 0, .41, 0, 0, 0, 0, .2, .03, .2)]);
 const STUMP_GEO = mergeGeometries([part(G.cyl6, 0x7a4c32, 0, .2, 0, 0, 0, 0, .3, .4, .3), part(G.cyl6, 0xd9a46a, 0, .41, 0, 0, 0, 0, .26, .02, .26)]);
 const ISTUMP_GEO = mergeGeometries([part(G.cyl6, 0x4a5a8a, 0, .2, 0, 0, 0, 0, .25, .4, .25), part(G.cyl6, 0xdff6ff, 0, .41, 0, 0, 0, 0, .22, .03, .22)]);
-const MAKERS = { tree: () => srand() < .72 ? makePalm() : makePuff(), rock: () => makeRock(sr(.85, 1.15)), ore: makeOre, crystal: makeCrystal, ftree: makeFrostTree, icerock: makeIceRock, frost: makeFrostGem, otree: makeObsTree, basalt: makeBasalt, magma: makeMagma, jtree: makeJTree, mossrock: makeMossRock, spore: makeSpore, planter: makePlanter, scrap: makeScrap, star: makeStarPod, prism: makePrism, gemrock: makeGemRock, cshroom: makeCaveShroom };
+const MAKERS = { tree: () => srand() < .72 ? makePalm() : makePuff(), rock: () => makeRock(sr(.85, 1.15)), ore: makeOre, crystal: makeCrystal, ftree: makeFrostTree, icerock: makeIceRock, frost: makeFrostGem, otree: makeObsTree, basalt: makeBasalt, magma: makeMagma, jtree: makeJTree, mossrock: makeMossRock, spore: makeSpore, planter: makePlanter, scrap: makeScrap, star: makeStarPod, prism: makePrism, gemrock: makeGemRock, cshroom: makeCaveShroom, feather: makeFeatherNest, cloudtree: makeCloudTree, skyrock: makeSkyRock };
 function addNode(type, x, z) {
   const m = MAKERS[type]();
   const def = NODE_DEF[type];
@@ -1309,6 +1364,33 @@ function refreshBuilding(id, anim = true) {
       parts.push(part(G.box, 0x8a5a3c, -2.8, 1, -1.9, 0, 0, 0, .08, 2, .08), part(G.box, 0x8a5a3c, -2.8, 1.5, -1.9, 0, 0, 0, .9, .08, .08), part(G.sph, 0xe8c870, -2.8, 2.15, -1.9, 0, 0, 0, .25, .25, .25), part(G.cone6, 0xc8a070, -2.8, 2.45, -1.9, 0, 0, 0, .3, .3, .3));
       b.g.add(mesh(parts));
     }
+  } else if (b.type === 'glider') {
+    const parts = [part(G.box, 0x8a5a3c, -.9, .9, 0, 0, 0, 0, .12, 1.8, .12), part(G.box, 0x8a5a3c, .9, .9, 0, 0, 0, 0, .12, 1.8, .12), part(G.box, 0x6a4430, 0, 1.75, 0, 0, 0, 0, 2, .1, .1), part(G.box, 0x9a6a3a, 0, .05, 0, 0, 0, 0, 2.4, .1, 1)];
+    if (L) {
+      const sail = new THREE.BufferGeometry(); sail.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, .9, -1.5, 0, -.5, 1.5, 0, -.5]), 3)); sail.computeVertexNormals();
+      const sm = new THREE.Mesh(sail, new THREE.MeshLambertMaterial({ color: 0xff7a3a, side: THREE.DoubleSide, flatShading: true })); sm.position.y = 2.1; sm.rotation.x = -.25; b.g.add(sm);
+      const st = new THREE.Mesh(sail, new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide })); st.scale.set(.45, 1, .45); st.position.set(0, 2.13, .2); st.rotation.x = -.25; b.g.add(st);
+      parts.push(part(G.box, 0x3a3a4a, 0, 1.95, 0, 0, 0, 0, .05, .4, .05));
+    } else parts.push(part(G.box, 0xb0a090, .3, .25, .2, 0, .4, 0, 1.4, .06, .5), part(G.box, 0x8a8070, -.4, .15, -.2, 0, -.3, 0, .9, .06, .4));
+    b.g.add(mesh(parts));
+  } else if (b.type === 'museum') {
+    if (!L) b.g.add(ruin(4.4, 3.4));
+    else {
+      const parts = [part(G.box, 0xd8d0e8, 0, .2, 0, 0, 0, 0, 6.4, .4, 5), part(G.box, 0xc8c0d8, 0, .5, .3, 0, 0, 0, 5.8, .2, 4.4), part(G.box, 0xf0e8f8, 0, 2.2, -.6, 0, 0, 0, 5.4, 3.4, 3)];
+      for (const x of [-2.4, -.8, .8, 2.4]) parts.push(part(G.cyl8, 0xfaf6ff, x, 2.1, 1.6, 0, 0, 0, .28, 3.2, .28), part(G.box, 0xe0d8ec, x, 3.75, 1.6, 0, 0, 0, .7, .15, .7), part(G.box, 0xe0d8ec, x, .7, 1.6, 0, 0, 0, .6, .2, .6));
+      parts.push(part(G.box, 0xe8e0f4, 0, 3.95, .3, 0, 0, 0, 6, .3, 4.2), part(G.prism, 0xd8c8f0, 0, 4.7, .3, Math.PI / 2, 0, Math.PI / 2, 1.2, 4.2, 3.4));
+      parts.push(part(G.box, 0x6a4a8a, 0, 1.5, .92, 0, 0, 0, 1.3, 2, .08), part(G.box, 0xffc23a, 0, 4.6, 1.75, 0, 0, 0, 1.4, .4, .05));
+      b.g.add(mesh(parts));
+      const done = S.museum ? S.museum.done : {};
+      b.cases = ['fish', 'gems', 'relics'].map((k, i) => {
+        const on = done[k], x = (i - 1) * 1.9;
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(.7, .7, .7), new THREE.MeshLambertMaterial({ color: 0xbfe6ff, transparent: true, opacity: .35 })); glass.position.set(x, 1.15 + .35, 2.35); b.g.add(glass);
+        const stand = new THREE.Mesh(G.box, new THREE.MeshLambertMaterial({ color: 0x8a7aa8, flatShading: true })); stand.scale.set(.6, .9, .6); stand.position.set(x, .7, 2.35); b.g.add(stand);
+        const gem = new THREE.Mesh(i === 0 ? G.sph : i === 1 ? G.oct : G.ico, on ? emis([0x5fb8ff, 0xff7ae0, 0xffc23a][i], 1.4) : new THREE.MeshLambertMaterial({ color: 0x5a5470, flatShading: true }));
+        gem.scale.setScalar(.22); gem.position.set(x, 1.5, 2.35); b.g.add(gem);
+        return gem;
+      });
+    }
   } else if (b.type === 'fame') {
     b.g.add(mesh([
       part(G.box, 0x8e86a8, 0, .2, 0, 0, 0, 0, 10, .4, 5.6), part(G.box, 0x9a92b4, 0, .5, -.4, 0, 0, 0, 9.4, .2, 4.4),
@@ -1317,8 +1399,8 @@ function refreshBuilding(id, anim = true) {
       part(G.box, 0xe8e0c0, 0, 4.7, -2.2, 0, 0, 0, 9.8, .5, .6), part(G.box, 0xffc23a, 0, 4.7, -1.88, 0, 0, 0, 5, .35, .05),
       part(G.box, 0xff5a5a, -3.2, 3.6, -2.15, 0, 0, 0, .8, 1.6, .05), part(G.box, 0x5fb8ff, 3.2, 3.6, -2.15, 0, 0, 0, .8, 1.6, .05),
     ]));
-    ['golem', 'serpent', 'queen', 'aicore', 'shadow'].forEach((k, i) => {
-      const x = -3.6 + i * 1.8, won = S.stats[k] > 0;
+    ['golem', 'serpent', 'queen', 'aicore', 'shadow', 'roc'].forEach((k, i) => {
+      const x = -3.75 + i * 1.5, won = S.stats[k] > 0;
       b.g.add(mesh([part(G.cyl8, 0x6e6888, x, .9, -.6, 0, 0, 0, .7, .6, .7), part(G.cyl8, 0x8e86a8, x, 1.25, -.6, 0, 0, 0, .8, .1, .8), part(G.box, won ? 0xffc23a : 0x4a4660, x, .85, .12, -.3, 0, 0, .6, .25, .05)]));
       if (won) { const st = makeStatue(k); st.position.set(x, 1.3, -.6); b.g.add(st); }
       else { const q = new THREE.Mesh(G.oct, new THREE.MeshLambertMaterial({ color: 0x55506a, flatShading: true, transparent: true, opacity: .55 })); q.scale.setScalar(.3); q.position.set(x, 1.8, -.6); b.g.add(q); }
@@ -1427,13 +1509,14 @@ placeBuilding('crew', 'crew', CREW_POS.x, CREW_POS.z, 2.22, 2.5);
 placeBuilding('kitchen', 'kitchen', KITCHEN_POS.x, KITCHEN_POS.z, -2.33, 2.4);
 placeBuilding('obelisk', 'obelisk', OBELISK_POS.x, OBELISK_POS.z, -.36, 1.2);
 placeBuilding('fame', 'fame', FAME_POS.x, FAME_POS.z, Math.PI / 2, 0);
-for (let i = 0; i < 5; i++) addCol(FAME_POS.x - .6, FAME_POS.z - (-3.6 + i * 1.8), .5);
+for (let i = 0; i < 6; i++) addCol(FAME_POS.x - .6, FAME_POS.z - (-3.75 + i * 1.5), .45);
 addCol(FAME_POS.x - 2.2, FAME_POS.z + 4.4, .45); addCol(FAME_POS.x - 2.2, FAME_POS.z - 4.4, .45);
 placeBuilding('petcenter', 'petcenter', PETC_POS.x, PETC_POS.z, .18, 2.1);
 placeBuilding('arenagate', 'arenagate', GATE_POS.x, GATE_POS.z, -.65, 0);
 placeBuilding('mailbox', 'mailbox', MAIL_POS.x, MAIL_POS.z, -2.5, .45);
 placeBuilding('table', 'table', TABLE_POS.x, TABLE_POS.z, 2.5, .9);
 placeBuilding('farm', 'farm', FARM_POS.x, FARM_POS.z, FARM_ROT, 0);
+placeBuilding('museum', 'museum', MUSEUM_POS.x, MUSEUM_POS.z, -Math.PI / 2, 3.3);
 addCol(FARM_POS.x + 2.6 * Math.cos(FARM_ROT) - 1.6 * Math.sin(FARM_ROT), FARM_POS.z - 2.6 * Math.sin(FARM_ROT) - 1.6 * Math.cos(FARM_ROT), 1.1);
 addCol(17.6, -19.8, .6); addCol(14.4, -22.2, .6);
 
@@ -1996,6 +2079,161 @@ const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new
 const rainMat = new THREE.PointsMaterial({ color: 0xa8d0ff, size: .09, transparent: true, opacity: 0, depthWrite: false });
 const rain = new THREE.Points(rainGeo, rainMat); rain.frustumCulled = false; rain.visible = false; scene.add(rain);
 
+/* ================================================================
+   SKYREACH (floating sky islands) + treasure dig sites
+   ================================================================ */
+const skyGusts = [], skyDrafts = [], skyIsleGroups = [], skyWhales = [];
+let skyWindmill = null;
+function skyGround(x, z) {
+  const lx = x - SK_C.x, lz = z - SK_C.z;
+  for (const s of SKY_ISLES) if (dist2(lx, lz, s.x, s.z) < s.r - .2) return true;
+  for (const b of SKY_BRIDGES) {
+    const vx = b[2] - b[0], vz = b[3] - b[1], k = clamp(((lx - b[0]) * vx + (lz - b[1]) * vz) / (vx * vx + vz * vz), 0, 1);
+    if (Math.hypot(lx - b[0] - vx * k, lz - b[1] - vz * k) < .95) return true;
+  }
+  return false;
+}
+const skySafe = (x, z) => skyGround(x, z) && skyGround(x + 1.2, z) && skyGround(x - 1.2, z) && skyGround(x, z + 1.2) && skyGround(x, z - 1.2);
+{
+  const grassA = [0x9ae07a, 0xa8ec8a, 0x8ad46a], rockC = [0xd8cfe8, 0xc4b8dc, 0xb0a4cc];
+  SKY_ISLES.forEach((s, si) => {
+    const grp = new THREE.Group(); grp.position.set(SK_C.x + s.x, 0, SK_C.z + s.z); scene.add(grp); skyIsleGroups.push(grp);
+    const top = new THREE.CircleGeometry(s.r + .6, 40); top.rotateX(-Math.PI / 2);
+    const p = top.attributes.position, cols = new Float32Array(p.count * 3), tc = new THREE.Color();
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), z = p.getZ(i), n = Math.sin(x * .3 + si) * Math.cos(z * .25) + Math.sin(x * .11 + z * .13);
+      tc.setHex(grassA[0]).lerp(new THREE.Color(n > 0 ? grassA[1] : grassA[2]), Math.min(1, Math.abs(n) * .6));
+      if (Math.hypot(x, z) > s.r - .2) tc.setHex(0xf2f6ff);
+      cols[i * 3] = tc.r; cols[i * 3 + 1] = tc.g; cols[i * 3 + 2] = tc.b;
+    }
+    top.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    const gm = new THREE.Mesh(top, new THREE.MeshLambertMaterial({ vertexColors: true })); gm.receiveShadow = true; grp.add(gm);
+    const under = jitter(new THREE.ConeGeometry(s.r + .6, s.r * 1.7, 14, 3, true), 1.4, srand); under.rotateX(Math.PI);
+    const um = new THREE.Mesh(under, new THREE.MeshLambertMaterial({ color: 0xa898c8, flatShading: true })); um.position.y = -s.r * .85 - .05; grp.add(um);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(s.r + .6, s.r + .3, .9, 40, 1, true), new THREE.MeshLambertMaterial({ color: 0x8a6a5a, flatShading: true })); rim.position.y = -.45; grp.add(rim);
+    const parts = [];
+    for (let k = 0; k < s.r * 1.2; k++) { const a = srand() * 6.28, rr = s.r + sr(-.2, .4); parts.push(part(jitter(G.dode, .4), rockC[k % 3], Math.cos(a) * rr, sr(-1.6, -.4), Math.sin(a) * rr, 0, sr(0, 3), 0, sr(.6, 1.3))); }
+    for (let k = 0; k < 3; k++) { const a = srand() * 6.28, rr = sr(1, s.r * .5); parts.push(part(jitter(G.dode, .4), rockC[k % 3], Math.cos(a) * rr, -s.r * sr(.9, 1.4), Math.sin(a) * rr, 0, 0, 0, sr(.5, 1))); }
+    for (let k = 0; k < s.r * 3; k++) { const a = srand() * 6.28, rr = Math.sqrt(srand()) * (s.r - 1); parts.push(part(G.cone4, [0x7fc23a, 0x95d64a, 0x6fb534][k % 3], Math.cos(a) * rr, .25, Math.sin(a) * rr, sr(-.2, .2), 0, sr(-.3, .3), .1, sr(.4, .7), .1)); }
+    grp.add(mesh(parts));
+    const fl = [];
+    for (let k = 0; k < s.r * 1.5; k++) { const a = srand() * 6.28, rr = Math.sqrt(srand()) * (s.r - 1.2); fl.push(part(G.ico, [0xffffff, 0xffd8f0, 0xfff27a, 0x9ad8ff][k % 4], Math.cos(a) * rr, .22, Math.sin(a) * rr, 0, 0, 0, .1)); }
+    grp.add(mesh(fl, VCMAT, false));
+  });
+  // rope bridges
+  for (const b of SKY_BRIDGES) {
+    const ax = SK_C.x + b[0], az = SK_C.z + b[1], bx = SK_C.x + b[2], bz = SK_C.z + b[3];
+    const len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(bx - ax, bz - az), N = Math.ceil(len / .55), parts = [];
+    for (let i = 0; i <= N; i++) {
+      const k = i / N, x = lerp(ax, bx, k) - ax, z = lerp(az, bz, k) - az, sag = -Math.sin(k * Math.PI) * .35;
+      parts.push(part(G.box, i % 2 ? 0xb07a44 : 0x9a6a3a, x, .08 + sag, z, 0, ry, sr(-.05, .05), 1.9, .1, .42));
+      if (i % 4 === 0) for (const s2 of [-1, 1]) parts.push(part(G.box, 0x6a4a2e, x + Math.cos(ry) * s2 * .95, .45 + sag, z - Math.sin(ry) * s2 * .95, 0, ry, 0, .1, .9, .1));
+    }
+    for (const s2 of [-1, 1]) for (let i = 0; i < N; i++) {
+      const k0 = i / N, k1 = (i + 1) / N, y0 = .85 - Math.sin(k0 * Math.PI) * .5, y1 = .85 - Math.sin(k1 * Math.PI) * .5;
+      const x0 = lerp(ax, bx, k0) - ax + Math.cos(ry) * s2 * .95, z0 = lerp(az, bz, k0) - az - Math.sin(ry) * s2 * .95;
+      const x1 = lerp(ax, bx, k1) - ax + Math.cos(ry) * s2 * .95, z1 = lerp(az, bz, k1) - az - Math.sin(ry) * s2 * .95;
+      const seg = new THREE.CylinderGeometry(.035, .035, 1, 4); const dir = V(x1 - x0, y1 - y0, z1 - z0), L2 = dir.length();
+      const g2 = seg.toNonIndexed(); g2.scale(1, L2, 1); g2.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), dir.normalize())); g2.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+      const c = new Float32Array(g2.attributes.position.count * 3).fill(.85); for (let q = 0; q < c.length; q += 3) { c[q] = .9; c[q + 1] = .82; c[q + 2] = .62; } g2.setAttribute('color', new THREE.BufferAttribute(c, 3)); g2.deleteAttribute('uv');
+      parts.push(g2);
+    }
+    const m = mesh(parts); m.position.set(ax, 0, az); scene.add(m);
+  }
+  // wind current pads
+  const swirlMat = new THREE.MeshBasicMaterial({ color: 0xdff6ff, transparent: true, opacity: .45, side: THREE.DoubleSide, depthWrite: false });
+  for (const gp of SKY_GUSTS) {
+    const pos = skv(gp.x, gp.z), to = skv(gp.tx, gp.tz);
+    const base = mesh([part(G.cyl8, 0xe8f0ff, 0, .1, 0, 0, 0, 0, 1.3, .2, 1.3), part(G.cyl8, 0x7ab8ff, 0, .22, 0, 0, 0, 0, 1, .06, 1), ...[0, 1, 2, 3].map(i => part(G.box, 0xffffff, 0, .28, 0, 0, i * .785, 0, 1.8, .04, .18))]);
+    base.position.copy(pos); scene.add(base);
+    const fan = new THREE.Group(); fan.position.set(pos.x, .3, pos.z); scene.add(fan);
+    const rings = [0, 1, 2].map(i => { const r = new THREE.Mesh(new THREE.TorusGeometry(.8 - i * .15, .05, 4, 20), swirlMat); r.rotation.x = Math.PI / 2; fan.add(r); return r; });
+    const arrow = new THREE.Mesh(new THREE.ConeGeometry(.35, .7, 4), emis(0x9fe0ff, 1)); arrow.position.set(pos.x, 2.4, pos.z); const dir = to.clone().sub(pos).normalize(); arrow.quaternion.setFromUnitVectors(V(0, 1, 0), V(dir.x, .6, dir.z).normalize()); scene.add(arrow);
+    skyGusts.push({ pos, to, rings, arrow, h: 9 + Math.hypot(to.x - pos.x, to.z - pos.z) * .12 });
+  }
+  // updraft columns
+  for (const d of SKY_DRAFTS) {
+    const pos = skv(d.x, d.z);
+    const vent = mesh([part(G.cyl8, 0xc8d8f0, 0, .08, 0, 0, 0, 0, 1.6, .16, 1.6), part(G.cyl8, 0x5a7ab8, 0, .17, 0, 0, 0, 0, 1.3, .04, 1.3)]); vent.position.copy(pos); scene.add(vent);
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.2, 13, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xe8f8ff, transparent: true, opacity: .14, side: THREE.DoubleSide, depthWrite: false }));
+    col.position.set(pos.x, 6.5, pos.z); scene.add(col);
+    const rings = [0, 1, 2, 3].map(i => { const r = new THREE.Mesh(new THREE.TorusGeometry(1.3, .04, 4, 22), swirlMat); r.rotation.x = Math.PI / 2; r.position.set(pos.x, i * 3, pos.z); scene.add(r); return r; });
+    skyDrafts.push({ pos, rings });
+  }
+  // camp pod (storage), glider rack spot, signpost, windmill
+  const pod = mesh([part(G.cyl8, 0xe9e9f4, 0, .9, 0, 0, 0, 0, .9, 1.8, .9), part(G.cone6, 0x5aa8ff, 0, 2.1, 0, 0, 0, 0, .9, .7, .9), part(G.box, 0x5aa8ff, 0, .25, 0, 0, 0, 0, 2, .12, .3), part(G.box, 0x5aa8ff, 0, .25, 0, 0, Math.PI / 2, 0, 2, .12, .3)]);
+  pod.position.set(SK_STORE_POS.x, 0, SK_STORE_POS.z); scene.add(pod); addCol(SK_STORE_POS.x, SK_STORE_POS.z, 1.1);
+  for (const [x, z, c] of [[-10, 18, 0xff7a5a], [10, 14, 0xffd23a], [-3, 27, 0x7ab8ff]]) { const f = mesh([part(G.box, 0x8a5a3c, 0, 1.4, 0, 0, 0, 0, .1, 2.8, .1), part(G.prism, c, .45, 2.5, 0, Math.PI / 2, 0, Math.PI / 2, .35, .1, .55)]); f.position.copy(skv(x, z)); scene.add(f); addCol(SK_C.x + x, SK_C.z + z, .25); }
+  const mill = new THREE.Group(); mill.position.copy(skv(-35, -9)); scene.add(mill); addCol(SK_C.x - 35, SK_C.z - 9, 1.6);
+  mill.add(mesh([part(G.cyl8, 0xf0e8d8, 0, 2.4, 0, 0, 0, 0, 1.3, 4.8, 1.3), part(G.cyl8, 0xe0d4c0, 0, 2.4, 0, 0, 0, 0, 1.36, .2, 1.36), part(G.cone6, 0xd85a4a, 0, 5.4, 0, 0, 0, 0, 1.6, 1.4, 1.6), part(G.box, 0x6a4430, 0, .7, 1.25, 0, 0, 0, .6, 1.2, .1)]));
+  skyWindmill = new THREE.Group(); skyWindmill.position.set(0, 4.3, 1.45); mill.add(skyWindmill);
+  skyWindmill.add(mesh([part(G.cyl8, 0x6a4430, 0, 0, 0, Math.PI / 2, 0, 0, .2, .3, .2), ...[0, 1, 2, 3].map(i => { const a = i * Math.PI / 2; return part(G.box, 0xfff6e0, Math.cos(a) * 1.4, Math.sin(a) * 1.4, .1, 0, 0, a, 2.6, .5, .05); })]));
+  mill.rotation.y = .5;
+  // the Thunder Roc's nest
+  const nest = mesh([...Array.from({ length: 26 }, (_, i) => { const a = i / 26 * 6.28; return part(G.cyl6, [0x8a5a3c, 0x6a4430, 0xa0703c][i % 3], Math.cos(a) * 3.4, .35 + (i % 2) * .2, Math.sin(a) * 3.4, Math.PI / 2, -a + sr(-.4, .4), sr(-.3, .3), .14, 2.4, .14); }), part(G.cyl8, 0x6a4430, 0, .08, 0, 0, 0, 0, 3.2, .16, 3.2)]);
+  nest.position.copy(ROC_NEST); scene.add(nest);
+  for (let i = 0; i < 3; i++) { const egg = new THREE.Mesh(G.sph, emis(0xbfe6ff, .35)); egg.scale.set(.32, .42, .32); egg.position.set(ROC_NEST.x + (i - 1) * .7 + 1.2, .45, ROC_NEST.z - 1.6); scene.add(egg); }
+  // cloud sea + high clouds
+  const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xc8e0ff, emissiveIntensity: .35, flatShading: true });
+  const puff = new THREE.IcosahedronGeometry(1, 1), CN = 160, cim = new THREE.InstancedMesh(puff, cloudMat, CN), d = new THREE.Object3D();
+  for (let i = 0; i < CN; i++) {
+    const high = i < 30, a = srand() * 6.28, r = high ? sr(30, 110) : sr(10, 130);
+    d.position.set(SK_C.x + Math.cos(a) * r, high ? sr(16, 26) : sr(-26, -15), SK_C.z + Math.sin(a) * r - 15);
+    const s = high ? sr(2, 4) : sr(4, 9); d.scale.set(s * sr(1.2, 2), s * .55, s * sr(1, 1.6)); d.rotation.y = srand() * 6; d.updateMatrix(); cim.setMatrixAt(i, d.matrix);
+  }
+  scene.add(cim);
+  const sea = new THREE.Mesh(new THREE.CircleGeometry(220, 32), new THREE.MeshBasicMaterial({ color: 0xe8f4ff })); sea.rotation.x = -Math.PI / 2; sea.position.set(SK_C.x, -24, SK_C.z - 15); scene.add(sea);
+  // cloud whales
+  const wBody = new THREE.MeshLambertMaterial({ color: 0xbcd4f4, flatShading: true }), wBelly = new THREE.MeshLambertMaterial({ color: 0xf4f8ff, flatShading: true });
+  [[70, 4, .05, 1.6], [95, -6, -.035, 2.2], [55, 14, .07, 1.1]].forEach(([R, h, sp, s], wi) => {
+    const g = new THREE.Group(), b = new THREE.Group(); g.add(b);
+    const body = new THREE.Mesh(G.sph, wBody); body.scale.set(1.6, 1.3, 3.4); b.add(body);
+    const belly = new THREE.Mesh(G.sph, wBelly); belly.scale.set(1.3, .8, 3); belly.position.set(0, -.55, .2); b.add(belly);
+    for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(.14, 6, 5), new THREE.MeshBasicMaterial({ color: 0x1a1a3a })); e.position.set(sx * 1.25, .1, 2.1); b.add(e); const fin = new THREE.Mesh(G.box, wBody); fin.scale.set(1.6, .1, .7); fin.position.set(sx * 1.6, -.6, .9); fin.rotation.z = sx * -.4; b.add(fin); }
+    const tail = new THREE.Group(); tail.position.set(0, .2, -3.2); b.add(tail);
+    const tb = new THREE.Mesh(G.sph, wBody); tb.scale.set(.6, .5, 1.4); tb.position.z = -.6; tail.add(tb);
+    for (const sx of [-1, 1]) { const fl2 = new THREE.Mesh(G.box, wBody); fl2.scale.set(1.5, .1, .8); fl2.position.set(sx * .8, 0, -1.7); fl2.rotation.y = sx * .4; tail.add(fl2); }
+    for (let k = 0; k < 5; k++) { const c = new THREE.Mesh(puff, cloudMat); c.scale.setScalar(sr(.5, .9)); c.position.set(sr(-1, 1), 1.1 + sr(0, .3), sr(-2, 2)); b.add(c); }
+    g.scale.setScalar(s); scene.add(g);
+    skyWhales.push({ g, b, tail, R, h, sp, a: wi * 2.1 });
+  });
+}
+placeBuilding('ship_r_sk', 'rocket', SK_C.x + 8.5, SK_C.z + 22.5, -.4, 1.4, { linked: 'ship' });
+placeBuilding('glider', 'glider', SK_C.x - 8, SK_C.z + 10, .9, .9);
+
+// treasure dig sites (one map = one site)
+const DIG_SITES = [
+  { zone: 'home', pos: V(26, 0, 25), clue: 'On the outpost, past the fishing pond, on the side far away from town. Look for flowers by the cliffs.' },
+  { zone: 'home', pos: V(-29, 0, 3), clue: 'On the outpost, behind the Hall of Fame. The golden statues are watching over it!' },
+  { zone: 'ice', pos: iv(-32, 2), clue: 'On Frostveil, on the WEST shore of the biggest frozen lake. Brrr!' },
+  { zone: 'ice', pos: iv(-15, 24), clue: 'On Frostveil, between the camp and the little frozen lake to the south.' },
+  { zone: 'ember', pos: ev(-11, 1), clue: 'On Emberfall, just before the first lava river, west of the camp. It feels warm…' },
+  { zone: 'jungle', pos: jv(-27, 23), clue: 'In Verdantia, on the far side of the lagoon, where the fish splash.' },
+  { zone: 'jungle', pos: jv(18, 22), clue: 'In Verdantia, east of the landing camp, near the edge of the jungle.' },
+  { zone: 'station', pos: sv(-9, 22), clue: 'On Nebula Station, in the corner of the landing deck. Beep boop, X marks the spot.' },
+  { zone: 'cave', pos: cvv(-9, 6), clue: 'In Crystal Caverns, in the first cavern, near the lamp post by the camp.' },
+  { zone: 'sky', pos: skv(-28, -2), clue: 'In Skyreach, on Windmill Isle, right in front of the windmill.' },
+  { zone: 'sky', pos: skv(34, -4), clue: 'In Skyreach, at the far side of Feather Grove, near the edge of the island.' },
+];
+const RELICS = [
+  { id: 'coin', name: 'Ancient Coin', emoji: '🪙' }, { id: 'head', name: 'Stone Head', emoji: '🗿' }, { id: 'bone', name: 'Fossil Bone', emoji: '🦴' }, { id: 'compass', name: 'Old Compass', emoji: '🧭' },
+  { id: 'jar', name: 'Clay Jar', emoji: '🏺' }, { id: 'skull', name: 'Crystal Skull', emoji: '💀' }, { id: 'meteor', name: 'Meteor Chunk', emoji: '☄️' }, { id: 'crown', name: 'Lost Crown', emoji: '👑' },
+];
+const digMark = new THREE.Group();
+{
+  const xm = new THREE.MeshBasicMaterial({ color: 0xff3a3a });
+  for (const a of [.785, -.785]) { const b = new THREE.Mesh(new THREE.BoxGeometry(1.4, .05, .26), xm); b.rotation.y = a; b.position.y = .06; digMark.add(b); }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.25, 24), new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: .6, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = .05; digMark.add(ring);
+  digMark.visible = false; scene.add(digMark);
+}
+// spring blossoms at the outpost (shown in spring only)
+{
+  const N = 220, im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.16, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), N), d = new THREE.Object3D(), cs = [0xff9ad0, 0xffffff, 0xffd8f0, 0xc8a8ff, 0xfff27a];
+  let k = 0;
+  while (k < N) { const a = srand() * 6.28, r = Math.sqrt(srand()) * (ISLAND_R - 4), x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.hypot(x, z) < 10) continue; d.position.set(x, .2, z); d.scale.setScalar(sr(.7, 1.3)); d.updateMatrix(); im.setMatrixAt(k, d.matrix); im.setColorAt(k, new THREE.Color(cs[k % 5])); k++; }
+  im.visible = false; scene.add(im); SEASON_REF.spring = im;
+}
+
 // snow particles
 const SNOW_N = 1500;
 const snowGeo = new THREE.BufferGeometry();
@@ -2078,10 +2316,10 @@ buildPad({ id: 'portal', x: 0, z: -10.2, name: 'Awaken Ancient Portal', sub: () 
 buildPad({ id: 'trading', x: 14.2, z: -8.6, name: 'Restore Trading Post', sub: () => 'Sell extra resources for coins', max: 1, cost: () => ({ wood: 30, stone: 20 }), visible: () => lvl('workshop') > 0, after: () => { refreshBuilding('trading'); toast('🪙 Trading Post open! Stand on a green pad to sell.', 'big'); } });
 buildPad({ id: 'petden', x: -5.4, z: -9.6, name: l => l ? `Pet Lv ${l + 1}` : 'Adopt a Pet', sub: l => l === 1 ? 'Bloop follows you & gathers' : l === 2 ? 'Faster + zaps enemies' : 'Super Bloop!', max: 3, cost: l => [null, { coins: 80 }, { coins: 250, crystal: 8 }, { coins: 500, frost: 12 }][l], visible: () => lvl('trading') > 0, after: l => { refreshBuilding('petden'); makePet(); toast(l === 1 ? '🐾 Bloop joined you! It gathers nearby stuff.' : '🐾 Bloop leveled up!', 'big'); } });
 // sell pads at the trading post
-const SELL = { wood: { per: 2, coin: 1, keep: 20 }, stone: { per: 2, coin: 1, keep: 20 }, ore: { per: 1, coin: 1, keep: 10 }, crystal: { per: 1, coin: 3, keep: 10 }, frost: { per: 1, coin: 5, keep: 5 }, magma: { per: 1, coin: 8, keep: 5 }, spore: { per: 1, coin: 10, keep: 5 }, star: { per: 1, coin: 15, keep: 5 }, prism: { per: 1, coin: 18, keep: 5 } };
+const SELL = { wood: { per: 2, coin: 1, keep: 20 }, stone: { per: 2, coin: 1, keep: 20 }, ore: { per: 1, coin: 1, keep: 10 }, crystal: { per: 1, coin: 3, keep: 10 }, frost: { per: 1, coin: 5, keep: 5 }, magma: { per: 1, coin: 8, keep: 5 }, spore: { per: 1, coin: 10, keep: 5 }, star: { per: 1, coin: 15, keep: 5 }, prism: { per: 1, coin: 18, keep: 5 }, feather: { per: 1, coin: 20, keep: 5 } };
 RES.forEach((r, i) => addPad({
   id: 'sell_' + r, kind: 'sell', res: r, x: 9.4 + i * 2.5, z: -7.4 + Math.abs(i - 2) * .5, labelY: 1.6, max: 1, level: () => 0, cost: () => ({}),
-  visible: () => lvl('trading') > 0 && (r !== 'crystal' || S.tools.pick >= 3) && (r !== 'frost' || S.stats.iceVisits > 0) && (r !== 'ore' || lvl('mine') > 0) && (r !== 'magma' || S.stats.emberVisits > 0) && (r !== 'spore' || S.stats.jungleVisits > 0) && (r !== 'star' || S.stats.stationVisits > 0) && (r !== 'prism' || S.stats.caveVisits > 0),
+  visible: () => lvl('trading') > 0 && (r !== 'crystal' || S.tools.pick >= 3) && (r !== 'frost' || S.stats.iceVisits > 0) && (r !== 'ore' || lvl('mine') > 0) && (r !== 'magma' || S.stats.emberVisits > 0) && (r !== 'spore' || S.stats.jungleVisits > 0) && (r !== 'star' || S.stats.stationVisits > 0) && (r !== 'prism' || S.stats.caveVisits > 0) && (r !== 'feather' || S.stats.skyVisits > 0),
 }));
 // Frostveil pads
 buildPad({ id: 'heater', x: CAMP.x + 9, z: CAMP.z + 5.2, name: l => l ? `Heater Lv ${l + 1}` : 'Light the Heater', sub: l => `Safe from blizzards (${heatR(l)}m)`, max: 3, cost: l => [null, { wood: 20, stone: 20, ore: 5 }, { wood: 40, stone: 40, ore: 10, frost: 8 }, { wood: 60, stone: 60, ore: 15, frost: 16 }][l], visible: () => true, after: l => { refreshBuilding('heater'); toast(l === 1 ? '🔥 The Heater blazes! Frost Shards can\'t enter its warmth.' : '🔥 Heater upgraded — warm zone grows!', 'ice'); } });
@@ -2096,7 +2334,7 @@ buildPad({ id: 'forge', x: CAMP.x - 9, z: CAMP.z + 5.6, name: 'Restore the Forge
 addPad({ id: 'core', x: CORE_POS.x, z: CORE_POS.z + 3.2, name: () => 'Claim the Planet Core', sub: () => '+30 max health forever', level: () => S.core, max: 1, cost: () => ({}), visible: () => S.stats.golem > 0 && !S.core, done: () => claimCore() });
 
 buildPad({ id: 'emberportal', x: EP_ON_ICE.x, z: EP_ON_ICE.z + 4.6, name: 'Ignite the Ember Portal', sub: () => 'Opens the way to Emberfall', max: 1, cost: () => ({ coins: 200, frost: 25, crystal: 15, ore: 30 }), visible: () => S.stats.golem > 0, after: () => { refreshBuilding('emberportal'); toast('🌋 The Ember Portal blazes open! Step in to reach Emberfall.', 'big', 4500); } });
-buildPad({ id: 'ship', x: SHIP_SPOTS.home.pad.x, z: SHIP_SPOTS.home.pad.z, name: 'Repair the Space Ship', sub: () => 'Fly between planets', max: 1, cost: () => ({ wood: 80, stone: 60, ore: 40, crystal: 20, frost: 15, coins: 300 }), visible: () => S.stats.iceVisits > 0, after: () => { ['ship', 'ship_r_ice', 'ship_r_emb', 'ship_r_jun', 'ship_r_st', 'ship_r_cv'].forEach(id => refreshBuilding(id)); toast('🚀 Your ship is fixed! Stand on its pad to open the Star Map.', 'big', 4500); } });
+buildPad({ id: 'ship', x: SHIP_SPOTS.home.pad.x, z: SHIP_SPOTS.home.pad.z, name: 'Repair the Space Ship', sub: () => 'Fly between planets', max: 1, cost: () => ({ wood: 80, stone: 60, ore: 40, crystal: 20, frost: 15, coins: 300 }), visible: () => S.stats.iceVisits > 0, after: () => { ['ship', 'ship_r_ice', 'ship_r_emb', 'ship_r_jun', 'ship_r_st', 'ship_r_cv', 'ship_r_sk'].forEach(id => refreshBuilding(id)); toast('🚀 Your ship is fixed! Stand on its pad to open the Star Map.', 'big', 4500); } });
 buildPad({ id: 'shop', x: SHOP_POS.x, z: SHOP_POS.z - 3.4, name: 'Restore the Suit Shop', sub: () => 'New suit colors & hats', max: 1, cost: () => ({ wood: 35, stone: 25, coins: 40 }), visible: () => lvl('trading') > 0, after: () => { refreshBuilding('shop'); toast('👕 The Suit Shop is open! Stand on its pad to browse.', 'big'); } });
 buildPad({ id: 'bridge', x: EMB_C.x + BRIDGE_X, z: EMB_C.z - 1.8, name: 'Build Obsidian Bridge', sub: () => 'A safe path over the lava', max: 1, cost: () => ({ stone: 60, wood: 30, magma: 6 }), visible: () => true, after: () => { bridgeMesh.visible = true; toast('🌉 Obsidian Bridge built! No more lava hopping here.', 'big'); } });
 buildPad({ id: 'nest', x: ECAMP.x - 9, z: ECAMP.z + 5.2, name: l => l ? `Dragon Lv ${l + 1}` : 'Hatch the Dragon Egg', sub: l => l === 1 ? 'A baby dragon that breathes fire!' : 'Hotter fire, faster breath', max: 3, cost: l => [null, { magma: 8, coins: 250 }, { magma: 15, coins: 500 }, { magma: 25, coins: 900, frost: 20 }][l], visible: () => S.egg > 0, after: l => hatchOrLevel(l) });
@@ -2128,6 +2366,11 @@ uiPad('treeui', -3.4, -4.4, '<div class="nm">🌳 Upgrade Tree</div><div class="
 uiPad('farmui', -15.7, 20, '<div class="nm">🌱 Farm</div><div class="sub">Plant & harvest</div>', 'farm', () => lvl('farm') > 0);
 uiPad('ship_cave', SHIP_SPOTS.cave.pad.x, SHIP_SPOTS.cave.pad.z, '<div class="nm">🚀 Space Ship</div><div class="sub">Stand here for the Star Map</div>', 'map', () => lvl('ship') > 0);
 
+buildPad({ id: 'museum', x: MUSEUM_POS.x - 4.4, z: MUSEUM_POS.z, name: 'Build the Museum', sub: () => 'Show off fish, gems & relics', max: 1, cost: () => ({ wood: 80, stone: 60, crystal: 10, coins: 200 }), visible: () => lvl('workshop') > 0 && S.stats.iceVisits > 0, after: () => { refreshBuilding('museum'); toast('🏛 The Museum is open! Donate rare fish, gems and relics.', 'big'); } });
+uiPad('museumui', MUSEUM_POS.x - 4.4, MUSEUM_POS.z, '<div class="nm">🏛 Museum</div><div class="sub">Donate & complete collections</div>', 'museum', () => lvl('museum') > 0);
+buildPad({ id: 'glider', x: SK_C.x - 4.5, z: SK_C.z + 12.5, name: 'Craft a Glider', sub: () => 'Ride updrafts & glide between islands', max: 1, cost: () => ({ feather: 12, wood: 40, coins: 150 }), visible: () => true, after: () => { refreshBuilding('glider'); toast('🪂 Glider ready! Step into an updraft, or hold JUMP while falling to glide.', 'big', 5000); } });
+uiPad('ship_sky', SHIP_SPOTS.sky.pad.x, SHIP_SPOTS.sky.pad.z, '<div class="nm">🚀 Space Ship</div><div class="sub">Stand here for the Star Map</div>', 'map', () => lvl('ship') > 0);
+
 const portalHint = document.createElement('div'); portalHint.className = 'label panel dim'; portalHint.innerHTML = '<div class="nm">Ancient Portal</div><div class="sub">Dormant… needs crystals</div>'; $('labels').appendChild(portalHint);
 
 /* ================================================================
@@ -2139,6 +2382,7 @@ const portalHint = document.createElement('div'); portalHint.className = 'label 
     if (dist2(x, z, MINE_ENTRANCE.x, MINE_ENTRANCE.z) < 8) return true;
     if (dist2(x, z, -4, 17) < 5) return true;
     if (dist2(x, z, 15, -10) < 16) return true;
+    if (dist2(x, z, MUSEUM_POS.x, MUSEUM_POS.z) < 7 || DIG_SITES.some(d2 => d2.zone === 'home' && dist2(x, z, d2.pos.x, d2.pos.z) < 2.5)) return true;
     if (dist2(x, z, FARM_POS.x, FARM_POS.z) < 7.5 || dist2(x, z, RUNES[0].pos.x, RUNES[0].pos.z) < 2.5) return true;
     if (dist2(x, z, FAME_POS.x, FAME_POS.z) < 7 || dist2(x, z, PETC_POS.x, PETC_POS.z) < 5.5 || dist2(x, z, GATE_POS.x, GATE_POS.z) < 5.5) return true;
     if (dist2(x, z, CREW_POS.x, CREW_POS.z) < 5.5 || dist2(x, z, KITCHEN_POS.x, KITCHEN_POS.z) < 5.5 || dist2(x, z, POND.x, POND.z) < 7.5 || dist2(x, z, OBELISK_POS.x, OBELISK_POS.z) < 4.5) return true;
@@ -2251,6 +2495,26 @@ const portalHint = document.createElement('div'); portalHint.className = 'label 
       addNode(type, CV_C.x + x, CV_C.z + z); k++;
     }
   });
+  // Skyreach
+  const skbad = (x, z) => {
+    const wx = SK_C.x + x, wz = SK_C.z + z;
+    if (!skySafe(wx, wz)) return true;
+    if (SKY_BRIDGES.some(b => { const vx = b[2] - b[0], vz = b[3] - b[1], k = clamp(((x - b[0]) * vx + (z - b[1]) * vz) / (vx * vx + vz * vz), 0, 1); return Math.hypot(x - b[0] - vx * k, z - b[1] - vz * k) < 2.6; })) return true;
+    for (const g2 of SKY_GUSTS) if (dist2(x, z, g2.x, g2.z) < 3 || dist2(x, z, g2.tx, g2.tz) < 3) return true;
+    for (const d2 of SKY_DRAFTS) if (dist2(x, z, d2.x, d2.z) < 3.2) return true;
+    if (dist2(x, z, 0, 18) < 7.5 || dist2(x, z, -35, -9) < 3.5 || dist2(x, z, 0, -54) < 7 || dist2(x, z, -8, 10) < 3.2 || dist2(x, z, -4.5, 12.5) < 2.5 || dist2(x, z, 8.5, 22.5) < 3.5 || dist2(x, z, 5.5, 20.5) < 3) return true;
+    for (const d2 of DIG_SITES) if (d2.zone === 'sky' && dist2(wx, wz, d2.pos.x, d2.pos.z) < 2.5) return true;
+    for (const n of nodes) if (n.zone === 'sky' && dist2(wx, wz, n.x, n.z) < 2.8) return true;
+    return false;
+  };
+  [[0, { cloudtree: 3, skyrock: 2 }], [1, { cloudtree: 4, skyrock: 3, feather: 2 }], [2, { cloudtree: 3, skyrock: 2, feather: 5 }], [3, { skyrock: 1, feather: 1 }], [4, { feather: 4, skyrock: 2 }]].forEach(([si, want]) => {
+    const c = SKY_ISLES[si];
+    for (const [type, n] of Object.entries(want)) for (let k = 0, tries = 0; k < n && tries < 400; tries++) {
+      const a = srand() * 6.28, r = Math.sqrt(srand()) * (c.r - 2), x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
+      if (skbad(x, z)) continue;
+      addNode(type, SK_C.x + x, SK_C.z + z); k++;
+    }
+  });
 }
 
 /* ================================================================
@@ -2266,11 +2530,12 @@ const MAGMA_BODY = new THREE.MeshLambertMaterial({ color: 0x3a1a14, emissive: 0x
 const GOBLIN_BODY = new THREE.MeshLambertMaterial({ color: 0x6bd04a, flatShading: true });
 const SACK_MAT = new THREE.MeshLambertMaterial({ color: 0xa0703a, flatShading: true });
 const BEETLE_MAT = new THREE.MeshLambertMaterial({ color: 0x2a6a5a, emissive: 0x1aff9a, emissiveIntensity: .22, flatShading: true });
+const WISP_MAT = new THREE.MeshLambertMaterial({ color: 0x8a94b8, emissive: 0x2a3a6a, emissiveIntensity: .35, flatShading: true });
 const BAT_MAT = new THREE.MeshLambertMaterial({ color: 0x2a1a3a, emissive: 0x3a1a5a, emissiveIntensity: .3, flatShading: true, side: THREE.DoubleSide });
 const SDRONE_MAT = new THREE.MeshLambertMaterial({ color: 0x4a4f66, emissive: 0xff2a2a, emissiveIntensity: .12, flatShading: true });
 const SDRONE_RING = emis(0xff5a5a, .8);
 const BEETLE_LEG = new THREE.MeshLambertMaterial({ color: 0x1a1428, flatShading: true });
-const BODY_MAT = { gloom: GLOOM_BODY, crawl: CRAWL_BODY, shard: SHARD_BODY, magma: MAGMA_BODY, goblin: GOBLIN_BODY, beetle: BEETLE_MAT, sdrone: SDRONE_MAT, bat: BAT_MAT };
+const BODY_MAT = { gloom: GLOOM_BODY, crawl: CRAWL_BODY, shard: SHARD_BODY, magma: MAGMA_BODY, goblin: GOBLIN_BODY, beetle: BEETLE_MAT, sdrone: SDRONE_MAT, bat: BAT_MAT, wisp: WISP_MAT };
 function spawnEnemy(kind, x, z) {
   let e0wings = null;
   const g = new THREE.Group();
@@ -2280,6 +2545,11 @@ function spawnEnemy(kind, x, z) {
     const sack = new THREE.Mesh(G.ico1, SACK_MAT); sack.scale.setScalar(.42); sack.position.set(0, .85, -.42); sack.castShadow = true; g.add(sack);
     const knot = new THREE.Mesh(G.ico, emis(0xffd23a, 1)); knot.scale.setScalar(.12); knot.position.set(0, 1.25, -.42); g.add(knot);
     for (const sx of [-1, 1]) { const ear = new THREE.Mesh(G.cone4, GOBLIN_BODY); ear.scale.set(.08, .3, .08); ear.position.set(sx * .42, .75, 0); ear.rotation.z = -sx * 1.1; g.add(ear); const e2 = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), EYE_C); e2.position.set(sx * .14, .66, .36); g.add(e2); }
+  } else if (kind === 'wisp') {
+    body = new THREE.Mesh(jitter(G.ico1, .2, Math.random), WISP_MAT); body.scale.set(.5, .38, .5); body.position.y = 1.4; body.castShadow = true; g.add(body);
+    for (let i = 0; i < 4; i++) { const pf = new THREE.Mesh(G.ico1, WISP_MAT); const a = i * 1.57; pf.scale.setScalar(.55); pf.position.set(Math.cos(a) * .9, .25, Math.sin(a) * .9); body.add(pf); }
+    for (const sx of [-1, 1]) { const e2 = new THREE.Mesh(new THREE.SphereGeometry(.07, 6, 4), emis(0xfff27a, 2.5)); e2.position.set(sx * .14, 1.45, .45); g.add(e2); }
+    const zap = new THREE.Mesh(G.oct, emis(0xfff27a, 2)); zap.scale.set(.06, .3, .06); zap.position.set(0, .85, 0); g.add(zap);
   } else if (kind === 'bat') {
     body = new THREE.Mesh(G.sph, BAT_MAT); body.scale.set(.28, .26, .3); body.position.y = 1.5; body.castShadow = true; g.add(body);
     for (const sx of [-1, 1]) { const e2 = new THREE.Mesh(new THREE.SphereGeometry(.07, 6, 4), emis(0xffd23a, 2.5)); e2.position.set(sx * .1, 1.56, .25); g.add(e2); const ear = new THREE.Mesh(G.cone4, BAT_MAT); ear.scale.set(.06, .16, .06); ear.position.set(sx * .12, 1.78, 0); g.add(ear); }
@@ -2310,9 +2580,9 @@ function spawnEnemy(kind, x, z) {
   }
   g.position.set(x, 0, z); g.scale.setScalar(.01);
   scene.add(g);
-  const hp = { gloom: 2 + Math.floor((S.day - 1) * .8), crawl: 3 + S.tools.pick, shard: 5 + Math.floor(S.day * .6), magma: 7 + Math.floor(S.day * .6), goblin: 8 + S.day, beetle: 4 + Math.floor(S.day * .5), sdrone: 6 + Math.floor(S.day * .5), bat: 4 + Math.floor(S.day * .4) }[kind];
-  const speed = { gloom: rand(3, 3.8), crawl: rand(3.4, 4.2), shard: rand(3.8, 4.6), magma: rand(3.2, 4), goblin: 5.6, beetle: rand(4.2, 5), sdrone: rand(4, 4.8), bat: rand(4.6, 5.4) }[kind];
-  const e = { wings: e0wings, g, body, kind, hp, max: hp, speed, cd: 0, hop: Math.random() * 6, flash: 0, kx: 0, kz: 0, spawn: 0, dying: 0, dmg: { gloom: 8 + S.day, crawl: 10, shard: 9, magma: 11, goblin: 0, beetle: 7, sdrone: 8, bat: 6 }[kind], burn: 0, slow: 0, life: 25, zone: zoneOf(x, z) };
+  const hp = { gloom: 2 + Math.floor((S.day - 1) * .8), crawl: 3 + S.tools.pick, shard: 5 + Math.floor(S.day * .6), magma: 7 + Math.floor(S.day * .6), goblin: 8 + S.day, beetle: 4 + Math.floor(S.day * .5), sdrone: 6 + Math.floor(S.day * .5), bat: 4 + Math.floor(S.day * .4), wisp: 5 + Math.floor(S.day * .5) }[kind];
+  const speed = { gloom: rand(3, 3.8), crawl: rand(3.4, 4.2), shard: rand(3.8, 4.6), magma: rand(3.2, 4), goblin: 5.6, beetle: rand(4.2, 5), sdrone: rand(4, 4.8), bat: rand(4.6, 5.4), wisp: rand(4.2, 5) }[kind];
+  const e = { wings: e0wings, g, body, kind, hp, max: hp, speed, cd: 0, hop: Math.random() * 6, flash: 0, kx: 0, kz: 0, spawn: 0, dying: 0, dmg: { gloom: 8 + S.day, crawl: 10, shard: 9, magma: 11, goblin: 0, beetle: 7, sdrone: 8, bat: 6, wisp: 7 }[kind], burn: 0, slow: 0, life: 25, zone: zoneOf(x, z) };
   enemies.push(e);
   return e;
 }
@@ -2444,11 +2714,11 @@ const arcs = [];
 const RING_GEO = new THREE.RingGeometry(.85, 1, 28), DISC_GEO = new THREE.CircleGeometry(1, 28), ROCK_GEO = new THREE.DodecahedronGeometry(.45, 0);
 function arcDrop(from, to, dur, kind) {
   const met = kind === 'meteor';
-  const col = met ? 0xc8a8ff : kind === 'acid' ? 0x8aff3a : kind === 'shadow' ? 0xa86aff : 0xff4f2a;
+  const col = met ? 0xc8a8ff : kind === 'acid' ? 0x8aff3a : kind === 'shadow' ? 0xa86aff : kind === 'storm' ? 0xfff27a : 0xff4f2a;
   const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .85, side: THREE.DoubleSide }));
   const fill = new THREE.Mesh(DISC_GEO, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .2, side: THREE.DoubleSide }));
   for (const m of [ring, fill]) { m.rotation.x = -Math.PI / 2; m.position.set(to.x, .08, to.z); scene.add(m); }
-  const rock = new THREE.Mesh(ROCK_GEO, met ? emis(0xc8a8ff, 1.5) : kind === 'acid' ? ACID_MAT : kind === 'shadow' ? SH_GLOW : MAGMA_MAT);
+  const rock = new THREE.Mesh(ROCK_GEO, met ? emis(0xc8a8ff, 1.5) : kind === 'acid' ? ACID_MAT : kind === 'shadow' ? SH_GLOW : kind === 'storm' ? ROC_GLOW : MAGMA_MAT);
   rock.position.copy(from); scene.add(rock);
   arcs.push({ from: from.clone(), to: to.clone(), t: 0, dur, kind, ring, fill, rock, R: met ? 1.5 : 1.8 });
 }
@@ -2469,7 +2739,8 @@ function updateArcs(dt) {
         if (met) { SFX.meteor(); spawnLoot(a.to); if (d < a.R) damagePlayer(5, a.to.x, a.to.z); }
         else if (a.kind === 'acid') { SFX.splash(); spawnPuddle(a.to); if (d < a.R) damagePlayer(10, a.to.x, a.to.z); }
         else if (a.kind === 'shadow') { SFX.boom(); camShake = Math.max(camShake, .3); if (d < a.R + .3 && P.jumpY < .8) damagePlayer(12, a.to.x, a.to.z); }
-        else if (a.kind !== 'shadow') { SFX.boom(); camShake = Math.max(camShake, .25); if (d < a.R + .3) damagePlayer(13, a.to.x, a.to.z, 0, 2); }
+        else if (a.kind === 'storm') { bolt(V(a.to.x, 16, a.to.z), V(a.to.x, 0, a.to.z), 0xfff27a); bolt(V(a.to.x + 1, 16, a.to.z), V(a.to.x, 0, a.to.z), 0xffffff); SFX.zapL(); camShake = Math.max(camShake, .25); if (d < a.R + .2) damagePlayer(13, a.to.x, a.to.z); }
+        else { SFX.boom(); camShake = Math.max(camShake, .25); if (d < a.R + .3) damagePlayer(13, a.to.x, a.to.z, 0, 2); }
       }
       scene.remove(a.ring); scene.remove(a.fill); scene.remove(a.rock);
       a.ring.material.dispose(); a.fill.material.dispose(); if (met) a.rock.material.dispose();
@@ -2644,6 +2915,50 @@ function resetShadow() {
 function initShadow() { resetShadow(); shadow.state = (S.stats.shadow > 0 && S.day <= S.shadowDay) ? 'gone' : 'sleep'; }
 
 /* ================================================================
+   BOSS: THE THUNDER ROC
+   ================================================================ */
+const ROC_MAT = new THREE.MeshLambertMaterial({ color: 0x4a6ab8, emissive: 0x1a3a8a, emissiveIntensity: .2, flatShading: true });
+const ROC_LIGHT = new THREE.MeshLambertMaterial({ color: 0xe8f0ff, flatShading: true });
+const ROC_GOLD = new THREE.MeshLambertMaterial({ color: 0xffc23a, emissive: 0x6a4a00, emissiveIntensity: .3, flatShading: true });
+const ROC_GLOW = emis(0xfff27a, 1.8);
+const roc = { g: new THREE.Group(), isBoss: true, r: 2.3, textY: 7, state: 'sleep', mode: 'perch', modeT: 2, hp: 1, max: 1, fly: 0, flyTo: 0, flap: 0, flash: 0, burn: 0, slow: 0, deadT: 0, kx: 0, kz: 0, dive: null, ring: null, ang: 0, n: 0 };
+roc.targetable = () => roc.state === 'fight' && roc.fly < 2.6;
+roc.kill = () => killRoc();
+{
+  const g = roc.g, body = new THREE.Group(); g.add(body); roc.body = body;
+  const add = (geo, mat, x, y, z, sx, sy, sz, p = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; p.add(m); return m; };
+  add(G.sph, ROC_MAT, 0, 2.5, 0, 1.5, 1.3, 2.1);
+  add(G.sph, ROC_LIGHT, 0, 2.2, .5, 1.15, 1, 1.6);
+  const head = new THREE.Group(); head.position.set(0, 3.9, 1.8); body.add(head); roc.head = head;
+  add(G.sph, ROC_MAT, 0, 0, 0, .85, .8, .9, head);
+  const beak = add(G.cone4, ROC_GOLD, 0, -.15, 1.05, .32, .9, .32, head); beak.rotation.x = Math.PI / 2;
+  for (const sx of [-1, 1]) { add(new THREE.SphereGeometry(.13, 8, 6), ROC_GLOW, sx * .42, .18, .62, 1, .7, 1, head); }
+  for (let i = 0; i < 4; i++) { const c = add(G.cone4, ROC_GLOW, (i - 1.5) * .18, .7 + Math.abs(i - 1.5) * -.1, -.25 - i * .08, .1, .7, .1, head); c.rotation.x = -.6; }
+  roc.wings = [-1, 1].map(sx => {
+    const w = new THREE.Group(); w.position.set(sx * 1.3, 3, 0); body.add(w);
+    add(G.box, ROC_MAT, sx * 1.9, 0, 0, 3.8, .22, 1.6, w);
+    for (let i = 0; i < 4; i++) add(G.box, i % 2 ? ROC_LIGHT : ROC_MAT, sx * (2.4 + i * .5), -.05, -.9 - i * .15, .5, .12, 1.4 + i * .2, w);
+    add(G.box, ROC_GLOW, sx * 3.6, .1, .2, .9, .06, .14, w);
+    return w;
+  });
+  for (let i = 0; i < 5; i++) { const t = add(G.box, i % 2 ? ROC_LIGHT : ROC_MAT, (i - 2) * .35, 2.6, -2.3 - Math.abs(i - 2) * -.15, .3, .1, 1.6); t.rotation.y = (i - 2) * .25; t.rotation.x = .25; }
+  roc.legs = [-1, 1].map(sx => { const l = add(G.cyl6, ROC_GOLD, sx * .6, .7, .2, .12, 1.4, .12); add(G.box, ROC_GOLD, sx * .6, .06, .45, .45, .1, .6); return l; });
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(2.4, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .25, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.y = .06; g.add(sh); roc.shadowDisc = sh;
+  const warn = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xff3a3a, transparent: true, opacity: .35, depthWrite: false, side: THREE.DoubleSide })); warn.rotation.x = -Math.PI / 2; warn.visible = false; scene.add(warn); roc.warn = warn;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.92, 1, 40), new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring); roc.ringM = ring;
+  const stars = new THREE.Group(); for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(G.oct, ROC_GLOW); s.scale.setScalar(.18); stars.add(s); } stars.position.y = 5.1; stars.visible = false; g.add(stars); roc.dizzy = stars;
+  g.position.copy(ROC_NEST); g.visible = false; scene.add(g);
+  roc.col = addCol(ROC_NEST.x, ROC_NEST.z, 1.6); roc.col.on = false;
+}
+const rocMaxHp = () => Math.round(850 * (1 + .35 * (S.stats.roc || 0)));
+function resetRoc() {
+  roc.max = roc.hp = rocMaxHp(); roc.mode = 'perch'; roc.modeT = 2.5; roc.fly = 0; roc.flyTo = 0; roc.dive = null; roc.ring = null; roc.burn = 0; roc.slow = 0; roc.n = 0;
+  roc.g.position.copy(ROC_NEST); roc.g.rotation.set(0, 0, 0); roc.body.scale.setScalar(1); roc.body.rotation.set(0, 0, 0); roc.warn.visible = false; roc.ringM.visible = false; roc.dizzy.visible = false;
+  roc.col.x = ROC_NEST.x; roc.col.z = ROC_NEST.z;
+}
+function initRoc() { resetRoc(); roc.state = (S.stats.roc > 0 && S.day <= S.rocDay) ? 'gone' : 'sleep'; }
+
+/* ================================================================
    PET: BLOOP
    ================================================================ */
 const pet = { g: null, lvl: 0, target: null, hitT: 0, scanT: 0, zapT: 0, bob: 0 };
@@ -2666,6 +2981,7 @@ function makePet() {
   b.add(body, belly, eL, eR, tail, ...eyes, ...shines, ...cheeks);
   if (L >= 2) { const ant = new THREE.Mesh(new THREE.SphereGeometry(.06, 8, 6), emis(0xfff27a, 1.5)); ant.position.set(0, .48, 0); b.add(ant); }
   if (L >= 3) { const crown = new THREE.Mesh(new THREE.CylinderGeometry(.14, .1, .1, 5), emis(0xffd23a, .8)); crown.position.set(0, .36, 0); b.add(crown); }
+  evoDecor(b, 'bloop', .5);
   g.add(b); pet.body = b;
   g.position.set(player.position.x - 1, 0, player.position.z + .8);
   scene.add(g); pet.g = g; pet.lvl = L; pet.target = null;
@@ -2694,6 +3010,7 @@ function renderRes() {
     if (r === 'spore') hide = !S.stats.spore && !S.store.spore && !S.stats.jungleVisits;
     if (r === 'star') hide = !S.stats.star && !S.store.star && !S.stats.stationVisits;
     if (r === 'prism') hide = !S.stats.prism && !S.store.prism && !S.stats.caveVisits;
+    if (r === 'feather') hide = !S.stats.feather && !S.store.feather && !S.stats.skyVisits;
     if (r === 'coins') hide = !S.coins && !S.daily.claims && !lvl('trading');
     resEls[r].style.display = hide ? 'none' : '';
   }
@@ -2763,6 +3080,7 @@ function makeDragon() {
   const tail = [0, 1, 2].map(i => { const t = new THREE.Mesh(new THREE.SphereGeometry(.13 - i * .03, 6, 5), mat); t.position.set(0, -.02 - i * .03, -.35 - i * .17); return t; });
   const tip = new THREE.Mesh(new THREE.ConeGeometry(.07, .16, 4), belly); tip.position.set(0, -.1, -.9); tip.rotation.x = -Math.PI / 2;
   b.add(body, bel, head, snout, ...horns, ...eyes, ...wings, ...tail, tip);
+  evoDecor(head, 'sparky', .25);
   g.add(b); dragon.wings = wings; dragon.body = b; dragon.mouth = snout;
   g.position.set(player.position.x + 1, 2.4, player.position.z);
   scene.add(g); dragon.g = g; dragon.lvl = L;
@@ -2792,6 +3110,8 @@ const SUITS = [
   { id: 'beetle', name: 'Beetle Shell', col: 0x3fd09a, trophy: 'Bug Queen Slayer' },
   { id: 'chrome', name: 'Chrome Armor', col: 0xd8e0f0, trophy: 'Galaxy Saver' },
   { id: 'shadow', name: 'Shadow Cloak', col: 0x3a1a5a, trophy: 'Shadow Slayer' },
+  { id: 'storm', name: 'Storm Suit', col: 0x4a6ab8, trophy: 'Storm Chaser' },
+  { id: 'gem', name: 'Gem Suit', col: 0xc88aff, trophy: 'Gem Expert' },
 ];
 const HATS = [
   { id: 'none', name: 'No Hat', emoji: '🚫', price: 0 },
@@ -2810,6 +3130,9 @@ const HATS = [
   { id: 'visor', name: 'Cyber Visor', emoji: '🥽', trophy: 'Galaxy Saver' },
   { id: 'straw', name: 'Straw Hat', emoji: '👒', price: 80 },
   { id: 'scrown', name: 'Shadow Crown', emoji: '🌑', trophy: 'Shadow Slayer' },
+  { id: 'rocfeather', name: 'Roc Feather', emoji: '🪶', trophy: 'Storm Chaser' },
+  { id: 'fishhat', name: 'Fisher Cap', emoji: '🎣', trophy: 'Aquarium Keeper' },
+  { id: 'explorer', name: 'Explorer Hat', emoji: '🤠', trophy: 'Master Archaeologist' },
 ];
 function makeHat(id) {
   const g = new THREE.Group();
@@ -2825,6 +3148,9 @@ function makeHat(id) {
   else if (id === 'fisher') { add(new THREE.CylinderGeometry(.5, .5, .03, 16), L(0x7a8a4a), 0, .1, 0); add(new THREE.CylinderGeometry(.28, .34, .26, 12), L(0x7a8a4a), 0, .24, 0); add(new THREE.BoxGeometry(.12, .04, .02), L(0xff5a5a), .3, .25, .1); }
   else if (id === 'chef') { add(new THREE.CylinderGeometry(.3, .3, .3, 12), L(0xffffff), 0, .2, 0); add(new THREE.SphereGeometry(.38, 10, 8), L(0xffffff), 0, .48, 0).scale.y = .6; }
   else if (id === 'antennae') { for (const s of [-1, 1]) { add(new THREE.CylinderGeometry(.025, .025, .6), L(0x1a1428), s * .15, .3, 0, 0, -s * .35); add(new THREE.SphereGeometry(.08, 8, 6), emis(0x3aff9a, 1.3), s * .26, .58, 0); } }
+  else if (id === 'rocfeather') { add(new THREE.CylinderGeometry(.33, .33, .08, 14, 1, true), L(0x3a6aff), 0, .12, 0); const f2 = add(new THREE.SphereGeometry(.1, 8, 6), emis(0x7ad8ff, .8), .18, .42, -.12); f2.scale.set(.6, 3, .3); f2.rotation.z = -.3; const f3 = add(new THREE.SphereGeometry(.08, 8, 6), emis(0xfff27a, .9), .26, .36, -.08); f3.scale.set(.6, 2.4, .3); f3.rotation.z = -.6; }
+  else if (id === 'fishhat') { add(new THREE.CylinderGeometry(.42, .5, .06, 14), L(0x5a8a4a), 0, .1, 0); add(new THREE.CylinderGeometry(.3, .34, .28, 14), L(0x6a9a5a), 0, .26, 0); add(new THREE.SphereGeometry(.06, 6, 5), L(0xff5a5a), .34, .2, .1); add(new THREE.ConeGeometry(.04, .1, 4), L(0xffd23a), .34, .12, .1); }
+  else if (id === 'explorer') { add(new THREE.CylinderGeometry(.6, .6, .04, 16), L(0xa0703c), 0, .1, 0); add(new THREE.CylinderGeometry(.26, .32, .32, 12), L(0xb08048), 0, .27, 0); add(new THREE.CylinderGeometry(.33, .33, .07, 12), L(0x4a2a1a), 0, .16, 0); }
   else if (id === 'straw') { add(new THREE.CylinderGeometry(.62, .62, .04, 16), L(0xe8c870), 0, .1, 0); add(new THREE.CylinderGeometry(.27, .32, .3, 12), L(0xe8c870), 0, .26, 0); add(new THREE.CylinderGeometry(.33, .33, .07, 12), L(0xff5a5a), 0, .16, 0); }
   else if (id === 'scrown') { add(new THREE.CylinderGeometry(.32, .3, .14, 10, 1, true), emis(0x6a2aaa, .8), 0, .2, 0); for (let i = 0; i < 5; i++) { const a = i / 5 * 6.28; add(new THREE.OctahedronGeometry(.09), emis(i % 2 ? 0xc86aff : 0xffd23a, 1.4), Math.cos(a) * .3, .36, Math.sin(a) * .3).scale.y = 2; } }
   else if (id === 'visor') { add(new THREE.TorusGeometry(.37, .05, 6, 24), emis(0x5ff3ff, 1.6), 0, -.15, 0, Math.PI / 2); add(new THREE.BoxGeometry(.5, .1, .05), emis(0x5ff3ff, 1.6), 0, -.13, .36); add(new THREE.CylinderGeometry(.02, .02, .4), L(0xcfd6e6), .25, .15, 0); add(new THREE.SphereGeometry(.05, 6, 4), emis(0xff5a7a, 1.5), .25, .36, 0); }
@@ -2887,6 +3213,16 @@ const ACH = [
   { id: 'photos', ico: '📸', name: 'Photographer', ds: 'Take 10 photos', cur: () => S.stats.photos, goal: 10, rw: { coins: 120 } },
   { id: 'mail5', ico: '📬', name: 'Helpful Boss', ds: 'Finish 5 crew requests from the mailbox', cur: () => S.stats.mailQuests, goal: 5, rw: { coins: 250 } },
   { id: 'tree4', ico: '🌳', name: 'Master Planner', ds: 'Max out 4 upgrade paths', cur: () => Object.values(S.tree).filter(n => n.t >= 2).length, goal: 4, rw: { coins: 400 } },
+  { id: 'sky', ico: '☁️', name: 'Cloud Walker', ds: 'Fly to Skyreach', cur: () => S.stats.skyVisits, goal: 1, rw: { coins: 200 } },
+  { id: 'feather30', ico: '🪶', name: 'Feather Collector', ds: 'Gather 30 storm feathers', cur: () => S.stats.feather, goal: 30, rw: { coins: 300 } },
+  { id: 'glide5', ico: '🪂', name: 'Sky Surfer', ds: 'Ride 5 updrafts with your glider', cur: () => S.stats.drafts, goal: 5, rw: { coins: 250 } },
+  { id: 'roc', ico: '⚡', name: 'Storm Chaser', ds: 'Defeat the Thunder Roc', cur: () => S.stats.roc, goal: 1, rw: { coins: 800, cos: ['suit_storm', 'hat_rocfeather'] } },
+  { id: 'treasure5', ico: '💰', name: 'Treasure Hunter', ds: 'Dig up 5 treasure chests', cur: () => S.tmap.chests, goal: 5, rw: { coins: 400 } },
+  { id: 'evolve', ico: '✨', name: 'Pet Trainer', ds: 'Evolve a pet into its Mega form', cur: () => S.stats.megaPets, goal: 1, rw: { coins: 400 } },
+  { id: 'mfish', ico: '🐟', name: 'Aquarium Keeper', ds: 'Complete the museum Fish Tank', cur: () => S.museum.done.fish ? 1 : 0, goal: 1, rw: { coins: 300, cos: ['hat_fishhat'] } },
+  { id: 'mgems', ico: '💎', name: 'Gem Expert', ds: 'Complete the museum Gem Hall', cur: () => S.museum.done.gems ? 1 : 0, goal: 1, rw: { coins: 300, cos: ['suit_gem'] } },
+  { id: 'mrelic', ico: '🏺', name: 'Master Archaeologist', ds: 'Complete the museum Relic Room', cur: () => S.museum.done.relics ? 1 : 0, goal: 1, rw: { coins: 500, cos: ['hat_explorer'] } },
+  { id: 'seasons', ico: '🍂', name: 'All Seasons', ds: 'Harvest crops in spring, summer, autumn and winter', cur: () => [0, 1, 2, 3].filter(i => (S.seasonHarv || 0) & (1 << i)).length, goal: 4, rw: { coins: 400 } },
   { id: 'waves10', ico: '🌊', name: 'Arena Legend', ds: 'Clear wave 10 in Survival', cur: () => S.waveBest, goal: 10, rw: { coins: 400, cos: ['hat_propeller'] } },
 ];
 function checkAch() {
@@ -2958,6 +3294,7 @@ function renderModal() {
       { z: 'jungle', name: 'Verdantia', emoji: '🍄', orb: 'radial-gradient(circle at 35% 35%,#e8ff9a,#4fa83a 50%,#1a4a2a)', open: S.stats.serpent > 0 || S.stats.jungleVisits > 0, st: S.stats.queen ? 'Queen Beetle defeated ✓' : 'The Queen Beetle rules the jungle', lock: 'Defeat Magmaw to unlock' },
       { z: 'station', name: 'Nebula Station', emoji: '🛰', orb: 'radial-gradient(circle at 35% 35%,#e8f0ff,#8a7aff 50%,#1a1040)', open: S.stats.queen > 0 || S.stats.stationVisits > 0, st: S.stats.aicore ? 'Rogue AI Core defeated ✓' : 'The Rogue AI Core is online', lock: 'Defeat the Queen Beetle to unlock' },
       { z: 'cave', name: 'Crystal Caverns', emoji: '💎', orb: 'radial-gradient(circle at 35% 35%,#f0d8ff,#8a5aff 45%,#0a0414)', open: S.stats.aicore > 0 || S.stats.caveVisits > 0, st: S.stats.shadow ? 'The Shadow King is banished ✓' : `Runes found: ${runeCount()}/5`, lock: 'Defeat the Rogue AI Core to unlock' },
+      { z: 'sky', name: 'Skyreach', emoji: '☁', orb: 'radial-gradient(circle at 35% 35%,#ffffff,#8ac8ff 45%,#3a6ab8)', open: S.stats.caveVisits > 0 || S.stats.skyVisits > 0, st: S.stats.roc ? 'The Thunder Roc is defeated ✓' : lvl('glider') ? 'Glider ready 🪂' : 'Floating islands & storm feathers', lock: 'Visit Crystal Caverns to unlock' },
     ];
     body.innerHTML = `<h2>🚀 Star Map</h2><div class="lead">Pick a planet to fly to. A planet unlocks after you first reach it through a portal.</div><div class="planets">${PL.map(p => {
       const here = P.zone === p.z || (p.z === 'home' && P.zone === 'mine');
@@ -2980,7 +3317,7 @@ function modalAction(act, id) {
     closeModal();
     S.stats.flights++;
     toast('🚀 Blast off!', 'big');
-    const b = P.zone === 'ice' ? buildings.ship_r_ice : P.zone === 'ember' ? buildings.ship_r_emb : P.zone === 'jungle' ? buildings.ship_r_jun : P.zone === 'station' ? buildings.ship_r_st : P.zone === 'cave' ? buildings.ship_r_cv : buildings.ship;
+    const b = P.zone === 'ice' ? buildings.ship_r_ice : P.zone === 'ember' ? buildings.ship_r_emb : P.zone === 'jungle' ? buildings.ship_r_jun : P.zone === 'station' ? buildings.ship_r_st : P.zone === 'cave' ? buildings.ship_r_cv : P.zone === 'sky' ? buildings.ship_r_sk : buildings.ship;
     for (let i = 0; i < 5; i++) setTimeout(() => burst(b.x, .5, b.z, i % 2 ? 0xff8a3a : 0xffd23a, 16, 5, .8), i * 70);
     teleport(SHIP_SPOTS[id].arrive, id, 'launch');
     checkQuest(); checkAch(); save();
@@ -3046,7 +3383,7 @@ function fishReel() {
   if (f.pos >= f.zs && f.pos <= f.zs + f.zw) {
     f.hits++; SFX.pick();
     if (f.hits >= 3) {
-      const fi = f.fish; S.fish[fi.id] = (S.fish[fi.id] || 0) + 1; S.stats.fish++; if (fi.rar === 3) S.stats.legendFish++;
+      const fi = f.fish; S.fish[fi.id] = (S.fish[fi.id] || 0) + 1; S.stats.fish++; mapChance(.08, player.position); if (fi.rar === 3) S.stats.legendFish++;
       f.state = 'done'; f.msg = `🎉 You caught a <b style="color:${RARITY[fi.rar].c}">${fi.emoji} ${fi.name}</b>! ${RARITY[fi.rar].n} · worth ${fi.value} coins`;
       fi.rar >= 2 ? SFX.trophy() : SFX.coin(); checkQuest(); save();
     } else { f.zs = rand(.05, .95 - f.zw); f.spd *= 1.12; f.msg = `Nice! ${3 - f.hits} more…`; }
@@ -3121,9 +3458,9 @@ EXTRA_ACTIONS.job = id => {
 
 const rushUnlocked = () => S.stats.golem > 0 && S.stats.serpent > 0;
 const rushReady = () => rushUnlocked() && S.day >= S.rushDay;
-const rushList = () => ['golem', 'serpent'].concat(S.stats.jungleVisits > 0 ? ['queen'] : [], S.stats.stationVisits > 0 ? ['aicore'] : [], S.stats.shadow > 0 ? ['shadow'] : []);
+const rushList = () => ['golem', 'serpent'].concat(S.stats.jungleVisits > 0 ? ['queen'] : [], S.stats.stationVisits > 0 ? ['aicore'] : [], S.stats.shadow > 0 ? ['shadow'] : [], S.stats.roc > 0 ? ['roc'] : []);
 EXTRA_MODALS.rush = body => {
-  const names = rushList().map(k => ({ golem: '❄ Ice Golem', serpent: '🔥 Magmaw', queen: '🪲 Queen Beetle', aicore: '🤖 Rogue AI Core', shadow: '🌑 Shadow King' })[k]).join(' → ');
+  const names = rushList().map(k => ({ golem: '❄ Ice Golem', serpent: '🔥 Magmaw', queen: '🪲 Queen Beetle', aicore: '🤖 Rogue AI Core', shadow: '🌑 Shadow King', roc: '⚡ Thunder Roc' })[k]).join(' → ');
   const left = S.rushDay - S.day;
   body.innerHTML = `<h2>⚔ Boss Rush</h2><div class="lead">Fight every boss back to back: ${names}. They come back at full strength, and if you faint the rush ends. A new Boss Rush opens every 7 days.</div>
   <div class="ach"><div class="ico">⏱</div><div class="info"><div class="nm">Best time</div><div class="ds">${S.rushBest ? fmtTime(S.rushBest) : 'No full clear yet'} · cleared ${S.stats.rushes} time${S.stats.rushes === 1 ? '' : 's'}</div></div></div>
@@ -3173,7 +3510,7 @@ function updateNameTag() {
   project(player.position, nameTag, 2.6);
 }
 
-function fameKey() { return ['golem', 'serpent', 'queen', 'aicore', 'shadow'].map(k => S.stats[k] ? 1 : 0).join(''); }
+function fameKey() { return ['golem', 'serpent', 'queen', 'aicore', 'shadow', 'roc'].map(k => S.stats[k] ? 1 : 0).join(''); }
 function makeStatue(k) {
   const gm = new THREE.MeshLambertMaterial({ color: 0xffc23a, emissive: 0x6a4a00, emissiveIntensity: .35, flatShading: true });
   const g = new THREE.Group();
@@ -3181,13 +3518,14 @@ function makeStatue(k) {
   if (k === 'golem') { add(G.box, 0, .55, 0, .5, .5, .35); add(G.box, 0, .95, 0, .28, .24, .26); add(G.box, -.35, .5, 0, .14, .45, .14); add(G.box, .35, .5, 0, .14, .45, .14); add(G.box, -.12, .15, 0, .16, .3, .16); add(G.box, .12, .15, 0, .16, .3, .16); }
   else if (k === 'serpent') { for (let i = 0; i < 6; i++) { const s2 = i / 5, r = .17 - s2 * .03; add(G.ico1, -.3 + s2 * .5, .15 + Math.sin(s2 * 2.4) * .7, 0, r, r, r); } add(G.box, .25, .95, .05, .26, .16, .3); }
   else if (k === 'queen') { add(G.ico1, 0, .35, -.15, .35, .24, .48); add(G.ico1, 0, .38, .3, .2, .16, .18); for (let i = 0; i < 6; i++) { const s2 = i < 3 ? -1 : 1; add(G.box, s2 * .3, .2, -.2 + (i % 3) * .2, .3, .04, .04, 0, s2 * .5); } }
+  else if (k === 'roc') { add(G.ico1, 0, .45, 0, .28, .26, .38); add(G.ico1, 0, .75, .25, .17, .16, .17); add(G.box, -.38, .55, 0, .5, .05, .28, 0, .4); add(G.box, .38, .55, 0, .5, .05, .28, 0, -.4); add(G.box, 0, .72, .45, .06, .06, .16); add(G.cyl8, 0, .08, 0, .3, .16, .3); }
   else if (k === 'shadow') { add(G.cone6, 0, .5, 0, .38, 1, .38); add(G.ico1, 0, 1.12, 0, .16, .16, .16); for (let i = 0; i < 5; i++) add(G.oct, (i - 2) * .08, 1.36, 0, .03, .1, .03); }
   else { add(G.ico1, 0, .62, 0, .38, .38, .38); const r = new THREE.Mesh(new THREE.TorusGeometry(.55, .04, 5, 24), gm); r.position.y = .62; r.rotation.x = 1.2; g.add(r); add(G.cyl8, 0, .1, 0, .3, .2, .3); }
   return g;
 }
 EXTRA_MODALS.fame = body => {
   if (!S.stats.fameVisit) { S.stats.fameVisit = 1; setTimeout(checkQuest, 50); }
-  const LIST = [['golem', '🧊', 'The Ice Golem', 'Frostveil'], ['serpent', '🐍', 'Magmaw, the Lava Serpent', 'Emberfall'], ['queen', '🪲', 'The Queen Beetle', 'Verdantia'], ['aicore', '🤖', 'The Rogue AI Core', 'Nebula Station'], ['shadow', '🌑', 'The Shadow King', 'Crystal Caverns (secret!)']];
+  const LIST = [['golem', '🧊', 'The Ice Golem', 'Frostveil'], ['serpent', '🐍', 'Magmaw, the Lava Serpent', 'Emberfall'], ['queen', '🪲', 'The Queen Beetle', 'Verdantia'], ['aicore', '🤖', 'The Rogue AI Core', 'Nebula Station'], ['shadow', '🌑', 'The Shadow King', 'Crystal Caverns (secret!)'], ['roc', '⚡', 'The Thunder Roc', 'Skyreach']];
   body.innerHTML = `<h2>🏆 Hall of Fame</h2><div class="lead">A golden statue appears here for every boss <b style="color:${S.profile.color}">${esc(S.profile.name)}</b> has beaten.</div>`
     + LIST.map(([k, e, n, w]) => `<div class="ach ${S.stats[k] ? '' : 'locked'}"><div class="ico">${S.stats[k] ? e : '❔'}</div><div class="info"><div class="nm">${S.stats[k] ? n : '???'}</div><div class="ds">${w} · ${S.stats[k] ? `defeated ${S.stats[k]} time${S.stats[k] === 1 ? '' : 's'}` : 'not defeated yet'}</div></div></div>`).join('')
     + `<h3>RECORDS</h3><div class="ach"><div class="ico">⚔</div><div class="info"><div class="nm">Best Boss Rush</div><div class="ds">${S.rushBest ? fmtTime(S.rushBest) : 'not cleared yet'}</div></div></div><div class="ach"><div class="ico">🌊</div><div class="info"><div class="nm">Best Survival wave</div><div class="ds">${S.waveBest ? 'Wave ' + S.waveBest : 'not played yet'}</div></div></div><div class="ach"><div class="ico">💀</div><div class="info"><div class="nm">Monsters defeated</div><div class="ds">${S.stats.kills}</div></div></div>`;
@@ -3452,6 +3790,177 @@ $('psnap').addEventListener('click', () => {
 });
 
 /* ================================================================
+   SEASONS, PET EVOLUTION, TREASURE MAPS & MUSEUM
+   ================================================================ */
+const SEASON_DAYS = 3;
+const SEASONS = [
+  { id: 'spring', n: 'Spring', e: '🌸', gc: 0xc0f080, gk: .18, leaf: [0x8ae05a, 0xa8f06a, 0xffa8d8] },
+  { id: 'summer', n: 'Summer', e: '☀️', gc: 0xe0e060, gk: .1, leaf: null },
+  { id: 'autumn', n: 'Autumn', e: '🍂', gc: 0xd89a3a, gk: .55, leaf: [0xff8a2a, 0xffc23a, 0xd8442a] },
+  { id: 'winter', n: 'Winter', e: '❄️', gc: 0xf2f8ff, gk: .82, leaf: [0xeef6ff, 0xd0e4ff, 0xffffff] },
+];
+const seasonIdx = () => Math.floor((S.day - 1) / SEASON_DAYS) % 4;
+const seasonDaysLeft = () => SEASON_DAYS - (S.day - 1) % SEASON_DAYS;
+Object.assign(CROPS.carrot, { seasons: [0, 2, 3] });
+Object.assign(CROPS.corn, { seasons: [1, 2] });
+Object.assign(CROPS.pumpkin, { seasons: [2] });
+CROPS.berry = { name: 'Sky Berry', emoji: '🍓', time: 90, cost: 8, col: 0xff3a5a, sell: 10, seasons: [0, 1] };
+CROPS.melon = { name: 'Star Melon', emoji: '🍉', time: 180, cost: 18, col: 0x3aaa4a, sell: 22, seasons: [1] };
+CROPS.frostberry = { name: 'Frost Berry', emoji: '🫐', time: 150, cost: 15, col: 0x6ab8ff, sell: 18, seasons: [3] };
+const inSeason = k => CROPS[k].seasons.includes(seasonIdx());
+const seasonNames = k => CROPS[k].seasons.map(i => SEASONS[i].e).join('');
+FOOD_RECIPES.push(
+  { id: 'smoothie', name: 'Berry Smoothie', emoji: '🥤', food: 'berry', n: 3, buff: { speed: 180 }, desc: '+40% move speed for 3 min, and heals you' },
+  { id: 'slush', name: 'Melon Slush', emoji: '🍧', food: 'melon', n: 2, buff: { hp: 240, speed: 120 }, desc: '+50 max health for 4 min and +40% speed for 2 min' },
+  { id: 'tart', name: 'Frost Tart', emoji: '🥮', food: 'frostberry', n: 3, buff: { str: 200 }, desc: '+3 weapon damage for 3.3 min, and heals you' },
+);
+EXTRA_MODALS.farm = body => {
+  const si = seasonIdx(), se = SEASONS[si], snowy = si === 3;
+  const ready = S.farm.plots.filter(plotReady).length, empty = S.farm.plots.filter(p => !p).length;
+  body.innerHTML = `<h2>🌱 Farm</h2><div class="lead">Plant seeds, wait for them to grow, then harvest food. Crops keep growing while you explore, and grow <b>twice as fast in the ${snowy ? 'snow' : 'rain'}</b> ${snowy ? '🌨' : '🌧'}.${RAIN.on ? ` <b style="color:#9fd0ff">It is ${snowy ? 'snowing' : 'raining'} right now!</b>` : ''}</div>
+  <div class="ach"><div class="ico">${se.e}</div><div class="info"><div class="nm">It is ${se.n} at the outpost</div><div class="ds">${seasonDaysLeft()} day${seasonDaysLeft() === 1 ? '' : 's'} until ${SEASONS[(si + 1) % 4].n} ${SEASONS[(si + 1) % 4].e}. Each season lets you plant different seeds.</div></div></div>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr)">${S.farm.plots.map(p => {
+    if (!p) return '<div class="item"><div class="hat">🟫</div><div class="nm">Empty</div></div>';
+    const c = CROPS[p.crop], pr = Math.min(1, p.g / c.time);
+    return `<div class="item ${pr >= 1 ? 'on' : ''}"><div class="hat">${pr >= 1 ? c.emoji : pr > .5 ? '🌿' : '🌱'}</div><div class="nm">${c.name}</div><div class="pr">${pr >= 1 ? 'Ready!' : Math.floor(pr * 100) + '% · ' + fmtTime((c.time - p.g) / growRate())}</div></div>`;
+  }).join('')}</div>
+  <div style="text-align:center;margin-top:12px"><button class="sbtn big" data-act="harvest" ${ready ? '' : 'disabled'}>🧺 Harvest ${ready} ripe crop${ready === 1 ? '' : 's'}</button></div>
+  <h3>PLANT SEEDS ${empty ? `IN ${empty} EMPTY PLOT${empty === 1 ? '' : 'S'}` : '(NO EMPTY PLOTS)'}</h3>
+  <div class="grid">${Object.entries(CROPS).map(([k, c]) => { const ok = inSeason(k); return `<div class="item ${ok ? '' : 'locked'}" style="${ok ? '' : 'opacity:.6'}"><div class="hat">${c.emoji}</div><div class="nm">${c.name}</div><div class="pr">${ok ? `grows in ${fmtTime(c.time)}` : `Season: ${seasonNames(k)}`}</div><button class="sbtn" data-act="plant" data-id="${k}" ${ok && empty && S.coins >= c.cost * empty ? '' : 'disabled'}>${ok ? `${ic('coins')} ${c.cost * Math.max(1, empty)}` : 'Out of season'}</button></div>`; }).join('')}</div>
+  <h3>YOUR FOOD</h3><div class="pr">${Object.entries(CROPS).map(([k, c]) => `${c.emoji} ${S.food[k] || 0}`).join(' · ')} · cook it at the Kitchen, or feed your pets at the Pet Center!</div>`;
+};
+const plantBase = EXTRA_ACTIONS.plant;
+EXTRA_ACTIONS.plant = k => { if (!CROPS[k] || !inSeason(k)) return; plantBase(k); };
+const harvestBase = EXTRA_ACTIONS.harvest;
+EXTRA_ACTIONS.harvest = () => { const before = S.stats.harvests; harvestBase(); if (S.stats.harvests > before) { S.seasonHarv = (S.seasonHarv || 0) | (1 << seasonIdx()); checkAch(); save(); } };
+
+/* ---------------- pet evolution ---------------- */
+const PET_STAGES = [{ n: 'Baby', xp: 0, s: 1, m: 1 }, { n: 'Teen', xp: 80, s: 1.25, m: 1.5 }, { n: 'Mega', xp: 250, s: 1.55, m: 2.2 }];
+const PET_EVO = {
+  bloop: { emoji: '🐱', names: ['Bloop', 'Bloopster', 'Mega Bloop'], what: 'gathers faster' },
+  sparky: { emoji: '🐉', names: ['Sparky', 'Blaze', 'Inferno Drake'], what: 'breathes hotter fire' },
+  jelly: { emoji: '🟢', names: ['Jelly Blob', 'Jelly Giant', 'King Jelly'], what: 'heals you faster' },
+  robo: { emoji: '🤖', names: ['Mini Robot', 'Robo Pal', 'Mega Mech'], what: 'digs up treasure more often' },
+  phoenix: { emoji: '🔥', names: ['Baby Phoenix', 'Fire Bird', 'Sun Phoenix'], what: 'shoots stronger fireballs' },
+};
+const petHave = k => k === 'bloop' ? lvl('petden') > 0 : k === 'sparky' ? lvl('nest') > 0 : !!S.pets.owned[k];
+const petWithYou = k => k === 'bloop' || k === 'sparky' ? petHave(k) : S.pets.active === k;
+const petStage = k => { const x = S.petxp[k] || 0; return x >= PET_STAGES[2].xp ? 2 : x >= PET_STAGES[1].xp ? 1 : 0; };
+const petMul = k => PET_STAGES[petStage(k)].m;
+const petScale = k => PET_STAGES[petStage(k)].s;
+const petName = k => PET_EVO[k].names[petStage(k)];
+function evoDecor(parent, k, y) {
+  const st = petStage(k); if (!st) return;
+  const gem = new THREE.Mesh(G.oct, emis(st === 2 ? 0xffd23a : 0x7fd8ff, 1.5)); gem.scale.set(.06, .1, .06); gem.position.set(0, y, 0); parent.add(gem);
+  if (st === 2) { const halo = new THREE.Mesh(new THREE.TorusGeometry(.2, .025, 5, 18), emis(0xffd23a, 1.6)); halo.rotation.x = Math.PI / 2; halo.position.set(0, y + .14, 0); parent.add(halo); parent.userData.halo = halo; }
+}
+function remakePet(k) { if (k === 'bloop') makePet(); else if (k === 'sparky') makeDragon(); else if (S.pets.active === k) makeCompanion(); }
+function petXP(n, only) {
+  for (const k in PET_EVO) {
+    if (only ? k !== only : !petWithYou(k)) continue;
+    if (!petHave(k)) continue;
+    const before = petStage(k); S.petxp[k] = (S.petxp[k] || 0) + n;
+    if (petStage(k) > before) evolvePet(k);
+  }
+}
+function petObj(k) { return k === 'bloop' ? pet.g : k === 'sparky' ? dragon.g : comp.kind === k ? comp.g : null; }
+function evolvePet(k) {
+  const st = petStage(k); S.stats.evolved = (S.stats.evolved || 0) + 1; if (st === 2) S.stats.megaPets = (S.stats.megaPets || 0) + 1;
+  remakePet(k);
+  const o = petObj(k), p = o ? o.position : player.position;
+  for (let i = 0; i < 4; i++) setTimeout(() => burst(p.x, 1, p.z, [0xffd23a, 0x7fd8ff, 0xff7ae0, 0xffffff][i], 18, 5, 1), i * 120);
+  SFX.hatch(); setTimeout(() => SFX.trophy(), 300);
+  toast(`✨ ${PET_EVO[k].names[st - 1]} evolved into <b>${PET_EVO[k].names[st]}</b>! It ${PET_EVO[k].what}.`, 'big', 5000);
+  checkQuest(); checkAch(); save();
+}
+const FOOD_XP = { carrot: 20, corn: 30, pumpkin: 60, berry: 25, melon: 45, frostberry: 40 };
+const petsBase = EXTRA_MODALS.pets;
+EXTRA_MODALS.pets = body => {
+  petsBase(body);
+  const have = Object.keys(PET_EVO).filter(petHave), foods = Object.keys(FOOD_XP).filter(f => S.food[f] > 0);
+  body.innerHTML += `<h3>PET EVOLUTION</h3><div class="pr" style="margin-bottom:8px">Pets with you gain XP when you defeat monsters, gather and beat bosses. At ${PET_STAGES[1].xp} XP they become a Teen, and at ${PET_STAGES[2].xp} XP a Mega pet: bigger, stronger and shinier! Feed them farm food for extra XP.</div>`
+    + (have.length ? have.map(k => {
+      const x = S.petxp[k] || 0, st = petStage(k), nx = st < 2 ? PET_STAGES[st + 1].xp : PET_STAGES[2].xp, pv = st < 2 ? PET_STAGES[st].xp : 0, pc = st < 2 ? Math.min(100, (x - pv) / (nx - pv) * 100) : 100;
+      return `<div class="ach"><div class="ico" style="font-size:${22 + st * 6}px">${PET_EVO[k].emoji}</div><div class="info"><div class="nm">${petName(k)} · ${PET_STAGES[st].n}${st === 2 ? ' ✨' : ''}</div><div class="ds">${st < 2 ? `${x}/${nx} XP to ${PET_EVO[k].names[st + 1]}` : `Fully evolved! Power ×${PET_STAGES[2].m}`} · ${petWithYou(k) ? 'with you' : 'at home'}</div><div class="bar"><i style="width:${pc}%"></i></div><div class="row2" style="margin-top:6px">${foods.map(f => `<button class="sbtn alt" data-act="feed" data-id="${k}:${f}">${CROPS[f].emoji} +${FOOD_XP[f]}</button>`).join('') || '<span class="pr">Grow food at the Farm to feed pets.</span>'}</div></div></div>`;
+    }).join('') : '<div class="pr">You have no pets yet. Build the Pet Den, hatch Sparky or adopt a pet!</div>');
+};
+EXTRA_ACTIONS.feed = id => {
+  const [k, f] = id.split(':'); if (!PET_EVO[k] || !petHave(k) || !FOOD_XP[f] || !(S.food[f] > 0)) return;
+  S.food[f]--; S.stats.fed = (S.stats.fed || 0) + 1;
+  const o = petObj(k); if (o) burst(o.position.x, 1, o.position.z, 0xff9ad0, 10, 3, .6);
+  tone(700, .1, 'sine', .06, 400); tone(900, .12, 'sine', .05, 400, .08);
+  floatText((o ? o.position : player.position).clone().setY(2), `♥ +${FOOD_XP[f]} XP`, '#ff9ad0');
+  petXP(FOOD_XP[f], k); save(); renderModal();
+};
+
+/* ---------------- treasure maps ---------------- */
+const ZONE_NAMES = { home: 'the Outpost', ice: 'Frostveil', ember: 'Emberfall', jungle: 'Verdantia', station: 'Nebula Station', cave: 'Crystal Caverns', sky: 'Skyreach' };
+const zoneVisited = z => z === 'home' || (z === 'ice' && S.stats.iceVisits) || (z === 'ember' && S.stats.emberVisits) || (z === 'jungle' && S.stats.jungleVisits) || (z === 'station' && S.stats.stationVisits) || (z === 'cave' && S.stats.caveVisits) || (z === 'sky' && S.stats.skyVisits);
+function assembleMap() {
+  if (S.tmap.site >= 0 || S.tmap.pieces < 3) return;
+  const opts = DIG_SITES.map((s, i) => i).filter(i => zoneVisited(DIG_SITES[i].zone) && !S.tmap.dug[i]);
+  const pool = opts.length ? opts : DIG_SITES.map((s, i) => i).filter(i => zoneVisited(DIG_SITES[i].zone) && i !== S.tmap.last);
+  S.tmap.pieces -= 3; S.tmap.site = pool[Math.random() * pool.length | 0];
+  SFX.trophy();
+  toast(`🗺 You pieced together a TREASURE MAP! The X is on ${ZONE_NAMES[DIG_SITES[S.tmap.site].zone]}. Tap 🗺 Treasure to read the clue.`, 'big', 6000);
+  checkQuest(); save();
+}
+function givePiece(pos, n = 1) {
+  S.tmap.pieces += n; S.stats.pieces = (S.stats.pieces || 0) + n;
+  if (pos) floatText(pos.clone().setY(2.4), `🗺 +${n} map piece${n > 1 ? 's' : ''}`, '#f2d8a0');
+  toastOnce('piece', '🗺 You found a torn TREASURE MAP piece! Collect 3 to make a map.', 'big', 30);
+  tone(520, .12, 'triangle', .06, 200); tone(780, .15, 'triangle', .05, 200, .1);
+  assembleMap(); renderTmapBtn(); save();
+}
+const mapChance = (p, pos) => { if (Math.random() < p) givePiece(pos); };
+function treasureHint() {
+  const s = DIG_SITES[S.tmap.site]; if (!s) return '';
+  if (P.zone !== s.zone && !(P.zone === 'mine' && s.zone === 'home')) return `🗺 Treasure is on ${ZONE_NAMES[s.zone]}`;
+  const d = dist2(player.position.x, player.position.z, s.pos.x, s.pos.z);
+  return d < 3 ? '🗺 <b style="color:#ff8a5a">RIGHT HERE! Stand still to dig</b>' : d < 8 ? '🗺 <b style="color:#ff7a3a">🔥 Hot!</b>' : d < 16 ? '🗺 <b style="color:#ffc23a">♨ Warm</b>' : d < 30 ? '🗺 <b style="color:#9fd0ff">Cool</b>' : '🗺 <b style="color:#7fa8ff">❄ Cold</b>';
+}
+EXTRA_MODALS.tmap = body => {
+  const s = DIG_SITES[S.tmap.site], pc = S.tmap.pieces, rel = RELICS.filter(r => S.relics[r.id] || S.museum.relics[r.id]).length;
+  body.innerHTML = `<h2>🗺 Treasure Maps</h2><div class="lead">Torn map pieces drop from trees, rocks, monsters, fishing and bosses on every planet. Collect 3 pieces to make a map, follow the clue, then stand on the X to dig up a chest.</div>
+  <h3>MAP PIECES</h3><div class="row2" style="font-size:34px;gap:10px">${[0, 1, 2].map(i => `<span style="opacity:${i < pc % 3 || (pc >= 3 && i < 3) ? 1 : .2}">📜</span>`).join('')}<span class="pr" style="font-size:14px">${pc} piece${pc === 1 ? '' : 's'}</span></div>
+  <h3>YOUR MAP</h3>${s ? `<div class="ach"><div class="ico">❌</div><div class="info"><div class="nm">Treasure on ${ZONE_NAMES[s.zone]}</div><div class="ds">"${s.clue}"</div><div class="rw">${treasureHint()}</div></div></div>` : '<div class="pr">No map yet. Collect 3 pieces!</div>'}
+  <h3>RELICS FOUND (${rel}/${RELICS.length})</h3><div class="grid">${RELICS.map(r => { const own = S.relics[r.id] || S.museum.relics[r.id]; return `<div class="item"><div class="hat">${own ? r.emoji : '❔'}</div><div class="nm">${own ? r.name : '???'}</div><div class="pr">${S.museum.relics[r.id] ? 'In the museum' : own ? 'Donate it at the museum!' : 'Buried somewhere…'}</div></div>`; }).join('')}</div>
+  <div class="pr" style="margin-top:10px">Treasure chests dug up: ${S.tmap.chests}</div>`;
+};
+function renderTmapBtn() { const b = $('tmapBtn'); if (b) b.hidden = !(S.tmap.pieces > 0 || S.tmap.site >= 0 || S.tmap.chests > 0); }
+$('tmapBtn').addEventListener('click', () => { if (started) openModal('tmap'); });
+
+/* ---------------- museum ---------------- */
+const MUSEUM = {
+  fish: { name: 'Fish Tank', emoji: '🐟', items: () => Object.values(FISH_INDEX).filter(f => f.rar >= 2).map(f => ({ id: f.id, name: f.name, emoji: f.emoji, need: 'Catch one', have: (S.fish[f.id] || 0) > 0 })), reward: 800, trophy: 'Aquarium Keeper' },
+  gems: { name: 'Gem Hall', emoji: '💎', items: () => ['crystal', 'frost', 'magma', 'spore', 'star', 'prism', 'feather'].map(r => ({ id: r, name: RES_NAME[r], emoji: ic(r), need: '10 in storage', have: S.store[r] >= 10 })), reward: 1000, trophy: 'Gem Expert' },
+  relics: { name: 'Relic Room', emoji: '🏺', items: () => RELICS.map(r => ({ id: r.id, name: r.name, emoji: r.emoji, need: 'Dig it up', have: !!S.relics[r.id] })), reward: 1500, trophy: 'Master Archaeologist' },
+};
+const musCount = k => MUSEUM[k].items().filter(it => S.museum[k][it.id]).length;
+EXTRA_MODALS.museum = body => {
+  body.innerHTML = `<h2>🏛 Museum</h2><div class="lead">Donate rare fish, gems and relics to fill the display cases. Finish a whole collection for a big reward and a trophy!</div>` + Object.entries(MUSEUM).map(([k, c]) => {
+    const its = c.items(), n = musCount(k), done = S.museum.done[k];
+    return `<h3>${c.emoji} ${c.name.toUpperCase()} · ${n}/${its.length}${done ? ' ✓ COMPLETE' : ` · reward ${c.reward} coins`}</h3><div class="grid">${its.map(it => {
+      const in2 = S.museum[k][it.id];
+      return `<div class="item ${in2 ? 'on' : ''}"><div class="hat">${in2 || it.have || k === 'gems' ? it.emoji : '❔'}</div><div class="nm">${in2 || it.have || k === 'gems' ? it.name : '???'}</div>${in2 ? '<div class="pr">On display ✨</div>' : it.have ? `<button class="sbtn" data-act="donate" data-id="${k}:${it.id}">Donate</button>` : `<div class="pr">${it.need}</div>`}</div>`;
+    }).join('')}</div>`;
+  }).join('');
+};
+EXTRA_ACTIONS.donate = id => {
+  const [k, iid] = id.split(':'), c = MUSEUM[k]; if (!c || S.museum[k][iid]) return;
+  const it = c.items().find(x => x.id === iid); if (!it || !it.have) return;
+  if (k === 'fish') S.fish[iid]--; else if (k === 'gems') S.store[iid] -= 10; else delete S.relics[iid];
+  S.museum[k][iid] = 1; S.stats.donated = (S.stats.donated || 0) + 1; S.coins += 10;
+  SFX.buy(); toast(`🏛 Thank you for donating the ${it.name}! ${ic('coins')}+10`);
+  if (!S.museum.done[k] && musCount(k) >= c.items().length) {
+    S.museum.done[k] = 1; S.coins += c.reward;
+    setTimeout(() => { SFX.victory(); toast(`🏛 The ${c.name} is complete! ${ic('coins')}+${c.reward} · check your trophies!`, 'big', 5000); }, 400);
+    if (buildings.museum) { refreshBuilding('museum'); burst(buildings.museum.x, 3, buildings.museum.z, 0xffd23a, 30, 6, 1.2); }
+  }
+  renderRes(); checkQuest(); checkAch(); save(); renderModal();
+};
+
+/* ================================================================
    DAILY CHEST
    ================================================================ */
 const dayStr = (off = 0) => { const d = new Date(Date.now() - off * 864e5); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
@@ -3495,12 +4004,12 @@ function route(zone, fn) {
   if (P.zone === zone) return fn();
   if (P.zone === 'mine') return MINE_EXIT;
   if (P.zone === 'arena') return ARENA_EXIT;
-  if (zone === 'jungle' || P.zone === 'jungle' || zone === 'station' || P.zone === 'station' || zone === 'cave' || P.zone === 'cave') return SHIP_SPOTS[P.zone].pad;
+  if (zone === 'jungle' || P.zone === 'jungle' || zone === 'station' || P.zone === 'station' || zone === 'cave' || P.zone === 'cave' || zone === 'sky' || P.zone === 'sky') return SHIP_SPOTS[P.zone].pad;
   if (P.zone === 'ember') return EMB_PORTAL_T;
   if (P.zone === 'ice') return zone === 'ember' ? EP_ICE_T : ICE_PORTAL_T;
   return zone === 'mine' ? MINE_DOOR : HOME_PORTAL_T;
 }
-const home = fn => () => route('home', fn), mineQ = fn => () => route('mine', fn), ice = fn => () => route('ice', fn), emb = fn => () => route('ember', fn), jun = fn => () => route('jungle', fn), st = fn => () => route('station', fn), cv = fn => () => route('cave', fn);
+const home = fn => () => route('home', fn), mineQ = fn => () => route('mine', fn), ice = fn => () => route('ice', fn), emb = fn => () => route('ember', fn), jun = fn => () => route('jungle', fn), st = fn => () => route('station', fn), cv = fn => () => route('cave', fn), sk = fn => () => route('sky', fn);
 const nearJumper = kind => { let best = null, bd = 1e9; for (const j of jumpers) if (j.kind === kind) { const d = dist2(j.x, j.z, player.position.x, player.position.z); if (d < bd) { bd = d; best = j; } } return best ? V(best.x, 0, best.z) : null; };
 const QUESTS = [
   { id: 'trees', t: 'Chop down 3 trees', p: () => `${Math.min(S.stats.trees, 3)}/3 · walk up to a tree`, done: () => S.stats.trees >= 3, target: home(() => nearestNode('tree', 'home')), reward: { wood: 4 } },
@@ -3571,6 +4080,16 @@ const QUESTS = [
   { id: 'caverns', t: 'Fly to Crystal Caverns', p: () => 'Open the Star Map on your ship', done: () => S.stats.caveVisits > 0, target: () => P.zone === 'mine' ? MINE_EXIT : SHIP_SPOTS[P.zone].pad, reward: { coins: 120 } },
   { id: 'cart', t: 'Ride a minecart', p: () => 'Step onto a 🚃 cart stop', done: () => S.stats.carts > 0, target: cv(() => nearestStop()), reward: { coins: 60 } },
   { id: 'prism', t: 'Mine 5 prism shards', p: () => `${Math.min(S.stats.prism, 5)}/5 · keep your lantern fueled!`, done: () => S.stats.prism >= 5, target: cv(() => nearestNode('prism', 'cave')), reward: { prism: 3 } },
+  { id: 'skyreach', t: 'Fly to Skyreach', p: () => 'A new planet on the Star Map: floating sky islands!', done: () => S.stats.skyVisits > 0, target: () => P.zone === 'mine' ? MINE_EXIT : SHIP_SPOTS[P.zone].pad, reward: { coins: 150 } },
+  { id: 'gust', t: 'Ride a wind current', p: () => 'Step onto a swirling 🌬 wind pad', done: () => S.stats.gusts > 0, target: sk(() => nearestGust()), reward: { coins: 60 } },
+  { id: 'feather', t: 'Gather 5 storm feathers', p: () => `${Math.min(S.stats.feather, 5)}/5 · from feather nests (Axe Lv 4) or storm wisps at night`, done: () => S.stats.feather >= 5, target: sk(() => nearestNode('feather', 'sky')), reward: { feather: 3 } },
+  { id: 'glider', t: 'Craft a Glider', p: () => 'At the Skyreach camp', done: () => lvl('glider') > 0, target: sk(() => padPos('glider')), reward: { coins: 100 } },
+  { id: 'soar', t: 'Ride an updraft', p: () => 'Step into a tall wind column with your glider', done: () => S.stats.drafts > 0, target: sk(() => skv(0, -20.5)), reward: { coins: 80 } },
+  { id: 'roc', t: 'Defeat the Thunder Roc', p: () => 'Glide from Cloud Garden to the big nest island', done: () => S.stats.roc > 0, target: sk(() => ROC_NEST), reward: { coins: 200 } },
+  { id: 'museum', t: 'Build the Museum', p: () => 'East side of the outpost', done: () => lvl('museum') > 0, target: home(() => padPos('museum')), reward: { coins: 60 } },
+  { id: 'donate', t: 'Donate to the Museum', p: () => 'Rare fish, 10 gems, or a relic', done: () => S.stats.donated > 0, target: home(() => padPos('museumui')), reward: { coins: 60 } },
+  { id: 'treasure', t: 'Dig up a treasure chest', p: () => S.tmap.site >= 0 ? `Your map points to ${ZONE_NAMES[DIG_SITES[S.tmap.site].zone]}. Tap 🗺 Treasure for the clue!` : `Map pieces: ${S.tmap.pieces}/3 · they drop from trees, rocks, monsters & fish`, done: () => S.tmap.chests > 0, target: () => null, reward: { coins: 100 } },
+  { id: 'evolve', t: 'Evolve a pet', p: () => 'Pets level up as you fight & gather. Feed them farm food at the Pet Center!', done: () => S.stats.evolved > 0, target: () => null, reward: { coins: 100 } },
   { id: 'runes', t: 'Find the 5 hidden runes', p: () => `${runeCount()}/5 found · one on each older planet. Crew letters have hints!`, done: () => runeCount() >= 5, target: () => null, reward: { coins: 200 } },
   { id: 'shadow', t: 'Defeat the Shadow King', p: () => 'At the rune altar, deep in Crystal Caverns', done: () => S.stats.shadow > 0, target: cv(() => ALTAR) },
   { id: 'rush', t: 'Clear a Boss Rush', p: () => 'Obelisk at the outpost · opens every 7 days', done: () => S.stats.rushes > 0, target: home(() => padPos('rushui')) },
@@ -3672,6 +4191,7 @@ const ZONE_ENTER = {
   ember: '🌋 Welcome to <b style="color:#ffe08a">Emberfall</b>! Ride the moving stones over the lava, mine <b style="color:#ffe08a">magma cores</b>, and watch for eruptions…',
   jungle: '🍄 Welcome to <b style="color:#fff7a0">Verdantia</b>! Bounce on mushroom pads, swing on vines and mine <b style="color:#fff7a0">spore crystals</b>. The Queen Beetle rules here…',
   station: '🛰 Welcome to <b style="color:#fff27a">Nebula Station</b>! Low gravity — jump across gaps, ride the conveyors, dodge laser gates and mine <b style="color:#fff27a">star cores</b>…',
+  sky: '☁ Welcome to <b style="color:#7ad8ff">Skyreach</b>! Cross rope bridges, ride the 🌬 wind currents and gather <b style="color:#7ad8ff">storm feathers</b>. Don\'t fall off the islands!',
   cave: '💎 Welcome to <b style="color:#e0a8ff">Crystal Caverns</b>! It\'s dark down here. Keep your 🕯 lantern fueled at lamp posts, ride the 🚃 minecarts and mine <b style="color:#e0a8ff">prism shards</b>…',
 };
 function teleport(to, zone, sound = 'whoosh') {
@@ -3685,6 +4205,8 @@ function teleport(to, zone, sound = 'whoosh') {
     if (zone === 'mine') toastOnce('mine', ZONE_ENTER.mine, '', 30);
     P.air = null; P.jlock = null; P.jumpY = 0; P.vy = 0; P.jumps = 0;
     P.cart = null; if (rideCart) rideCart.visible = false; P.cartY = 0;
+    P.skyY = 0; P.skyAir = false; P.gust = null; P.gustLock = null; P.autoGlide = false; P.glideOn = false;
+    if (zone === 'sky') { S.stats.skyVisits++; if (S.stats.skyVisits === 1) toast(ZONE_ENTER.sky, 'ice', 6000); else toastOnce('sk', '☁ Back in Skyreach', '', 10); }
     if (zone === 'cave') { P.fuel = 100; S.stats.caveVisits++; if (S.stats.caveVisits === 1) toast(ZONE_ENTER.cave, 'ice', 6000); else toastOnce('cv', '💎 Back in Crystal Caverns. Lantern refilled!', '', 10); }
     if (zone === 'station') { S.stats.stationVisits++; if (S.stats.stationVisits === 1) toast(ZONE_ENTER.station, 'ice', 5500); else toastOnce('stn', '🛰 Back on Nebula Station', '', 10); }
     if (zone === 'jungle') { S.stats.jungleVisits++; if (S.stats.jungleVisits === 1) toast(ZONE_ENTER.jungle, 'jungle', 5500); else toastOnce('jun', '🍄 Back on Verdantia', '', 10); }
@@ -3716,7 +4238,7 @@ function damagePlayer(dmg, fromX, fromZ, chill = 0, burn = 0) {
     for (const r of RES) S.bag[r] = 0;
     renderRes();
     const z = P.zone === 'mine' || P.zone === 'arena' ? 'home' : P.zone;
-    setTimeout(() => { S.hp = S.maxHp; P.chill = 0; P.burn = 0; P.air = null; teleport(z === 'ice' ? ICE_ARRIVE.clone() : z === 'ember' ? EMB_ARRIVE.clone() : z === 'jungle' ? JUN_ARRIVE.clone() : z === 'station' ? ST_ARRIVE.clone() : z === 'cave' ? CV_ARRIVE.clone() : V(0, 0, 4), z); }, 900);
+    setTimeout(() => { S.hp = S.maxHp; P.chill = 0; P.burn = 0; P.air = null; teleport(z === 'ice' ? ICE_ARRIVE.clone() : z === 'ember' ? EMB_ARRIVE.clone() : z === 'jungle' ? JUN_ARRIVE.clone() : z === 'station' ? ST_ARRIVE.clone() : z === 'cave' ? CV_ARRIVE.clone() : z === 'sky' ? SK_ARRIVE.clone() : V(0, 0, 4), z); }, 900);
   }
 }
 
@@ -3726,8 +4248,8 @@ function breakNode(n) {
   const def = n.def, lv = S.tools[def.tool];
   const amt = (def.yield + (lv - def.req)) * (EV.golden > 0 ? 2 : 1);
   const got = addBag(def.res, amt);
-  const st = { tree: 'trees', rock: 'rocks', icerock: 'rocks', ftree: 'frostTrees', ore: 'ore', crystal: 'crystal', frost: 'frost', otree: 'obsTrees', basalt: 'rocks', magma: 'magma', jtree: 'trees', mossrock: 'rocks', spore: 'spore', planter: 'trees', scrap: 'ore', star: 'star', prism: 'prism', gemrock: 'rocks', cshroom: 'trees' }[n.type];
-  S.stats[st]++;
+  const st = { tree: 'trees', rock: 'rocks', icerock: 'rocks', ftree: 'frostTrees', ore: 'ore', crystal: 'crystal', frost: 'frost', otree: 'obsTrees', basalt: 'rocks', magma: 'magma', jtree: 'trees', mossrock: 'rocks', spore: 'spore', planter: 'trees', scrap: 'ore', star: 'star', prism: 'prism', gemrock: 'rocks', cshroom: 'trees', feather: 'feather', cloudtree: 'trees', skyrock: 'rocks' }[n.type];
+  S.stats[st]++; petXP(1); mapChance(.012, V(n.x, 0, n.z));
   burst(n.x, 1.2, n.z, def.chip, 14, 5, .9);
   for (let i = 0; i < got; i++) fly(V(n.x + rand(-.5, .5), 1 + rand(0, 1), n.z + rand(-.5, .5)), () => tmpV.copy(player.position).setY(1.2), RES_COL[def.res], () => SFX.pick(), i * .06);
   let html = `+${got} ${ic(def.res)}`;
@@ -3745,7 +4267,7 @@ function breakNode(n) {
   renderRes(); checkQuest();
 }
 
-const foes = () => { const f = enemies.filter(e => !e.dying && e.spawn >= 1); if (boss.state === 'fight') f.push(boss); if (serp.targetable()) f.push(serp); if (queen.state === 'fight') f.push(queen); if (aicore.targetable()) f.push(aicore); if (shadow.targetable()) f.push(shadow); return f; };
+const foes = () => { const f = enemies.filter(e => !e.dying && e.spawn >= 1); if (boss.state === 'fight') f.push(boss); if (serp.targetable()) f.push(serp); if (queen.state === 'fight') f.push(queen); if (aicore.targetable()) f.push(aicore); if (shadow.targetable()) f.push(shadow); if (roc.targetable()) f.push(roc); return f; };
 const foeR = f => f.isBoss ? (f.r || 1.9) : 0;
 function hitFoe(f, dmg, kb = 8, color = '#ffffff', show = true) {
   if (f.dying || (f.isBoss && !f.targetable())) return;
@@ -3788,9 +4310,9 @@ function attack(target) {
 
 function killEnemy(e, drop) {
   if (e.dying) return;
-  e.dying = .01; S.stats.kills++;
+  e.dying = .01; S.stats.kills++; petXP(3); if (drop) mapChance(e.kind === 'goblin' ? .5 : .03, e.g.position);
   SFX.kill();
-  burst(e.g.position.x, .8, e.g.position.z, { gloom: 0x8a5aff, crawl: 0xff6a5a, shard: 0xbfe6ff, magma: 0xff6a1a, goblin: 0x6bd04a, beetle: 0x3aff9a, sdrone: 0xff5a5a, bat: 0xc88aff }[e.kind], 16, 5, .8);
+  burst(e.g.position.x, .8, e.g.position.z, { gloom: 0x8a5aff, crawl: 0xff6a5a, shard: 0xbfe6ff, magma: 0xff6a1a, goblin: 0x6bd04a, beetle: 0x3aff9a, sdrone: 0xff5a5a, bat: 0xc88aff, wisp: 0xfff27a }[e.kind], 16, 5, .8);
   if (!drop) return;
   if (e.kind === 'goblin') {
     const c = 80 + (Math.random() * 71 | 0); S.coins += c;
@@ -3803,9 +4325,9 @@ function killEnemy(e, drop) {
   const coins = e.kind === 'gloom' ? 1 + (Math.random() * 2 | 0) : e.kind === 'crawl' ? 1 + (Math.random() * 3 | 0) : 2 + (Math.random() * 3 | 0);
   S.coins += coins;
   let html = `+${coins} ${ic('coins')}`;
-  const chance = e.kind === 'gloom' ? .6 : e.kind === 'crawl' ? .8 : e.kind === 'magma' ? .3 : e.kind === 'beetle' ? .25 : e.kind === 'sdrone' ? .2 : e.kind === 'bat' ? .15 : .4;
+  const chance = e.kind === 'gloom' ? .6 : e.kind === 'crawl' ? .8 : e.kind === 'magma' ? .3 : e.kind === 'beetle' ? .25 : e.kind === 'sdrone' ? .2 : e.kind === 'bat' ? .15 : e.kind === 'wisp' ? .3 : .4;
   if (Math.random() < chance) {
-    const r = e.kind === 'bat' ? 'prism' : e.kind === 'sdrone' ? 'star' : e.kind === 'beetle' ? 'spore' : e.kind === 'magma' ? 'magma' : e.kind === 'shard' ? 'frost' : e.kind === 'gloom' ? (Math.random() < .25 && S.tools.pick >= 3 ? 'crystal' : 'ore') : 'ore';
+    const r = e.kind === 'wisp' ? 'feather' : e.kind === 'bat' ? 'prism' : e.kind === 'sdrone' ? 'star' : e.kind === 'beetle' ? 'spore' : e.kind === 'magma' ? 'magma' : e.kind === 'shard' ? 'frost' : e.kind === 'gloom' ? (Math.random() < .25 && S.tools.pick >= 3 ? 'crystal' : 'ore') : 'ore';
     if (addBag(r, 1)) { fly(e.g.position.clone().setY(1), () => tmpV.copy(player.position).setY(1.2), RES_COL[r], () => SFX.pick()); html += ` +1 ${ic(r)}`; }
   }
   floatText(e.g.position.clone().setY(2), html, '#ffe9a0');
@@ -3906,6 +4428,7 @@ function update(dt) {
   if (W.k > .2 && P.zone === 'ice' && !inHeat) { player.position.x += Math.cos(W.windA) * W.k * 1.6 * dt; player.position.z += Math.sin(W.windA) * W.k * 1.6 * dt; }
   resolveCollisions(player.position, .45);
   jumpPhysics(dt);
+  glideTick(dt);
   P.onStone = false;
   if (P.zone === 'ember' && !fading) {
     const st = P.jumpY === 0 && stoneUnder(player.position.x, player.position.z);
@@ -3924,6 +4447,7 @@ function update(dt) {
   jungleMove(dt);
   stationMove(dt);
   caveMove(dt);
+  skyMove(dt);
   if (moving) P.face = Math.atan2(ix, iz);
 
   // ---- target: foes first, then nodes
@@ -3974,7 +4498,7 @@ function update(dt) {
   P.armR.rotation.z = sliding && P.swing <= 0 ? 1.1 : 0;
   player.rotation.y = lerpAngle(player.rotation.y, P.face, 1 - Math.exp(-dt * 14));
   player.rotation.z = sliding ? Math.sin(t * 3) * .08 : 0;
-  player.position.y = (sliding ? 0 : Math.abs(Math.sin(P.walk)) * .08 * Math.min(1, sp / 4)) + (P.onStone ? .22 : 0) + (P.air ? P.airY : 0) + P.jumpY + (P.cartY || 0);
+  player.position.y = (sliding ? 0 : Math.abs(Math.sin(P.walk)) * .08 * Math.min(1, sp / 4)) + (P.onStone ? .22 : 0) + (P.air ? P.airY : 0) + P.jumpY + (P.cartY || 0) + (P.zone === 'sky' ? P.skyY - P.jumpY : 0);
   P.hurtT -= dt;
   P.suit.emissive.setHex(P.hurtT > 0 ? 0xff0000 : P.burn > 0 ? 0x8a2a00 : P.chill > 0 ? 0x2266aa : 0x000000);
   if (sliding && Math.random() < dt * 12) burst(player.position.x, .1, player.position.z, 0xffffff, 1, 1.5, .4, .6);
@@ -3997,8 +4521,8 @@ function update(dt) {
   }
 
   // ---- deposit at base (outpost or Frostveil cargo pod — both feed the same storage)
-  const inTown = (P.zone === 'home' && Math.hypot(player.position.x, player.position.z) < TOWN_R) || (P.zone === 'ice' && dist2(player.position.x, player.position.z, CAMP.x, CAMP.z) < CAMP_R) || (P.zone === 'ember' && dist2(player.position.x, player.position.z, ECAMP.x, ECAMP.z) < CAMP_R) || (P.zone === 'jungle' && dist2(player.position.x, player.position.z, JCAMP.x, JCAMP.z) < CAMP_R) || (P.zone === 'station' && dist2(player.position.x, player.position.z, ST_CAMP.x, ST_CAMP.z) < CAMP_R) || (P.zone === 'cave' && dist2(player.position.x, player.position.z, CV_CAMP.x, CV_CAMP.z) < CAMP_R);
-  const depTo = P.zone === 'ice' ? ICE_STORE_POS : P.zone === 'ember' ? EMB_STORE_POS : P.zone === 'jungle' ? JUN_STORE_POS : P.zone === 'station' ? ST_STORE_POS : P.zone === 'cave' ? CV_STORE_POS : STORE_POS;
+  const inTown = (P.zone === 'home' && Math.hypot(player.position.x, player.position.z) < TOWN_R) || (P.zone === 'ice' && dist2(player.position.x, player.position.z, CAMP.x, CAMP.z) < CAMP_R) || (P.zone === 'ember' && dist2(player.position.x, player.position.z, ECAMP.x, ECAMP.z) < CAMP_R) || (P.zone === 'jungle' && dist2(player.position.x, player.position.z, JCAMP.x, JCAMP.z) < CAMP_R) || (P.zone === 'station' && dist2(player.position.x, player.position.z, ST_CAMP.x, ST_CAMP.z) < CAMP_R) || (P.zone === 'cave' && dist2(player.position.x, player.position.z, CV_CAMP.x, CV_CAMP.z) < CAMP_R) || (P.zone === 'sky' && dist2(player.position.x, player.position.z, SK_CAMP.x, SK_CAMP.z) < CAMP_R);
+  const depTo = P.zone === 'ice' ? ICE_STORE_POS : P.zone === 'ember' ? EMB_STORE_POS : P.zone === 'jungle' ? JUN_STORE_POS : P.zone === 'station' ? ST_STORE_POS : P.zone === 'cave' ? CV_STORE_POS : P.zone === 'sky' ? SK_STORE_POS : STORE_POS;
   P.depT -= dt;
   if (inTown && bagCount() > 0 && P.depT <= 0 && S.hp > 0) {
     P.depT = .045;
@@ -4179,6 +4703,15 @@ function update(dt) {
           spawnEnemy('sdrone', x, z); break;
         }
       }
+    } else if (P.zone === 'sky' && night && roc.state !== 'fight') {
+      P.spawnT = 3.5;
+      if (living.filter(e => e.kind === 'wisp' && !e.summoned).length < Math.min(6, 2 + Math.floor(S.day / 3))) {
+        for (let tries = 0; tries < 10; tries++) {
+          const a = rand(0, 6.28), r = rand(10, 17), x = player.position.x + Math.cos(a) * r, z = player.position.z + Math.sin(a) * r;
+          if (!skyGround(x, z) || dist2(x, z, SK_CAMP.x, SK_CAMP.z) < CAMP_R + 2) continue;
+          spawnEnemy('wisp', x, z); break;
+        }
+      }
     } else if (P.zone === 'cave' && shadow.state !== 'fight' && !P.cart) {
       P.spawnT = 4;
       if (living.filter(e => e.kind === 'bat' && !e.summoned).length < (P.fuel < 30 ? 5 : 2)) {
@@ -4205,6 +4738,7 @@ function update(dt) {
     if (e.kind === 'gloom' && e.summoned && e.shadowMinion && shadow.state !== 'fight') { e.dying = .01; burst(g.position.x, 1, g.position.z, 0x9a5aff, 8, 3, .6); continue; }
     if (e.wings) e.wings.forEach((w, wi) => w.rotation.z = (wi ? -1 : 1) * Math.sin(t * 22 + e.hop) * .8);
     if (e.kind === 'sdrone' && e.summoned && aicore.state !== 'fight') { e.dying = .01; burst(g.position.x, 1, g.position.z, 0xff5a5a, 8, 3, .6); continue; }
+    if (e.kind === 'wisp' && !e.arena && (e.summoned ? roc.state !== 'fight' : !night)) { e.dying = .01; burst(g.position.x, 1.4, g.position.z, 0xffffff, 8, 3, .6); continue; }
     if (e.kind === 'gloom' && !night && !e.arena) { e.dying = .01; burst(g.position.x, .8, g.position.z, 0x3a2a63, 8, 3, .6); continue; }
     if (e.kind === 'shard' && !e.arena && (e.summoned ? boss.state !== 'fight' : !(W.bliz || night))) { e.dying = .01; burst(g.position.x, 1, g.position.z, 0xffffff, 8, 3, .6); continue; }
     if (e.kind === 'beetle' && !e.arena && (e.summoned ? queen.state !== 'fight' : !night)) { e.dying = .01; burst(g.position.x, .5, g.position.z, 0x3aff9a, 8, 3, .6); continue; }
@@ -4227,7 +4761,7 @@ function update(dt) {
     e.hop += dt * 9;
     const hopK = Math.max(0, Math.sin(e.hop));
     const spd = e.speed * (e.slow > 0 ? .4 : 1);
-    if (e.kind === 'shard' || e.kind === 'sdrone' || e.kind === 'bat') {
+    if (e.kind === 'shard' || e.kind === 'sdrone' || e.kind === 'bat' || e.kind === 'wisp') {
       g.position.x += (mx * spd + e.kx) * dt; g.position.z += (mz * spd + e.kz) * dt;
       e.body.position.y = 1 + Math.sin(e.hop * .5) * .15; e.body.rotation.y += dt * 3;
     } else {
@@ -4261,6 +4795,9 @@ function update(dt) {
   updateCompanion(dt, t);
   updateWaves(dt);
   updateShadow(dt, t);
+  updateRoc(dt, t);
+  updateSky(dt, t);
+  updateTreasure(dt, t);
   updateCave(dt, t);
   updateOutpost(dt, t);
   updateCrew(dt, t);
@@ -4347,6 +4884,13 @@ function update(dt) {
     lantern.intensity = 3 + f * 26; lantern.distance = 6 + f * 12;
     plazaLight.intensity = 0;
     torchLights.forEach((tl, i) => { tl.L.position.set(CV_C.x + LAMPS[i][0], 2.6, CV_C.z + LAMPS[i][1]); tl.L.intensity = 28 + Math.sin(t * 7 + i) * 4; tl.L.color.setHex(0xffc27a); });
+  } else if (P.zone === 'sky') {
+    hemi.intensity = lerp(.8, 1.7, dn); hemi.color.setRGB(lerp(.45, .9, dn), lerp(.5, .95, dn), 1); hemi.groundColor.setHex(0x8a9ad0);
+    sun.intensity = lerp(.5, 2.5, dn); sun.color.setRGB(1, lerp(.8, .96, dn), lerp(.75, .88, dn));
+    scene.background.copy(SKY_REACH_NIGHT).lerp(SKY_REACH_DAY, dn); if (roc.state === 'fight' && roc.mode === 'storm') scene.background.lerp(SKY_REACH_STORM, .5);
+    scene.fog.color.copy(scene.background); scene.fog.near = 60; scene.fog.far = 170;
+    lantern.intensity = nightK * 8; plazaLight.intensity = 0;
+    for (const tl of torchLights) tl.L.intensity = 0;
   } else if (P.zone === 'station') {
     hemi.intensity = 1.1; hemi.color.setHex(0xb8c8ff); hemi.groundColor.setHex(0x3a2a5a);
     sun.intensity = 2; sun.color.setHex(0xf0f0ff);
@@ -4471,13 +5015,15 @@ function safeZoneFor(kind) {
   if (kind === 'beetle') return { x: JCAMP.x, z: JCAMP.z, r: CAMP_R };
   if (kind === 'sdrone') return { x: ST_CAMP.x, z: ST_CAMP.z, r: CAMP_R };
   if (kind === 'bat') return { x: CV_CAMP.x, z: CV_CAMP.z, r: CAMP_R };
+  if (kind === 'wisp') return { x: SK_CAMP.x, z: SK_CAMP.z, r: CAMP_R };
   if (kind === 'gloom' && lvl('generator')) return { x: 0, z: 0, r: safeR(lvl('generator')) };
   if (kind === 'shard' && lvl('heater')) return { x: CAMP.x, z: CAMP.z, r: heatR(lvl('heater')) };
   return null;
 }
 
 function updateSnow(dt, t) {
-  snow.visible = P.zone === 'ice' || P.zone === 'ember' || P.zone === 'jungle' || P.zone === 'station' || P.zone === 'cave';
+  snow.visible = P.zone === 'ice' || P.zone === 'ember' || P.zone === 'jungle' || P.zone === 'station' || P.zone === 'cave' || P.zone === 'home';
+  if (snow.visible && P.zone === 'home') { updateSeasonFx(dt, t); return; }
   if (snow.visible && P.zone === 'station') { updateDust(dt, t); return; }
   if (snow.visible && P.zone === 'cave') { updateMotes(dt, t); return; }
   if (!snow.visible) return;
@@ -4608,7 +5154,7 @@ function updatePet(dt, t) {
   if (!L) return;
   if (!pet.g || pet.lvl !== L) makePet();
   const g = pet.g;
-  g.visible = !fading;
+  g.visible = !fading; g.scale.setScalar(petScale('bloop'));
   if (pet.target && (!pet.target.alive || pet.target.zone !== P.zone || dist2(pet.target.x, pet.target.z, player.position.x, player.position.z) > 12)) pet.target = null;
   pet.scanT -= dt;
   if (!pet.target && pet.scanT <= 0) {
@@ -4642,10 +5188,10 @@ function updatePet(dt, t) {
     g.rotation.y = lerpAngle(g.rotation.y, Math.atan2(n.x - g.position.x, n.z - g.position.z), .3);
     pet.hitT -= dt;
     if (pet.hitT <= 0) {
-      pet.hitT = 1.1 - L * .22;
+      pet.hitT = (1.1 - L * .22) / Math.sqrt(petMul('bloop'));
       if (bagCount() >= bagCap()) pet.target = null;
       else {
-        n.hp -= .5 + L * .5; n.shake = 1;
+        n.hp -= (.5 + L * .5) * petMul('bloop'); n.shake = 1;
         pet.body.position.y += .2;
         burst(n.x, 1, n.z, n.def.chip, 3, 2.5, .4, .7);
         tone(900 + L * 200, .06, 'sine', .04, 300);
@@ -4675,11 +5221,11 @@ function lavaAt(x, z) {
   return false;
 }
 function bossBar() {
-  const bf = boss.state === 'fight' ? boss : serp.state === 'fight' ? serp : queen.state === 'fight' ? queen : aicore.state === 'fight' ? aicore : shadow.state === 'fight' ? shadow : null;
+  const bf = boss.state === 'fight' ? boss : serp.state === 'fight' ? serp : queen.state === 'fight' ? queen : aicore.state === 'fight' ? aicore : shadow.state === 'fight' ? shadow : roc.state === 'fight' ? roc : null;
   $('boss').style.display = bf ? 'block' : 'none';
   if (bf) {
     $('boss').classList.toggle('fire', bf !== boss);
-    $('bossName').textContent = bf === boss ? '❄ ICE GOLEM' : bf === serp ? '🔥 MAGMAW, THE LAVA SERPENT' : bf === queen ? '🪲 THE QUEEN BEETLE' : bf === aicore ? `🤖 ROGUE AI CORE · PHASE ${aicore.phase}` : '🌑 THE SHADOW KING';
+    $('bossName').textContent = bf === boss ? '❄ ICE GOLEM' : bf === serp ? '🔥 MAGMAW, THE LAVA SERPENT' : bf === queen ? '🪲 THE QUEEN BEETLE' : bf === aicore ? `🤖 ROGUE AI CORE · PHASE ${aicore.phase}` : bf === roc ? '⚡ THE THUNDER ROC' : '🌑 THE SHADOW KING';
     $('bossFill').style.width = Math.max(0, bf.hp / bf.max * 100) + '%';
   }
 }
@@ -4698,7 +5244,7 @@ function updateEmbers(dt, t) {
 }
 
 function updateEvents(dt, t) {
-  const bossOn = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || RUSH.active || WAVES.active || P.zone === 'arena';
+  const bossOn = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' || RUSH.active || WAVES.active || P.zone === 'arena';
   if (P.zone !== 'mine' && !bossOn && !fading && S.hp > 0) EV.t -= dt;
   if (EV.t <= 0) {
     EV.t = rand(100, 160);
@@ -4849,7 +5395,7 @@ function updateSerpent(dt, t) {
 function updateDragon(dt, t) {
   const L = lvl('nest'); if (!L) return;
   if (!dragon.g || dragon.lvl !== L) makeDragon();
-  const g = dragon.g; g.visible = !fading;
+  const g = dragon.g; g.visible = !fading; g.scale.setScalar(petScale('sparky'));
   dragon.flap += dt * 14;
   dragon.wings.forEach((w, i) => w.rotation.z = (i ? -1 : 1) * Math.sin(dragon.flap) * .7);
   const ry = player.rotation.y;
@@ -4869,7 +5415,7 @@ function updateDragon(dt, t) {
       dragon.tick -= dt;
       if (dragon.tick <= 0) {
         dragon.tick = .25;
-        for (const o of foes()) if (dist2(o.g.position.x, o.g.position.z, fp.x, fp.z) - foeR(o) < 1.8) { o.burn = Math.max(o.burn || 0, 2); hitFoe(o, 1 + L * .5, 2, '#ffb36b'); }
+        for (const o of foes()) if (dist2(o.g.position.x, o.g.position.z, fp.x, fp.z) - foeR(o) < 1.8) { o.burn = Math.max(o.burn || 0, 2); hitFoe(o, (1 + L * .5) * petMul('sparky'), 2, '#ffb36b'); }
       }
     }
   } else if (dragon.breathT <= 0) {
@@ -5094,10 +5640,12 @@ function startRushStage() {
   else if (k === 'serpent') { resetSerpent(); serp.state = 'sleep'; teleport(V(LAVA_LAKE.x, 0, LAVA_LAKE.z + 12.5), 'ember', 'launch'); }
   else if (k === 'queen') { resetQueen(); queen.state = 'sleep'; teleport(V(QARENA.x, 0, QARENA.z + 9), 'jungle', 'launch'); }
   else if (k === 'aicore') { resetAICore(); aicore.state = 'sleep'; teleport(sv(0, -35), 'station', 'launch'); }
+  else if (k === 'roc') { resetRoc(); roc.state = 'sleep'; teleport(V(ROC_NEST.x, 0, ROC_NEST.z + 9), 'sky', 'launch'); }
   else { resetShadow(); shadow.state = 'sleep'; teleport(V(ALTAR.x, 0, ALTAR.z + 8), 'cave', 'launch'); }
   setTimeout(() => toast(`⚔ Round ${RUSH.stage + 1} of ${RUSH.list.length}!`, 'danger', 2500), 500);
 }
 function rushNext(kind) {
+  petXP(40); givePiece(player.position);
   if (!RUSH.active || RUSH.list[RUSH.stage] !== kind) return;
   RUSH.stage++;
   if (RUSH.stage >= RUSH.list.length) endRush(true);
@@ -5244,6 +5792,9 @@ $('musicBtn').addEventListener('click', () => { musicOn = !musicOn; $('musicBtn'
 let musicGain = null, musicNext = 0, musicStep = 0, musicKey = null;
 const mf = m => 440 * Math.pow(2, (m - 69) / 12);
 const TRACKS = {
+  sky: { bpm: 96, lw: 'sine', lv: .05, ld: 2.4, bw: 'triangle', bv: .06, bd: 3,
+    lead: [79, 0, 84, 0, 83, 0, 79, 0, 76, 0, 0, 0, 79, 0, 81, 0, 83, 0, 86, 0, 84, 0, 83, 0, 79, 0, 0, 0, 76, 0, 0, 0],
+    bass: [43, 0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0] },
   home: { bpm: 104, lw: 'triangle', lv: .05, ld: 1.6, bw: 'sine', bv: .08,
     lead: [72, 0, 76, 0, 79, 0, 76, 74, 72, 0, 0, 69, 72, 0, 74, 0, 76, 0, 79, 0, 81, 0, 79, 76, 74, 0, 72, 0, 74, 0, 0, 0],
     bass: [48, 0, 0, 0, 55, 0, 0, 0, 57, 0, 0, 0, 53, 0, 0, 0, 48, 0, 0, 0, 55, 0, 0, 0, 53, 0, 0, 0, 55, 0, 0, 0] },
@@ -5280,7 +5831,7 @@ function updateMusic() {
   const on = !muted && musicOn;
   musicGain.gain.value = on ? .55 : 0;
   if (!on) return;
-  const key = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || P.zone === 'arena' ? 'boss' : P.zone;
+  const key = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' || P.zone === 'arena' ? 'boss' : P.zone;
   const tr = TRACKS[key] || TRACKS.home;
   if (key !== musicKey) { musicKey = key; musicStep = 0; }
   const step = 60 / tr.bpm / 2;
@@ -5314,6 +5865,7 @@ function doJump() {
   else { burst(player.position.x, P.jumpY + .3, player.position.z, 0xff8a2a, 12, 3, .4, .7, 4); noise(.2, .2, 1500); tone(500, .15, 'triangle', .06, 500); }
 }
 function jumpPhysics(dt) {
+  if (P.zone === 'sky') return;
   if (P.jumpY <= 0 && P.vy === 0) return;
   P.vy -= (P.zone === 'station' ? 11 : 28) * dt;
   P.jumpY += P.vy * dt;
@@ -5509,6 +6061,7 @@ function makeCompanion() {
     const wm = new THREE.MeshLambertMaterial({ color: 0xffa040, emissive: 0xff5a0a, emissiveIntensity: .7, side: THREE.DoubleSide });
     comp.wings = [-1, 1].map(s2 => { const w = new THREE.Group(); const m = new THREE.Mesh(wg, wm); m.scale.x = s2; w.add(m); w.position.set(s2 * .1, .06, 0); b.add(w); return w; });
   }
+  evoDecor(b, k, k === 'jelly' ? .72 : k === 'robo' ? .95 : .45);
   g.position.set(player.position.x + 1.5, 0, player.position.z); scene.add(g); comp.g = g;
 }
 function phoenixSave() {
@@ -5522,7 +6075,8 @@ function updateCompanion(dt, t) {
   P.phxCD = Math.max(0, P.phxCD - dt);
   if (P.hat && P.hat.userData.prop) P.hat.userData.prop.rotation.y += dt * 18;
   if (!comp.g) return;
-  const g = comp.g, b = comp.body; g.visible = !fading;
+  const g = comp.g, b = comp.body; g.visible = !fading; g.scale.setScalar(petScale(comp.kind));
+  if (petStage(comp.kind) === 2 && Math.random() < dt * 3) burst(g.position.x, 1, g.position.z, 0xffd23a, 1, 1, .4, .5, -2);
   const ry = player.rotation.y;
   const gx = player.position.x + Math.cos(ry) * 1.5 + Math.sin(ry) * .6, gz = player.position.z - Math.sin(ry) * 1.5 + Math.cos(ry) * .6;
   const dx = gx - g.position.x, dz = gz - g.position.z, d = Math.hypot(dx, dz);
@@ -5533,15 +6087,15 @@ function updateCompanion(dt, t) {
   if (comp.kind === 'jelly') {
     const sq = Math.sin(comp.bob);
     b.scale.set(1 + sq * .08, 1 - sq * .1, 1 + sq * .08); b.position.y = Math.max(0, sq) * .18 + P.jumpY * .3;
-    if (S.hp > 0 && S.hp < maxHp()) { S.hp = Math.min(maxHp(), S.hp + dt * 2.5); if (Math.random() < dt * 4) burst(player.position.x + rand(-.4, .4), .5, player.position.z + rand(-.4, .4), 0x7dff8a, 1, 1, .5, .6, -3); }
+    if (S.hp > 0 && S.hp < maxHp()) { S.hp = Math.min(maxHp(), S.hp + dt * 2.5 * petMul('jelly')); if (Math.random() < dt * 4) burst(player.position.x + rand(-.4, .4), .5, player.position.z + rand(-.4, .4), 0x7dff8a, 1, 1, .5, .6, -3); }
   } else if (comp.kind === 'robo') {
     b.position.y = 0; comp.wheels.forEach(w => w.rotation.x += dt * d * 6);
     comp.digT -= dt;
     if (comp.digT <= 0) {
-      comp.digT = 25;
+      comp.digT = 25 / petMul('robo');
       let html;
       if (Math.random() < .5) { const c = 10 + (Math.random() * 21 | 0); S.coins += c; html = `+${c} ${ic('coins')}`; }
-      else { const opts = ['wood', 'stone', 'ore']; if (S.tools.pick >= 3) opts.push('crystal'); if (S.stats.iceVisits) opts.push('frost'); if (S.stats.emberVisits) opts.push('magma'); if (S.stats.jungleVisits) opts.push('spore'); if (S.stats.stationVisits) opts.push('star'); const r = opts[Math.random() * opts.length | 0], n = ['wood', 'stone', 'ore'].includes(r) ? 6 : 2; S.store[r] += n; html = `+${n} ${ic(r)}`; }
+      else { const opts = ['wood', 'stone', 'ore']; if (S.tools.pick >= 3) opts.push('crystal'); if (S.stats.iceVisits) opts.push('frost'); if (S.stats.emberVisits) opts.push('magma'); if (S.stats.jungleVisits) opts.push('spore'); if (S.stats.stationVisits) opts.push('star'); if (S.stats.skyVisits) opts.push('feather'); const r = opts[Math.random() * opts.length | 0], n = ['wood', 'stone', 'ore'].includes(r) ? 6 : 2; S.store[r] += n; html = `+${n} ${ic(r)}`; }
       burst(g.position.x, .3, g.position.z, 0x8a6a4a, 10, 3, .5); SFX.coin();
       floatText(g.position.clone().setY(1.2), `🤖 ${html}`, '#bfe6ff'); renderRes();
     }
@@ -5554,14 +6108,14 @@ function updateCompanion(dt, t) {
       comp.fireT = 2;
       let best = null, bd = 7;
       for (const f of foes()) { const dd = dist2(f.g.position.x, f.g.position.z, player.position.x, player.position.z) - foeR(f); if (dd < bd) { bd = dd; best = f; } }
-      if (best) { const from = g.position.clone().setY(b.position.y); fireStream(from, best.g.position.clone().setY(best.isBoss ? 2.5 : .6), 6, 12); best.burn = Math.max(best.burn || 0, 1.5); hitFoe(best, 2, 2, '#ffb36b'); SFX.fire(); }
+      if (best) { const from = g.position.clone().setY(b.position.y); fireStream(from, best.g.position.clone().setY(best.isBoss ? 2.5 : .6), 6, 12); best.burn = Math.max(best.burn || 0, 1.5); hitFoe(best, 2 * petMul('phoenix'), 2, '#ffb36b'); SFX.fire(); }
     }
   }
 }
 
 /* ---------------- Survival Waves ---------------- */
 function wavePool() {
-  const p2 = ['gloom']; if (lvl('mine')) p2.push('crawl'); if (S.stats.iceVisits) p2.push('shard'); if (S.stats.emberVisits) p2.push('magma'); if (S.stats.jungleVisits) p2.push('beetle'); if (S.stats.stationVisits) p2.push('sdrone');
+  const p2 = ['gloom']; if (lvl('mine')) p2.push('crawl'); if (S.stats.iceVisits) p2.push('shard'); if (S.stats.emberVisits) p2.push('magma'); if (S.stats.jungleVisits) p2.push('beetle'); if (S.stats.stationVisits) p2.push('sdrone'); if (S.stats.skyVisits) p2.push('wisp');
   return p2;
 }
 function startWaves() {
@@ -5800,12 +6354,12 @@ function plotMesh(crop) {
   for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(G.cone4, leaf); m.scale.set(.08, .45, .08); m.position.set(((i % 3) - 1) * .4, .2, (i < 3 ? -.25 : .25)); m.rotation.z = rand(-.3, .3); stems.add(m); }
   g.add(stems); g.userData.stems = stems;
   const c = CROPS[crop], prod = new THREE.Group();
-  const pm = crop === 'pumpkin' ? new THREE.MeshLambertMaterial({ color: c.col, emissive: 0xff5a0a, emissiveIntensity: .6, flatShading: true }) : new THREE.MeshLambertMaterial({ color: c.col, flatShading: true });
+  const pm = crop === 'pumpkin' || crop === 'frostberry' ? new THREE.MeshLambertMaterial({ color: c.col, emissive: crop === 'pumpkin' ? 0xff5a0a : 0x3a7aff, emissiveIntensity: .6, flatShading: true }) : new THREE.MeshLambertMaterial({ color: c.col, flatShading: true });
   for (let i = 0; i < 3; i++) {
     const m = new THREE.Mesh(crop === 'carrot' ? G.cone6 : G.sph, pm);
     if (crop === 'carrot') { m.scale.set(.09, .3, .09); m.rotation.x = Math.PI; m.position.set((i - 1) * .4, .3, 0); }
     else if (crop === 'corn') { m.scale.set(.1, .25, .1); m.position.set((i - 1) * .4, .55, 0); }
-    else { m.scale.set(.26, .2, .26); m.position.set((i - 1) * .42, .15, 0); }
+    else { const sc = crop === 'melon' ? [.34, .26] : crop === 'pumpkin' ? [.26, .2] : [.13, .13]; m.scale.set(sc[0], sc[1], sc[0]); m.position.set((i - 1) * .42, crop === 'berry' || crop === 'frostberry' ? .35 : .15, (crop === 'berry' || crop === 'frostberry') ? (i % 2) * .15 : 0); }
     prod.add(m);
   }
   prod.visible = false; g.add(prod); g.userData.prod = prod;
@@ -5822,13 +6376,15 @@ function updateOutpost(dt, t) {
   RAIN.t -= dt;
   if (RAIN.t <= 0) {
     RAIN.on = !RAIN.on; RAIN.t = RAIN.on ? rand(40, 60) : rand(120, 220);
-    if (P.zone === 'home') toast(RAIN.on ? '🌧 It\'s raining at the outpost! Crops grow twice as fast.' : '🌤 The rain stops.', RAIN.on ? 'ice' : '');
+    if (P.zone === 'home') toast(RAIN.on ? (seasonIdx() === 3 ? '🌨 It\'s snowing at the outpost! Crops grow twice as fast.' : '🌧 It\'s raining at the outpost! Crops grow twice as fast.') : seasonIdx() === 3 ? '🌤 The snow stops.' : '🌤 The rain stops.', RAIN.on ? 'ice' : '');
   }
   RAIN.k = lerp(RAIN.k, RAIN.on && P.zone === 'home' ? 1 : 0, 1 - Math.exp(-dt * .8));
   rain.visible = RAIN.k > .03; rainMat.opacity = RAIN.k * .8;
+  const snowy = seasonIdx() === 3, rainSpd = snowy ? 4 : 22; rainMat.color.setHex(snowy ? 0xffffff : 0xa8d0ff); rainMat.size = snowy ? .16 : .09;
+  if (seasonState.cur !== seasonIdx()) applySeason(seasonState.cur >= 0);
   if (rain.visible) {
     const a = rainPos, px = player.position.x, pz = player.position.z;
-    for (let i = 0; i < RAIN_N; i++) { const j = i * 3; a[j + 1] -= dt * 22; a[j] += dt * 2; if (a[j + 1] < 0) { a[j + 1] += 20; if (Math.random() < .02) burst(a[j], .05, a[j + 2], 0xa8d0ff, 1, 1, .2, .4); } if (a[j] - px > 30) a[j] -= 60; else if (a[j] - px < -30) a[j] += 60; if (a[j + 2] - pz > 30) a[j + 2] -= 60; else if (a[j + 2] - pz < -30) a[j + 2] += 60; }
+    for (let i = 0; i < RAIN_N; i++) { const j = i * 3; a[j + 1] -= dt * rainSpd; a[j] += dt * 2; if (a[j + 1] < 0) { a[j + 1] += 20; if (Math.random() < .02) burst(a[j], .05, a[j + 2], 0xa8d0ff, 1, 1, .2, .4); } if (a[j] - px > 30) a[j] -= 60; else if (a[j] - px < -30) a[j] += 60; if (a[j + 2] - pz > 30) a[j + 2] -= 60; else if (a[j + 2] - pz < -30) a[j + 2] += 60; }
     rainGeo.attributes.position.needsUpdate = true;
     RAIN.sndT -= dt; if (RAIN.sndT <= 0) { RAIN.sndT = .3; noise(.4, .025 * RAIN.k, 2500); }
   }
@@ -5858,6 +6414,338 @@ function updateOutpost(dt, t) {
   if (tv('trading', 'B', 1, 1)) { stallT -= dt; if (stallT <= 0) { stallT = 10; const c = tv('trading', 'B', 2, 4); S.coins += c; renderRes(); if (P.zone === 'home' && buildings.trading) floatText(V(buildings.trading.x, 3.5, buildings.trading.z), `+${c} ${ic('coins')}`, '#ffe9a0'); } }
 }
 
+/* ---------------- Skyreach: islands, wind currents, updrafts, glider ---------------- */
+P.skyY = 0; P.skyAir = false; P.gust = null; P.gustLock = null; P.glideOn = false; P.autoGlide = false; P.jumpHeld = false;
+const gliderMesh = new THREE.Group();
+{
+  const sail = new THREE.BufferGeometry(); sail.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 1, -1.6, 0, -.6, 0, .15, -.3, 0, 0, 1, 0, .15, -.3, 1.6, 0, -.6]), 3)); sail.computeVertexNormals();
+  gliderMesh.add(new THREE.Mesh(sail, new THREE.MeshLambertMaterial({ color: 0xff7a3a, side: THREE.DoubleSide, flatShading: true })));
+  const stripe = new THREE.Mesh(sail, new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide, flatShading: true })); stripe.scale.set(.5, 1, .5); stripe.position.set(0, .02, .25); gliderMesh.add(stripe);
+  const bar = new THREE.Mesh(G.box, new THREE.MeshLambertMaterial({ color: 0x3a3a4a })); bar.scale.set(.05, .9, .05); bar.position.y = -.45; gliderMesh.add(bar);
+  const hb = new THREE.Mesh(G.box, new THREE.MeshLambertMaterial({ color: 0x3a3a4a })); hb.scale.set(1, .05, .05); hb.position.y = -.9; gliderMesh.add(hb);
+  gliderMesh.position.set(0, 2.55, 0); gliderMesh.visible = false; player.add(gliderMesh);
+}
+addEventListener('keydown', e => { if (e.code === 'Space') P.jumpHeld = true; });
+addEventListener('keyup', e => { if (e.code === 'Space') P.jumpHeld = false; });
+$('jumpBtn').addEventListener('pointerdown', () => { P.jumpHeld = true; });
+for (const ev2 of ['pointerup', 'pointercancel', 'pointerleave']) $('jumpBtn').addEventListener(ev2, () => { P.jumpHeld = false; });
+const nearestGust = () => { let best = null, bd = 1e9; for (const gp of skyGusts) { const d = dist2(gp.pos.x, gp.pos.z, player.position.x, player.position.z); if (d < bd) { bd = d; best = gp; } } return best ? best.pos : null; };
+function startGust(gp) {
+  P.gustLock = gp; P.gust = { from: player.position.clone(), to: gp.to.clone(), t: 0, dur: 1.5 + Math.hypot(gp.to.x - gp.pos.x, gp.to.z - gp.pos.z) * .025, h: gp.h };
+  S.stats.gusts = (S.stats.gusts || 0) + 1; P.vel.set(0, 0, 0);
+  noise(.8, .12, 600); tone(300, .6, 'sine', .06, 600);
+  toastOnce('gust', '🌬 WHOOSH! The wind current carries you to another island!', '', 20);
+  checkQuest();
+}
+function glideTick(dt) {
+  // on normal planets: hold Jump while falling to glide
+  if (P.zone === 'sky') return;
+  P.glideOn = lvl('glider') > 0 && P.jumpY > .3 && P.vy < 0 && P.jumpHeld && S.hp > 0 && !P.air;
+  if (P.glideOn) { P.vy = Math.max(P.vy, -1.8); player.position.x += Math.sin(P.face) * 2.5 * dt; player.position.z += Math.cos(P.face) * 2.5 * dt; }
+}
+function skyMove(dt) {
+  if (P.zone !== 'sky' || fading) { if (P.zone !== 'sky') { P.skyY = 0; P.skyAir = false; P.gust = null; } return; }
+  if (P.gust) {
+    const g = P.gust; g.t += dt; const k = Math.min(1, g.t / g.dur);
+    player.position.x = lerp(g.from.x, g.to.x, k); player.position.z = lerp(g.from.z, g.to.z, k);
+    P.skyY = Math.sin(k * Math.PI) * g.h; P.vel.set(0, 0, 0); P.face = Math.atan2(g.to.x - g.from.x, g.to.z - g.from.z);
+    if (Math.random() < dt * 30) burst(player.position.x + rand(-.6, .6), P.skyY + rand(0, 1.5), player.position.z + rand(-.6, .6), 0xffffff, 1, 2, .5, .6);
+    P.jumpY = Math.max(.01, P.skyY);
+    if (k >= 1) { P.gust = null; P.skyY = 0; P.vy = 0; P.skyAir = false; P.jumps = 0; P.jumpY = 0; P.safePos.copy(player.position); burst(player.position.x, .2, player.position.z, 0xffffff, 12, 3, .6); SFX.whoosh(); }
+    return;
+  }
+  const px = player.position.x, pz = player.position.z, ground = skyGround(px, pz), hasG = lvl('glider') > 0;
+  if (!P.skyAir && S.hp > 0) for (const gp of skyGusts) {
+    const d = dist2(px, pz, gp.pos.x, gp.pos.z);
+    if (d < 1.2) { if (P.gustLock !== gp) { startGust(gp); return; } }
+    else if (P.gustLock === gp) P.gustLock = null;
+  }
+  let draft = null;
+  for (const dr of skyDrafts) if (dist2(px, pz, dr.pos.x, dr.pos.z) < 1.8 && P.skyY > -1) draft = dr;
+  if (draft && hasG && S.hp > 0) {
+    if (!P.skyAir || !P.inDraft) { S.stats.drafts = (S.stats.drafts || 0) + 1; checkQuest(); checkAch(); noise(1, .1, 400); }
+    P.vy = P.skyY >= 11 ? Math.min(P.vy, 0) : Math.min(P.vy + 32 * dt, 7); P.skyAir = true; P.autoGlide = true;
+    toastOnce('draft', '🪂 Whoosh! The updraft lifts you up. Steer to soar — land on any island!', '', 40);
+  } else if (draft && !P.skyAir) toastOnce('nodraft', '🌬 A strong updraft! Craft a 🪂 Glider at camp to ride it.', '', 15);
+  P.inDraft = !!(draft && hasG);
+  if (!P.skyAir) {
+    if (P.vy > 0) P.skyAir = true;
+    else if (!ground) { P.skyAir = true; P.vy = -.1; toastOnce('edge', hasG ? '🪂 Hold JUMP to glide!' : '😱 Careful near the edges!', '', 6); }
+  }
+  if (P.skyAir) {
+    if (!P.inDraft) P.vy -= 28 * dt;
+    P.glideOn = hasG && P.vy <= 0 && (P.jumpHeld || P.autoGlide) && S.hp > 0;
+    if (P.glideOn) {
+      P.vy = Math.max(P.vy, -1.7);
+      player.position.x += (Math.sin(P.face) * 3.2 + P.vel.x * .3) * dt; player.position.z += (Math.cos(P.face) * 3.2 + P.vel.z * .3) * dt;
+      if (Math.random() < dt * 8) burst(player.position.x, P.skyY + 2.4, player.position.z, 0xffffff, 1, .6, .4, .5);
+    }
+    P.skyY += P.vy * dt;
+    if (P.skyY <= 0 && P.skyY > -.8 && P.vy <= 0 && skyGround(player.position.x, player.position.z)) {
+      P.skyY = 0; P.vy = 0; P.skyAir = false; P.jumps = 0; P.autoGlide = false; P.glideOn = false;
+      burst(player.position.x, .1, player.position.z, 0xffffff, 6, 2, .4, .6);
+    } else if (P.skyY < -9 && S.hp > 0) {
+      P.skyY = 0; P.vy = 0; P.skyAir = false; P.autoGlide = false; P.glideOn = false; P.jumps = 0;
+      if (!skyGround(P.safePos.x, P.safePos.z)) P.safePos.copy(SK_ARRIVE);
+      player.position.copy(P.safePos); P.vel.set(0, 0, 0);
+      damagePlayer(8, player.position.x, player.position.z); P.vel.set(0, 0, 0);
+      toastOnce('fell', hasG ? '☁ You fell into the clouds! Hold JUMP to glide next time.' : '☁ You fell into the clouds! Use bridges and wind currents.', 'danger', 6);
+    }
+  } else { P.skyY = 0; P.vy = 0; if (skySafe(px, pz)) P.safePos.copy(player.position); }
+  P.jumpY = P.skyAir ? Math.max(.01, P.skyY) : 0;
+}
+function updateSky(dt, t) {
+  gliderMesh.visible = P.glideOn && !fading;
+  if (gliderMesh.visible) { gliderMesh.rotation.z = clamp(-P.vel.x * .04, -.3, .3) * Math.cos(player.rotation.y); gliderMesh.rotation.x = -.15 + Math.sin(t * 3) * .04; }
+  if (P.zone !== 'sky') return;
+  if (skyWindmill) skyWindmill.rotation.z += dt * 1.4;
+  for (const gp of skyGusts) { gp.rings.forEach((r, i) => { const f = (t * .8 + i / 3) % 1; r.position.y = f * 2.2; r.scale.setScalar(1 - f * .5); r.material.opacity = .45; }); gp.arrow.position.y = 2.4 + Math.sin(t * 3) * .2; if (Math.random() < dt * 3) burst(gp.pos.x + rand(-.6, .6), .4, gp.pos.z + rand(-.6, .6), 0xdff6ff, 1, 2, .6, .6, -4); }
+  for (const dr of skyDrafts) { dr.rings.forEach((r, i) => { r.position.y = ((t * 2.5 + i * 3) % 12); r.rotation.z += dt; }); if (Math.random() < dt * 5) burst(dr.pos.x + rand(-1, 1), rand(0, 2), dr.pos.z + rand(-1, 1), 0xffffff, 1, 1, .8, .5, -8); }
+  for (const w of skyWhales) {
+    w.a += w.sp * dt; const x = SK_C.x + Math.cos(w.a) * w.R, z = SK_C.z - 15 + Math.sin(w.a) * w.R;
+    w.g.position.set(x, w.h + Math.sin(t * .4 + w.R) * 2, z); w.g.rotation.y = Math.atan2(-Math.sin(w.a) * Math.sign(w.sp), Math.cos(w.a) * Math.sign(w.sp));
+    w.tail.rotation.x = Math.sin(t * 1.4 + w.R) * .35; w.b.rotation.z = Math.sin(t * .5 + w.R) * .06;
+    if (Math.random() < dt * .25) { const p = w.g.position; burst(p.x, p.y + 3 * w.g.scale.x, p.z, 0xffffff, 12, 3, 1.2, 1, -4); }
+  }
+  const shk = Math.max(0, roc.shakeT || 0); roc.shakeT = shk - dt;
+  skyIsleGroups.forEach((gp, i) => { gp.position.y = shk > 0 ? Math.sin(t * 45 + i) * .12 * Math.min(1, shk) : 0; gp.rotation.z = shk > 0 ? Math.sin(t * 31 + i * 2) * .012 * Math.min(1, shk) : 0; });
+  for (const e of enemies) if (e.kind === 'wisp' && !e.dying && Math.random() < dt * 1.5) burst(e.g.position.x, 1.6, e.g.position.z, 0xfff27a, 1, 1.5, .3, .4);
+}
+
+/* ---------------- the Thunder Roc ---------------- */
+const ROC_ISLE = skv(SKY_ISLES[4].x, SKY_ISLES[4].z), ROC_R = SKY_ISLES[4].r - 2.5;
+function rocClamp(p) { const d = dist2(p.x, p.z, ROC_ISLE.x, ROC_ISLE.z); if (d > ROC_R) { p.x = ROC_ISLE.x + (p.x - ROC_ISLE.x) * ROC_R / d; p.z = ROC_ISLE.z + (p.z - ROC_ISLE.z) * ROC_R / d; } return p; }
+function killRoc() {
+  if (roc.state !== 'fight') return;
+  roc.state = 'dead'; roc.deadT = 0; roc.col.on = false; roc.warn.visible = false; roc.ringM.visible = false; roc.dizzy.visible = false; roc.dive = null; roc.ring = null;
+  const first = !S.stats.roc;
+  S.stats.roc = (S.stats.roc || 0) + 1; S.rocDay = S.day;
+  const fe = first ? 30 : 15, coins = first ? 1500 : 600;
+  S.store.feather += fe; S.coins += coins;
+  SFX.boom(); setTimeout(() => SFX.victory(), 600); camShake = 1.2;
+  toast(`🏆 The Thunder Roc is defeated! ${ic('feather')}+${fe} ${ic('coins')}+${coins}`, 'big', 5000);
+  if (first) setTimeout(() => { toast('⚡ A golden Roc statue now stands in the Hall of Fame, and it dropped a whole treasure map!', 'ice', 6000); givePiece(roc.g.position, 2); }, 1600);
+  else if (!RUSH.active) setTimeout(() => toast('The Roc will return to its nest tomorrow.'), 1600);
+  for (const e of enemies) if (e.rocMinion) e.dying = .01;
+  renderRes(); checkQuest(); save(); rushNext('roc');
+}
+function updateRoc(dt, t) {
+  const g = roc.g, body = roc.body;
+  if (roc.state === 'gone') { g.visible = false; if (S.day > S.rocDay) { resetRoc(); roc.state = 'sleep'; } return; }
+  if (roc.state === 'dead') {
+    roc.deadT += dt; roc.fly = Math.max(0, roc.fly - dt * 6); body.position.y = roc.fly; body.rotation.z = Math.min(1.3, roc.deadT * 1.2);
+    body.scale.setScalar(Math.max(.01, 1 - Math.max(0, roc.deadT - 1.3) / 1.2));
+    if (Math.random() < dt * 22) burst(g.position.x + rand(-2, 2), rand(.5, 4), g.position.z + rand(-2, 2), Math.random() < .5 ? 0x4a6ab8 : 0xfff27a, 2, 4, .8);
+    if (roc.deadT > 2.5) { roc.state = 'gone'; g.visible = false; }
+    return;
+  }
+  roc.flap += dt * (roc.fly > .5 ? 9 : 2);
+  const wa = roc.fly > .5 ? Math.sin(roc.flap) * .75 : .45 + Math.sin(roc.flap) * .04;
+  roc.wings.forEach((w, i) => w.rotation.z = (i ? -1 : 1) * wa);
+  const px = player.position.x, pz = player.position.z, dN = dist2(px, pz, ROC_NEST.x, ROC_NEST.z);
+  if (roc.state === 'sleep') {
+    g.visible = P.zone === 'sky'; roc.col.on = false; body.position.y = Math.sin(t * 1.5) * .05; roc.head.rotation.y = Math.sin(t * .7) * .6;
+    if (P.zone === 'sky' && dN < 13 && S.hp > 0 && !fading && !P.skyAir) {
+      resetRoc(); roc.state = 'fight'; g.visible = true; roc.mode = 'rise'; roc.modeT = 1.2; roc.next = 'storm';
+      toast('⚡ THE THUNDER ROC AWAKENS!', 'danger', 4000); SFX.roar(); camShake = .8;
+    }
+    return;
+  }
+  if (P.zone !== 'sky' || dN > 30 || S.hp <= 0) {
+    roc.state = 'sleep'; resetRoc();
+    for (const e of enemies) if (e.rocMinion) e.dying = .01;
+    if (P.zone === 'sky' && S.hp > 0) toast('The Thunder Roc flies back to its nest…');
+    return;
+  }
+  const enr = roc.hp < roc.max * .5, tm = (roc.slow > 0 ? .6 : 1) * (enr ? 1.3 : 1);
+  if (roc.burn > 0) { roc.burn -= dt; roc.hp -= dt * 2.5; if (roc.hp <= 0) { killRoc(); return; } }
+  roc.slow = Math.max(0, roc.slow - dt);
+  roc.modeT -= dt * tm;
+  const dx = px - g.position.x, dz = pz - g.position.z, d = Math.hypot(dx, dz) || 1;
+  let face = Math.atan2(dx, dz);
+  const m = roc.mode;
+  if (m === 'perch' || m === 'stun') {
+    roc.flyTo = 0;
+    if (m === 'perch' && d > 4) { g.position.x += dx / d * 1.5 * tm * dt; g.position.z += dz / d * 1.5 * tm * dt; }
+    roc.dizzy.visible = m === 'stun';
+    if (m === 'stun') { roc.dizzy.rotation.y += dt * 4; roc.dizzy.children.forEach((s, i) => { const a = t * 4 + i * 2.1; s.position.set(Math.cos(a) * .8, 0, Math.sin(a) * .8 + 1.8); }); face = g.rotation.y; body.rotation.z = Math.sin(t * 6) * .12; }
+    else body.rotation.z = 0;
+    if (roc.modeT <= 0) {
+      roc.dizzy.visible = false; body.rotation.z = 0;
+      if (m === 'stun') { roc.mode = 'perch'; roc.modeT = 1.2; }
+      else {
+        const seq = ['dive', 'storm', 'dive', 'quake'], nx2 = seq[roc.n++ % 4];
+        if (enr && roc.n % 3 === 0) { for (let i = 0; i < 3; i++) { const a = rand(0, 6.28); const p2 = rocClamp(V(g.position.x + Math.cos(a) * 4, 0, g.position.z + Math.sin(a) * 4)); const e = spawnEnemy('wisp', p2.x, p2.z); e.summoned = true; e.arena = true; e.rocMinion = true; } toastOnce('rocsum', '⚡ The Roc calls storm wisps!', 'danger', 10); }
+        if (nx2 === 'quake') { roc.mode = 'quake'; roc.modeT = 1.1; SFX.roar(); }
+        else { roc.mode = 'rise'; roc.modeT = 1; roc.next = nx2; SFX.whoosh(); }
+      }
+    }
+  } else if (m === 'rise' || m === 'land') {
+    roc.flyTo = m === 'rise' ? 7 : 0;
+    if (roc.modeT <= 0) {
+      if (m === 'land') { roc.mode = 'perch'; roc.modeT = enr ? 2 : 2.8; camShake = Math.max(camShake, .3); burst(g.position.x, .3, g.position.z, 0xffffff, 16, 4, .6); }
+      else if (roc.next === 'dive') { roc.mode = 'aim'; roc.modeT = 1.2; roc.aim = V(px, 0, pz); roc.ang = Math.atan2(g.position.x - px, g.position.z - pz); }
+      else { roc.mode = 'storm'; roc.modeT = 3; roc.boltT = .2; toastOnce('rocstorm', '⚡ Lightning! Keep moving!', 'danger', 12); }
+    }
+  } else if (m === 'aim') {
+    roc.flyTo = 7;
+    if (roc.modeT > .45) { roc.aim.set(px, 0, pz); rocClamp(roc.aim); }
+    roc.ang += dt * .8; const tx = roc.aim.x + Math.sin(roc.ang) * 9, tz = roc.aim.z + Math.cos(roc.ang) * 9;
+    g.position.x = lerp(g.position.x, tx, 1 - Math.exp(-dt * 3)); g.position.z = lerp(g.position.z, tz, 1 - Math.exp(-dt * 3));
+    const ax = roc.aim.x - g.position.x, az = roc.aim.z - g.position.z, al = Math.hypot(ax, az) || 1;
+    const end = rocClamp(V(roc.aim.x + ax / al * 4, 0, roc.aim.z + az / al * 4));
+    const L2 = dist2(g.position.x, g.position.z, end.x, end.z);
+    roc.warn.visible = true; roc.warn.position.set((g.position.x + end.x) / 2, .07, (g.position.z + end.z) / 2); roc.warn.scale.set(3.6, L2, 1); roc.warn.rotation.set(-Math.PI / 2, 0, Math.atan2(end.x - g.position.x, end.z - g.position.z) + Math.PI);
+    roc.warn.material.opacity = .25 + (Math.sin(t * 20) > 0 ? .2 : 0);
+    face = Math.atan2(ax, az);
+    if (roc.modeT <= 0) { roc.mode = 'dive'; roc.dive = { from: g.position.clone(), to: end, t: 0, dur: .65, hit: false }; tone(900, .5, 'sawtooth', .05, -700); noise(.5, .15, 1200); }
+  } else if (m === 'dive') {
+    const dv = roc.dive; dv.t += dt; const k = Math.min(1, dv.t / dv.dur);
+    g.position.x = lerp(dv.from.x, dv.to.x, k); g.position.z = lerp(dv.from.z, dv.to.z, k);
+    roc.fly = 7 * Math.pow(1 - k, 2) + .2; roc.flyTo = roc.fly;
+    face = Math.atan2(dv.to.x - dv.from.x, dv.to.z - dv.from.z);
+    roc.warn.visible = k < .9;
+    if (Math.random() < dt * 40) burst(g.position.x, roc.fly + 2.5, g.position.z, 0xfff27a, 1, 2, .3, .4);
+    if (!dv.hit && roc.fly < 2.6 && dist2(px, pz, g.position.x, g.position.z) < 2.3 && P.jumpY < 1.5 && S.hp > 0) { dv.hit = true; damagePlayer(16, g.position.x, g.position.z); }
+    if (k >= 1) { roc.warn.visible = false; roc.fly = 0; roc.mode = 'stun'; roc.modeT = enr ? 2.1 : 2.8; camShake = Math.max(camShake, .6); SFX.boom(); burst(g.position.x, .3, g.position.z, 0xffffff, 24, 5, .8); toastOnce('rocstun', '💫 The Roc crashed and is dizzy — attack now!', '', 15); }
+  } else if (m === 'storm') {
+    roc.flyTo = 7;
+    g.position.x = lerp(g.position.x, ROC_ISLE.x, 1 - Math.exp(-dt)); g.position.z = lerp(g.position.z, ROC_ISLE.z, 1 - Math.exp(-dt));
+    roc.boltT -= dt * tm;
+    if (roc.boltT <= 0) {
+      roc.boltT = enr ? .35 : .5;
+      const n = enr ? 2 : 1;
+      for (let i = 0; i < n; i++) { const q = rocClamp(V(px + (i ? rand(-3, 3) : rand(-1, 1)) + P.vel.x * .4, 0, pz + (i ? rand(-3, 3) : rand(-1, 1)) + P.vel.z * .4)); arcDrop(V(q.x, 16, q.z), q, .95, 'storm'); }
+    }
+    if (Math.random() < dt * 10) bolt(V(g.position.x + rand(-3, 3), 9 + rand(0, 2), g.position.z + rand(-3, 3)), V(g.position.x + rand(-4, 4), 7, g.position.z + rand(-4, 4)));
+    if (roc.modeT <= 0) { roc.mode = 'land'; roc.modeT = 1; }
+  } else if (m === 'quake') {
+    const k = roc.modeT;
+    if (k > .45) { body.scale.set(1.05, .88, 1.05); roc.flyTo = 0; }
+    else { body.scale.setScalar(1); roc.flyTo = 3.5; }
+    if (k <= 0) {
+      roc.fly = 0; roc.flyTo = 0; roc.mode = 'perch'; roc.modeT = enr ? 2 : 2.6;
+      roc.ring = { x: g.position.x, z: g.position.z, r: 1, hit: false }; roc.shakeT = 1.4; camShake = 1.1; SFX.boom(); SFX.smash();
+      burst(g.position.x, .3, g.position.z, 0xd8cfe8, 30, 7, 1);
+      toastOnce('quake', '🌋 The island is shaking! JUMP over the shockwave!', 'danger', 15);
+      for (let i = 0; i < (enr ? 4 : 2); i++) { const q = rocClamp(V(px + rand(-5, 5), 0, pz + rand(-5, 5))); arcDrop(V(q.x, 16, q.z), q, 1.2, 'storm'); }
+    }
+  }
+  if (roc.ring) {
+    const r = roc.ring; r.r += dt * 9; roc.ringM.visible = true; roc.ringM.position.set(r.x, .12, r.z); roc.ringM.scale.setScalar(r.r); roc.ringM.material.opacity = Math.max(0, .9 - r.r / 20);
+    const pd = dist2(px, pz, r.x, r.z);
+    if (!r.hit && Math.abs(pd - r.r) < .7 && P.jumpY < .6 && S.hp > 0) { r.hit = true; damagePlayer(12, r.x, r.z); }
+    if (r.r > 18) { roc.ring = null; roc.ringM.visible = false; }
+  }
+  if (m !== 'dive') roc.fly = lerp(roc.fly, roc.flyTo, 1 - Math.exp(-dt * 4));
+  rocClamp(g.position);
+  body.position.y = roc.fly + (roc.fly > .5 ? Math.sin(t * 3) * .3 : 0);
+  roc.shadowDisc.scale.setScalar(Math.max(.5, 1 - roc.fly * .06));
+  g.rotation.y = lerpAngle(g.rotation.y, face, 1 - Math.exp(-dt * 6));
+  roc.col.x = g.position.x; roc.col.z = g.position.z; roc.col.on = roc.fly < 2.6;
+  if (Math.random() < dt * 6) { roc.wings[Math.random() * 2 | 0].children[5]?.getWorldPosition(tmpV); burst(tmpV.x, tmpV.y, tmpV.z, 0xfff27a, 1, 1.5, .3, .4); }
+  if (roc.flash > 0) roc.flash -= dt;
+  ROC_MAT.emissiveIntensity = roc.flash > 0 ? 1.3 : .2 + (enr ? .25 + Math.max(0, Math.sin(t * 9)) * .2 : 0);
+}
+
+/* ---------------- treasure digging ---------------- */
+let digT = 0, chestFx = null;
+function openTreasure(s) {
+  const zi = ['home', 'ice', 'ember', 'jungle', 'station', 'cave', 'sky'].indexOf(s.zone), mult = 1 + zi * .25;
+  const coins = Math.round((120 + Math.random() * 120) * mult);
+  S.coins += coins;
+  const resPool = ['wood', 'stone', 'ore', 'crystal'].concat(S.stats.iceVisits ? ['frost'] : [], S.stats.emberVisits ? ['magma'] : [], S.stats.jungleVisits ? ['spore'] : [], S.stats.stationVisits ? ['star'] : [], S.stats.caveVisits ? ['prism'] : [], S.stats.skyVisits ? ['feather'] : []);
+  const r = resPool[Math.min(resPool.length - 1, Math.floor(Math.random() * resPool.length))], n = ['wood', 'stone', 'ore'].includes(r) ? 15 : 5;
+  S.store[r] += n;
+  let extra = '';
+  const missing = RELICS.filter(x => !S.relics[x.id] && !S.museum.relics[x.id]);
+  if (missing.length && (Math.random() < .65 || S.tmap.chests === 0)) { const rl = missing[Math.random() * missing.length | 0]; S.relics[rl.id] = 1; extra = ` · relic: ${rl.emoji} ${rl.name}!`; }
+  else { S.tmap.pieces += 1; extra = ' · 🗺 +1 map piece'; }
+  const i = S.tmap.site; S.tmap.dug[i] = 1; S.tmap.last = i; S.tmap.site = -1; S.tmap.chests++;
+  // chest pops up
+  if (chestFx) scene.remove(chestFx.g);
+  const g = new THREE.Group();
+  g.add(mesh([part(G.box, 0x8a5a3c, 0, .35, 0, 0, 0, 0, 1, .7, .7), part(G.box, 0x6a4430, 0, .75, 0, 0, 0, 0, 1.05, .15, .75), part(G.box, 0xffc23a, 0, .55, .36, 0, 0, 0, .2, .25, .04), part(G.box, 0xffc23a, -.45, .45, 0, 0, 0, 0, .06, .7, .72), part(G.box, 0xffc23a, .45, .45, 0, 0, 0, 0, .06, .7, .72)]));
+  const glow = new THREE.Mesh(G.ico, emis(0xffd23a, 2)); glow.scale.setScalar(.3); glow.position.y = 1; g.add(glow);
+  g.position.set(s.pos.x, -1, s.pos.z); scene.add(g); chestFx = { g, t: 0 };
+  for (let k = 0; k < 14; k++) fly(V(s.pos.x, 1, s.pos.z), () => tmpV.copy(player.position).setY(1.2), 0xffd23a, k % 3 ? null : () => SFX.coin(), .4 + k * .05);
+  SFX.chest(); setTimeout(() => SFX.trophy(), 400); camShake = .3;
+  toast(`💰 TREASURE! ${ic('coins')}+${coins} ${ic(r)}+${n}${extra}`, 'big', 5500);
+  digMark.visible = false;
+  assembleMap(); renderTmapBtn(); renderRes(); checkQuest(); checkAch(); save();
+}
+function updateTreasure(dt, t) {
+  if (chestFx) { chestFx.t += dt; chestFx.g.position.y = Math.min(0, -1 + chestFx.t * 2); chestFx.g.rotation.y += dt; if (chestFx.t > 5) { chestFx.g.scale.setScalar(Math.max(.01, 1 - (chestFx.t - 5) * 2)); if (chestFx.t > 5.5) { scene.remove(chestFx.g); chestFx = null; } } }
+  const hint = $('tmHint'), s = DIG_SITES[S.tmap.site];
+  if (!s || !started) { hint.hidden = true; digMark.visible = false; return; }
+  hint.hidden = false; const h = treasureHint(); if (hint.innerHTML !== h) hint.innerHTML = h;
+  const here = P.zone === s.zone, d = here ? dist2(player.position.x, player.position.z, s.pos.x, s.pos.z) : 99;
+  digMark.visible = here && d < 14; if (digMark.visible) { digMark.position.set(s.pos.x, 0, s.pos.z); digMark.children[2].scale.setScalar(1 + Math.sin(t * 4) * .1); if (Math.random() < dt * 4) burst(s.pos.x + rand(-.5, .5), .3, s.pos.z + rand(-.5, .5), 0xffd23a, 1, 1.2, .6, .5, -2); }
+  const still = Math.hypot(P.vel.x, P.vel.z) < 1.2;
+  if (here && d < 1.6 && still && S.hp > 0 && !fading && P.jumpY === 0) {
+    digT += dt; P.swing = Math.max(P.swing, .6);
+    if (Math.random() < dt * 14) burst(s.pos.x + rand(-.4, .4), .3, s.pos.z + rand(-.4, .4), 0x8a6a4a, 2, 3, .5);
+    if (Math.random() < dt * 5) noise(.12, .08, 300);
+    toastOnce('dig', '⛏ Digging…', '', 6);
+    if (digT > 1.5) { digT = 0; openTreasure(s); }
+  } else digT = Math.max(0, digT - dt * 2);
+}
+
+/* ---------------- seasons at the outpost ---------------- */
+const seasonState = { cur: -1 };
+function seasonTrees(si) {
+  const pal = SEASONS[si].leaf;
+  for (const n of nodes) {
+    if (n.zone !== 'home' || n.type !== 'tree') continue;
+    n.g.traverse(o => {
+      if (!o.isMesh || !o.geometry.attributes.color || o.material !== VCMAT) return;
+      const ca = o.geometry.attributes.color;
+      if (!o.userData.orig) { o.geometry = o.geometry.clone(); o.userData.orig = Float32Array.from(o.geometry.attributes.color.array); }
+      const src = o.userData.orig, dst = o.geometry.attributes.color.array;
+      for (let i = 0; i < src.length; i += 3) {
+        const r = src[i], g2 = src[i + 1], b = src[i + 2];
+        if (pal && g2 > r * 1.15 && g2 > b * 1.3) { const c = new THREE.Color(pal[Math.floor(i / 9) % 3]); const l = .85 + (g2 - .6) * .5; dst[i] = c.r * l; dst[i + 1] = c.g * l; dst[i + 2] = c.b * l; }
+        else { dst[i] = r; dst[i + 1] = g2; dst[i + 2] = b; }
+      }
+      o.geometry.attributes.color.needsUpdate = true;
+    });
+  }
+}
+function tintGeo(geo, hex, k) {
+  const ca = geo.attributes.color; if (!ca) return;
+  if (!geo.userData.orig) geo.userData.orig = Float32Array.from(ca.array);
+  const src = geo.userData.orig, dst = ca.array, c = new THREE.Color(hex);
+  for (let i = 0; i < src.length; i += 3) { dst[i] = lerp(src[i], c.r, k); dst[i + 1] = lerp(src[i + 1], c.g, k); dst[i + 2] = lerp(src[i + 2], c.b, k); }
+  ca.needsUpdate = true;
+}
+function applySeason(announce) {
+  const si = seasonIdx(), se = SEASONS[si]; seasonState.cur = si;
+  if (SEASON_REF.ground) tintGeo(SEASON_REF.ground.geometry, se.gc, se.gk);
+  if (SEASON_REF.tuft) tintGeo(SEASON_REF.tuft.geometry, se.gc, Math.min(.9, se.gk * 1.1));
+  if (SEASON_REF.fl) SEASON_REF.fl.visible = si <= 1;
+  if (SEASON_REF.spring) SEASON_REF.spring.visible = si === 0;
+  if (SEASON_REF.snowCaps) SEASON_REF.snowCaps.visible = si === 3;
+  seasonTrees(si);
+  if (announce) {
+    const crops = Object.keys(CROPS).filter(inSeason).map(k => CROPS[k].emoji).join(' ');
+    toast(`${se.e} ${se.n} has arrived at the outpost! In season: ${crops}`, si === 3 ? 'ice' : si === 2 ? 'fire' : 'jungle', 5000);
+  }
+}
+function updateSeasonFx(dt, t) {
+  const si = seasonIdx(), px = player.position.x, pz = player.position.z, a = snowPos;
+  const col = [0xffb8d8, 0xfff27a, 0xff9a3a, 0xffffff][si];
+  snowMat.color.setHex(col); snowMat.size = si === 1 ? .1 : si === 3 ? .13 : .16;
+  const fall = si === 1 ? 0 : si === 3 ? 1.8 : 1.1;
+  for (let i = 0; i < SNOW_N; i++) {
+    const j = i * 3;
+    if (si === 1) { a[j] += Math.sin(t * .7 + i) * .4 * dt; a[j + 1] = .6 + (i % 7) * .35 + Math.sin(t * 1.3 + i) * .3; a[j + 2] += Math.cos(t * .6 + i * .3) * .4 * dt; }
+    else { a[j + 1] -= fall * dt * (.6 + (i % 5) * .15); a[j] += (Math.sin(t * 1.2 + i) * (si === 3 ? .3 : 1.1) + .4) * dt; a[j + 2] += Math.cos(t + i * .7) * .5 * dt; if (a[j + 1] < 0) a[j + 1] += 16; }
+    if (a[j] - px > 30) a[j] -= 60; else if (a[j] - px < -30) a[j] += 60;
+    if (a[j + 2] - pz > 30) a[j + 2] -= 60; else if (a[j + 2] - pz < -30) a[j + 2] += 60;
+  }
+  snowGeo.attributes.position.needsUpdate = true;
+}
+
 const lerpAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI; if (d < -Math.PI) d += Math.PI * 2; return a + d * t; };
 const easeOutBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
 
@@ -5877,12 +6765,13 @@ function project(v, el, yOff = 0) {
 function updateCamera(dt) {
   if (PHOTO.on) { photoCamera(dt); return; }
   const portrait = innerWidth < innerHeight;
-  const z = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' ? 1.4 : 1;
+  const z = boss.state === 'fight' || serp.state === 'fight' || queen.state === 'fight' || aicore.state === 'fight' || shadow.state === 'fight' || roc.state === 'fight' ? 1.4 : 1;
   const off = portrait ? [0, 14 * z, 15 * z] : [0, 10 * z, 12.5 * z];
-  const want = tmpV.set(player.position.x + off[0], off[1], player.position.z + off[2]);
+  const cy = P.zone === 'sky' ? Math.max(-5, P.skyY) * .85 : 0;
+  const want = tmpV.set(player.position.x + off[0], off[1] + cy, player.position.z + off[2]);
   camPos.lerp(want, 1 - Math.exp(-dt * 6));
   camera.position.copy(camPos);
-  camera.lookAt(camPos.x - off[0], 1, camPos.z - off[2] - 2);
+  camera.lookAt(camPos.x - off[0], 1 + camPos.y - off[1], camPos.z - off[2] - 2);
   if (camShake > 0) { camera.position.x += rand(-1, 1) * camShake * .4; camera.position.y += rand(-1, 1) * camShake * .4; }
   stars.position.copy(camera.position);
   stars.visible = P.zone !== 'cave';
@@ -5913,8 +6802,8 @@ function updateLabels(dt) {
 }
 function updateHUD() {
   const narrow = innerWidth < 600;
-  const zn = P.zone === 'mine' ? (narrow ? '⛏ ' : '⛏ Mine · ') : P.zone === 'ice' ? (narrow ? '❄ ' : '❄ Frostveil · ') : P.zone === 'ember' ? (narrow ? '🌋 ' : '🌋 Emberfall · ') : P.zone === 'jungle' ? (narrow ? '🍄 ' : '🍄 Verdantia · ') : P.zone === 'station' ? (narrow ? '🛰 ' : '🛰 Nebula Station · ') : P.zone === 'arena' ? (narrow ? '🏟 ' : '🏟 Arena · ') : P.zone === 'cave' ? (narrow ? '💎 ' : '💎 Crystal Caverns · ') : '';
-  $('dayTxt').textContent = `${zn}Day ${S.day}${P.zone === 'ice' && W.bliz ? ' · 🌨' : ''}${P.zone === 'ember' && ERU.on ? ' · 🔥' : ''}${EV.golden > 0 ? ' · ✨' : ''}${P.zone === 'home' && RAIN.on ? ' · 🌧' : ''}`;
+  const zn = P.zone === 'mine' ? (narrow ? '⛏ ' : '⛏ Mine · ') : P.zone === 'ice' ? (narrow ? '❄ ' : '❄ Frostveil · ') : P.zone === 'ember' ? (narrow ? '🌋 ' : '🌋 Emberfall · ') : P.zone === 'jungle' ? (narrow ? '🍄 ' : '🍄 Verdantia · ') : P.zone === 'station' ? (narrow ? '🛰 ' : '🛰 Nebula Station · ') : P.zone === 'arena' ? (narrow ? '🏟 ' : '🏟 Arena · ') : P.zone === 'cave' ? (narrow ? '💎 ' : '💎 Crystal Caverns · ') : P.zone === 'sky' ? (narrow ? '☁ ' : '☁ Skyreach · ') : '';
+  $('dayTxt').textContent = `${zn}Day ${S.day}${P.zone === 'ice' && W.bliz ? ' · 🌨' : ''}${P.zone === 'ember' && ERU.on ? ' · 🔥' : ''}${EV.golden > 0 ? ' · ✨' : ''}${P.zone === 'home' && RAIN.on ? (seasonIdx() === 3 ? ' · 🌨' : ' · 🌧') : ''}${P.zone === 'home' || P.zone === 'mine' ? ' · ' + SEASONS[seasonIdx()].e : ''}`;
   $('day').classList.toggle('night', isNight());
   $('day').classList.toggle('storm', (P.zone === 'ice' && W.bliz) || (P.zone === 'ember' && ERU.on));
   $('tfill').style.width = (S.time * 100) + '%';
@@ -5960,6 +6849,7 @@ else if (S.zone === 'ember' && S.stats.emberVisits) { P.zone = 'ember'; player.p
 else if (S.zone === 'jungle' && S.stats.jungleVisits) { P.zone = 'jungle'; player.position.copy(JUN_ARRIVE); }
 else if (S.zone === 'station' && S.stats.stationVisits) { P.zone = 'station'; player.position.copy(ST_ARRIVE); }
 else if (S.zone === 'cave' && S.stats.caveVisits) { P.zone = 'cave'; player.position.copy(CV_ARRIVE); }
+else if (S.zone === 'sky' && S.stats.skyVisits) { P.zone = 'sky'; player.position.copy(SK_ARRIVE); P.safePos.copy(SK_ARRIVE); }
 else { S.zone = 'home'; player.position.set(0, 0, 4); }
 P.safePos.copy(player.position);
 if (S.core) coreRings.visible = true;
@@ -5974,12 +6864,15 @@ applyCosmetics();
 initQueen();
 initAICore();
 initShadow();
+initRoc();
 makeCompanion();
 refreshBoots();
 makeCrew();
 for (const id in buildings) refreshBuilding(id, false);
 offlineCrew();
 farmOffline();
+applySeason(false);
+renderTmapBtn();
 buildFarmVis();
 renderTools(); renderRes(); renderQuest(); updateHUD();
 if (hasSave) { $('play').textContent = 'Continue'; $('newgame').style.display = ''; }
@@ -5991,7 +6884,7 @@ $('play').addEventListener('click', () => {
     setTimeout(() => toast('🚀 Crash landing! This planet looks… abandoned.', 'big', 4000), 300);
     setTimeout(() => toast('Follow the <b style="color:var(--warn)">yellow arrow</b> to your goal.', '', 4500), 2600);
   } else {
-    toast(`Hi ${esc(S.profile.name)}! Welcome back${P.zone === 'ice' ? ' to Frostveil' : P.zone === 'ember' ? ' to Emberfall' : P.zone === 'jungle' ? ' to Verdantia' : P.zone === 'station' ? ' to Nebula Station' : P.zone === 'cave' ? ' to Crystal Caverns' : ''}! Day ${S.day}`, 'big');
+    toast(`Hi ${esc(S.profile.name)}! Welcome back${P.zone === 'ice' ? ' to Frostveil' : P.zone === 'ember' ? ' to Emberfall' : P.zone === 'jungle' ? ' to Verdantia' : P.zone === 'station' ? ' to Nebula Station' : P.zone === 'cave' ? ' to Crystal Caverns' : P.zone === 'sky' ? ' to Skyreach' : ''}! Day ${S.day}`, 'big');
     if (offlineMsg) setTimeout(() => toast(offlineMsg, 'big', 5500), 2800);
     if (chestReady()) setTimeout(() => toast('🎁 Your daily chest is ready at the outpost!'), 1500);
   }
@@ -6003,7 +6896,7 @@ $('newgame').addEventListener('click', () => {
   try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
   location.reload();
 });
-window.__game = { shadow, RUNES, rails, cartStops, PHOTO, RAIN, enterPhoto, exitPhoto, newLetter, CV_ARRIVE, ALTAR, CAVERNS, aicore, WAVES, doJump, startWaves, endWaves, comp, makeCompanion, ST_ARRIVE, CORE_C, AR_C, lasers, stBelts, deckGroup, queen, RUSH, B, FISHING, crewBots, jumpers, startRush, fishReel, makeCrew, JUN_ARRIVE, QARENA, JCAMP, serp, dragon, EV, ERU, stones, openModal, closeModal, modalAction, arcDrop, spawnEnemy, EMB_ARRIVE, LAVA_LAKE, SHIP_SPOTS, ECAMP, EP_ICE_T, S, P, W, player, nodes, pads, enemies, buildings, boss, pet, update, teleport, claimChest, initBoss, refreshBuilding, makePet, renderRes, renderTools, ICE_ARRIVE, ARENA, CAMP };
+window.__game = { roc, SK_C, SK_ARRIVE, ROC_NEST, skyGround, skyGusts, skyDrafts, DIG_SITES, RELICS, givePiece, assembleMap, openTreasure, petXP, petStage, applySeason, seasonIdx, SEASONS, CROPS, MUSEUM, killRoc, shadow, RUNES, rails, cartStops, PHOTO, RAIN, enterPhoto, exitPhoto, newLetter, CV_ARRIVE, ALTAR, CAVERNS, aicore, WAVES, doJump, startWaves, endWaves, comp, makeCompanion, ST_ARRIVE, CORE_C, AR_C, lasers, stBelts, deckGroup, queen, RUSH, B, FISHING, crewBots, jumpers, startRush, fishReel, makeCrew, JUN_ARRIVE, QARENA, JCAMP, serp, dragon, EV, ERU, stones, openModal, closeModal, modalAction, arcDrop, spawnEnemy, EMB_ARRIVE, LAVA_LAKE, SHIP_SPOTS, ECAMP, EP_ICE_T, S, P, W, player, nodes, pads, enemies, buildings, boss, pet, update, teleport, claimChest, initBoss, refreshBuilding, makePet, renderRes, renderTools, ICE_ARRIVE, ARENA, CAMP };
 frame();
 </script>
 </body>
