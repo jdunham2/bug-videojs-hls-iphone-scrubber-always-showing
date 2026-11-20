@@ -127,15 +127,15 @@ const ITEMS=[
   {id:'lolly',name:'Sugar Lollipop',r:1,price:30,sym:'◉',col:'#e88bd8',mods:{atkSpd:10,speed:4,maxHp:-3}},
   {id:'donut',name:'Sprinkle Donut',r:1,price:32,sym:'○',col:'#ff9ad0',mods:{luck:12,harvest:5}},
   {id:'icecream',name:'Brain Freeze',r:2,price:50,sym:'✻',col:'#ffb3e0',mods:{freeze:8,atkSpd:5},extra:'Hits have an 8% chance to freeze aliens',max:3},
-  {id:'ball',name:'Bouncy Ball',r:1,price:34,sym:'●',col:'#ff5a3d',mods:{ricochet:1},extra:'Ranged shots bounce to 1 more alien',max:2},
-  {id:'flag',name:'Starting Flag',r:1,price:28,sym:'⚑',col:'#ff6b6b',mods:{startRush:1,speed:3},extra:'+50% Attack Speed for the first 6s of each wave',max:1},
-  {id:'snowman',name:'Snowman',r:1,price:30,sym:'✻',col:'#e8f6ff',mods:{chill:12},extra:'Kills have a 12% chance to freeze nearby aliens',max:3},
+  {id:'ball',name:'Bouncy Ball',r:2,price:58,sym:'●',col:'#ff5a3d',mods:{ricochet:1},extra:'Ranged shots bounce to 1 more alien',max:1},
+  {id:'flag',name:'Starting Flag',r:1,price:28,sym:'⚑',col:'#ff6b6b',mods:{startRush:1,speed:3},extra:'+50% Attack Speed for the first 10s of each wave',max:1},
+  {id:'snowman',name:'Snowman',r:1,price:30,sym:'✻',col:'#e8f6ff',mods:{chill:20},extra:'Kills have a 20% chance to freeze nearby aliens',max:3},
   {id:'spring',name:'Spring Coil',r:1,price:26,sym:'↯',col:'#ff7a4d',mods:{secondWind:1,maxHp:2},extra:'Below 35% HP: triple regen and +15% speed',max:1},
-  {id:'mirror',name:'Mirror Shield',r:2,price:55,sym:'◈',col:'#bfe4ff',mods:{reflect:15,armor:1},extra:'Enemy shots have a 15% chance to bounce back at aliens',max:2},
+  {id:'mirror',name:'Mirror Shield',r:2,price:55,sym:'◈',col:'#bfe4ff',mods:{reflect:25,armor:1},extra:'Enemy shots have a 25% chance to bounce back at aliens',max:2},
   {id:'ember',name:'Ember Pail',r:2,price:52,sym:'♨',col:'#ff9a3d',mods:{ember:1},extra:'Leave a trail of fire while you move',max:2},
-  {id:'chest',name:'Treasure Chest',r:2,price:55,sym:'▣',col:'#d89a4a',mods:{freeCrate:1},extra:'Get a free crate at the start of each wave',max:1},
-  {id:'coffin',name:'Tiny Coffin',r:2,price:48,sym:'✝',col:'#b48be0',mods:{critHeal:1,crit:4},extra:'Critical hits heal 1 HP (at most 2 per second)',max:1},
-  {id:'meteor',name:'Meteor Shard',r:3,price:90,sym:'☄',col:'#a07850',mods:{meteor:1},extra:'Calls down a meteor on an alien every 7s',max:2},
+  {id:'chest',name:'Treasure Chest',r:2,price:60,sym:'▣',col:'#d89a4a',mods:{freeCrate:1},extra:'Get a free crate every other wave',max:1},
+  {id:'coffin',name:'Tiny Coffin',r:2,price:48,sym:'✝',col:'#b48be0',mods:{critHeal:1,crit:4},extra:'Critical hits heal 1 HP (at most once per second)',max:1},
+  {id:'meteor',name:'Meteor Shard',r:3,price:90,sym:'☄',col:'#a07850',mods:{meteor:1},extra:'Calls down a meteor on an alien every 6s',max:2},
   {id:'glassball',name:'Glass Cannonball',r:3,price:85,sym:'●',col:'#6fe3ff',mods:{dmg:40,maxHpPct:-35},extra:'-35% Max HP',max:1},
 ];
 const ITEM_BY=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
@@ -464,7 +464,7 @@ function addWeapon(id,tier){
 }
 function canAddWeapon(id,tier){return run.weapons.length<maxW()||run.weapons.some(w=>w.id===id&&w.tier===tier&&tier<3)}
 function wDmg(def,t){const base=def.dmg*TIER_DMG[t]+(def.melee?S.melee:S.ranged)*(def.flame||def.spin||def.beam?.4:1);const mul=(1+S.dmg/100)*(def.melee?1:(run.char.rangedMul||1));const cb=S.comboDmg&&run?Math.min(30,Math.floor(run.combo/5)*S.comboDmg)/100:0;const chm=run?(run.char.pit&&P&&P.hp<maxHp()*.5?1.3:1)*(run.char.solar&&state==='wave'?1+Math.min(.4,(run.time-(run.waveT0||run.time))*.01):1):1;return Math.max(1,base*mul*(1+cb)*chm)}
-function wCd(def,t){const as=S.atkSpd+(run&&run.rageT>0?S.rage:0)+(run&&run.slipT>0?60:0)+(run&&S.startRush&&run.time-(run.waveT0||-99)<6?50:0);const a=as>=0?1+as/100:1/(1-as/100);return def.cd*TIER_CD[t]/a}
+function wCd(def,t){const as=S.atkSpd+(run&&run.rageT>0?S.rage:0)+(run&&run.slipT>0?60:0)+(run&&S.startRush&&run.time-(run.waveT0||-99)<10?50:0);const a=as>=0?1+as/100:1/(1-as/100);return def.cd*TIER_CD[t]/a}
 function wRange(def){return Math.max(60,(def.range+S.range*(def.melee?.5:1))*(def.melee&&run?(run.char.meleeRange||1):1))}
 const priceMul=()=>(DZ(4)?1.25:1)*(1-Math.min(45,S.shopDisc||0)/100);
 function wPrice(id,t){return Math.round(WEAPONS[id].price*TIER_PRICE[t]*(1+.1*run.wave)*priceMul())}
@@ -556,7 +556,7 @@ function jag(pts){const out=[pts[0]];for(let i=1;i<pts.length;i++){const a=pts[i
 /* ================= combat ================= */
 function dealHit(e,dmg,def,ang,knock){
   const crit=Math.random()*100<(def.crit+S.crit); if(crit)PROF.crits++;
-  if(crit&&S.critHeal&&state==='wave'&&run.time-(run.chT||-9)>.5){run.chT=run.time;heal(1)}
+  if(crit&&S.critHeal&&state==='wave'&&run.time-(run.chT||-9)>1){run.chT=run.time;heal(1)}
   if(crit&&S.critZap){const o=nearestEnemy(e.x,e.y,170,new Set([e]));if(o){const zd=Math.max(1,Math.round(dmg*def.critMul*S.critZap/100));fx.push({k:'zap',pts:jag([{x:e.x,y:e.y},{x:o.x,y:o.y}]),nodes:[{x:o.x,y:o.y}],t:0,life:.15});hurtEnemy(o,zd,false,Math.atan2(o.y-e.y,o.x-e.x),3,false,true)}}
   if(def.exec&&!e.def.isBoss&&e.hp>0&&e.hp<=e.maxHp*def.exec){const was=!e.dead;texts.push({x:e.x,y:e.y-e.r-14,vy:-70,t:0,life:.7,s:20,txt:'EXECUTE',c:'#c9b3ff'});parts.push({x:e.x,y:e.y,vx:0,vy:0,t:0,life:.3,img:'fx_glint',col:'#c9b3ff',s0:24,s1:60,add:1});hurtEnemy(e,Math.ceil(e.hp)+9999,true,ang,knock,false,true);if(was&&e.dead)creditKill(def);return}
   const was=!e.dead; hurtEnemy(e,Math.max(1,Math.round(dmg*(crit?def.critMul:1))),crit,ang,knock,crit&&def.bonk);
@@ -616,7 +616,7 @@ function killEnemy(e,drops){
   if(e.elite)PROF.elites++;
   PROF.ek=PROF.ek||{}; PROF.ek[e.type]=(PROF.ek[e.type]||0)+1;
   if(e.crate)pickups.push({k:'crate',x:e.x,y:e.y,t:0,vx:0,vy:0});
-  if(S.chill&&Math.random()*100<S.chill){for(const o of enemies){if(o===e||o.dead||o.popT!=null)continue;if(d2(o.x,o.y,e.x,e.y)<110*110)o.frz=o.def.isBoss?.5:1.3}fx.push({k:'ring',x:e.x,y:e.y,r0:10,r1:110,t:0,life:.35,c:'#bff4ff',w:5});parts.push({x:e.x,y:e.y,vx:0,vy:0,t:0,life:.4,img:'fx_glint',col:'#bff4ff',s0:30,s1:80,add:1})}
+  if(S.chill&&Math.random()*100<S.chill){for(const o of enemies){if(o===e||o.dead||o.popT!=null)continue;if(d2(o.x,o.y,e.x,e.y)<140*140)o.frz=o.def.isBoss?.5:1.5}fx.push({k:'ring',x:e.x,y:e.y,r0:10,r1:140,t:0,life:.35,c:'#bff4ff',w:5});parts.push({x:e.x,y:e.y,vx:0,vy:0,t:0,life:.4,img:'fx_glint',col:'#bff4ff',s0:30,s1:80,add:1})}
   if(S.boom>0&&Math.random()*100<S.boom)booms.push({x:e.x,y:e.y,t:.07,r:55,dmg:8+S.dmg*.1+run.wave,safe:true});
   if(e.type==='splitter')for(let k=0;k<2;k++){const m2=makeEnemy('mini',e.x+rand(-6,6),e.y+rand(-6,6));const a=rand(0,TAU);m2.kx=Math.cos(a)*260;m2.ky=Math.sin(a)*260;enemies.push(m2)}
   if(big||e.elite){freezeT=Math.max(freezeT,.06);shake=Math.max(shake,8)}
@@ -901,7 +901,7 @@ function startWave(n){
   run.wave=n; const def=run.waves[n-1];
   run.timer=def.dur; run.spawnT=.5; run.shieldReady=true; run.shieldT=0; run.revUsed=0; run.droneT=0; run.bombT=3; run.sawA=0; run.rageT=0; run.rodT=1.5; run.eliteN=0; run.hiveN=0; run.bugT=def.bug?rand(def.dur*.25,def.dur*.6):-1; run.bossT=def.boss?1.5:-1; run.boss=null; run.bosses=[];
   run.combo=0; run.comboT=0; run.rerolls=0; run.waveT0=run.time; run.appleT=0; run.metT=3; run.embT=0; run.embTick=0;
-  if(S.freeCrate&&n>1){run.crates+=S.freeCrate;setTimeout(()=>{if(P)texts.push({x:P.x,y:P.y-50,vy:-50,t:0,life:1.2,s:20,txt:'+CRATE',c:'#ffcc4d'})},400)}
+  if(S.freeCrate&&n>1&&n%2===0){run.crates+=S.freeCrate;setTimeout(()=>{if(P)texts.push({x:P.x,y:P.y-50,vy:-50,t:0,life:1.2,s:20,txt:'+CRATE',c:'#ffcc4d'})},400)}
   embers=[];webs=[];kpools=[];rings=[];mines=[];marks=[];pools=[];enemies=[];bullets=[];ebullets=[];gems=[];pickups=[];parts=[];texts=[];fx=[];spawns=[];booms=[];
   dctx.clearRect(0,0,AW,AH);
   P.x=AW/2;P.y=AH/2;P.vx=P.vy=0;P.hp=maxHp();P.iframes=1;run.hpTrail=P.hp;
@@ -1172,8 +1172,8 @@ function update(dt){
       for(const e of enemies)if(e.sawCd>0)e.sawCd-=dt}
     if(S.ember){run.embT-=dt;if(P.moving&&run.embT<=0){run.embT=.1;embers.push({x:P.x+rand(-6,6),y:P.y+P.r*.5+rand(-4,4),t:0,life:1.6+.4*S.ember,rot:rand(0,TAU)})}
       run.embTick-=dt;if(run.embTick<=0){run.embTick=.4;const ed=Math.max(1,Math.round((3+run.wave*.45)*S.ember*(1+S.dmg/100))),hitE=new Set();for(const q of embers)for(const e of enemies){if(hitE.has(e)||e.dead||e.popT!=null||e.under||e.z>20)continue;if(d2(q.x,q.y,e.x,e.y)<(e.r+20)*(e.r+20)){hitE.add(e);const was=!e.dead;hurtEnemy(e,ed,false,0,0,false,true);if(was&&e.dead)creditKill({id:'ember'})}}}}
-    if(S.meteor){run.metT-=dt;if(run.metT<=0){run.metT=7/Math.min(2,S.meteor);const live=enemies.filter(e=>!e.dead&&e.popT==null&&!e.under);const tg=live.find(e=>e.def.isBoss)||(live.length?live[Math.floor(Math.random()*live.length)]:null);
-      if(tg){const mx=tg.x,my=tg.y;fx.push({k:'ring',x:mx,y:my,r0:95,r1:15,t:0,life:.7,c:'#ff8a3d',w:4});booms.push({x:mx,y:my,t:.7,r:90,dmg:Math.round((45+run.wave*5)*(1+S.dmg/100)),knock:20,safe:true,def:{id:'meteor'}});for(let k=0;k<6;k++)parts.push({x:mx-140+k*6,y:my-260+k*12,vx:200,vy:380,t:-k*.02,life:.65,img:'fx_fire',col:'#ff9a3c',s0:34-k*4,s1:10,add:1});setTimeout(()=>{shake=Math.max(shake,9)},700)}}}
+    if(S.meteor){run.metT-=dt;if(run.metT<=0){run.metT=6/Math.min(2,S.meteor);const live=enemies.filter(e=>!e.dead&&e.popT==null&&!e.under);const tg=live.find(e=>e.def.isBoss)||(live.length?live[Math.floor(Math.random()*live.length)]:null);
+      if(tg){const mx=tg.x,my=tg.y;fx.push({k:'ring',x:mx,y:my,r0:95,r1:15,t:0,life:.7,c:'#ff8a3d',w:4});booms.push({x:mx,y:my,t:.7,r:90,dmg:Math.round((60+run.wave*6)*(1+S.dmg/100)),knock:20,safe:true,def:{id:'meteor'}});for(let k=0;k<6;k++)parts.push({x:mx-140+k*6,y:my-260+k*12,vx:200,vy:380,t:-k*.02,life:.65,img:'fx_fire',col:'#ff9a3c',s0:34-k*4,s1:10,add:1});setTimeout(()=>{shake=Math.max(shake,9)},700)}}}
     if(S.bombs){run.bombT-=dt;if(run.bombT<=0){run.bombT=6/Math.min(2,S.bombs);const bt=nearestEnemy(P.x,P.y,320);mines.push({x:bt?bt.x:P.x,y:bt?bt.y:P.y+P.r*.5,t:0,arm:99,life:bt?.9:1.3,timed:true,dmg:Math.round((30+run.wave*2)*(1+S.dmg/100)),def:{id:'bombbag',blast:90,knock:22}});sfx('click')}}
     if(run.char.waveHeal&&state==='wave'){run.appleT=(run.appleT||0)+dt;if(run.appleT>=15){run.appleT=0;heal(Math.max(1,Math.round(maxHp()*run.char.waveHeal)));parts.push({x:P.x,y:P.y-P.r,vx:0,vy:-30,t:0,life:.6,img:'fx_heart',col:'#ff6b6b',s0:20,s1:8,add:1})}}
     if(run.slipT>0){run.slipT-=dt;if(Math.random()<dt*10)parts.push({x:P.x+rand(-12,12),y:P.y-rand(0,20),vx:0,vy:-50,t:0,life:.35,c:'#b8ff8a',s:3,fade:1})}
