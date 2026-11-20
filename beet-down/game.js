@@ -58,12 +58,12 @@ const WEAPONS={
   scythe:{name:'Scythe',sets:['blade'],melee:true,sweep:3.15,dmg:15,cd:1.2,range:125,knock:14,crit:6,critMul:2.2,price:36,len:54,pv:.16,desc:'Spins all the way around, cutting every alien nearby.'},
   silencer:{name:'Silenced Pistol',sets:['precise'],exec:.25,dmg:13,cd:.75,range:420,speed:1100,pierce:1,knock:6,crit:8,critMul:2,price:32,len:40,pv:.32,desc:'Pierces 1. Instantly finishes any non-boss alien below 25% health.'},
   pepper:{name:'Pepper Mill',sets:['kitchen','elemental'],flame:true,pepper:true,dmg:2,cd:.12,range:175,speed:380,spread:.55,knock:1,crit:0,critMul:2,price:34,len:44,pv:.3,desc:'Sprays a cloud of pepper that poisons aliens it touches.'},
-  turret:{name:'Turret Kit',sets:['precise','heavy'],turret:true,dmg:6,cd:3.5,range:320,knock:4,crit:5,critMul:2,price:40,len:40,pv:.5,desc:'Drops a mini turret that shoots nearby aliens for 8s.'},
+  turret:{name:'Turret Kit',sets:['precise','heavy'],turret:true,dmg:7,cd:3,range:320,knock:4,crit:5,critMul:2,price:40,len:40,pv:.5,desc:'Drops a mini turret that shoots nearby aliens for 10s.'},
   cannon:{name:'Cannon',sets:['heavy','explosive'],cannon:true,dmg:30,cd:2.2,range:520,speed:330,knock:40,crit:3,critMul:2,price:42,len:52,pv:.36,desc:'A huge cannonball that rolls through every alien in its path.'},
   frost:{name:'Frost Ray',sets:['elemental','precise'],beam:true,frost:true,dmg:2.5,cd:.16,range:340,knock:1,crit:3,critMul:2,price:38,len:46,pv:.32,desc:'Freezing beam. Every 5th hit on an alien freezes it.'},
-  shovel:{name:'Shovel',sets:['blunt'],melee:true,sweep:.9,clods:3,dmg:13,cd:1,range:120,knock:16,crit:5,critMul:2,price:28,len:50,pv:.14,desc:'Wide scoop that also flings 3 dirt clods forward.'},
-  ballista:{name:'Ballista',sets:['precise','heavy'],pin:true,dmg:26,cd:1.5,range:600,speed:1300,pierce:99,knock:6,crit:10,critMul:2.2,price:40,len:50,pv:.4,desc:'Heavy bolts pierce everything and pin aliens, slowing them for 2s.'},
-  lantern:{name:'Ghost Lantern',sets:['elemental'],wisp:true,dmg:9,cd:1.1,range:440,speed:170,knock:3,crit:5,critMul:2,price:34,len:34,pv:.5,desc:'Releases 2 spirit wisps that drift out and hunt aliens.'},
+  shovel:{name:'Shovel',sets:['blunt'],melee:true,sweep:.9,clods:3,dmg:11,cd:1,range:120,knock:16,crit:5,critMul:2,price:28,len:50,pv:.14,desc:'Wide scoop that also flings 3 dirt clods forward.'},
+  ballista:{name:'Ballista',sets:['precise','heavy'],pin:true,dmg:30,cd:1.25,range:600,speed:1300,pierce:99,knock:6,crit:15,critMul:2.2,price:40,len:50,pv:.4,desc:'Heavy bolts pierce everything and pin aliens, slowing them for 2s.'},
+  lantern:{name:'Ghost Lantern',sets:['elemental'],wisp:true,dmg:9,cd:1.1,range:440,speed:260,knock:3,crit:5,critMul:2,price:34,len:34,pv:.5,desc:'Releases 2 spirit wisps that drift out and hunt aliens.'},
   cluster:{name:'Cluster Launcher',sets:['explosive','heavy'],cluster:4,dmg:14,cd:2.2,range:420,speed:480,blast:70,knock:18,crit:3,critMul:2,price:42,len:56,pv:.36,desc:'Rockets burst into 4 extra bomblets.'},
 };
 /* Weapon sets: bonuses unlock at 2, 4 and 6 weapons of a set (duplicates count). Each tier replaces the one before. */
@@ -498,7 +498,7 @@ function updateWeapons(dt){
         T.cur=T.a-def.sweep+2*def.sweep*easeInOut(Math.min(1,p));
         if(!T.done&&p>=.45){T.done=true;
           for(const e of enemies){if(e.dead||e.popT!=null||e.under)continue;const dd=Math.hypot(e.x-sp.x,e.y-sp.y);if(dd<R+e.r&&angDiff(T.a,Math.atan2(e.y-sp.y,e.x-sp.x))<def.sweep+.15)dealHit(e,T.dmg,def,Math.atan2(e.y-sp.y,e.x-sp.x),def.knock)}
-          if(def.clods){const n=def.clods+S.extraProj;for(let k=0;k<n;k++){const ang=T.a+(k/(n-1||1)-.5)*.5;bullets.push({clod:true,x:sp.x+Math.cos(T.a)*20,y:sp.y+Math.sin(T.a)*20,vx:Math.cos(ang)*560,vy:Math.sin(ang)*560,spd:560,dmg:T.dmg*.5,def,range:260,trav:0,pierce:0,hit:new Set(),r:6,a:ang,rot:rand(0,TAU)})}}
+          if(def.clods){const n=def.clods+S.extraProj;for(let k=0;k<n;k++){const ang=T.a+(k/(n-1||1)-.5)*.5;bullets.push({clod:true,x:sp.x+Math.cos(T.a)*20,y:sp.y+Math.sin(T.a)*20,vx:Math.cos(ang)*560,vy:Math.sin(ang)*560,spd:560,dmg:T.dmg*.35,def,range:260,trav:0,pierce:0,hit:new Set(),r:6,a:ang,rot:rand(0,TAU)})}}
           if(def.sweep>3)fx.push({k:'ring',x:sp.x,y:sp.y,r0:R*.4,r1:R+10,t:0,life:.22,c:'#e8f0ff',w:7});else fx.push({k:'slash',x:sp.x+Math.cos(T.a)*R*.6,y:sp.y+Math.sin(T.a)*R*.6,a:T.a,t:0,life:.18,s:R*1.25})}
       }else{
         w.ext=p<.35?1-Math.pow(1-p/.35,3):Math.max(0,1-(p-.35)/.65);
@@ -542,7 +542,7 @@ function fire(w,def,sp,tgt,a,R){
     if(def.rail){shake=Math.max(shake,4);muzzle(mx,my,a,1.6)} sfx(def.rail?'rail':'laser'); return;
   }
   if(def.mine){mines.push({x:P.x+rand(-14,14),y:P.y+P.r*.6+rand(-8,8),t:0,arm:.5,life:14,dmg,def});if(mines.length>12)mines.shift();sfx('click');return}
-  if(def.turret){turrets.push({x:clamp(P.x+rand(-40,40),20,AW-20),y:clamp(P.y+rand(-30,30),20,AH-20),t:0,life:8,cd:.3,dmg,def,aim:a});if(turrets.length>8)turrets.shift();sfx('click');return}
+  if(def.turret){turrets.push({x:clamp(P.x+rand(-40,40),20,AW-20),y:clamp(P.y+rand(-30,30),20,AH-20),t:0,life:10,cd:.3,dmg,def,aim:a});if(turrets.length>10)turrets.shift();sfx('click');return}
   if(def.cannon){bullets.push({cannon:true,x:mx,y:my,vx:Math.cos(a)*def.speed,vy:Math.sin(a)*def.speed,spd:def.speed,dmg,def,range:R,trav:0,pierce:999,hit:new Set(),r:16,a,rot:0});muzzle(mx,my,a,1.8);shake=Math.max(shake,4);sfx('rocket');return}
   if(def.wisp){const n=2+S.extraProj;for(let i=0;i<n;i++){const ang=a+(i-(n-1)/2)*1.1;bullets.push({wisp:true,homing:true,x:mx,y:my,vx:Math.cos(ang)*def.speed,vy:Math.sin(ang)*def.speed,spd:420,dmg,def,range:R+300,trav:0,pierce:0,hit:new Set(),r:7,a:ang,rot:rand(0,TAU)})}sfx('zap');return}
   if(def.disc){const n=1+S.extraProj;for(let i=0;i<n;i++){const ang=a+(n>1?(i/(n-1)-.5)*.5:0);bullets.push({disc:true,x:mx,y:my,vx:Math.cos(ang)*def.speed,vy:Math.sin(ang)*def.speed,dmg,def,life:1.6+.25*w.tier+S.range/400,t:0,hcd:new Map(),r:13,rot:0,bnc:0})}sfx('swing');return}
@@ -1238,7 +1238,7 @@ function update(dt){
     else if(b.rocket&&Math.random()<.7)parts.push({x:b.x,y:b.y,vx:rand(-20,20),vy:rand(-20,20),t:0,life:.4,img:'fx_puff',col:'#9a8a9a',s0:6,s1:18,rot:rand(0,TAU),a0:.5});
   }
   for(let i=turrets.length-1;i>=0;i--){const q=turrets[i];q.t+=dt;if(q.t>=q.life){turrets.splice(i,1);parts.push({x:q.x,y:q.y,vx:0,vy:0,t:0,life:.3,img:'fx_puff',col:'#b8b8c8',s0:16,s1:40,a0:.5});continue}
-    if(state!=='wave')continue;q.cd-=dt;const tg=nearestEnemy(q.x,q.y,wRange(q.def));if(tg){const a=Math.atan2(tg.y-q.y,tg.x-q.x);q.aim=angLerp(q.aim,a,Math.min(1,dt*15));if(q.cd<=0){q.cd=.65;bullets.push({x:q.x+Math.cos(a)*14,y:q.y-6+Math.sin(a)*14,vx:Math.cos(a)*900,vy:Math.sin(a)*900,spd:900,dmg:q.dmg,def:q.def,range:wRange(q.def)+40,trav:0,pierce:0,hit:new Set(),r:4,a});sfx('shoot');q.rec=1}}q.rec=Math.max(0,(q.rec||0)-dt*8)}
+    if(state!=='wave')continue;q.cd-=dt;const tg=nearestEnemy(q.x,q.y,wRange(q.def));if(tg){const a=Math.atan2(tg.y-q.y,tg.x-q.x);q.aim=angLerp(q.aim,a,Math.min(1,dt*15));if(q.cd<=0){q.cd=.55;bullets.push({x:q.x+Math.cos(a)*14,y:q.y-6+Math.sin(a)*14,vx:Math.cos(a)*900,vy:Math.sin(a)*900,spd:900,dmg:q.dmg,def:q.def,range:wRange(q.def)+40,trav:0,pierce:0,hit:new Set(),r:4,a});sfx('shoot');q.rec=1}}q.rec=Math.max(0,(q.rec||0)-dt*8)}
   for(let i=embers.length-1;i>=0;i--){embers[i].t+=dt;if(embers[i].t>=embers[i].life)embers.splice(i,1)}
   for(let i=webs.length-1;i>=0;i--){const w=webs[i];w.t+=dt;if(w.t>=w.life)webs.splice(i,1);else if(!w.landed&&w.t>=w.land){w.landed=1;sfx('click');if(w.dmg>0&&state==='wave'&&Math.hypot(P.x-w.x,(P.y-w.y)*1.3)<w.r)hurtPlayer(w.dmg,{type:w.honey?'hqueen':'webber',dead:true});parts.push({x:w.x,y:w.y,vx:0,vy:0,t:0,life:.3,img:'fx_puff',col:'#ffffff',s0:20,s1:60,a0:.5})}}
   for(let i=kpools.length-1;i>=0;i--){kpools[i].t+=dt;if(kpools[i].t>=kpools[i].life)kpools.splice(i,1)}
