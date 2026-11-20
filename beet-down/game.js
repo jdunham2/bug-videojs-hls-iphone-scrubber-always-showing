@@ -170,6 +170,10 @@ const CHARS=[
   {id:'egg',name:'Egg',role:'Hatchling',desc:'Fragile now. Terrifying later.',weapon:'knife',mods:{dmg:-35},lines:[['+7% damage and +2 Max HP every wave','pos']],grow:true,k:2.6,fy:.5,es:.1,ez:.06},
   {id:'coconut',name:'Coconut',role:'Hard Shell',desc:'Nothing gets through in one piece.',weapon:'hammer',mods:{armor:5,maxHp:8,speed:-10,dodge:-10},lines:[['No single hit takes more than 15% of your Max HP','pos']],capHit:.15,k:2.3,fy:.56,es:.12,ez:.065},
   {id:'pear',name:'Pear',role:'Slippery',desc:'Hard to pin down, harder to stop.',weapon:'smg',mods:{dodge:12,speed:8,maxHp:-4},lines:[['Dodging gives +60% Attack Speed for 2s','pos']],slip:true,k:2.6,fy:.66,es:.09,ez:.055},
+  {id:'apple',name:'Apple',role:'Healthy',desc:'One a day keeps the aliens away.',weapon:'pistol',mods:{maxHp:6,regen:2,harvest:5},lines:[['Every 15s in a wave, heal 15% Max HP','pos'],['Fruit heals twice as much','pos']],waveHeal:.15,fruitHeal:2,k:2.3,fy:.58,es:.14,ez:.065},
+  {id:'avocado',name:'Avocado',role:'Pit Fighter',desc:'Crack the skin and see what happens.',weapon:'pan',mods:{maxHp:8,armor:1,dmg:-5},lines:[['Below 50% HP: +30% damage','pos']],pit:true,k:2.7,fy:.58,es:.1,ez:.055},
+  {id:'orange',name:'Orange',role:'Sunny',desc:'Warms up as the day goes on.',weapon:'smg',mods:{atkSpd:5,dmg:-15},lines:[['+1% damage every second of a wave (up to +40%)','pos']],solar:true,k:2.3,fy:.56,es:.14,ez:.065},
+  {id:'cactus',name:'Cactus',role:'Desert Born',desc:'Drinks only what it takes.',weapon:'spear',mods:{thorns:6,maxHp:6,armor:2},lines:[['HP Regen does nothing','neg'],['Kills heal 1 HP (up to 3 per second)','pos']],noRegen:true,killHeal:true,k:3.6,fy:.6,es:.07,ez:.045},
   {id:'leek',name:'Leek',role:'Lancer',desc:'Keeps every alien at arm\'s length.',weapon:'spear',mods:{melee:2,maxHp:3},lines:[['Melee weapons reach 50% farther','pos']],meleeRange:1.5,k:4.6,fy:.76,es:.045,ez:.03},
 ];
 
@@ -196,6 +200,10 @@ const UNLOCKS={
   leek:{txt:'Defeat 1,000 aliens with melee weapons',goal:1000,val:p=>p.meleeK},
   coconut:{txt:'Take 2,000 damage across runs',goal:2000,val:p=>p.dmgTaken||0},
   pear:{txt:'Dodge 500 attacks',goal:500,val:p=>p.dodges||0},
+  apple:{txt:'Heal 1,000 HP across runs',goal:1000,val:p=>p.heal||0},
+  avocado:{txt:'Reach level 25 in a run',goal:25,val:p=>p.maxLevel||0},
+  orange:{txt:'Get a 150 kill combo',goal:150,val:p=>p.combo||0},
+  cactus:{txt:'Take 1,000 hits across runs',goal:1000,val:p=>p.hitsTaken||0},
 };
 const profDefaults=()=>({best:0,kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{},fmedals:{},len:10,wunlocked:[],wseen:[],eseen:[],crits:0,hitsTaken:0,spent:0,full8:0,ek:{},dmgTaken:0,maxLevel:0,dodges:0,meleeK:0,boomK:0,full6:0,elites:0,wk:{}});
 const PROF=Object.assign(profDefaults(),{best:store.get('bd_best',0)},store.get('bd_prof',{}));
@@ -455,7 +463,7 @@ function addWeapon(id,tier){
   run.weapons.push({id,tier,cd:rand(.1,.5),aim:-Math.PI/2,ext:0,thrust:null,recoil:0,flash:0,spin:0}); recalc(); if(run.weapons.length>=8&&!PROF.full8){PROF.full8=1;checkUnlocks()} if(run.weapons.length>=6&&!PROF.full6){PROF.full6=1;checkUnlocks()} return true;
 }
 function canAddWeapon(id,tier){return run.weapons.length<maxW()||run.weapons.some(w=>w.id===id&&w.tier===tier&&tier<3)}
-function wDmg(def,t){const base=def.dmg*TIER_DMG[t]+(def.melee?S.melee:S.ranged)*(def.flame||def.spin||def.beam?.4:1);const mul=(1+S.dmg/100)*(def.melee?1:(run.char.rangedMul||1));const cb=S.comboDmg&&run?Math.min(30,Math.floor(run.combo/5)*S.comboDmg)/100:0;return Math.max(1,base*mul*(1+cb))}
+function wDmg(def,t){const base=def.dmg*TIER_DMG[t]+(def.melee?S.melee:S.ranged)*(def.flame||def.spin||def.beam?.4:1);const mul=(1+S.dmg/100)*(def.melee?1:(run.char.rangedMul||1));const cb=S.comboDmg&&run?Math.min(30,Math.floor(run.combo/5)*S.comboDmg)/100:0;const chm=run?(run.char.pit&&P&&P.hp<maxHp()*.5?1.3:1)*(run.char.solar&&state==='wave'?1+Math.min(.4,(run.time-(run.waveT0||run.time))*.01):1):1;return Math.max(1,base*mul*(1+cb)*chm)}
 function wCd(def,t){const as=S.atkSpd+(run&&run.rageT>0?S.rage:0)+(run&&run.slipT>0?60:0)+(run&&S.startRush&&run.time-(run.waveT0||-99)<6?50:0);const a=as>=0?1+as/100:1/(1-as/100);return def.cd*TIER_CD[t]/a}
 function wRange(def){return Math.max(60,(def.range+S.range*(def.melee?.5:1))*(def.melee&&run?(run.char.meleeRange||1):1))}
 const priceMul=()=>(DZ(4)?1.25:1)*(1-Math.min(45,S.shopDisc||0)/100);
@@ -591,6 +599,7 @@ function killEnemy(e,drops){
   if(e.type==='bee'&&webs.length<40)webs.push({honey:1,dmg:0,x:e.x,y:e.y,sx:e.x,sy:e.y,t:0,land:0,life:4,r:36,rot:0,landed:1});
   if(e.loot){let n=e.loot;e.loot=0;while(n>0){const v=Math.min(3,n);n-=v;dropGem(e.x,e.y,v)}texts.push({x:e.x,y:e.y-24,vy:-50,t:0,life:1,s:18,txt:'loot back!',c:'#ffcc4d'})}
   if(!drops)return;
+  if(run.char.killHeal&&state==='wave'&&run.time-(run.khT||-9)>.33){run.khT=run.time;heal(1)}
   run.kills++; PROF.kills++; run.combo++; run.comboT=1.4; run.bestCombo=Math.max(run.bestCombo,run.combo); PROF.combo=Math.max(PROF.combo,run.combo);
   if(run.combo%25===0){
     const bonus=Math.floor(run.combo/25)*3;
@@ -645,7 +654,7 @@ function hurtPlayer(d,src){
   const ar=S.armor; const mul=ar>=0?15/(15+ar):1+(-ar)/15;
   d=Math.max(1,Math.round(d*mul)); if(run.char.capHit)d=Math.min(d,Math.max(1,Math.round(maxHp()*run.char.capHit)));
   run.dmgBy=run.dmgBy||{}; const dk=src?src.type:'shot'; run.dmgBy[dk]=(run.dmgBy[dk]||0)+d;
-  PROF.dmgTaken=(PROF.dmgTaken||0)+d;
+  PROF.dmgTaken=(PROF.dmgTaken||0)+d; PROF.hitsTaken=(PROF.hitsTaken||0)+1;
   if(src&&src.type==='thief'&&!src.dead&&!src.loot){const n=Math.min(run.mats,4+run.wave);if(n>0){run.mats-=n;src.loot=n;src.flee=6;texts.push({x:P.x,y:P.y-56,vy:-60,t:0,life:1,s:20,txt:'-'+n+' MATS',c:'#ffcc4d'});sfx('swing')}}
   P.hp-=d; P.iframes=.75; hurtFlash=1; shake=Math.max(shake,11); freezeT=Math.max(freezeT,.07);
   texts.push({x:P.x,y:P.y-34,vy:-80,t:0,life:.8,s:22,txt:'-'+d,c:'#ff5d6c'});
@@ -891,7 +900,7 @@ function startWave(n){
   PROF.best=Math.max(PROF.best,n); store.set('bd_best',PROF.best);
   run.wave=n; const def=run.waves[n-1];
   run.timer=def.dur; run.spawnT=.5; run.shieldReady=true; run.shieldT=0; run.revUsed=0; run.droneT=0; run.bombT=3; run.sawA=0; run.rageT=0; run.rodT=1.5; run.eliteN=0; run.hiveN=0; run.bugT=def.bug?rand(def.dur*.25,def.dur*.6):-1; run.bossT=def.boss?1.5:-1; run.boss=null; run.bosses=[];
-  run.combo=0; run.comboT=0; run.rerolls=0; run.waveT0=run.time; run.metT=3; run.embT=0; run.embTick=0;
+  run.combo=0; run.comboT=0; run.rerolls=0; run.waveT0=run.time; run.appleT=0; run.metT=3; run.embT=0; run.embTick=0;
   if(S.freeCrate&&n>1){run.crates+=S.freeCrate;setTimeout(()=>{if(P)texts.push({x:P.x,y:P.y-50,vy:-50,t:0,life:1.2,s:20,txt:'+CRATE',c:'#ffcc4d'})},400)}
   embers=[];webs=[];kpools=[];rings=[];mines=[];marks=[];pools=[];enemies=[];bullets=[];ebullets=[];gems=[];pickups=[];parts=[];texts=[];fx=[];spawns=[];booms=[];
   dctx.clearRect(0,0,AW,AH);
@@ -1148,7 +1157,7 @@ function update(dt){
     if(P.moving&&Math.random()<dt*10)parts.push({x:P.x+rand(-6,6),y:P.y+P.r,vx:-P.vx*.1,vy:rand(-20,-5),t:0,life:.4,img:'fx_puff',col:'#c8b4cc',s0:6,s1:16,rot:rand(0,TAU),a0:.35});
   }
   P.iframes-=dt; P.blink-=dt; if(P.blink<-.12)P.blink=rand(2,4.5);
-  if(state==='wave'&&S.regen>0){P.regenAcc+=dt*S.regen*.12*(S.secondWind&&P.hp<maxHp()*.35?3:1);while(P.regenAcc>=1){P.regenAcc-=1;heal(1)}}
+  if(state==='wave'&&S.regen>0&&!run.char.noRegen){P.regenAcc+=dt*S.regen*.12*(S.secondWind&&P.hp<maxHp()*.35?3:1);while(P.regenAcc>=1){P.regenAcc-=1;heal(1)}}
   run.hpTrail=P.hp<run.hpTrail?lerp(run.hpTrail,P.hp,1-Math.exp(-dt*4)):P.hp;
   if(state==='wave'){
     if(!run.waves[run.wave-1].boss){run.timer-=dt;if(run.timer<=0){run.timer=0;endWave()}}else run.timer+=dt;
@@ -1166,6 +1175,7 @@ function update(dt){
     if(S.meteor){run.metT-=dt;if(run.metT<=0){run.metT=7/Math.min(2,S.meteor);const live=enemies.filter(e=>!e.dead&&e.popT==null&&!e.under);const tg=live.find(e=>e.def.isBoss)||(live.length?live[Math.floor(Math.random()*live.length)]:null);
       if(tg){const mx=tg.x,my=tg.y;fx.push({k:'ring',x:mx,y:my,r0:95,r1:15,t:0,life:.7,c:'#ff8a3d',w:4});booms.push({x:mx,y:my,t:.7,r:90,dmg:Math.round((45+run.wave*5)*(1+S.dmg/100)),knock:20,safe:true,def:{id:'meteor'}});for(let k=0;k<6;k++)parts.push({x:mx-140+k*6,y:my-260+k*12,vx:200,vy:380,t:-k*.02,life:.65,img:'fx_fire',col:'#ff9a3c',s0:34-k*4,s1:10,add:1});setTimeout(()=>{shake=Math.max(shake,9)},700)}}}
     if(S.bombs){run.bombT-=dt;if(run.bombT<=0){run.bombT=6/Math.min(2,S.bombs);const bt=nearestEnemy(P.x,P.y,320);mines.push({x:bt?bt.x:P.x,y:bt?bt.y:P.y+P.r*.5,t:0,arm:99,life:bt?.9:1.3,timed:true,dmg:Math.round((30+run.wave*2)*(1+S.dmg/100)),def:{id:'bombbag',blast:90,knock:22}});sfx('click')}}
+    if(run.char.waveHeal&&state==='wave'){run.appleT=(run.appleT||0)+dt;if(run.appleT>=15){run.appleT=0;heal(Math.max(1,Math.round(maxHp()*run.char.waveHeal)));parts.push({x:P.x,y:P.y-P.r,vx:0,vy:-30,t:0,life:.6,img:'fx_heart',col:'#ff6b6b',s0:20,s1:8,add:1})}}
     if(run.slipT>0){run.slipT-=dt;if(Math.random()<dt*10)parts.push({x:P.x+rand(-12,12),y:P.y-rand(0,20),vx:0,vy:-50,t:0,life:.35,c:'#b8ff8a',s:3,fade:1})}
     if(run.rageT>0){run.rageT-=dt;if(Math.random()<dt*14)parts.push({x:P.x+rand(-12,12),y:P.y-rand(0,20),vx:0,vy:-60,t:0,life:.4,c:'#ff5d3d',s:3,fade:1})}
     if(run.char.aura){run.auraT-=dt;if(run.auraT<=0){run.auraT=.5;const ad=Math.round(2+run.wave*.3+S.melee*.4);for(const e of enemies){if(e.dead||e.popT!=null||e.under)continue;if(Math.hypot(e.x-P.x,e.y-P.y)<80+e.r)hurtEnemy(e,ad,false,Math.atan2(e.y-P.y,e.x-P.x),3)}}}
@@ -1232,7 +1242,7 @@ function update(dt){
     const d=Math.hypot(P.x-p.x,P.y-p.y)||1;
     if(d<(state==='waveEnd'?2000:60)&&p.t>.3){const s=state==='waveEnd'?900:300;p.x+=(P.x-p.x)/d*s*dt;p.y+=(P.y-p.y)/d*s*dt}
     if(d<P.r+14&&p.t>.3){pickups.splice(i,1);
-      if(p.k==='fruit'){heal(3+Math.round(maxHp()*.08));sfx('heal');for(let k=0;k<4;k++)parts.push({x:P.x+rand(-14,14),y:P.y-10,vx:rand(-20,20),vy:rand(-90,-50),t:0,life:.7,img:'fx_heart',col:'#7bd35a',s0:14,s1:8,add:1})}
+      if(p.k==='fruit'){heal((3+Math.round(maxHp()*.08))*(run.char.fruitHeal||1));sfx('heal');for(let k=0;k<4;k++)parts.push({x:P.x+rand(-14,14),y:P.y-10,vx:rand(-20,20),vy:rand(-90,-50),t:0,life:.7,img:'fx_heart',col:'#7bd35a',s0:14,s1:8,add:1})}
       else{run.crates++;sfx('crate');texts.push({x:P.x,y:P.y-44,vy:-60,t:0,life:1,s:22,txt:'+CRATE',c:'#ffcc4d'});fx.push({k:'ring',x:P.x,y:P.y,r0:10,r1:90,t:0,life:.4,c:'#ffcc4d',w:5})}}}
   if(run.comboT>0){run.comboT-=dt;if(run.comboT<=0)run.combo=0}
   for(let i=marks.length-1;i>=0;i--){const m=marks[i];m.t+=dt;if(m.t<m.life)continue;marks.splice(i,1);
