@@ -4765,6 +4765,7 @@ addEventListener('keydown', e => {
   else if (wheel && wheel.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); wheel.push = true; } else if (k === 'escape') wheel = null; }
   else if (pie && pie.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) pieBite(); } else if (k === 'escape') pie = null; }
   else if (deco && deco.on && mode === 'talk') { const k = e.key.toLowerCase(), dm = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); decoMove(...dm[k]); } else if (k === ' ' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) decoAct(); } else if (k === 'q' || k === '[' || k === ']') { e.preventDefault(); e.stopImmediatePropagation(); decoCycle(k === 'q' || k === '[' ? -1 : 1); } else if (k === 'x' || k === 'delete' || k === 'backspace') { e.preventDefault(); e.stopImmediatePropagation(); decoStore(); } else if (k === 'escape') { if (deco.hold) { e.preventDefault(); e.stopImmediatePropagation(); if (deco.hold.from) decoReturn(); else deco.hold = null; decoUI(); } else deco = null; } }
+  else if (hin && hin.on && mode === 'talk' && document.getElementById('hinC')) { const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); hin.keys.add(k); } else if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) hinAct(); } else if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); hinExit(); } }
   else if (ice && ice.on && mode === 'talk') { const k = e.key.toLowerCase(), dm = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); iceMove(...dm[k]); } else if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); iceAct(false); } else if (k === 'x' || k === 'q') { e.preventDefault(); e.stopImmediatePropagation(); iceAct(true); } else if (k === 'escape') ice = null; }
   else if (axe && axe.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) axeThrow(); } else if (k === 'escape') axe = null; }
   else if (mode === 'talk' && ((jig && jig.won) || (wrd && wrd.done) || (chs && chs.over) || (maz && maz.won) || (kln && kln.won) || (sdk && sdk.won) || (gls && gls.done) || (cbk && cbk.over) || (mrs && mrs.done) || (twd && twd.over)) && [' ', 'enter', 'e'].includes(e.key.toLowerCase())) { e.preventDefault(); e.stopImmediatePropagation(); }
@@ -8212,6 +8213,160 @@ function bubEnd(won) {
   renderHUD(); save(); const nx = won && M.li < 2 ? M.li + 1 : M.li;
   openPanel('Soap bubbles', txt, [{label: nx !== M.li ? `Next: ${BUB_LV[nx].name}` : 'Try again', primary: true, fn: () => bubStart(n, nx)}, ...(nx !== M.li ? [{label: 'Same tub again', fn: () => bubStart(n, M.li)}] : []), {label: 'Close', fn: closeTalk}]);
 }
+// ===== walk around inside your home =====
+const HIN_W = 12, HIN_H = 9, HIN_C = 32, HIN_OX = 1, HIN_EDGE = 12; // the decorating grid (10×7) plus a strip either side and two rows at the front
+let hin = null, hinRet = false, hinPos = null;
+function hinFixtures() {
+  const L = S.home.level, f = [
+    {id: 'bed', x: HIN_W - 1, y: 1, w: 1, h: 2, name: 'Bed', verb: 'Sleep until morning', fn: () => { sleep(); hin && (hin.msg = 'You sleep soundly and wake to birdsong.', hin.msgT = 3); }},
+    {id: 'chest', x: HIN_W - 1, y: 4, w: 1, h: 1, name: 'Storage chest', verb: 'Open the chest and home menu', fn: () => hinAway(() => openHome())},
+    {id: 'fire', x: 0, y: 1, w: 1, h: 2, name: 'Cooking fire', verb: 'Cook at the fire', fn: () => hinAway(() => openCraft())},
+    {id: 'desk', x: 0, y: 4, w: 1, h: 1, name: 'Writing desk', verb: 'Decorate your room', fn: () => hinAway(() => decoOpen())},
+  ];
+  if (L >= 2) f.push({id: 'bench', x: 0, y: 6, w: 1, h: 1, name: 'Workbench', verb: 'Craft at the workbench', fn: () => hinAway(() => openCraft())});
+  if (L >= 3) f.push({id: 'anvil', x: HIN_W - 1, y: 6, w: 1, h: 1, name: 'Forge', verb: 'Work the forge', fn: () => hinAway(() => openCraft())});
+  return f;
+}
+function hinAway(fn) { if (!hin) return; hinPos = {x: hin.p.x, y: hin.p.y, f: hin.face}; hin = null; hinRet = true; $('talk').hidden = true; mode = 'play'; fn(); }
+function hinMaybeBack() { if (!hinRet) return; setTimeout(() => { if (!hinRet || mode !== 'play') return; hinRet = false; if (Math.hypot(S.x - HOME.x, S.y - HOME.y) < 9 && S.home.level) hinOpen(true); }, 0); }
+function hinSolid(cx, cy) {
+  if (cx < 0 || cx >= HIN_W || cy < 1) return true;
+  if (cy >= HIN_H) return !(cx === Math.floor(HIN_W/2) - 1 || cx === Math.floor(HIN_W/2));
+  for (const f of hin.fx) if (cx >= f.x && cx < f.x + f.w && cy >= f.y && cy < f.y + f.h) return true;
+  for (const it of roomState().items) { const F = FURNITURE[it.k]; if (F.flat || F.wall) continue; const x = it.x + HIN_OX; if (cx >= x && cx < x + F.w && cy >= it.y && cy < it.y + F.h) return true; }
+  return false;
+}
+function hinFree(x, y) { const r = .3; for (const [a, b] of [[-r, -.1], [r, -.1], [-r, .3], [r, .3]]) if (hinSolid(Math.floor(x + a), Math.floor(y + b))) return false; return true; }
+function hinOpen(back) {
+  if (!S.home.level) return;
+  homeCtx = null; roomState();
+  const p = back && hinPos ? {x: hinPos.x, y: hinPos.y} : {x: HIN_W/2, y: HIN_H - .45};
+  hin = {on: true, p, face: back && hinPos ? hinPos.f : 'up', phase: 0, moving: false, keys: new Set(), padDir: null, path: null, goal: null, msg: '', msgT: 0, last: performance.now(), t: 0, fx: hinFixtures(), visits: 0,
+    pet: S.pet ? {x: p.x + 1, y: p.y - .6, face: 'left', phase: 0, moving: false, wait: 1} : null};
+  hinPos = null;
+  if (!back) { S.homeVisits = (S.homeVisits || 0) + 1; SFX.click && SFX.click(); }
+  const L = HOME_LEVELS[S.home.level];
+  openPanel(`Inside your ${L.name.toLowerCase()}`, `<canvas id="hinC" width="${HIN_W*HIN_C}" height="${HIN_H*HIN_C + HIN_EDGE}" style="display:block;margin:0 auto;border-radius:6px;width:100%;max-width:560px;image-rendering:pixelated;touch-action:none;cursor:pointer"></canvas><div id="hinInfo" style="text-align:center;min-height:2.6em;margin-top:6px"></div>`,
+    [{label: 'Go outside', fn: hinExit}]);
+  { const g = $('portrait').getContext('2d'); g.fillStyle = '#6e9c4e'; g.fillRect(0, 0, 72, 72); g.fillStyle = S.home.level >= 2 ? '#c8c4bc' : '#8a6038'; g.fillRect(14, 32, 44, 30); g.fillStyle = '#b83a2a'; g.beginPath(); g.moveTo(8, 34); g.lineTo(36, 10); g.lineTo(64, 34); g.fill(); g.fillStyle = '#5a3a20'; g.fillRect(31, 44, 10, 18); g.fillStyle = '#f0d070'; g.fillRect(18, 40, 8, 8); g.fillRect(46, 40, 8, 8); }
+  setTimeout(() => { const c = document.getElementById('hinC'); if (!c || !hin) return;
+    c.addEventListener('pointerdown', e => { e.preventDefault(); if (!hin) return; const r = c.getBoundingClientRect(), s = c.width/r.width; hinTap((e.clientX - r.left)*s/HIN_C, (e.clientY - r.top)*s/HIN_C); });
+    hin.last = performance.now(); requestAnimationFrame(hinLoop); }, 30);
+}
+function hinExit() { if (!hin) { closeTalk(); return; } hin = null; hinRet = false; closeTalk(); player.facing = 'down'; SFX.click && SFX.click(); }
+function hinTarget() {
+  const H = hin, px = H.p.x, py = H.p.y; let best = null, bd = .95;
+  const near = (x, y, w, h) => Math.hypot(Math.max(x - px, 0, px - (x + w)), Math.max(y - py, 0, py - (y + h)));
+  for (const f of H.fx) { const d = near(f.x, f.y, f.w, f.h); if (d < bd) { bd = d; best = f; } }
+  for (const it of roomState().items) { const F = FURNITURE[it.k]; const d = F.wall ? (py < 1.9 ? near(it.x + HIN_OX, 0, F.w, 1) : 9) : near(it.x + HIN_OX, it.y, F.w, F.h) + (F.flat ? .4 : 0); if (d < bd) { bd = d; best = {id: 'item', it, name: F.name, verb: 'Look'}; } }
+  if (Math.abs(px - HIN_W/2) < 1.3 && py > HIN_H - .9) best = {id: 'door', name: 'Front door', verb: 'Go outside', fn: hinExit};
+  return best;
+}
+const HIN_LOOK = {bed_quilt: 'A patchwork quilt, still warm.', rug: 'Soft under your boots.', chair: 'You sit for a moment and rest your feet.', armchair: 'You sink into the armchair. Bliss.', bookshelf: 'Dog-eared adventure stories and a cookbook.', hearth: 'The second hearth crackles happily.', plant: 'You give the fern a little water.', lamp: 'A warm, steady glow.', piano: 'You plink out a little tune.', fishtank: 'The fish blow bubbles at you.', rubber_duck: 'Squeak!'};
+function hinAct(t) {
+  const H = hin; t = t || hinTarget(); if (!H || !t) return;
+  if (t.id === 'item') { const k = t.it.k; H.msg = `<b>${t.name}</b> · ${HIN_LOOK[k] || 'It makes the place feel like home.'}`; H.msgT = 3; if (k === 'piano' && SFX.chime) SFX.chime(); else if (SFX.click) SFX.click(); if (/chair/.test(k)) { H.sit = 1.6; } return; }
+  t.fn();
+}
+function hinTap(tx, ty) { if (!hin) return;
+  const H = hin, cx = Math.floor(tx), cy = Math.min(HIN_H - 1, Math.floor(ty));
+  const tgt = hinTarget(), hit = (o) => o && (o.id === 'item' ? (() => { const F = FURNITURE[o.it.k]; return cx >= o.it.x + HIN_OX && cx < o.it.x + HIN_OX + F.w && cy >= (F.wall ? 0 : o.it.y) && cy < (F.wall ? 1 : o.it.y + F.h); })() : o.id === 'door' ? ty > HIN_H - 1 && Math.abs(tx - HIN_W/2) < 1.2 : cx >= o.x && cx < o.x + o.w && cy >= o.y && cy < o.y + o.h);
+  if (hit(tgt)) { hinAct(tgt); return; }
+  // tapped something else: walk next to it (BFS over free cells)
+  let goal = null;
+  for (const f of H.fx) if (cx >= f.x && cx < f.x + f.w && cy >= f.y && cy < f.y + f.h) goal = f;
+  if (!goal && ty > HIN_H - 1 && Math.abs(tx - HIN_W/2) < 1.2) goal = {id: 'door', x: HIN_W/2 - 1, y: HIN_H - 1, w: 2, h: 1};
+  if (!goal) for (const it of roomState().items) { const F = FURNITURE[it.k], y0 = F.wall ? 0 : it.y, h = F.wall ? 1 : F.h; if (cx >= it.x + HIN_OX && cx < it.x + HIN_OX + F.w && cy >= y0 && cy < y0 + h) goal = {id: 'item', it, x: it.x + HIN_OX, y: y0, w: F.w, h}; }
+  const sx = Math.floor(H.p.x), sy = Math.min(HIN_H - 1, Math.floor(H.p.y)), key = (x, y) => y*HIN_W + x, prev = new Map([[key(sx, sy), -1]]), q = [[sx, sy]];
+  const isEnd = (x, y) => goal ? (goal.id === 'door' ? y === HIN_H - 1 && (x === HIN_W/2 - 1 || x === HIN_W/2) : (Math.abs(x - Math.max(goal.x, Math.min(goal.x + goal.w - 1, x))) + Math.abs(y - Math.max(goal.y, Math.min(goal.y + goal.h - 1, y))) === 1)) : x === cx && y === cy;
+  let end = null;
+  while (q.length) { const [x, y] = q.shift(); if (isEnd(x, y)) { end = [x, y]; break; }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 1 || nx >= HIN_W || ny >= HIN_H || prev.has(key(nx, ny)) || hinSolid(nx, ny)) continue; prev.set(key(nx, ny), key(x, y)); q.push([nx, ny]); } }
+  if (!end) { H.msg = 'You can’t get there. Furniture is in the way.'; H.msgT = 2; return; }
+  const path = []; let k = key(end[0], end[1]); while (k !== -1 && k !== key(sx, sy)) { path.unshift({x: k % HIN_W + .5, y: Math.floor(k/HIN_W) + .55}); k = prev.get(k); }
+  H.path = path; H.goal = goal;
+}
+function hinDir() {
+  const H = hin, k = H.keys; let dx = 0, dy = 0;
+  if (k.has('arrowup') || k.has('w')) dy -= 1; if (k.has('arrowdown') || k.has('s')) dy += 1; if (k.has('arrowleft') || k.has('a')) dx -= 1; if (k.has('arrowright') || k.has('d')) dx += 1;
+  if (H.padDir) { dx += H.padDir[0]; dy += H.padDir[1]; }
+  if (!dx && !dy) return null; const m = Math.hypot(dx, dy); return [dx/m, dy/m];
+}
+function hinStep(o, dx, dy, d) {
+  let moved = false;
+  if (dx && hinFree(o.x + dx*d, o.y)) { o.x += dx*d; moved = true; }
+  if (dy && hinFree(o.x, o.y + dy*d)) { o.y += dy*d; moved = true; }
+  if (Math.abs(dx) > Math.abs(dy)) o.face = dx > 0 ? 'right' : 'left'; else if (dy) o.face = dy > 0 ? 'down' : 'up';
+  return moved;
+}
+function hinLoop(now) {
+  const H = hin, c = document.getElementById('hinC'); if (!H || !c) return;
+  const dt = Math.min(.05, (now - H.last)/1000); H.last = now; H.t += dt; H.msgT = Math.max(0, H.msgT - dt); if (H.sit) H.sit = Math.max(0, H.sit - dt);
+  let d = hinDir(); if (d) { H.path = null; H.goal = null; H.sit = 0; }
+  if (!d && H.path && H.path.length) { const w = H.path[0], ex = w.x - H.p.x, ey = w.y - H.p.y, m = Math.hypot(ex, ey); if (m < .08) { H.path.shift(); if (!H.path.length) { const g = H.goal; H.path = null; H.goal = null; if (g) hinAct(g.id === 'door' ? {id: 'door', fn: hinExit} : g.id === 'item' ? {id: 'item', it: g.it, name: FURNITURE[g.it.k].name} : g); if (!hin) return; } } else d = [ex/m, ey/m]; }
+  H.moving = false;
+  if (d) { const sp = 3.6*dt, o = {x: H.p.x, y: H.p.y, face: H.face}; H.moving = hinStep(o, d[0], d[1], sp); H.p.x = o.x; H.p.y = o.y; H.face = o.face; if (H.moving) H.phase += dt*10;
+    if (H.p.y > HIN_H + .05) { hinExit(); return; } }
+  const P = H.pet; if (P) { const ex = H.p.x - P.x, ey = H.p.y - P.y, m = Math.hypot(ex, ey); P.moving = false; P.wait -= dt;
+    if (m > 1.6) { const o = {x: P.x, y: P.y, face: P.face}; P.moving = hinStep(o, ex/m, ey/m, 3.2*dt); P.x = o.x; P.y = o.y; P.face = o.face; }
+    else if (P.wait < 0) { P.wait = 1.5 + Math.random()*2.5; const a = Math.random()*7; P.tx = P.x + Math.cos(a)*.8; P.ty = P.y + Math.sin(a)*.6; }
+    else if (P.tx !== undefined && Math.hypot(P.tx - P.x, P.ty - P.y) > .1) { const fx = P.tx - P.x, fy = P.ty - P.y, fm = Math.hypot(fx, fy), o = {x: P.x, y: P.y, face: P.face}; P.moving = hinStep(o, fx/fm, fy/fm, 1.6*dt); P.x = o.x; P.y = o.y; P.face = o.face; if (!P.moving) P.tx = undefined; }
+    if (P.moving) P.phase += dt*10; }
+  hinDraw(c);
+  const info = document.getElementById('hinInfo');
+  if (info) { const t = hinTarget(), cm = roomComfort(), ct = comfortTier(cm), key = !isTouch || PAD.active ? `<kbd>E</kbd> ` : 'Tap: ';
+    info.innerHTML = H.msgT > 0 ? H.msg : t ? `${key}${t.id === 'item' ? `Look at the ${t.name.toLowerCase()}` : t.verb}` : `<span style="color:var(--muted)">Comfort ${cm}${ct ? ` · ${ct[1]}` : ''} · ${!isTouch || PAD.active ? 'walk with the arrow keys or WASD' : 'tap to walk, tap things to use them'}</span>`; }
+  requestAnimationFrame(hinLoop);
+}
+function hinDrawFixture(g, f, t) {
+  const X = f.x*HIN_C, Y = f.y*HIN_C, W = f.w*HIN_C, Hh = f.h*HIN_C, box = (c, a, b, w, h) => { g.fillStyle = c; g.fillRect(X + a, Y + b, w, h); };
+  if (f.id === 'bed') { box('#5a3a20', 3, 0, W - 6, Hh - 2); box('#6a4a2a', 3, 0, W - 6, 8); box('#f0ece0', 6, 9, W - 12, 11); box('#a83a3a', 5, 22, W - 10, Hh - 28); box('#c85a4a', 5, 22, W - 10, 4); for (let y = 30; y < Hh - 8; y += 9) box('rgba(255,255,255,.18)', 5, y, W - 10, 2); }
+  else if (f.id === 'chest') { box('#6a4422', 3, 8, W - 6, Hh - 10); box('#8a5a2a', 3, 6, W - 6, 9); box('#c8a040', 3, 14, W - 6, 2); box('#c8a040', W/2 - 3, 12, 6, 7); box('#3a2a10', W/2 - 1, 15, 2, 3); }
+  else if (f.id === 'fire') { box('#7a7a82', 2, 4, W - 4, Hh - 6); box('#8a8a92', 0, 2, W, 6); box('#2a2420', 6, Hh/2 - 4, W - 12, Hh/2 - 4); for (let i = 0; i < 3; i++) { const fl = Math.sin(t*9 + i*2.1)*3; g.fillStyle = ['#e85a1a', '#f8a02a', '#ffe07a'][i]; g.beginPath(); g.moveTo(X + 8 + i*2, Y + Hh - 10); g.lineTo(X + W/2 + fl*.6, Y + Hh/2 + 2 + i*5 + fl); g.lineTo(X + W - 8 - i*2, Y + Hh - 10); g.fill(); }
+    box('#4a2a10', 7, Hh - 11, W - 14, 3); box('#3a3a3a', W/2 - 5, Hh/2 - 2, 10, 2); }
+  else if (f.id === 'desk') { box('#7a5230', 2, 10, W - 4, 8); box('#5a3a20', 4, 18, 3, Hh - 20); box('#5a3a20', W - 7, 18, 3, Hh - 20); box('#f0ead8', 7, 6, 12, 8); box('#3a3a4a', 21, 8, 4, 5); g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.beginPath(); g.moveTo(X + 23, Y + 8); g.lineTo(X + 27, Y + 1); g.stroke(); }
+  else if (f.id === 'bench') { box('#8a6038', 1, 9, W - 2, 8); box('#5a3a20', 3, 17, 3, Hh - 19); box('#5a3a20', W - 6, 17, 3, Hh - 19); box('#9a9aa2', 6, 5, 10, 3); box('#6a4422', 18, 3, 3, 7); box('#8a8a90', 16, 2, 7, 3); }
+  else if (f.id === 'anvil') { box('#5a3a20', 9, Hh - 12, W - 18, 10); box('#4a4a52', 4, 8, W - 8, 7); box('#3a3a42', 9, 14, W - 18, 6); box('#6a6a72', 4, 8, W - 8, 2); }
+}
+function hinDraw(c) {
+  const H = hin, g = c.getContext('2d'), L = S.home.level, t = H.t, CW = HIN_W*HIN_C, CH = HIN_H*HIN_C;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const wall = L >= 3 ? ['#5a7a5a', '#4e6e4e'] : L >= 2 ? ['#9a9690', '#86827c'] : ['#8a6038', '#7a5230'];
+  g.fillStyle = wall[0]; g.fillRect(0, 0, CW, HIN_C);
+  if (L >= 3) { g.fillStyle = wall[1]; for (let x = 6; x < CW; x += 16) g.fillRect(x, 0, 6, HIN_C); g.fillStyle = '#c8a860'; g.fillRect(0, HIN_C - 8, CW, 2); }
+  else if (L >= 2) { g.fillStyle = wall[1]; for (let y = 0; y < HIN_C; y += 8) for (let x = (y/8 % 2)*10; x < CW; x += 20) g.fillRect(x, y, 18, 6); }
+  else { g.fillStyle = wall[1]; for (let y = 3; y < HIN_C; y += 8) g.fillRect(0, y, CW, 3); }
+  g.fillStyle = '#5a3a20'; g.fillRect(0, HIN_C - 4, CW, 4);
+  // windows in the corners show the sky outside
+  const sky = S.time > .8 || S.time < .2 ? '#1a2440' : S.time > .7 || S.time < .27 ? '#e09a6a' : '#8ac8f0';
+  for (const wx of [0, HIN_W - 1]) { g.fillStyle = '#6a4a2a'; g.fillRect(wx*HIN_C + 5, 4, 22, 20); g.fillStyle = sky; g.fillRect(wx*HIN_C + 7, 6, 18, 16); g.fillStyle = '#6a4a2a'; g.fillRect(wx*HIN_C + 15, 6, 2, 16); g.fillRect(wx*HIN_C + 7, 13, 18, 2);
+    if (sky === '#1a2440') { g.fillStyle = '#fff8c8'; g.fillRect(wx*HIN_C + 10, 8, 1, 1); g.fillRect(wx*HIN_C + 21, 17, 1, 1); } }
+  // floor
+  for (let y = 1; y < HIN_H; y++) for (let x = 0; x < HIN_W; x++) { g.fillStyle = L >= 3 ? ((x + y) % 2 ? '#8a5a3a' : '#94643f') : (x + y) % 2 ? '#a07a50' : '#a8825a'; g.fillRect(x*HIN_C, y*HIN_C, HIN_C, HIN_C); g.fillStyle = 'rgba(0,0,0,.1)'; g.fillRect(x*HIN_C, y*HIN_C + HIN_C - 1, HIN_C, 1); }
+  // front wall with the door gap and a doormat
+  const dx0 = (HIN_W/2 - 1)*HIN_C; g.fillStyle = wall[1]; g.fillRect(0, CH, CW, HIN_EDGE); g.fillStyle = '#5a3a20'; g.fillRect(0, CH, CW, 3);
+  g.fillStyle = '#6a8a4a'; g.fillRect(dx0, CH, HIN_C*2, HIN_EDGE); g.fillStyle = '#8a3a2a'; g.fillRect(dx0 + 10, CH - 14, HIN_C*2 - 20, 12); g.fillStyle = '#a85a3a'; g.fillRect(dx0 + 13, CH - 11, HIN_C*2 - 26, 6);
+  const R = roomState(), items = R.items;
+  for (const it of items) { const F = FURNITURE[it.k]; if (F.flat) decoPiece(g, it.k, (it.x + HIN_OX)*HIN_C, it.y*HIN_C, F.w*HIN_C, F.h*HIN_C); }
+  for (const it of items) { const F = FURNITURE[it.k]; if (F.wall) decoPiece(g, it.k, (it.x + HIN_OX)*HIN_C, 0, F.w*HIN_C, F.h*HIN_C); }
+  const sp = [];
+  for (const it of items) { const F = FURNITURE[it.k]; if (F.flat || F.wall) continue; sp.push({y: it.y + F.h, f: () => decoPiece(g, it.k, (it.x + HIN_OX)*HIN_C, it.y*HIN_C, F.w*HIN_C, F.h*HIN_C)}); }
+  for (const f of H.fx) sp.push({y: f.y + f.h, f: () => hinDrawFixture(g, f, t)});
+  const z = HIN_C/TS;
+  sp.push({y: H.p.y + .3, f: () => { g.save(); g.scale(z, z); drawPerson(g, H.p.x*TS, H.p.y*TS - (H.sit ? 2 : 0), player.cols, H.phase, H.moving, H.face, {scarf: true, cos: S.hat}); g.restore(); }});
+  if (H.pet) sp.push({y: H.pet.y + .2, f: () => { g.save(); g.scale(z, z); drawPet(g, S.pet, H.pet.x*TS, H.pet.y*TS, H.pet.face, H.pet.phase, H.pet.moving); g.restore(); }});
+  sp.sort((a, b) => a.y - b.y); for (const s of sp) s.f();
+  // highlight what you can use
+  const tg = hinTarget();
+  if (tg) { g.strokeStyle = 'rgba(255,240,160,' + (.55 + Math.sin(t*6)*.3) + ')'; g.lineWidth = 2;
+    if (tg.id === 'item') { const F = FURNITURE[tg.it.k]; g.strokeRect((tg.it.x + HIN_OX)*HIN_C + 1, (F.wall ? 0 : tg.it.y)*HIN_C + 1, F.w*HIN_C - 2, (F.wall ? 1 : F.h)*HIN_C - 2); }
+    else if (tg.id === 'door') g.strokeRect(dx0 + 1, CH - 18, HIN_C*2 - 2, 18 + HIN_EDGE - 2);
+    else g.strokeRect(tg.x*HIN_C + 1, tg.y*HIN_C + 1, tg.w*HIN_C - 2, tg.h*HIN_C - 2); }
+  // night: dim the room, the fire glows
+  const night = S.time > .78 || S.time < .22 ? .45 : S.time > .7 || S.time < .27 ? .2 : 0;
+  if (night) { g.fillStyle = `rgba(10,14,40,${night})`; g.fillRect(0, 0, CW, CH + HIN_EDGE);
+    const gr = g.createRadialGradient(HIN_C/2, HIN_C*2.2, 4, HIN_C/2, HIN_C*2.2, HIN_C*4); gr.addColorStop(0, `rgba(255,170,80,${night*.7})`); gr.addColorStop(1, 'rgba(255,170,80,0)'); g.fillStyle = gr; g.fillRect(0, 0, CW, CH); }
+}
 // ===== pony jumping show (Hettie Hurdle, Hollowpine) =====
 let jump = null;
 const JW = 360, JH = 200, JGROUND = 162, JFENCES = 15;
@@ -8686,7 +8841,7 @@ addEventListener('keydown', e => {
   else if (castle && castle.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) castleDrop(); } }
   else if (lock && lock.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) lockPress(); } }
 }, {capture: true});
-addEventListener('keyup', e => { if (ahk) ahk.keys.delete(e.key.toLowerCase()); if (bub) bub.keys.delete(e.key.toLowerCase()); if (jig) jig.keys.delete(e.key.toLowerCase()); if (hen) hen.keys.delete(e.key.toLowerCase()); if (bns) bns.keys.delete(e.key.toLowerCase()); if (bdm) bdm.keys.delete(e.key.toLowerCase()); if (brk) brk.keys.delete(e.key.toLowerCase()); if (mrs && [' ', 'enter', 'e'].includes(e.key.toLowerCase())) mrsUp(); if (sgc) sgc.keys.delete(e.key.toLowerCase()); if (maz) maz.keys.delete(e.key.toLowerCase()); if (rft) rft.keys.delete(e.key.toLowerCase()); if (cdv && [' ', 'Enter', 'e', 'E'].includes(e.key)) cdv.keys.delete(' '); if (spook) spook.keys.delete(e.key.toLowerCase()); if (crl) { crl.keys.delete(e.key.toLowerCase()); if (e.key === 'Enter' || e.key.toLowerCase() === 'e') crl.keys.delete(' '); } if (gls) gls.keys.delete(e.key.toLowerCase()); if (bag) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') bagShoot(); } if (lhw) lhw.keys.delete(e.key.toLowerCase()); if (sdive) sdive.keys.delete(e.key.toLowerCase()); if (wheel) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') wheel.push = false; } if (sled) sled.keys.delete(e.key.toLowerCase()); if (golf) golf.keys.delete(e.key.toLowerCase()); if (logr) logr.keys.delete(e.key.toLowerCase()); if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
+addEventListener('keyup', e => { if (hin) hin.keys.delete(e.key.toLowerCase()); if (ahk) ahk.keys.delete(e.key.toLowerCase()); if (bub) bub.keys.delete(e.key.toLowerCase()); if (jig) jig.keys.delete(e.key.toLowerCase()); if (hen) hen.keys.delete(e.key.toLowerCase()); if (bns) bns.keys.delete(e.key.toLowerCase()); if (bdm) bdm.keys.delete(e.key.toLowerCase()); if (brk) brk.keys.delete(e.key.toLowerCase()); if (mrs && [' ', 'enter', 'e'].includes(e.key.toLowerCase())) mrsUp(); if (sgc) sgc.keys.delete(e.key.toLowerCase()); if (maz) maz.keys.delete(e.key.toLowerCase()); if (rft) rft.keys.delete(e.key.toLowerCase()); if (cdv && [' ', 'Enter', 'e', 'E'].includes(e.key)) cdv.keys.delete(' '); if (spook) spook.keys.delete(e.key.toLowerCase()); if (crl) { crl.keys.delete(e.key.toLowerCase()); if (e.key === 'Enter' || e.key.toLowerCase() === 'e') crl.keys.delete(' '); } if (gls) gls.keys.delete(e.key.toLowerCase()); if (bag) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') bagShoot(); } if (lhw) lhw.keys.delete(e.key.toLowerCase()); if (sdive) sdive.keys.delete(e.key.toLowerCase()); if (wheel) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') wheel.push = false; } if (sled) sled.keys.delete(e.key.toLowerCase()); if (golf) golf.keys.delete(e.key.toLowerCase()); if (logr) logr.keys.delete(e.key.toLowerCase()); if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
 // ===== archaeology =====
 const DIG_FINDS = ['dig_idol', 'dig_horn', 'dig_scarab', 'dig_mask', 'dig_seal', 'dig_tablet', 'dig_amulet', 'dig_crest'];
 const DIG_TILES = [T.RUINS, T.DUNE, T.SAND, T.MESA, T.SAVANNA];
@@ -11794,6 +11949,7 @@ const GUIDE = [
   ['Signal lamp', 'Mina Flint in Lantern Bay has you signal ships by lamp. Tap for a dot, hold for a dash, and pause to finish each letter. The chart is shown below the lamp. Get 80% of letters right across five words to pass; a perfect night watch earns her Brass Signal Lamp.'],
   ['Catapult', 'Bramwell the Siege-Master in Thornwick has five practice forts. Aim with ↑/↓ or the mouse, then stop the power bar; watch the wind flag. Wood breaks in one hit, stone in two, and unsupported blocks fall: a straw soldier that falls two rows, or gets landed on, is knocked out. Take every fort for a Toy Catapult.'],
   ['Dominoes', 'Pilar in Reedholm plays draw dominoes, first to 50. Match a tile to either end of the line; if nothing fits, draw from the boneyard, and pass if it is empty. Going out scores the pips left in the other hand. Win three matches for her Bone Domino Set.'],
+  ['Inside your home', 'Walk up to your front door and step inside. Walk around with the arrow keys, WASD, the stick, or by tapping. The bed lets you sleep, the chest holds your things and opens the home menu, the fire and workbench are for crafting, and the writing desk lets you decorate. Furniture you place shows up in the room, and your pet comes in too.'],
   ['Hedge maze', 'Lady Rosalind in Crownfall lets you into the royal hedge maze. Walk with the arrow keys, WASD, the stick, or by holding a finger toward a direction. You only see a few paces, but remember where you have been; the blue arrow points to the fountain at the centre. Find the three golden roses for extra pay, and all three in the great labyrinth for a Topiary Peacock.'],
   ['Rafting', 'Clem the Rafter in Greenstem takes you down the river. Steer with left and right (or hold a finger where you want to go), paddle faster with up. Three knocks on rocks or banks and the raft breaks; pass through flag gates for points and beware whirlpools. Finish Thunder gorge without a knock for Clem’s Carved Paddle.'],
   ['Juggling', 'Jolly Jem the jester in Maplehold teaches juggling. Press left (← or A) as a ball lands in your left hand and right (→ or D) for your right; on a touch screen, tap that half. Three drops ends the show. You speed up, then get a fourth and fifth ball. 100 catches earns Jem’s Juggling Clubs.'],
@@ -12476,6 +12632,7 @@ function padPoll(dt) {
   if (mrs && mrs.on && mode === 'talk' && !mrs.done) { if (down(OK)) mrsDown(); if (up(OK)) mrsUp(); if (down(BACK)) { mrs = null; closeTalk(); } PAD.prev = B; return; }
   if (sgc && sgc.on && mode === 'talk') { sgc.padY = -sy + (now(12) ? 1 : 0) - (now(13) ? 1 : 0); if (down(OK)) sgcPress(); if (down(BACK)) { sgc = null; closeTalk(); } PAD.prev = B; return; }
   if (dmn && dmn.on && mode === 'talk' && !dmn.roundOver && document.getElementById('dmnC')) { if (down(14)) { dmn.sel = (dmn.sel + dmn.hand.length - 1) % Math.max(1, dmn.hand.length); dmnDraw(); } if (down(15)) { dmn.sel = (dmn.sel + 1) % Math.max(1, dmn.hand.length); dmnDraw(); } if (down(12) || down(13)) { dmn.end = 1 - dmn.end; dmnDraw(); } if (down(OK)) dmnTry(dmn.sel); if (down(2)) dmnDrawTile(); if (down(BACK)) { dmn = null; closeTalk(); } PAD.prev = B; return; }
+  if (hin && hin.on && mode === 'talk' && document.getElementById('hinC')) { const hx = (now(15) ? 1 : 0) - (now(14) ? 1 : 0) + (Math.abs(sx) > .3 ? sx : 0), hy = (now(13) ? 1 : 0) - (now(12) ? 1 : 0) + (Math.abs(sy) > .3 ? sy : 0); hin.padDir = hx || hy ? [hx, hy] : null; if (down(OK)) hinAct(); if (down(BACK)) hinExit(); PAD.prev = B; return; }
   if (maz && maz.on && mode === 'talk' && !maz.won) { if (down(OK)) mazFinish(); maz.padDir = now(12) || sy < -.5 ? [0, -1] : now(13) || sy > .5 ? [0, 1] : now(14) || sx < -.5 ? [-1, 0] : now(15) || sx > .5 ? [1, 0] : null; if (down(BACK)) { maz = null; closeTalk(); } PAD.prev = B; return; }
   if (rft && rft.on && mode === 'talk') { rft.padX = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rft.padFwd = now(OK) || now(12) || sy < -.5; if (down(BACK)) { rft = null; closeTalk(); } PAD.prev = B; return; }
   if (jug && jug.on && mode === 'talk') { if (down(14) || down(4) || down(2)) jugPress(0); if (down(15) || down(5) || down(OK)) jugPress(1); if (down(BACK)) { if (!jug.over) jugEnd(); } PAD.prev = B; return; }
@@ -14103,7 +14260,7 @@ function gossip(n) {
 const bdayOf = n => { let h = 0; for (const c of n.id) h = (h*31 + c.charCodeAt(0)) >>> 0; return h % 28 + 1; };
 const isBirthday = n => !!n && !n.wander && !n.festival && ((S.day - 1) % 28) + 1 === bdayOf(n);
 const back = n => ({label:'Back', fn: () => say(hello(n), mainOptions(n))});
-function closeTalk() { $('talk').hidden = true; mode = 'play'; talkNPC = null; nearNPC = null; promptKey = null; renderHUD(); }
+function closeTalk() { $('talk').hidden = true; mode = 'play'; talkNPC = null; nearNPC = null; promptKey = null; renderHUD(); hinMaybeBack(); }
 
 function legendTalk(n) {
   S.legendsKnown = true; S.legends = S.legends || {};
@@ -15724,7 +15881,7 @@ function homeTarget() {
   const lvl = S.home.level, K = '<kbd style="margin:0 6px 0 0">E</kbd>';
   if (Math.hypot(S.x - (HOME.x + .5), S.y - (HOME.y - .4)) < 1.2) {
     if (!lvl) return {key:'sale', html:'Homestead for sale · ask <b>Pell</b>, the land agent', btn:'', fn: () => toast('Pell, standing beside the plot, sells this homestead.')};
-    return {key:'door', html:`${K}Go inside your ${HOME_LEVELS[lvl].name.toLowerCase()}`, btn:'Enter', fn: openHome};
+    return {key:'door', html:`${K}Go inside your ${HOME_LEVELS[lvl].name.toLowerCase()}`, btn:'Enter', fn: () => hinOpen()};
   }
   if (lvl >= 2 && Math.hypot(S.x - (HOME.x + 4.5), S.y - (HOME.y + 3.4)) < 1.4) { const P = S.home.prod; return {key:'barn' + P.milk + P.wool + P.truffle, html:`${K}Barn · ${P.milk} milk · ${P.wool} wool · ${P.truffle} truffles`, btn:'Barn', fn: barnTalk}; }
   if (lvl >= 2 && Math.hypot(S.x - COOP.x, S.y - COOP.y) < 1.3) return {key:'coop' + S.home.eggs + S.home.chickens, html:`${K}Chicken coop · ${S.home.chickens} hens · ${S.home.eggs} eggs`, btn:'Coop', fn: coopTalk};
@@ -16208,7 +16365,7 @@ function openJournal() {
   $('journalSheet').querySelectorAll('[data-title]').forEach(b => b.addEventListener('click', () => { S.title = b.dataset.title; save(); renderHUD(); openJournal(); }));
   $('journal').hidden = false;
 }
-function closeModal(id) { $(id).hidden = true; if (['journal','map','bag','craft','board','home','skills','pause'].includes(mode)) mode = 'play'; promptKey = null; renderHUD(); }
+function closeModal(id) { $(id).hidden = true; if (['journal','map','bag','craft','board','home','skills','pause'].includes(mode)) mode = 'play'; promptKey = null; renderHUD(); hinMaybeBack(); }
 
 const MAPV = {z: 3, cx: 0, cy: 0, vw: 900, vh: 500, fit: 1, drag: null};
 function openMap() {
@@ -17114,6 +17271,7 @@ const ACH = [
   ['sgc_first','Breach!','Knock down a fort with the catapult', () => (S.sgcDone || []).length >= 1],
   ['sgc_all','Siege Engineer','Take all five of Bramwell’s forts', () => (S.sgcDone || []).length >= SGC_LV.length],
   ['dmn_win','Clack Clack','Win a dominoes match against Pilar', () => (S.dmnWins || 0) >= 1],
+  ['home_inside','Make Yourself at Home','Step inside your homestead and look around', () => (S.homeVisits || 0) >= 1],
   ['maz_first','Amazing','Find the fountain in Lady Rosalind’s hedge maze', () => (S.mazWins || 0) >= 1],
   ['maz_great','Heart of the Labyrinth','Solve the great labyrinth', () => (S.mazBeat || 0) >= 3],
   ['maz_roses','Golden Bouquet','Find all three golden roses in one maze', () => (S.mazRoses || 0) >= 3],
@@ -17830,8 +17988,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 49;
+const WN_VER = 50;
 const WHATS_NEW = [
+  ['Walk inside your home', 'Step through your front door to walk around your house, see the furniture you placed, sleep, cook and decorate.'],
   ['Table hockey', 'Breda Stormhand in Stormwatch challenges all comers to table hockey.'],
   ['Soap bubbles', 'Suds McGee in Reedholm needs help popping an overflowing tub of soap bubbles.'],
   ['Cheese tower', 'Mabel Rind in Maplehold needs help building the tallest cheese tower the fair has ever seen.'],
@@ -18180,7 +18339,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {revealAt: (x, y, r) => reveal(x, y, r), get ahk(){return ahk;}, get bub(){return bub;}, bubFire: () => bubFire(), get stk(){return stk;}, get jig(){return jig;}, stkDrop: () => stkDrop(), jigGrab: (x, y) => jigGrab(x, y), jigRelease: () => jigRelease(), get wrd(){return wrd;}, get hen(){return hen;}, wrdType: c => wrdType(c), wrdSubmit: () => wrdSubmit(), get dck(){return dck;}, get bns(){return bns;}, dckHop: (x, y) => dckHop(x, y), get snk(){return snk;}, get mtc(){return mtc;}, snkTurn: d => snkTurn(d), mtcTry: (a, b) => mtcTry(a, b), mtcMatches: g => mtcMatches(g), get bdm(){return bdm;}, get brk(){return brk;}, bdmSwing: () => bdmSwing(), bdmPredict: s => bdmPredict(s), brkLaunch: () => brkLaunch(), get chs(){return chs;}, get cup(){return cup;}, chsPick: (st, l) => chsPick(st, l), chsLegal: st => chsLegal(st), chsClick: q => chsClick(q), cupPick: i => cupPick(i), get chp(){return chp;}, get dye(){return dye;}, chpChop: s => chpChop(s), dyeMix: d => dyeMix(d), dyeAdd: i => dyeAdd(i), get twd(){return twd;}, get mrs(){return mrs;}, twdAct: () => twdAct(), twdSend: () => twdSend(), MRS, mrsDown: () => mrsDown(), mrsUp: () => mrsUp(), get sgc(){return sgc;}, get dmn(){return dmn;}, sgcPress: () => sgcPress(), dmnTry: (i, s) => dmnTry(i, s), dmnPlayable: h => dmnPlayable(h), dmnDrawTile: () => dmnDrawTile(), get maz(){return maz;}, get rft(){return rft;}, mazStep: (x, y) => mazStep(x, y), get jug(){return jug;}, get sdk(){return sdk;}, jugPress: h => jugPress(h), sdkPut: d => sdkPut(d), get kln(){return kln;}, get cdv(){return cdv;}, klnMove: (a, b) => klnMove(a, b), klnAct: h => klnAct(h), get crl(){return crl;}, get gls(){return gls;}, crlSim: (st, sh) => crlSim(st, sh), crlLaunch: (a, p, s) => crlLaunch(a, p, s), crlScore: st => crlScore(st), glsQuality: () => glsQuality(), get cbk(){return cbk;}, get drg(){return drg;}, cbkScore: (a, b) => cbkScore(a, b), drgPick: (b, p, l) => drgPick(b, p, l), drgMoves: (b, p) => drgMoves(b, p), get nono(){return nono;}, get rev(){return rev;}, revPick: (b, p, l) => revPick(b, p, l), revMoves: (b, p) => revMoves(b, p), get spook(){return spook;}, spookStart: () => spookStart(), get skip(){return skip;}, skipThrow: (a, p) => skipThrow(a, p), skipPlan: (a, p) => skipPlan(a, p), get pipe(){return pipe;}, pipeStart: (n, i) => pipeStart(n, i), pipeSolved: () => pipeSolved(), pipeGen: n => pipeGen(n), pipeRot: (m, k) => pipeRot(m, k), get lamp(){return lamp;}, lampSolve: (b, n) => lampSolve(b, n), bagStep: (B, dt) => bagStep(B, dt), BG: {BG_LANE, BGH, BG_SLOTV, BG_PEGS, BG_CUPS, BG_ARC}, get sweep(){return sweep;}, sweepStart: (n, i) => sweepStart(n, i), sweepAct: f => sweepAct(f), sweepCount: (x, y) => sweepCount(sweep, x, y), get bag(){return bag;}, bagShoot: pw => bagShoot(pw), bagNudge: d => bagNudge(d), get crate(){return crate;}, crateStart: (n, i) => crateStart(n, i), crateMove: (x, y) => crateMove(x, y), CRATE_LV, get tiles(){return tiles;}, tileClick: i => tileClick(i), tileMoves: () => tileMoves(), tileShuffle: () => tileShuffle(), tileFreeIn: (a, i) => tileFreeIn(new Set(a), i), TILE_POS, get ice(){return ice;}, iceStart: (n, i) => iceStart(n, i), ICE_PUZ, get axe(){return axe;}, axeAim: A => axeAim(A), get isl(){return isl;}, islTick: () => islTick(0), get islSpots(){return islSpots;}, openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get hin(){return hin;}, homeXY: () => ({x: HOME.x, y: HOME.y}), get gmode(){return mode;}, hinOpen: b => hinOpen(b), hinAct: () => hinAct(), hinTap: (x, y) => hinTap(x, y), revealAt: (x, y, r) => reveal(x, y, r), get ahk(){return ahk;}, get bub(){return bub;}, bubFire: () => bubFire(), get stk(){return stk;}, get jig(){return jig;}, stkDrop: () => stkDrop(), jigGrab: (x, y) => jigGrab(x, y), jigRelease: () => jigRelease(), get wrd(){return wrd;}, get hen(){return hen;}, wrdType: c => wrdType(c), wrdSubmit: () => wrdSubmit(), get dck(){return dck;}, get bns(){return bns;}, dckHop: (x, y) => dckHop(x, y), get snk(){return snk;}, get mtc(){return mtc;}, snkTurn: d => snkTurn(d), mtcTry: (a, b) => mtcTry(a, b), mtcMatches: g => mtcMatches(g), get bdm(){return bdm;}, get brk(){return brk;}, bdmSwing: () => bdmSwing(), bdmPredict: s => bdmPredict(s), brkLaunch: () => brkLaunch(), get chs(){return chs;}, get cup(){return cup;}, chsPick: (st, l) => chsPick(st, l), chsLegal: st => chsLegal(st), chsClick: q => chsClick(q), cupPick: i => cupPick(i), get chp(){return chp;}, get dye(){return dye;}, chpChop: s => chpChop(s), dyeMix: d => dyeMix(d), dyeAdd: i => dyeAdd(i), get twd(){return twd;}, get mrs(){return mrs;}, twdAct: () => twdAct(), twdSend: () => twdSend(), MRS, mrsDown: () => mrsDown(), mrsUp: () => mrsUp(), get sgc(){return sgc;}, get dmn(){return dmn;}, sgcPress: () => sgcPress(), dmnTry: (i, s) => dmnTry(i, s), dmnPlayable: h => dmnPlayable(h), dmnDrawTile: () => dmnDrawTile(), get maz(){return maz;}, get rft(){return rft;}, mazStep: (x, y) => mazStep(x, y), get jug(){return jug;}, get sdk(){return sdk;}, jugPress: h => jugPress(h), sdkPut: d => sdkPut(d), get kln(){return kln;}, get cdv(){return cdv;}, klnMove: (a, b) => klnMove(a, b), klnAct: h => klnAct(h), get crl(){return crl;}, get gls(){return gls;}, crlSim: (st, sh) => crlSim(st, sh), crlLaunch: (a, p, s) => crlLaunch(a, p, s), crlScore: st => crlScore(st), glsQuality: () => glsQuality(), get cbk(){return cbk;}, get drg(){return drg;}, cbkScore: (a, b) => cbkScore(a, b), drgPick: (b, p, l) => drgPick(b, p, l), drgMoves: (b, p) => drgMoves(b, p), get nono(){return nono;}, get rev(){return rev;}, revPick: (b, p, l) => revPick(b, p, l), revMoves: (b, p) => revMoves(b, p), get spook(){return spook;}, spookStart: () => spookStart(), get skip(){return skip;}, skipThrow: (a, p) => skipThrow(a, p), skipPlan: (a, p) => skipPlan(a, p), get pipe(){return pipe;}, pipeStart: (n, i) => pipeStart(n, i), pipeSolved: () => pipeSolved(), pipeGen: n => pipeGen(n), pipeRot: (m, k) => pipeRot(m, k), get lamp(){return lamp;}, lampSolve: (b, n) => lampSolve(b, n), bagStep: (B, dt) => bagStep(B, dt), BG: {BG_LANE, BGH, BG_SLOTV, BG_PEGS, BG_CUPS, BG_ARC}, get sweep(){return sweep;}, sweepStart: (n, i) => sweepStart(n, i), sweepAct: f => sweepAct(f), sweepCount: (x, y) => sweepCount(sweep, x, y), get bag(){return bag;}, bagShoot: pw => bagShoot(pw), bagNudge: d => bagNudge(d), get crate(){return crate;}, crateStart: (n, i) => crateStart(n, i), crateMove: (x, y) => crateMove(x, y), CRATE_LV, get tiles(){return tiles;}, tileClick: i => tileClick(i), tileMoves: () => tileMoves(), tileShuffle: () => tileShuffle(), tileFreeIn: (a, i) => tileFreeIn(new Set(a), i), TILE_POS, get ice(){return ice;}, iceStart: (n, i) => iceStart(n, i), ICE_PUZ, get axe(){return axe;}, axeAim: A => axeAim(A), get isl(){return isl;}, islTick: () => islTick(0), get islSpots(){return islSpots;}, openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
