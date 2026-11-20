@@ -278,7 +278,7 @@ const ENEMIES={
   warden:{hp:7000,spd:55,dmg:11,r:64,mats:60,col:'#6b5444',dark:'#2e2219',heavy:true,isBoss:true},
   wraith:{hp:6800,spd:95,dmg:9,r:58,mats:60,col:'#e8e0ff',dark:'#8a8090',heavy:true,isBoss:true},
   hqueen:{hp:7600,spd:80,dmg:10,r:62,mats:60,col:'#ffc21f',dark:'#9a6f00',heavy:true,isBoss:true},
-  wmother:{hp:7400,spd:85,dmg:10,r:60,mats:60,col:'#6b5444',dark:'#2e2219',heavy:true,isBoss:true},
+  wmother:{hp:8200,spd:85,dmg:10,r:60,mats:60,col:'#6b5444',dark:'#2e2219',heavy:true,isBoss:true},
   fortress:{hp:7200,spd:45,dmg:10,r:60,mats:60,col:'#f2eef0',dark:'#8a8090',heavy:true,isBoss:true},
   rampager:{hp:7400,spd:72,dmg:10,r:62,mats:60,col:'#ff4d6d',dark:'#9c1f37',heavy:true,isBoss:true},
   watcher:{hp:7200,spd:45,dmg:10,r:60,mats:60,col:'#45d6e8',dark:'#1d7584',heavy:true,isBoss:true},
@@ -1020,22 +1020,22 @@ function hqueenAI(e,dt,nx,ny,d){
 function wmotherAI(e,dt,nx,ny,d){
   const ph2=e.hp<e.maxHp*.5; e.stT-=dt; let mx=0,my=0; const cycle=['weave','pounce','silk','pounce','summon'];
   switch(e.st){
-    case 'chase':{const sd=e.wob>Math.PI?1:-1;if(d>280){mx=nx*e.spd;my=ny*e.spd}else{mx=-ny*e.spd*.7*sd;my=nx*e.spd*.7*sd}
+    case 'chase':{const sd=e.wob>Math.PI?1:-1;if(d>200){mx=nx*e.spd;my=ny*e.spd}else{mx=-ny*e.spd*.7*sd;my=nx*e.spd*.7*sd}
       if(e.stT<=0){e.st=cycle[e.phaseIdx++%cycle.length];
-        if(e.st==='weave'){const k=ph2?8:6;for(let i=0;i<k;i++){const x=i?P.x+rand(-200,200):P.x,y=i?P.y+rand(-150,150):P.y;webs.push({dmg:5,x:clamp(x,40,AW-40),y:clamp(y,40,AH-40),sx:e.x,sy:e.y,t:-i*.09,land:.8,life:6.5,r:58,rot:rand(0,TAU)})}e.stT=1.3;e.sq=1;sfx('lob')}
-        else if(e.st==='pounce'){e.n=ph2?2:1;e.ph='crouch';e.stT=.5;e.tx=P.x;e.ty=P.y;fx.push({k:'ring',x:e.tx,y:e.ty,r0:90,r1:25,t:0,life:1.1,c:'#ff3b5c',w:4});sfx('fuse')}
-        else if(e.st==='silk'){e.stT=1.5;e.volT=.1}else e.stT=.9}
+        if(e.st==='weave'){const k=ph2?8:6;for(let i=0;i<k;i++){const x=i?P.x+rand(-200,200):P.x,y=i?P.y+rand(-150,150):P.y;webs.push({dmg:7,x:clamp(x,40,AW-40),y:clamp(y,40,AH-40),sx:e.x,sy:e.y,t:-i*.09,land:.8,life:6.5,r:58,rot:rand(0,TAU)})}e.stT=1.3;e.sq=1;sfx('lob')}
+        else if(e.st==='pounce'){e.n=ph2?3:2;e.ph='crouch';e.stT=.5;e.tx=P.x;e.ty=P.y;fx.push({k:'ring',x:e.tx,y:e.ty,r0:90,r1:25,t:0,life:1.1,c:'#ff3b5c',w:4});sfx('fuse')}
+        else if(e.st==='silk'){e.stT=2;e.volT=.1}else e.stT=.9}
       break}
     case 'weave': if(e.stT<=0){e.st='chase';e.stT=1.6} break;
     case 'pounce':
       if(e.ph==='crouch'){e.shk=1;if(e.stT<=0){e.shk=0;e.ph='air';e.stT=0;e.hx0=e.x;e.hy0=e.y}}
       else{e.stT+=dt;const p=Math.min(1,e.stT/.6);e.x=lerp(e.hx0,e.tx,p);e.y=lerp(e.hy0,e.ty,p);e.z=Math.sin(p*Math.PI)*120;e.kx=e.ky=0;
-        if(p>=1){e.z=0;e.sq=1;shake=16;sfx('boom');rings.push({x:e.x,y:e.y,r:e.r,max:280,spd:300,w:18,dmg:Math.round(e.dmg*.7),hit:false});fx.push({k:'ring',x:e.x,y:e.y,r0:20,r1:150,t:0,life:.35,c:'#a09080',w:8});
+        if(p>=1){e.z=0;e.sq=1;shake=16;sfx('boom');rings.push({x:e.x,y:e.y,r:e.r,max:280,spd:300,w:18,dmg:Math.round(e.dmg*.7),hit:false});ring(e,ph2?14:10,210,8,7,'#f4f0ff',rand(0,1));fx.push({k:'ring',x:e.x,y:e.y,r0:20,r1:150,t:0,life:.35,c:'#a09080',w:8});
           parts.push({x:e.x,y:e.y+e.r*.5,vx:0,vy:0,t:0,life:.45,img:'fx_puff',col:'#a09080',s0:40,s1:130,rot:rand(0,TAU),a0:.6});
           if(state==='wave'&&Math.hypot(P.x-e.x,P.y-e.y)<e.r+P.r+10)hurtPlayer(e.dmg+4,e);
           if(--e.n>0){e.ph='crouch';e.stT=.5;e.tx=P.x;e.ty=P.y;fx.push({k:'ring',x:e.tx,y:e.ty,r0:90,r1:25,t:0,life:1.2,c:'#ff3b5c',w:4})}else{e.st='chase';e.stT=1.6}}}
       return[0,0];
-    case 'silk': e.volT-=dt; if(e.volT<=0){e.volT=.38;fan(e,ph2?7:5,.2,350,8,8,'#f4f0ff');sfx('zap');e.sq=1} if(e.stT<=0){e.st='chase';e.stT=1.6} break;
+    case 'silk': e.volT-=dt; if(e.volT<=0){e.volT=.3;fan(e,ph2?7:5,.2,350,8,8,'#f4f0ff');sfx('zap');e.sq=1} if(e.stT<=0){e.st='chase';e.stT=1.6} break;
     case 'summon': if(e.stT<=0){const k=ph2?5:4;for(let i=0;i<k;i++){const a=i/k*TAU;queueSpawn(i%2?'thief':i===4?'grub':'webber',clamp(e.x+Math.cos(a)*140,40,AW-40),clamp(e.y+Math.sin(a)*140,40,AH-40),false,.6)}e.st='chase';e.stT=2;sfx('roar')} break;
   }
   return[mx,my];
