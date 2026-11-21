@@ -365,12 +365,14 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   <button id="rollBtn" class="tbtn" hidden>Roll</button>
 </div>
 
+<div id="worldLoad" style="position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:#0d131b;color:#ebe4d3;font:18px 'Pixelify Sans',monospace;letter-spacing:.04em">Shaping the world…</div>
 <script>
-(() => {
+setTimeout(() => {
 'use strict';
 
 /* ================= constants & data ================= */
-const WS = 3; // the world is laid out in design tiles; each design tile is WS×WS world tiles
+const WS = 10, NEAR_K = Math.max(1, WS/2); // NEAR_K widens searches for coast and water around towns
+// the world is laid out in design tiles; each design tile is WS×WS world tiles
 const WORLD_H = 250*WS, BAND_DY = WORLD_H - 250; // interiors (dungeons, mines, vaults) sit in a band below the overworld
 const OLD_W = 360*WS;
 const EAST_W = 520*WS, FAR_W = 680*WS, RIM_W = 840*WS;
@@ -1599,7 +1601,7 @@ function islFindSpots() {
 function islRedraw(x, y) {
   for (let cy = Math.floor((y - 1)/CH); cy <= Math.floor((y + ISL_H + 1)/CH); cy++) for (let cx = Math.floor((x - 1)/CH); cx <= Math.floor((x + ISL_W + 1)/CH); cx++) {
     const o = chunks[cy] && chunks[cy][cx]; if (o) { o.width = o.height = 0; chunks[cy][cx] = null; } }
-  mapCtx.putImageData(mapImg, 0, 0, x - 2, y - 2, ISL_W + 5, ISL_H + 5);
+  mapPut(x - 2, y - 2, ISL_W + 5, ISL_H + 5);
 }
 function islPick(wk) {
   const n = islSpots.length, h = w => (Math.imul((w + 11) ^ 0x5bd1e995, 2654435761) >>> 0) % n;
@@ -1617,7 +1619,7 @@ function islApply() {
 }
 function islRemove() {
   const o = isl; isl = null;
-  for (const [i, t] of o.orig) { map[i] = t; if (S.explored[i]) revealMapPixel(i); else { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; } }
+  for (const [i, t] of o.orig) { map[i] = t; if (S.explored[i]) revealMapPixel(i); else mapCol[i] = 0; }
   islRedraw(o.x, o.y);
 }
 function islNearTown() { let best = null, bd = 1e9; for (const k in TOWNS) { const d = Math.hypot(TOWNS[k].x - isl.x, TOWNS[k].y - isl.y); if (d < bd) { bd = d; best = k; } } return best; }
@@ -2964,6 +2966,18 @@ const nodes = [];
 const nodeGrid = new Int32Array(W*H).fill(-1);
 let spawn = {x:0,y:0};
 
+// fine detail for the land: noise that repeats every 256 tiles, worked out once (the big shapes never repeat, so the repeat doesn't show)
+function pvnoise(x, y, s, P) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf*xf*(3 - 2*xf), v = yf*yf*(3 - 2*yf), m = k => ((k % P) + P) % P;
+  const a = hash2(m(xi), m(yi), s), b = hash2(m(xi + 1), m(yi), s), c = hash2(m(xi), m(yi + 1), s), d = hash2(m(xi + 1), m(yi + 1), s);
+  return a + (b - a)*u + (c - a)*v + (a - b - c + d)*u*v;
+}
+const DETAIL = (() => { const e = new Float32Array(65536), m = new Float32Array(65536), b = new Float32Array(65536);
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const i = y*256 + x;
+    e[i] = (pvnoise(x/8, y/8, SEED+201, 32)*.67 + pvnoise(x/4, y/4, SEED+218, 64)*.33 - .5)*.1;
+    m[i] = (pvnoise(x/8, y/8, SEED+202, 32)*.67 + pvnoise(x/4, y/4, SEED+219, 64)*.33 - .5)*.12;
+    b[i] = (pvnoise(x/16, y/16, SEED+229, 16)*.45 + pvnoise(x/8, y/8, SEED+230, 32)*.35 + pvnoise(x/4, y/4, SEED+231, 64)*.2 - .5)*.5; }
+  return {e, m, b}; })();
 function genTerrain() {
   // the shape of the land is designed at one design tile per WS world tiles: work its fields out on that coarse grid, then blend them up
   const Wc = W/WS + 1, Hc = WORLD_H/WS + 1, NF = 15, F = new Float32Array(Wc*Hc*NF), coldY = new Float32Array(Wc);
@@ -3006,14 +3020,15 @@ function genTerrain() {
     const fx = Math.min(Wc - 1.0001, (x + .5)/WS), fy = Math.min(Hc - 1.0001, (y + .5)/WS), x0 = fx|0, y0 = fy|0, ax = fx - x0, ay = fy - y0;
     const o00 = (y0*Wc + x0)*NF, o10 = o00 + NF, o01 = o00 + Wc*NF, o11 = o01 + NF, w00 = (1 - ax)*(1 - ay), w10 = ax*(1 - ay), w01 = (1 - ax)*ay, w11 = ax*ay;
     const f = k => F[o00 + k]*w00 + F[o10 + k]*w10 + F[o01 + k]*w01 + F[o11 + k]*w11;
-    const e = f(0) + (vnoise(x/9, y/9, SEED+201)*.67 + vnoise(x/4.5, y/4.5, SEED+218)*.33 - .5)*.1, m = f(1) + (vnoise(x/8 + 40, y/8, SEED+202)*.67 + vnoise(x/4 + 80, y/4, SEED+219)*.33 - .5)*.12;
-    const bw = (vnoise(x/16, y/16, SEED+229)*.45 + vnoise(x/7, y/7, SEED+230)*.35 + vnoise(x/3.5, y/3.5, SEED+231)*.2 - .5)*.5;
+    const di = ((y & 255) << 8) | (x & 255), e = F[o00]*w00 + F[o10]*w10 + F[o01]*w01 + F[o11]*w11 + DETAIL.e[di];
+    let t;
+    if (e < .45) t = e < .40 ? T.DEEP : T.SHAL;
+    else {
+    const m = f(1) + DETAIL.m[di];
+    const bw = DETAIL.b[di];
     const volc = f(2) + bw, gloom = f(3) + bw, jungle = f(4) + bw, mesa = f(5) + bw, moor = f(6) + bw, blossom = f(7) + bw, savanna = f(8) + bw, maple = f(9) + bw, ruins = f(10) + bw, shroom = f(11) + bw, shimmer = f(12) + bw, redwood = f(13) + bw, bamboo = f(14) + bw;
     const cold = fy < coldY[x0]*(1 - ax) + coldY[x0 + 1]*ax;
-    let t;
-    if (e < .40) t = T.DEEP;
-    else if (e < .45) t = T.SHAL;
-    else if (e < .48) t = cold ? T.SNOW : T.SAND;
+    if (e < .48) t = cold ? T.SNOW : T.SAND;
     else if (e > .97) t = T.MOUNT;
     else if (e > .87) t = cold ? T.SNOW : T.HILL;
     else if (cold) t = T.SNOW;
@@ -3034,9 +3049,10 @@ function genTerrain() {
     if (shroom > .36 && (t === T.GRASS || t === T.FOREST || t === T.MARSH || t === T.DUNE)) t = T.SHROOM;
     if (bamboo > .36 && (t === T.GRASS || t === T.FOREST || t === T.MARSH || t === T.DUNE)) t = T.BAMBOO;
     if (ruins > .38 && (t === T.GRASS || t === T.DUNE || t === T.SAND || t === T.HILL || t === T.FOREST || t === T.MARSH)) t = T.RUINS;
-    const di = Math.hypot(x-ISLE.x, y-ISLE.y);
-    if (di < ISLE.land) t = di > ISLE.land-1.6 ? T.SAND : (hash2(x,y,5) > .7 ? T.FOREST : T.GRASS);
-    else if (di < ISLE.ring) t = T.DEEP;
+    }
+    const iX = x - ISLE.x, iY = y - ISLE.y, dI2 = iX*iX + iY*iY, dI = dI2 < ISLE.ring*ISLE.ring ? Math.sqrt(dI2) : 1e9;
+    if (dI < ISLE.land) t = dI > ISLE.land-1.6 ? T.SAND : (hash2(x,y,5) > .7 ? T.FOREST : T.GRASS);
+    else if (dI < ISLE.ring) t = T.DEEP;
     map[idx(x,y)] = t;
   }
 }
@@ -3107,10 +3123,10 @@ function genWorld() {
     for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => Math.hypot(a - x, b - y) < 1.9)) { n.x = x + .5; n.y = y + .8; break; } } }
   for (const n of NPCS) {
     if (n.wander && !npcWalkable(n.x, n.y)) { n.x = TOWNS[n.town].x + .5; n.y = TOWNS[n.town].y + 2.8; }
-    if (n.cove) { const tw = TOWNS[n.town]; let best = null, bd = 1e9; for (let dy = -16; dy <= 16; dy++) for (let dx = -16; dx <= 16; dx++) { const x = tw.x + dx, y = tw.y + dy; if (!inB(x, y)) continue; const t = map[idx(x, y)], d = Math.hypot(dx, dy); if (t === T.SAND && d > 9 && reach[idx(x, y)] && [[1,0],[-1,0],[0,1],[0,-1]].some(([a, b]) => map[idx(x + a, y + b)] === T.SHAL || map[idx(x + a, y + b)] === T.DEEP) && d < bd) { bd = d; best = {x, y}; } } if (best) { n.x = best.x + .5; n.y = best.y + .8; } }
+    if (n.cove) { const tw = TOWNS[n.town], CR = Math.round(16*NEAR_K); let best = null, bd = 1e9; for (let dy = -CR; dy <= CR; dy++) for (let dx = -CR; dx <= CR; dx++) { const x = tw.x + dx, y = tw.y + dy; if (!inB(x, y)) continue; const t = map[idx(x, y)], d = Math.hypot(dx, dy); if (t === T.SAND && d > 9 && reach[idx(x, y)] && [[1,0],[-1,0],[0,1],[0,-1]].some(([a, b]) => map[idx(x + a, y + b)] === T.SHAL || map[idx(x + a, y + b)] === T.DEEP) && d < bd) { bd = d; best = {x, y}; } } if (best) { n.x = best.x + .5; n.y = best.y + .8; } }
     if (n.travel) { n.path = ROAD_PATHS[n.travel[0] + '_' + n.travel[1]] || []; n.pi = Math.floor(n.path.length * (.2 + hash2(n.path.length, 3, 9)*.6)); n.dir = 1; if (n.path.length) { n.x = n.path[n.pi] % W + .5; n.y = ((n.path[n.pi] / W) | 0) + .8; } }
   }
-  placeNodes();
+  placeNodes(); flood.q = null;
 }
 
 function placeNodes() {
@@ -3120,11 +3136,12 @@ function placeNodes() {
   const keepClear = new Uint8Array(W*H), stamp = (cx, cy, r) => { for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) if (inB(x, y) && Math.hypot(x - cx, y - cy) < r) keepClear[idx(x, y)] = 1; };
   for (const k in TOWNS) stamp(TOWNS[k].x, TOWNS[k].y, TOWNS[k].small ? 4.5 : 7);
   stamp(HOME.x, HOME.y, 9);
+  for (const i of blocked) keepClear[i] = 1; for (const i of ESTATE_CLEAR) keepClear[i] = 1;
   for (const sh of SHRINES) for (let y = sh.y - 3; y <= sh.y + 3; y++) for (let x = sh.x - 3; x <= sh.x + 3; x++) if (inB(x, y)) keepClear[idx(x, y)] = 1;
   for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) {
     const i = idx(x,y), t = map[i];
-    if (keepClear[i] || blocked.has(i) || ESTATE_CLEAR.has(i)) continue;
-    const r = hash2(x, y, 77), nearMt = near(x,y,T.MOUNT), silverLand = Math.hypot(x - 150*WS, y - 95*WS) < 34*WS;
+    if (keepClear[i]) continue;
+    const r = hash2(x, y, 77), nearMt = (t === T.HILL || t === T.SNOW || t === T.MESA) && near(x,y,T.MOUNT), silverLand = Math.hypot(x - 150*WS, y - 95*WS) < 34*WS;
     let type = null;
     switch (t) {
       case T.FOREST: type = r < .035 ? 'branch' : r < .075 ? 'oak' : r < .10 ? 'bush' : r < .115 ? 'herb' : r < .123 ? 'hive' : r < .132 ? 'appletree' : null; break;
@@ -3177,12 +3194,35 @@ function roadPath(sx, sy, gx, gy, cost) {
   // coarse plan: one cell per design tile, priced by the world tile at its middle
   const Wc = Math.ceil(W/WS), Hc = Math.ceil(H/WS), cc = i => { const x = (i % Wc)*WS + 1, y = ((i / Wc) | 0)*WS + 1; return x < W && y < H ? cost(idx(x, y)) : Infinity; };
   const plan = astar(Math.floor(sx/WS), Math.floor(sy/WS), Math.floor(gx/WS), Math.floor(gy/WS), cc, Wc, Hc);
-  if (plan.length < 2) return astar(sx, sy, gx, gy, cost);
-  const band = new Set(), R = WS*2;
-  for (const c of plan) { const cx = (c % Wc)*WS + 1, cy = ((c / Wc) | 0)*WS + 1; for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (inB(cx + dx, cy + dy)) band.add(idx(cx + dx, cy + dy)); }
-  band.add(idx(sx, sy)); band.add(idx(gx, gy));
-  const fine = astar(sx, sy, gx, gy, i => band.has(i) ? cost(i) : Infinity);
-  return fine.length > 1 && fine[fine.length - 1] === idx(sx, sy) ? fine : astar(sx, sy, gx, gy, cost);
+  if (plan.length < 2) return [];
+  for (const R of [WS + 3, WS*3]) {
+    const band = new Set(), h = Math.floor(WS/2);
+    for (const c of plan) { const cx = (c % Wc)*WS + h, cy = ((c / Wc) | 0)*WS + h; for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (inB(cx + dx, cy + dy)) band.add(idx(cx + dx, cy + dy)); }
+    band.add(idx(sx, sy)); band.add(idx(gx, gy));
+    const fine = astarSparse(sx, sy, gx, gy, i => band.has(i) ? cost(i) : Infinity);
+    if (fine.length > 1) return fine;
+  }
+  return [];
+}
+function astarSparse(sx, sy, gx, gy, cost) {
+  const g = new Map(), came = new Map(), closed = new Set(), hf = [], hi = [];
+  const push = (f,i) => { hf.push(f); hi.push(i); let c = hf.length-1; while (c > 0) { const p = (c-1)>>1; if (hf[p] <= hf[c]) break; [hf[p],hf[c]] = [hf[c],hf[p]]; [hi[p],hi[c]] = [hi[c],hi[p]]; c = p; } };
+  const pop = () => { const top = hi[0], lf = hf.pop(), li = hi.pop(); if (hf.length) { hf[0] = lf; hi[0] = li; let c = 0; for (;;) { const l = 2*c+1, r = l+1; let m = c; if (l < hf.length && hf[l] < hf[m]) m = l; if (r < hf.length && hf[r] < hf[m]) m = r; if (m === c) break; [hf[m],hf[c]] = [hf[c],hf[m]]; [hi[m],hi[c]] = [hi[c],hi[m]]; c = m; } } return top; };
+  const s0 = idx(sx, sy), goal = idx(gx, gy); g.set(s0, 0); push(0, s0); let found = false;
+  while (hf.length) {
+    const cur = pop(); if (cur === goal) { found = true; break; }
+    if (closed.has(cur)) continue; closed.add(cur);
+    const cx = cur % W, cy = (cur / W) | 0, gc = g.get(cur);
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = cx + dx, ny = cy + dy; if (!inB(nx, ny)) continue;
+      const ni = idx(nx, ny); if (closed.has(ni)) continue;
+      const c = cost(ni); if (!isFinite(c)) continue;
+      const ng = gc + c, og = g.get(ni);
+      if (og === undefined || ng < og) { g.set(ni, ng); came.set(ni, cur); push(ng + (Math.abs(nx-gx) + Math.abs(ny-gy))*.45, ni); }
+    }
+  }
+  if (!found) return [];
+  const out = []; let c = goal; while (c !== undefined) { out.push(c); c = came.get(c); } return out;
 }
 let ASTAR_BUF = null;
 function astar(sx, sy, gx, gy, cost, GW = W, GH = H) {
@@ -3217,20 +3257,32 @@ function walkable(t, raft, climb) {
   return true;
 }
 function flood(sx, sy, raft, climb) {
-  const seen = new Uint8Array(W*H), q = new Int32Array(W*H); let qn = 0; q[qn++] = idx(sx,sy); seen[q[0]] = 1;
+  const seen = new Uint8Array(W*H); if (!flood.q) flood.q = new Int32Array(W*H); const q = flood.q; let qn = 0; q[qn++] = idx(sx,sy); seen[q[0]] = 1;
+  const ok = new Uint8Array(256); for (let t = 0; t < 256; t++) ok[t] = walkable(t, raft, climb) ? 1 : 0;
   while (qn) {
-    const c = q[--qn], x = c % W, y = (c / W) | 0;
-    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-      const nx = x+dx, ny = y+dy; if (!inB(nx,ny)) continue;
-      const ni = idx(nx,ny); if (seen[ni] || !walkable(map[ni], raft, climb)) continue;
-      seen[ni] = 1; q[qn++] = ni;
-    }
+    const c = q[--qn], x = c % W;
+    let ni = c + 1; if (x < W - 1 && !seen[ni] && ok[map[ni]]) { seen[ni] = 1; q[qn++] = ni; }
+    ni = c - 1; if (x > 0 && !seen[ni] && ok[map[ni]]) { seen[ni] = 1; q[qn++] = ni; }
+    ni = c + W; if (ni < W*H && !seen[ni] && ok[map[ni]]) { seen[ni] = 1; q[qn++] = ni; }
+    ni = c - W; if (ni >= 0 && !seen[ni] && ok[map[ni]]) { seen[ni] = 1; q[qn++] = ni; }
   }
   return seen;
 }
 
 /* ================= terrain pre-render (chunked) ================= */
-let chunks = [], mapCanvas, mapCtx, mapImg;
+let chunks = [], mapStrips = [], mapCol = null;
+const MAP_SW = 2048; let MAP_PAL = null;
+function mapPut(x, y, w, h) { // copy part of mapCol onto the strip canvases
+  const x0 = Math.max(0, Math.floor(x)), y0 = Math.max(0, Math.floor(y)), x1 = Math.min(W, Math.ceil(x + w)), y1 = Math.min(H, Math.ceil(y + h)); if (x1 <= x0 || y1 <= y0) return;
+  for (const st of mapStrips) { const a = Math.max(x0, st.x0), b = Math.min(x1, st.x0 + st.w); if (b <= a) continue;
+    const img = st.g.createImageData(b - a, y1 - y0), d = img.data; let o = 0;
+    for (let yy = y0; yy < y1; yy++) for (let xx = a; xx < b; xx++) { const c = MAP_PAL[mapCol[yy*W + xx]]; d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = 255; o += 4; }
+    st.g.putImageData(img, a - st.x0, y0); }
+}
+function mapDraw(g, sx, sy, sw, sh, dx, dy, dw, dh) { // drawImage of the map, across strips
+  const kx = dw/sw;
+  for (const st of mapStrips) { const a = Math.max(sx, st.x0), b = Math.min(sx + sw, st.x0 + st.w); if (b <= a) continue; g.drawImage(st.c, a - st.x0, sy, b - a, sh, dx + (a - sx)*kx, dy, (b - a)*kx, dh); }
+}
 const rgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
 const TILE_RGB = TILE_COL.map(rgb);
 const CW = Math.ceil(W/CH), CHH = Math.ceil(H/CH);
@@ -3341,9 +3393,10 @@ const getChunk = (cx, cy) => { const c = chunks[cy][cx] || buildChunk(cx, cy); c
 function renderTerrain() {
   for (const [x, y] of chunkLive) { const o = chunks[y] && chunks[y][x]; if (o) o.width = o.height = 0; }
   chunks = Array.from({length: CHH}, () => Array(CW).fill(null)); chunkLive = [];
-  mapCanvas = document.createElement('canvas'); mapCanvas.width = W; mapCanvas.height = H;
-  mapCtx = mapCanvas.getContext('2d'); mapImg = mapCtx.createImageData(W, H);
-  for (let i = 0; i < W*H; i++) { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; mapImg.data[i*4+3] = 255; }
+  for (const st of mapStrips) st.c.width = st.c.height = 0;
+  mapStrips = []; mapCol = new Uint8Array(W*H);
+  if (!MAP_PAL) { MAP_PAL = [[14,18,25]]; for (let t = 0; t < 254; t++) MAP_PAL.push(TILE_RGB[t] || [14,18,25]); MAP_PAL[255] = [120,80,60]; }
+  for (let x0 = 0; x0 < W; x0 += MAP_SW) { const c = document.createElement('canvas'); c.width = Math.min(MAP_SW, W - x0); c.height = H; const g = c.getContext('2d'); g.fillStyle = '#0e1219'; g.fillRect(0, 0, c.width, c.height); mapStrips.push({c, g, x0, w: c.width}); }
 }
 function drawHouse(g, px, py, roof) {
   g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px+3, py+28, 28, 4);
@@ -3425,8 +3478,7 @@ function drawAnvil(g, px, py) {
   g.fillStyle = '#6a6a74'; g.fillRect(px+3, py+6, 10, 1);
 }
 function revealMapPixel(i) {
-  const t = map[i], c = t === T.HOUSE ? [120,80,60] : TILE_RGB[t];
-  mapImg.data[i*4] = c[0]; mapImg.data[i*4+1] = c[1]; mapImg.data[i*4+2] = c[2];
+  const t = map[i]; mapCol[i] = t === T.HOUSE ? 255 : t + 1;
 }
 
 /* ================= game state ================= */
@@ -3468,11 +3520,12 @@ function serialize() {
   rle += run;
   return JSON.stringify({...S, explored: undefined, ex0: ex[0], rle, mapW: W, mapH: H, ws: WS});
 }
-const WS_SKIP = new Set(['room', 'look', 'inv', 'chest', 'npc', 'known', 'skills', 'equip', 'achievements', 'home', 'rep', 'contracts', 'cbase', 'flags', 'found', 'towns', 'killsBy', 'bosses', 'board', 'curios', 'curiosShown', 'stash']);
+const WS_SKIP = new Set(['explored', 'depleted', 'room', 'look', 'inv', 'chest', 'npc', 'known', 'skills', 'equip', 'achievements', 'home', 'rep', 'contracts', 'cbase', 'flags', 'found', 'towns', 'killsBy', 'bosses', 'board', 'curios', 'curiosShown', 'stash']);
 function wsGrowSave(s, k, oWH) {
-  const fix = (o, a, b) => { if (o[b] >= oWH) o[b] += WORLD_H - oWH; else if (o[a] >= 0) { o[a] *= k; o[b] *= k; } };
+  const sc = v => Number.isInteger(v) ? Math.round(v*k) : v*k; // whole tiles stay whole
+  const fix = (o, a, b) => { if (o[b] >= oWH) o[b] += WORLD_H - oWH; else if (o[a] >= 0) { o[a] = sc(o[a]); o[b] = sc(o[b]); } };
   const walk = (v, d) => {
-    if (!v || typeof v !== 'object' || d > 6) return;
+    if (!v || typeof v !== 'object' || d > 6 || ArrayBuffer.isView(v)) return;
     if (Array.isArray(v)) { for (const e of v) walk(e, d + 1); return; }
     if (typeof v.x === 'number' && typeof v.y === 'number') fix(v, 'x', 'y');
     if (typeof v.tx === 'number' && typeof v.ty === 'number') fix(v, 'tx', 'ty');
@@ -3652,14 +3705,14 @@ function reveal(cx, cy, r) {
       const i = idx(x,y);
       if (!S.explored[i]) { S.explored[i] = 1; revealMapPixel(i); changed = true; }
     }
-  if (changed) mapCtx.putImageData(mapImg, 0, 0, x0, y0, Math.ceil(r*2) + 2, Math.ceil(r*2) + 2);
+  if (changed) mapPut(x0, y0, Math.ceil(r*2) + 2, Math.ceil(r*2) + 2);
 }
 function rebuildMapPixels() {
-  for (let i = 0; i < W*H; i++) if (S.explored[i]) revealMapPixel(i); else { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; }
-  mapCtx.putImageData(mapImg, 0, 0);
+  for (let i = 0; i < W*H; i++) if (S.explored[i]) revealMapPixel(i); else mapCol[i] = 0;
+  mapPut(0, 0, W, H);
 }
 let exploredMemo = {t: -1e9, s: null, v: 0};
-const exploredPct = () => { const now = performance.now(); if (exploredMemo.s === S && now - exploredMemo.t < 2000) return exploredMemo.v; let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP && !(isl && isl.set.has(i))) { land++; if (S.explored[i]) seen++; } } exploredMemo = {t: now, s: S, v: Math.round(seen/land*100)}; return exploredMemo.v; };
+const exploredPct = () => { const now = performance.now(); if (exploredMemo.s === S && now - exploredMemo.t < 10000) return exploredMemo.v; let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP && !(isl && isl.set.has(i))) { land++; if (S.explored[i]) seen++; } } exploredMemo = {t: now, s: S, v: Math.round(seen/land*100)}; return exploredMemo.v; };
 const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('spyglass') ? 1.5 : 0) + conHas('owl') + (S.pet === 'clockwork_owl' ? 2.5 : 0) + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
@@ -9496,9 +9549,9 @@ function bellTalk(n) {
   const W = S.sb, H = TOWNS.tidewatch;
   if (!W) {
     const pieces = []; let pier = null;
-    for (let k = 0; k < 6000 && pieces.length < 3; k++) { const a = Math.random()*6.283, r = 15 + Math.random()*40, x = Math.floor(H.x + Math.cos(a)*r), y = Math.floor(H.y + Math.sin(a)*r);
+    for (let k = 0; k < 6000 && pieces.length < 3; k++) { const a = Math.random()*6.283, r = (15 + Math.random()*40)*NEAR_K, x = Math.floor(H.x + Math.cos(a)*r), y = Math.floor(H.y + Math.sin(a)*r);
       if (!inB(x, y) || !coastal(x, y) || !passable(x + .5, y + .5) || townAt(x, y, 8) || pieces.some(q => Math.hypot(q.x - x, q.y - y) < 10)) continue; pieces.push({x: x + .5, y: y + .5}); }
-    for (let r = 6; r < 25 && !pier; r++) for (let a = 0; a < 24; a++) { const x = Math.floor(H.x + Math.cos(a/24*6.283)*r), y = Math.floor(H.y + Math.sin(a/24*6.283)*r); if (inB(x, y) && coastal(x, y) && passable(x + .5, y + .5)) { pier = {x: x + .5, y: y + .5}; break; } }
+    for (let r = 6; r < 25*NEAR_K && !pier; r++) { const na = Math.max(24, Math.ceil(r*6.3)); for (let a = 0; a < na; a++) { const x = Math.floor(H.x + Math.cos(a/na*6.283)*r), y = Math.floor(H.y + Math.sin(a/na*6.283)*r); if (inB(x, y) && coastal(x, y) && passable(x + .5, y + .5)) { pier = {x: x + .5, y: y + .5}; break; } } }
     if (pieces.length < 3 || !pier) { say('“The tide is high today. Come back another time, dear.”', [back(n)]); return; }
     const names = [['crown', 'Bell Crown', 'The top of the bell, crusted with barnacles.'], ['lip', 'Bell Lip', 'A curved bronze rim, still faintly ringing.'], ['clapper', 'Bell Clapper', 'The heavy iron tongue of the bell.']];
     S.sb = {step: 1, pieces: pieces.map((q, i) => ({...q, k: names[i][0], name: names[i][1], desc: names[i][2], got: false})), pier}; save();
@@ -10521,7 +10574,7 @@ function regattaTalk(n) {
 }
 function startRegatta(n) {
   let start = null; const T0 = TOWNS[n.town];
-  for (let r = 3; r < 20 && !start; r++) for (let a = 0; a < 16 && !start; a++) { const x = Math.floor(T0.x + Math.cos(a/16*6.283)*r), y = Math.floor(T0.y + Math.sin(a/16*6.283)*r); if (inB(x, y) && map[idx(x, y)] === T.DEEP) start = {x: x + .5, y: y + .5}; }
+  for (let r = 3; r < 20*NEAR_K && !start; r++) { const na = Math.max(16, Math.ceil(r*6.3)); for (let a = 0; a < na && !start; a++) { const x = Math.floor(T0.x + Math.cos(a/na*6.283)*r), y = Math.floor(T0.y + Math.sin(a/na*6.283)*r); if (inB(x, y) && map[idx(x, y)] === T.DEEP) start = {x: x + .5, y: y + .5}; } }
   if (!start) { toast('No open water nearby for a regatta.'); return; }
   const buoys = []; let px = start.x, py = start.y, ang = Math.random()*6.283;
   for (let k = 0; k < 6; k++) { let ok = false; for (let t = 0; t < 40 && !ok; t++) { const a = ang + (Math.random() - .5)*2.2, d = 7 + Math.random()*4, x = px + Math.cos(a)*d, y = py + Math.sin(a)*d; if (!inB(Math.floor(x), Math.floor(y)) || map[idx(Math.floor(x), Math.floor(y))] !== T.DEEP) continue; buoys.push({x, y}); px = x; py = y; ang = a; ok = true; } if (!ok) break; }
@@ -13619,7 +13672,7 @@ function drawMini() {
   g.imageSmoothingEnabled = false;
   g.fillStyle = '#0d131b'; g.fillRect(0, 0, m.width, m.height);
   const sx = Math.round(S.x - span/2), sy = Math.round(S.y - span/2), s = m.width/span;
-  g.drawImage(mapCanvas, sx, sy, span, span, 0, 0, m.width, m.height);
+  mapDraw(g, sx, sy, span, span, 0, 0, m.width, m.height);
   for (const k in TOWNS) if (S.towns[k]) { const t = TOWNS[k]; g.fillStyle = '#e3a948'; g.fillRect((t.x - sx)*s - 3, (t.y - sy)*s - 3, 6, 6); }
   for (const L of LANDMARKS) if (S.found[L.id] || (L.id === 'shrine' && S.flags.shrineMarked)) { g.fillStyle = '#ebe4d3'; g.fillRect((L.x - sx)*s - 2, (L.y - sy)*s - 2, 4, 4); }
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = '#b07aff'; g.fillRect((E.x - sx)*s - 3, (E.y - sy)*s - 3, 6, 6); }
@@ -16462,7 +16515,7 @@ function drawBigMap() {
   c.width = Math.round(V.vw*dpr); c.height = Math.round(V.vh*dpr); c.style.width = V.vw + 'px'; c.style.height = V.vh + 'px';
   const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.fillStyle = '#0d131b'; g.fillRect(0, 0, c.width, c.height);
   g.save(); g.translate(-Math.round(V.cx*s - c.width/2), -Math.round(V.cy*s - c.height/2));
-  g.drawImage(mapCanvas, 0, 0, W, WORLD_H, 0, 0, W*s, WORLD_H*s);
+  mapDraw(g, 0, 0, W, WORLD_H, 0, 0, W*s, WORLD_H*s);
   g.font = `${Math.round(11*dpr)}px "Pixelify Sans", monospace`; g.textAlign = 'center';
   for (const L of LANDMARKS) if (S.found[L.id] || (L.id === 'shrine' && S.flags.shrineMarked)) {
     g.fillStyle = S.found[L.id] ? '#ebe4d3' : '#e3a948';
@@ -16827,8 +16880,8 @@ function redrawRect([rx, ry, rw, rh]) {
     const g = chunks[cy][cx].getContext('2d'); g.setTransform(1, 0, 0, 1, -cx*CH*TS, -cy*CH*TS);
     for (let y = cy*CH; y < Math.min(H, (cy + 1)*CH); y++) for (let x = cx*CH; x < Math.min(W, (cx + 1)*CH); x++) drawTile(g, x, y);
   }
-  for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) { const i = idx(x,y); if (S) S.explored[i] = 0; mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; }
-  mapCtx.putImageData(mapImg, 0, 0, rx, ry, rw, rh);
+  for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) { const i = idx(x,y); if (S) S.explored[i] = 0; mapCol[i] = 0; }
+  mapPut(rx, ry, rw, rh);
 }
 function populateAbyss() {
   const D = DUNGEONS.abyss, f = ABYSS.floor, mul = 1.2 + f*.22;
@@ -18053,7 +18106,7 @@ function renderPause() {
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
 const WN_VER = 51;
 const WHATS_NEW = [
-  ['A much bigger world', 'The whole world is now three times as wide and three times as tall: nine times the land, with wild country between every town. Journeys take longer, so mounts, balloons and fast travel matter more. Your save carries over.'],
+  ['A vast world', 'The whole world is now ten times as wide and ten times as tall as it began: a hundred times the land, with long stretches of wild country between every town. Journeys take longer, so mounts, balloons and fast travel matter more. Your save carries over.'],
   ['Walk inside your home', 'Step through your front door to walk around your house, see the furniture you placed, sleep, cook and decorate.'],
   ['Table hockey', 'Breda Stormhand in Stormwatch challenges all comers to table hockey.'],
   ['Soap bubbles', 'Suds McGee in Reedholm needs help popping an overflowing tub of soap bubbles.'],
@@ -18409,5 +18462,6 @@ window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
 window.__sw = {dims: () => ({W, H, WORLD_H, WS}), map, TILE_COL, ROAD_PATHS, set petFindT(v){petFindT=v;}, mgPay: (k, a, f) => mgPay(k, a, f), get skyWhale(){return skyWhale;}, set whaleT(v){whaleT=v;}, get meteor(){return meteor;}, set meteorT(v){meteorT=v;}, get cloudPearls(){return cloudPearls;}, ensureSummits: () => ensureSummits(), get moonRabbit(){return moonRabbit;}, guardianCheck: () => guardianCheck(), get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
-})();
+document.getElementById('worldLoad').remove();
+}, 40);
 </script>
