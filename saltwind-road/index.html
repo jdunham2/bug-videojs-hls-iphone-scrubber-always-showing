@@ -370,10 +370,11 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
 'use strict';
 
 /* ================= constants & data ================= */
-const WORLD_H = 250;
-const OLD_W = 360;
-const EAST_W = 520, FAR_W = 680, RIM_W = 840;
-const TS = 16, W = 1000, H = 310, CH = 32, SEED = 7331, DAY_LEN = 240, BASE_HP = 10;
+const WS = 3; // the world is laid out in design tiles; each design tile is WS×WS world tiles
+const WORLD_H = 250*WS, BAND_DY = WORLD_H - 250; // interiors (dungeons, mines, vaults) sit in a band below the overworld
+const OLD_W = 360*WS;
+const EAST_W = 520*WS, FAR_W = 680*WS, RIM_W = 840*WS;
+const TS = 16, W = 1000*WS, H = WORLD_H + 60, CH = 32, SEED = 7331, DAY_LEN = 240, BASE_HP = 10;
 const T = {DEEP:0,SHAL:1,SAND:2,GRASS:3,FOREST:4,HILL:5,MOUNT:6,SNOW:7,MARSH:8,ROAD:9,FLOOR:10,DUNE:11,BRIDGE:12,HOUSE:13,ASH:14,LAVA:15,GLOOM:16,JUNGLE:17,MESA:18,MOOR:19,VOID:20,DFLOOR:21,DWALL:22,DTORCH:23,DSTAIR:24,DSPIKE:25,DDOWN:26,BLOSSOM:27,SAVANNA:28,MAPLE:29,RUINS:30,SHROOM:31,BAMBOO:32,SHIMMER:33,REDWOOD:34};
 const TILE_COL = ['#1f3d5c','#2f6c8c','#d8c48c','#6e9c4e','#4b7a3b','#8b8d58','#6c6872','#e4ecf0','#5b7853','#b59c6c','#a59b8a','#e0b766','#8a6440','#6e9c4e','#4a4446','#c8461c','#2c4630','#3d7a3a','#b8643a','#6a5a6a','#05070a','#3a3640','#1e1a24','#1e1a24','#4a4452','#3a3640','#120a1a','#7aa862','#c8b05e','#8a7a4a','#8a8890','#4a3a5a','#6a9a4a','#a8b8c8','#3a5a2a'];
 const SPEED = [0,0.45,0.9,1,0.72,0.62,0,0.8,0.6,1.3,1.2,0.82,1.2,0,0.9,0,0.7,0.75,0.9,0.95,0,1,0,0,1,1,1,0.85,1,0.75,1,0.8,0.8,1,0.75];
@@ -1465,7 +1466,7 @@ const CRITTER_SPAWN = (t, x, night, r) => {
     case T.GRASS: return night ? (r < .5 ? 'raccoon' : 'rabbit') : 'rabbit';
     case T.FOREST: return night ? (r < .6 ? 'raccoon' : 'owl') : (r < .6 ? 'deer' : 'rabbit');
     case T.MARSH: return 'frog';
-    case T.SAND: return x < 340 && r < .7 ? 'turtle' : null;
+    case T.SAND: return x < 340*WS && r < .7 ? 'turtle' : null;
     case T.SNOW: return r < .6 ? 'penguin' : 'goat';
     case T.HILL: return 'goat';
     case T.JUNGLE: return 'parrot';
@@ -1518,6 +1519,8 @@ const BOSSES = {
   abyss:{name:'Abyssal Echo',tx:-999,ty:-999,x:-999,y:-999,kind:'wyrm',size:2.4,hp:200,dmg:5,speed:3,cd:2,abilities:['dash','spray'],dungeon:'abyss',pcol:'#b07aff',loot:{coins:300,items:{abyss_shard:3}},intro:''},
 };
 const BK = Object.keys(BOSSES);
+const wsSpot = o => { if (o.reward && o.reward.reveal) o.reward.reveal *= WS; if (o.tx < 0) return; if (o.ty >= 250) o.ty += BAND_DY; else { o.tx *= WS; o.ty *= WS; } };
+for (const k of BK) wsSpot(BOSSES[k]);
 const BKM = BK.filter(k => k !== 'abyss' && k !== 'titan' && k !== 'heroic');
 
 const DUNGEONS = {
@@ -1545,6 +1548,7 @@ const DUNGEONS = {
     theme:{floor:'#221a30', floor2:'#1e1629', wall:'#0a0610', top:'#3a2a5a', accent:'#b07aff'}},
 };
 const DK = Object.keys(DUNGEONS);
+for (const k of DK) { const D = DUNGEONS[k]; if (D.rect) D.rect[1] += BAND_DY; if (D.near) D.near = [D.near[0]*WS, D.near[1]*WS]; }
 const DK_FIXED = DK.filter(k => !DUNGEONS[k].endless && !DUNGEONS[k].mine);
 const SHARD_DK = DK_FIXED.filter(k => !DUNGEONS[k].sealed);
 const shardCount = () => SHARD_DK.filter(k => S.bosses[DUNGEONS[k].boss]).length;
@@ -1586,16 +1590,16 @@ function islShape(dx, dy) {
 }
 function islFindSpots() {
   islSpots = [];
-  for (let y = 28; y + ISL_H + 20 < WORLD_H; y += 7) for (let x = 14; x + ISL_W + 14 < EAST_W; x += 7) {
+  for (let y = 28*WS; y + ISL_H + 20 < WORLD_H; y += 7*WS) for (let x = 14; x + ISL_W + 14 < EAST_W; x += 7*WS) {
     let ok = true;
     for (let yy = y - 5; yy < y + ISL_H + 5 && ok; yy++) for (let xx = x - 5; xx < x + ISL_W + 5; xx++) if (map[idx(xx, yy)] !== T.DEEP) { ok = false; break; }
-    if (ok && Object.values(TOWNS).some(t => Math.hypot(t.x - x - ISL_W/2, t.y - y - ISL_H/2) < 48)) islSpots.push([x, y]);
+    if (ok && Object.values(TOWNS).some(t => Math.hypot(t.x - x - ISL_W/2, t.y - y - ISL_H/2) < 48*WS)) islSpots.push([x, y]);
   }
 }
 function islRedraw(x, y) {
   for (let cy = Math.floor((y - 1)/CH); cy <= Math.floor((y + ISL_H + 1)/CH); cy++) for (let cx = Math.floor((x - 1)/CH); cx <= Math.floor((x + ISL_W + 1)/CH); cx++) {
     const o = chunks[cy] && chunks[cy][cx]; if (o) { o.width = o.height = 0; chunks[cy][cx] = null; } }
-  mapCtx.putImageData(mapImg, 0, 0);
+  mapCtx.putImageData(mapImg, 0, 0, x - 2, y - 2, ISL_W + 5, ISL_H + 5);
 }
 function islPick(wk) {
   const n = islSpots.length, h = w => (Math.imul((w + 11) ^ 0x5bd1e995, 2654435761) >>> 0) % n;
@@ -1737,7 +1741,7 @@ const CROPS = {
   peach:{name:'Peach Tree',grow:3,yield:[4,6]},
   orange:{name:'Orange Tree',grow:3,yield:[4,6]},
 };
-const HOME = {x:54, y:106};
+const HOME = {x:40*WS + 14, y:105*WS + 1}; // just east of Port Wren
 const COOP = {x: HOME.x - 4, y: HOME.y - .6};
 const plotPos = i => ({x: HOME.x - 2 + (i % 4), y: HOME.y + 1 + Math.floor(i / 4)});
 const PROPERTIES = {
@@ -1770,7 +1774,7 @@ const ESTATES = {
   pagoda:   {name:'Cliffside Pagoda',   price:3000, tx:786,ty:70,  style:'pagoda',     where:'the heights of Bamboo Reach'},
   treehouse:{name:'Giant Treehouse',    price:3500, tx:920,ty:196, style:'treehouse',  where:'the depths of Giantwood'},
 };
-for (const k in ESTATES) PROPERTIES[k] = {...ESTATES[k], estate: true};
+for (const k in ESTATES) { wsSpot(ESTATES[k]); PROPERTIES[k] = {...ESTATES[k], estate: true}; }
 for (const k in PROPERTIES) if (!PROPERTIES[k].estate && !PROPERTIES[k].town) PROPERTIES[k].town = k;
 const ESTATE_TILES = new Set(), ESTATE_CLEAR = new Set();
 const placeName = k => { const P = PROPERTIES[k]; return P.estate ? P.where : TOWNS[P.town].name; };
@@ -2141,7 +2145,8 @@ const TOWNS = {
   blackwater:{name:'Blackwater',  x:652,y:233,ground:T.SAND, roof:'#2a2a2a',produce:['pirate_gold','grog'],demand:['wood','rope','iron','bread'],pirate:true},
   isle:     {name:'Sunken Isle',  x:246,y:178,ground:T.SAND, roof:'#8b6aa8',produce:['pearl'],         demand:['amber','glass','crystal'], small:true},
 };
-const ISLE = {x:246, y:178, land:8, ring:14};
+const ISLE = {x:246*WS, y:178*WS, land:8*WS, ring:14*WS};
+for (const k in TOWNS) { TOWNS[k].x *= WS; TOWNS[k].y *= WS; }
 const FORGE_TOWNS = ['frost','dun','highcairn','ashfall','redrock','skyhold','crownfall'];
 
 const NPCS = [
@@ -2920,6 +2925,7 @@ const LANDMARKS = [
   {id:'skullrock', name:'Skull Rock', tx:612,ty:234, sea:true, reward:{coins:300,items:{pirate_gold:2,jeweled_goblet:1}}, lore:"A rock carved like a grinning skull. In its eye socket, a chest of pirate treasure."},
   {id:'vault', name:'Royal Vault', tx:628,ty:186, reward:{coins:200,items:{ancient_coin:2}}, lore:"A collapsed treasury. A few coins of the old kingdom still glint in the dust."},
 ];
+for (const L of LANDMARKS) wsSpot(L);
 
 const GOAL_COIN = 600, GOAL_PACTS = 4;
 const TIERS = [[0,'Stranger'],[1,'Known'],[2.5,'Trusted'],[4,'Kin']];
@@ -2958,16 +2964,19 @@ const nodes = [];
 const nodeGrid = new Int32Array(W*H).fill(-1);
 let spawn = {x:0,y:0};
 
-function genWorld() {
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (y >= WORLD_H) { map[idx(x,y)] = T.VOID; continue; }
-    const nx = x >= RIM_W ? (x - RIM_W)/(W - RIM_W)*2 - 1 : x >= FAR_W ? (x - FAR_W)/(RIM_W - FAR_W)*2 - 1 : x >= EAST_W ? (x - EAST_W)/(FAR_W - EAST_W)*2 - 1 : x >= OLD_W ? (x - OLD_W)/(EAST_W - OLD_W)*2 - 1 : x/OLD_W*2 - 1, ny = y/WORLD_H*2 - 1;
+function genTerrain() {
+  // the shape of the land is designed at one design tile per WS world tiles: work its fields out on that coarse grid, then blend them up
+  const Wc = W/WS + 1, Hc = WORLD_H/WS + 1, NF = 15, F = new Float32Array(Wc*Hc*NF), coldY = new Float32Array(Wc);
+  for (let x = 0; x < Wc; x++) coldY[x] = 34 + (fbm(x/16, 3, SEED+7) - .5) * 26;
+  for (let y = 0; y < Hc; y++) for (let x = 0; x < Wc; x++) {
+    const o = (y*Wc + x)*NF, wx = x*WS;
+    const nx = wx >= RIM_W ? (wx - RIM_W)/(W - RIM_W)*2 - 1 : wx >= FAR_W ? (wx - FAR_W)/(RIM_W - FAR_W)*2 - 1 : wx >= EAST_W ? (wx - EAST_W)/(FAR_W - EAST_W)*2 - 1 : wx >= OLD_W ? (wx - OLD_W)/(EAST_W - OLD_W)*2 - 1 : wx/OLD_W*2 - 1, ny = y*WS/WORLD_H*2 - 1;
     const edge = Math.pow(Math.max(Math.abs(nx), Math.abs(ny)), 3) * .55 + Math.pow(Math.hypot(nx,ny)/1.414, 2) * .35;
     let e = fbm(x/32, y/32, SEED) + .32 - edge;
     e += bump(x,y,172,24,55,.22) + bump(x,y,135,30,26,.14);    // northern range
     e += bump(x,y,150,95,30,.2);                              // Highcairn massif
     e += bump(x,y,240,42,36,.16);                             // the burning mountain
-    e += bump(x,y,ISLE.x,ISLE.y,46,-.2);
+    e += bump(x,y,ISLE.x/WS,ISLE.y/WS,46,-.2);
     e += bump(x,y,40,105,30,.06) + bump(x,y,42,165,30,.08);   // keep the west coast towns dry
     e += bump(x,y,312,112,40,.05) + bump(x,y,288,210,40,.08) + bump(x,y,186,226,34,.06) + bump(x,y,328,40,26,.12);
     e += bump(x,y,478,38,34,.24) + bump(x,y,392,118,22,.08) + bump(x,y,452,180,30,.06) + bump(x,y,432,70,24,.06);   // Eastreach
@@ -2990,7 +2999,17 @@ function genWorld() {
     const shimmer = bump(x,y,884,112,46,1) + (fbm(x/12, y/12, SEED+47) - .5) * .4;
     const redwood = bump(x,y,932,178,46,1) + (fbm(x/12, y/12, SEED+53) - .5) * .4;
     const bamboo = bump(x,y,770,82,44,1) + (fbm(x/11, y/11, SEED+43) - .5) * .4;
-    const cold = y < 34 + (fbm(x/16, 3, SEED+7) - .5) * 26;
+    F[o] = e; F[o+1] = m; F[o+2] = volc; F[o+3] = gloom; F[o+4] = jungle; F[o+5] = mesa; F[o+6] = moor; F[o+7] = blossom; F[o+8] = savanna; F[o+9] = maple; F[o+10] = ruins; F[o+11] = shroom; F[o+12] = shimmer; F[o+13] = redwood; F[o+14] = bamboo;
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (y >= WORLD_H) { map[idx(x,y)] = T.VOID; continue; }
+    const fx = Math.min(Wc - 1.0001, (x + .5)/WS), fy = Math.min(Hc - 1.0001, (y + .5)/WS), x0 = fx|0, y0 = fy|0, ax = fx - x0, ay = fy - y0;
+    const o00 = (y0*Wc + x0)*NF, o10 = o00 + NF, o01 = o00 + Wc*NF, o11 = o01 + NF, w00 = (1 - ax)*(1 - ay), w10 = ax*(1 - ay), w01 = (1 - ax)*ay, w11 = ax*ay;
+    const f = k => F[o00 + k]*w00 + F[o10 + k]*w10 + F[o01 + k]*w01 + F[o11 + k]*w11;
+    const e = f(0) + (vnoise(x/9, y/9, SEED+201)*.67 + vnoise(x/4.5, y/4.5, SEED+218)*.33 - .5)*.1, m = f(1) + (vnoise(x/8 + 40, y/8, SEED+202)*.67 + vnoise(x/4 + 80, y/4, SEED+219)*.33 - .5)*.12;
+    const bw = (vnoise(x/16, y/16, SEED+229)*.45 + vnoise(x/7, y/7, SEED+230)*.35 + vnoise(x/3.5, y/3.5, SEED+231)*.2 - .5)*.5;
+    const volc = f(2) + bw, gloom = f(3) + bw, jungle = f(4) + bw, mesa = f(5) + bw, moor = f(6) + bw, blossom = f(7) + bw, savanna = f(8) + bw, maple = f(9) + bw, ruins = f(10) + bw, shroom = f(11) + bw, shimmer = f(12) + bw, redwood = f(13) + bw, bamboo = f(14) + bw;
+    const cold = fy < coldY[x0]*(1 - ax) + coldY[x0 + 1]*ax;
     let t;
     if (e < .40) t = T.DEEP;
     else if (e < .45) t = T.SHAL;
@@ -3002,7 +3021,7 @@ function genWorld() {
     else if (m > .74) t = T.MARSH;
     else if (m > .56) t = T.FOREST;
     else t = T.GRASS;
-    if (volc > .42 && t !== T.DEEP && t !== T.SHAL) t = (volc > .58 && fbm(x/6, y/6, SEED+11) > .56) ? T.LAVA : T.ASH;
+    if (volc > .42 && t !== T.DEEP && t !== T.SHAL) t = (volc > .58 && fbm(x/10, y/10, SEED+11) > .56) ? T.LAVA : T.ASH;
     if (gloom > .38 && (t === T.FOREST || t === T.GRASS || t === T.MARSH)) t = T.GLOOM;
     if (jungle > .36 && (t === T.FOREST || t === T.GRASS || t === T.MARSH || t === T.DUNE)) t = T.JUNGLE;
     if (mesa > .36 && (t === T.DUNE || t === T.GRASS || t === T.SAND || t === T.HILL || t === T.FOREST)) t = T.MESA;
@@ -3020,6 +3039,10 @@ function genWorld() {
     else if (di < ISLE.ring) t = T.DEEP;
     map[idx(x,y)] = t;
   }
+}
+const PLACE_OFFS = (() => { const R = 30*WS, a = []; for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx*dx + dy*dy <= R*R) a.push([dx, dy]); return a.sort((p, q) => (p[0]*p[0] + p[1]*p[1]) - (q[0]*q[0] + q[1]*q[1])); })();
+function genWorld() {
+  genTerrain();
   for (const k in TOWNS) {
     const tw = TOWNS[k], r = tw.small ? 4 : 6;
     for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
@@ -3037,7 +3060,7 @@ function genWorld() {
   const links = [['wren','hollow'],['hollow','frost'],['wren','thorn'],['thorn','reed'],['wren','reed'],['reed','dun'],['highcairn','hollow'],['highcairn','dun'],['highcairn','reed'],['frost','ashfall'],['ashfall','dun'],['dun','jade'],['jade','storm'],['ashfall','storm'],['jade','redrock'],['redrock','graven'],['graven','reed'],['jade','lantern'],['lantern','petal'],['lantern','sunreach'],['petal','skyhold'],['petal','sunreach'],['petal','maplehold'],['maplehold','tidewatch'],['maplehold','crownfall'],['sunreach','crownfall'],['tidewatch','greenstem'],['crownfall','sporehaven'],['greenstem','sporehaven'],['sporehaven','driftport'],['greenstem','prismvale'],['prismvale','farhaven'],['prismvale','tallpine'],['tallpine','mossbridge'],['driftport','mossbridge']];
   for (const [a,b] of links) {
     const A = TOWNS[a], B = TOWNS[b];
-    const path = astar(A.x, A.y, B.x, B.y, i => { const x = i % W, y = (i / W) | 0; return Math.hypot(x - ISLE.x, y - ISLE.y) < ISLE.ring + 1 ? Infinity : COST[map[i]]; });
+    const path = roadPath(A.x, A.y, B.x, B.y, i => { const x = i % W, y = (i / W) | 0; return Math.hypot(x - ISLE.x, y - ISLE.y) < ISLE.ring + 1 ? Infinity : COST[map[i]]; });
     ROAD_PATHS[a + '_' + b] = ROAD_PATHS[b + '_' + a] = path;
     for (const i of path) {
       const t = map[i];
@@ -3047,7 +3070,7 @@ function genWorld() {
   }
   // the homestead: a cleared plot east of Port Wren with its own lane
   for (let y = -5; y <= 5; y++) for (let x = -6; x <= 6; x++) { const tx = HOME.x + x, ty = HOME.y + y; if (inB(tx,ty) && map[idx(tx,ty)] !== T.HOUSE) map[idx(tx,ty)] = T.GRASS; }
-  for (const i of astar(TOWNS.wren.x, TOWNS.wren.y, HOME.x - 7, HOME.y, i => COST[map[i]])) { const t = map[i]; if (t !== T.FLOOR && t !== T.HOUSE) map[i] = (t === T.DEEP || t === T.SHAL) ? T.BRIDGE : T.ROAD; }
+  for (const i of roadPath(TOWNS.wren.x, TOWNS.wren.y, HOME.x - 7, HOME.y, i => COST[map[i]])) { const t = map[i]; if (t !== T.FLOOR && t !== T.HOUSE) map[i] = (t === T.DEEP || t === T.SHAL) ? T.BRIDGE : T.ROAD; }
   spawn = {x: TOWNS.wren.x + .5, y: TOWNS.wren.y + 2.3};
   const reach = flood(Math.floor(spawn.x), Math.floor(spawn.y), false, false);
   const reachC = flood(Math.floor(spawn.x), Math.floor(spawn.y), false, true);
@@ -3055,12 +3078,8 @@ function genWorld() {
   const onLand = (x, y) => { const t = map[idx(x, y)]; return t !== T.DEEP && t !== T.SHAL; };
   const farFromTowns = (x,y,r) => Object.values(TOWNS).every(t => Math.hypot(x - t.x, y - t.y) > r);
   const place = (o, okFn, minTown) => {
-    let best = null, bd = 1e9;
-    for (let y = Math.max(0,o.ty-30); y < Math.min(H,o.ty+30); y++) for (let x = Math.max(0,o.tx-30); x < Math.min(W,o.tx+30); x++) {
-      if (!okFn(x, y, map[idx(x,y)]) || !farFromTowns(x, y, minTown)) continue;
-      const d = Math.hypot(x-o.tx, y-o.ty);
-      if (d < bd) { bd = d; best = {x,y}; }
-    }
+    let best = null;
+    for (const [dx, dy] of PLACE_OFFS) { const x = o.tx + dx, y = o.ty + dy; if (!inB(x, y) || !okFn(x, y, map[idx(x,y)]) || !farFromTowns(x, y, minTown)) continue; best = {x, y}; break; }
     if (!best) best = {x:o.tx, y:o.ty};
     o.x = best.x; o.y = best.y;
   };
@@ -3098,14 +3117,14 @@ function placeNodes() {
   const near = (x,y,t) => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) => tileAt(x+dx,y+dy) === t);
   const landNear = (x,y) => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) => { const t = tileAt(x+dx,y+dy); return t !== T.DEEP && t !== T.SHAL; });
   const blocked = new Set([...LANDMARKS.map(L => idx(L.x, L.y)), ...BK.map(k => idx(BOSSES[k].x, BOSSES[k].y)), ...chests.map(c => idx(c.x, c.y)), ...DK.map(k => idx(DUNGEONS[k].entrance.x, DUNGEONS[k].entrance.y))]);
+  const keepClear = new Uint8Array(W*H), stamp = (cx, cy, r) => { for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) if (inB(x, y) && Math.hypot(x - cx, y - cy) < r) keepClear[idx(x, y)] = 1; };
+  for (const k in TOWNS) stamp(TOWNS[k].x, TOWNS[k].y, TOWNS[k].small ? 4.5 : 7);
+  stamp(HOME.x, HOME.y, 9);
+  for (const sh of SHRINES) for (let y = sh.y - 3; y <= sh.y + 3; y++) for (let x = sh.x - 3; x <= sh.x + 3; x++) if (inB(x, y)) keepClear[idx(x, y)] = 1;
   for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) {
     const i = idx(x,y), t = map[i];
-    if (blocked.has(i) || ESTATE_CLEAR.has(i) || SHRINES.some(sh => Math.abs(sh.x - x) <= 3 && Math.abs(sh.y - y) <= 3)) continue;
-    let inTownArea = false;
-    for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x, y - TOWNS[k].y) < (TOWNS[k].small ? 4.5 : 7)) inTownArea = true;
-    if (Math.hypot(x - HOME.x, y - HOME.y) < 9) inTownArea = true;
-    if (inTownArea) continue;
-    const r = hash2(x, y, 77), nearMt = near(x,y,T.MOUNT), silverLand = Math.hypot(x-150, y-95) < 34;
+    if (keepClear[i] || blocked.has(i) || ESTATE_CLEAR.has(i)) continue;
+    const r = hash2(x, y, 77), nearMt = near(x,y,T.MOUNT), silverLand = Math.hypot(x - 150*WS, y - 95*WS) < 34*WS;
     let type = null;
     switch (t) {
       case T.FOREST: type = r < .035 ? 'branch' : r < .075 ? 'oak' : r < .10 ? 'bush' : r < .115 ? 'herb' : r < .123 ? 'hive' : r < .132 ? 'appletree' : null; break;
@@ -3154,21 +3173,35 @@ function placeNodes() {
   mineNodes();
 }
 
-function astar(sx, sy, gx, gy, cost) {
-  const N = W*H, g = new Float64Array(N).fill(Infinity), came = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
+function roadPath(sx, sy, gx, gy, cost) {
+  // coarse plan: one cell per design tile, priced by the world tile at its middle
+  const Wc = Math.ceil(W/WS), Hc = Math.ceil(H/WS), cc = i => { const x = (i % Wc)*WS + 1, y = ((i / Wc) | 0)*WS + 1; return x < W && y < H ? cost(idx(x, y)) : Infinity; };
+  const plan = astar(Math.floor(sx/WS), Math.floor(sy/WS), Math.floor(gx/WS), Math.floor(gy/WS), cc, Wc, Hc);
+  if (plan.length < 2) return astar(sx, sy, gx, gy, cost);
+  const band = new Set(), R = WS*2;
+  for (const c of plan) { const cx = (c % Wc)*WS + 1, cy = ((c / Wc) | 0)*WS + 1; for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (inB(cx + dx, cy + dy)) band.add(idx(cx + dx, cy + dy)); }
+  band.add(idx(sx, sy)); band.add(idx(gx, gy));
+  const fine = astar(sx, sy, gx, gy, i => band.has(i) ? cost(i) : Infinity);
+  return fine.length > 1 && fine[fine.length - 1] === idx(sx, sy) ? fine : astar(sx, sy, gx, gy, cost);
+}
+let ASTAR_BUF = null;
+function astar(sx, sy, gx, gy, cost, GW = W, GH = H) {
+  const N = GW*GH; if (!ASTAR_BUF || ASTAR_BUF.n < N) ASTAR_BUF = {n: N, g: new Float64Array(N), came: new Int32Array(N), closed: new Uint8Array(N)};
+  const {g, came, closed} = ASTAR_BUF; g.fill(Infinity, 0, N); came.fill(-1, 0, N); closed.fill(0, 0, N);
+  const inG = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH, idG = (x, y) => y*GW + x;
   const hf = [], hi = [];
   const push = (f,i) => { hf.push(f); hi.push(i); let c = hf.length-1; while (c > 0) { const p = (c-1)>>1; if (hf[p] <= hf[c]) break; [hf[p],hf[c]] = [hf[c],hf[p]]; [hi[p],hi[c]] = [hi[c],hi[p]]; c = p; } };
   const pop = () => { const top = hi[0], lf = hf.pop(), li = hi.pop(); if (hf.length) { hf[0] = lf; hi[0] = li; let c = 0; for (;;) { const l = 2*c+1, r = l+1; let m = c; if (l < hf.length && hf[l] < hf[m]) m = l; if (r < hf.length && hf[r] < hf[m]) m = r; if (m === c) break; [hf[m],hf[c]] = [hf[c],hf[m]]; [hi[m],hi[c]] = [hi[c],hi[m]]; c = m; } } return top; };
-  const s = idx(sx,sy), goal = idx(gx,gy);
+  const s = idG(sx,sy), goal = idG(gx,gy);
   g[s] = 0; push(0, s);
   while (hf.length) {
     const cur = pop();
     if (cur === goal) break;
     if (closed[cur]) continue; closed[cur] = 1;
-    const cx = cur % W, cy = (cur / W) | 0;
+    const cx = cur % GW, cy = (cur / GW) | 0;
     for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-      const nx = cx+dx, ny = cy+dy; if (!inB(nx,ny)) continue;
-      const ni = idx(nx,ny); if (closed[ni]) continue;
+      const nx = cx+dx, ny = cy+dy; if (!inG(nx,ny)) continue;
+      const ni = idG(nx,ny); if (closed[ni]) continue;
       const c = cost(ni); if (!isFinite(c)) continue;
       const ng = g[cur] + c;
       if (ng < g[ni]) { g[ni] = ng; came[ni] = cur; push(ng + (Math.abs(nx-gx)+Math.abs(ny-gy))*.45, ni); }
@@ -3184,13 +3217,13 @@ function walkable(t, raft, climb) {
   return true;
 }
 function flood(sx, sy, raft, climb) {
-  const seen = new Uint8Array(W*H), q = [idx(sx,sy)]; seen[q[0]] = 1;
-  while (q.length) {
-    const c = q.pop(), x = c % W, y = (c / W) | 0;
+  const seen = new Uint8Array(W*H), q = new Int32Array(W*H); let qn = 0; q[qn++] = idx(sx,sy); seen[q[0]] = 1;
+  while (qn) {
+    const c = q[--qn], x = c % W, y = (c / W) | 0;
     for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
       const nx = x+dx, ny = y+dy; if (!inB(nx,ny)) continue;
       const ni = idx(nx,ny); if (seen[ni] || !walkable(map[ni], raft, climb)) continue;
-      seen[ni] = 1; q.push(ni);
+      seen[ni] = 1; q[qn++] = ni;
     }
   }
   return seen;
@@ -3433,17 +3466,44 @@ function serialize() {
   const ex = S.explored; let rle = '', cur = ex[0], run = 0;
   for (let i = 0; i < ex.length; i++) { if (ex[i] === cur) run++; else { rle += run + ','; cur = ex[i]; run = 1; } }
   rle += run;
-  return JSON.stringify({...S, explored: undefined, ex0: ex[0], rle, mapW: W});
+  return JSON.stringify({...S, explored: undefined, ex0: ex[0], rle, mapW: W, mapH: H, ws: WS});
+}
+const WS_SKIP = new Set(['room', 'look', 'inv', 'chest', 'npc', 'known', 'skills', 'equip', 'achievements', 'home', 'rep', 'contracts', 'cbase', 'flags', 'found', 'towns', 'killsBy', 'bosses', 'board', 'curios', 'curiosShown', 'stash']);
+function wsGrowSave(s, k, oWH) {
+  const fix = (o, a, b) => { if (o[b] >= oWH) o[b] += WORLD_H - oWH; else if (o[a] >= 0) { o[a] *= k; o[b] *= k; } };
+  const walk = (v, d) => {
+    if (!v || typeof v !== 'object' || d > 6) return;
+    if (Array.isArray(v)) { for (const e of v) walk(e, d + 1); return; }
+    if (typeof v.x === 'number' && typeof v.y === 'number') fix(v, 'x', 'y');
+    if (typeof v.tx === 'number' && typeof v.ty === 'number') fix(v, 'tx', 'ty');
+    for (const key in v) if (!WS_SKIP.has(key)) walk(v[key], d + 1);
+  };
+  for (const key in s) if (!WS_SKIP.has(key)) walk(s[key], 0);
+  fix(s, 'x', 'y'); s.wsMoved = 1;
+}
+// after an old save grows, the spot you stood on may have become water: step to the nearest dry land
+function wsSettle() {
+  if (!S || !S.wsMoved) return; delete S.wsMoved;
+  const ok = (x, y) => inB(x, y) && walkable(map[idx(x, y)], false, false) && map[idx(x, y)] !== T.SHAL;
+  const cx = Math.floor(S.x), cy = Math.floor(S.y); if (ok(cx, cy)) return;
+  for (let r = 1; r < 40; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && ok(cx + dx, cy + dy)) { S.x = cx + dx + .5; S.y = cy + dy + .5; return; }
+  S.x = spawn.x; S.y = spawn.y;
 }
 function deserialize(str) {
   const o = JSON.parse(str), base = freshState();
   const s = Object.assign(base, o);
-  const oldW = o.mapW || OLD_W, tmp = new Uint8Array(oldW*H);
+  const ows = o.ws || 1, oldW = o.mapW || 360, oldH = o.mapH || (ows === 1 ? 310 : H), tmp = new Uint8Array(oldW*oldH);
   let v = o.ex0, p = 0;
   for (const part of String(o.rle).split(',')) { const n = +part; if (v) tmp.fill(1, p, Math.min(tmp.length, p + n)); p += n; v = v ? 0 : 1; }
-  if (oldW === W) s.explored = tmp;
-  else { s.explored = new Uint8Array(W*H); for (let y = 0; y < H; y++) s.explored.set(tmp.subarray(y*oldW, (y + 1)*oldW), y*W); s.depleted = {}; }
-  delete s.mapW;
+  if (oldW === W && oldH === H) s.explored = tmp;
+  else if (ows === WS) { s.explored = new Uint8Array(W*H); for (let y = 0; y < Math.min(H, oldH); y++) s.explored.set(tmp.subarray(y*oldW, y*oldW + Math.min(oldW, W)), y*W); s.depleted = {}; }
+  else { // a save from before the world grew: blow the explored map up, and move everything stored in world tiles
+    const k = WS/ows, oWH = 250*ows, ex = s.explored = new Uint8Array(W*H);
+    for (let y = 0; y < WORLD_H; y++) { const sy = Math.floor(y/k); if (sy >= oldH) break; for (let x = 0; x < W; x++) { const sx = Math.floor(x/k); if (sx < oldW && tmp[sy*oldW + sx]) ex[y*W + x] = 1; } }
+    for (let y = WORLD_H; y < H; y++) { const sy = y - WORLD_H + oWH; if (sy < oldH) for (let x = 0; x < Math.min(oldW, W); x++) if (tmp[sy*oldW + x]) ex[y*W + x] = 1; }
+    wsGrowSave(s, k, oWH); s.depleted = {}; s.chests = {}; for (const key of ['summits', 'waystones', 'shells', 'glades']) delete s[key];
+  }
+  delete s.mapW; delete s.mapH; delete s.ws;
   for (const n of NPCS) if (n.trader && !s.npc[n.id]) s.npc[n.id] = base.npc[n.id];
   delete s.rle; delete s.ex0;
   return s;
@@ -3585,20 +3645,21 @@ function burst(x, y, col, n = 6, sp = 3) { for (let i = 0; i < n; i++) particles
 /* ================= exploration ================= */
 let lastTile = -1;
 function reveal(cx, cy, r) {
-  let changed = false;
+  let changed = false; const y0 = Math.max(0, Math.floor(cy-r)), x0 = Math.max(0, Math.floor(cx-r));
   for (let y = Math.max(0, Math.floor(cy-r)); y <= Math.min(H-1, Math.ceil(cy+r)); y++)
     for (let x = Math.max(0, Math.floor(cx-r)); x <= Math.min(W-1, Math.ceil(cx+r)); x++) {
       if (Math.hypot(x+.5-cx, y+.5-cy) > r) continue;
       const i = idx(x,y);
       if (!S.explored[i]) { S.explored[i] = 1; revealMapPixel(i); changed = true; }
     }
-  if (changed) mapCtx.putImageData(mapImg, 0, 0);
+  if (changed) mapCtx.putImageData(mapImg, 0, 0, x0, y0, Math.ceil(r*2) + 2, Math.ceil(r*2) + 2);
 }
 function rebuildMapPixels() {
   for (let i = 0; i < W*H; i++) if (S.explored[i]) revealMapPixel(i); else { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; }
   mapCtx.putImageData(mapImg, 0, 0);
 }
-const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP && !(isl && isl.set.has(i))) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
+let exploredMemo = {t: -1e9, s: null, v: 0};
+const exploredPct = () => { const now = performance.now(); if (exploredMemo.s === S && now - exploredMemo.t < 2000) return exploredMemo.v; let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP && !(isl && isl.set.has(i))) { land++; if (S.explored[i]) seen++; } } exploredMemo = {t: now, s: S, v: Math.round(seen/land*100)}; return exploredMemo.v; };
 const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('spyglass') ? 1.5 : 0) + conHas('owl') + (S.pet === 'clockwork_owl' ? 2.5 : 0) + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
@@ -4052,6 +4113,7 @@ const LEGENDS = [
   {id:'implord',   name:'The Imp Lord',       type:'imp',      tx:232, ty:54,  hp:230, dmg:2.8, col:'#ff6a2a', drop:'ember_crown'},
   {id:'mirelord',  name:'The Mirelord',       type:'lurker',   tx:150, ty:176, hp:240, dmg:2.8, col:'#6a8a4a', drop:'mire_mail'},
 ];
+for (const L of LEGENDS) wsSpot(L);
 const LEGEND_BY = Object.fromEntries(LEGENDS.map(L => [L.id, L]));
 function legendHint(L) {
   let best = 'wren', bd = 1e9; for (const k in TOWNS) { if (k === 'isle') continue; const d = Math.hypot(TOWNS[k].x - L.tx, TOWNS[k].y - L.ty); if (d < bd) { bd = d; best = k; } }
@@ -8575,11 +8637,11 @@ function quizAsk(n, Q) {
 let courier = null;
 function courierTalk(n) {
   if (courier) { say(`“Your parcel for <b>${TOWNS[courier.to].name}</b> is ticking! ${Math.ceil(courier.t)} seconds left. Go, go!”`, [{label: 'Give up the delivery', fn: () => { courier = null; $('courierUI').hidden = true; S.courierFails = (S.courierFails || 0) + 1; say('“A shame. I’ll find another runner.”', [back(n)]); }}, back(n)]); return; }
-  const T0 = TOWNS[n.town], opts = Object.keys(TOWNS).filter(k => k !== n.town && k !== 'isle' && S.towns[k]).map(k => [k, Math.hypot(TOWNS[k].x - T0.x, TOWNS[k].y - T0.y)]).filter(([, d]) => d > 35 && d < 170).sort((a, b) => a[1] - b[1]);
+  const T0 = TOWNS[n.town], opts = Object.keys(TOWNS).filter(k => k !== n.town && k !== 'isle' && S.towns[k]).map(k => [k, Math.hypot(TOWNS[k].x - T0.x, TOWNS[k].y - T0.y)]).filter(([, d]) => d > 35*WS && d < 170*WS).sort((a, b) => a[1] - b[1]);
   if (!opts.length) { say('“I’ve no parcels for towns you know. Explore a bit more and come back!”', [back(n)]); return; }
   const choices = [opts[0], opts[Math.floor(opts.length/2)], opts[opts.length - 1]].filter((v, i, a) => a.indexOf(v) === i);
   say(`“Express parcels, paid by speed! Pick a destination. The clock starts the moment you leave. The faster you arrive, the bigger the tip.”${S.couriers ? `<br><span style="color:var(--muted)">Deliveries made: ${S.couriers}</span>` : ''}`, [
-    ...choices.map(([k, d]) => { const t = Math.round(d/3.6 + 25), pay = Math.round(30 + d*1.6); return {label: `${TOWNS[k].name} · ${t}s · up to ${Math.round(pay*1.5)}◆`, fn: () => { courier = {to: k, from: n.town, t, max: t, pay}; $('courierUI').hidden = false; closeTalk(); SFX.chime(); toast(`<b>Express parcel for ${TOWNS[k].name}!</b><br>${t} seconds on the clock. Ride hard!`, 4000); }}; }), back(n)]);
+    ...choices.map(([k, d]) => { const t = Math.round(d/3.6 + 25), pay = Math.round(30 + d/WS*1.6); return {label: `${TOWNS[k].name} · ${t}s · up to ${Math.round(pay*1.5)}◆`, fn: () => { courier = {to: k, from: n.town, t, max: t, pay}; $('courierUI').hidden = false; closeTalk(); SFX.chime(); toast(`<b>Express parcel for ${TOWNS[k].name}!</b><br>${t} seconds on the clock. Ride hard!`, 4000); }}; }), back(n)]);
 }
 function updateCourier(dt) {
   const C = courier; if (!C) return;
@@ -8728,7 +8790,7 @@ function drawBird(b) {
 // ===== party races =====
 let prace = null, myRace = null;
 function startPartyRace() {
-  const cand = Object.keys(TOWNS).filter(k => k !== 'isle').map(k => [k, Math.hypot(TOWNS[k].x - S.x, TOWNS[k].y - S.y)]).filter(([, d]) => d > 45 && d < 120).sort((a, b) => a[1] - b[1]);
+  const cand = Object.keys(TOWNS).filter(k => k !== 'isle').map(k => [k, Math.hypot(TOWNS[k].x - S.x, TOWNS[k].y - S.y)]).filter(([, d]) => d > 45*WS && d < 120*WS).sort((a, b) => a[1] - b[1]);
   if (!cand.length) { toast('No town at a good racing distance from here.'); return; }
   const [to] = pick(cand.slice(0, 4)), at = Date.now() + 6000; myRace = {i: Date.now() % 1e9, to, at}; partyT = 0; closeTalk();
   joinRace(myRace.i, to, at);
@@ -8941,8 +9003,8 @@ const RIDDLES = {
 function riddleTalk(n) {
   if (S.riddle) { say(`“The riddle stands, traveler:”<br><br><i>“${RIDDLES[S.riddle.k]}”</i><br><br><span style="color:var(--muted)">Travel to the town it describes to solve it.</span>`, [{label: 'Give up (new riddle tomorrow)', fn: () => { S.riddle = null; S.riddleDay = S.day; save(); say('“Some answers take longer to find.”', [back(n)]); }}, back(n)]); return; }
   if (S.riddleDay === S.day) { say('“One riddle a day is plenty. Come back tomorrow.”', [back(n)]); return; }
-  const here = TOWNS[n.town], opts = Object.keys(RIDDLES).filter(k => TOWNS[k] && Math.hypot(TOWNS[k].x - here.x, TOWNS[k].y - here.y) > 30 && !(S.riddlesSolved || {})[k]);
-  const pool = opts.length ? opts : Object.keys(RIDDLES).filter(k => TOWNS[k] && Math.hypot(TOWNS[k].x - here.x, TOWNS[k].y - here.y) > 30);
+  const here = TOWNS[n.town], opts = Object.keys(RIDDLES).filter(k => TOWNS[k] && Math.hypot(TOWNS[k].x - here.x, TOWNS[k].y - here.y) > 30*WS && !(S.riddlesSolved || {})[k]);
+  const pool = opts.length ? opts : Object.keys(RIDDLES).filter(k => TOWNS[k] && Math.hypot(TOWNS[k].x - here.x, TOWNS[k].y - here.y) > 30*WS);
   const k = pick(pool); S.riddle = {k, day: S.day}; save();
   say(`“Listen closely, and go where the answer lies:”<br><br><i>“${RIDDLES[k]}”</i><br><br><span style="color:var(--muted)">Travel to the town this describes. The reward is bigger the farther it is.</span>`, [back(n)]);
 }
@@ -8950,7 +9012,7 @@ let riddleT = 0;
 function riddleCheck(dt) {
   if (!S.riddle) return; riddleT -= dt; if (riddleT > 0) return; riddleT = 1;
   const k = S.riddle.k, T1 = TOWNS[k]; if (!T1 || Math.hypot(T1.x - S.x, T1.y - S.y) > 9) return;
-  const d = Math.hypot(T1.x - TOWNS.highcairn.x, T1.y - TOWNS.highcairn.y), c = Math.round(80 + d*1.2);
+  const d = Math.hypot(T1.x - TOWNS.highcairn.x, T1.y - TOWNS.highcairn.y), c = Math.round(80 + d/WS*1.2);
   S.riddle = null; S.riddleDay = S.day; S.riddlesSolved = S.riddlesSolved || {}; S.riddlesSolved[k] = true; S.riddles = (S.riddles || 0) + 1;
   S.coins += c; gainXP(30 + Math.round(d/4)); SFX.victory(); renderHUD(); save();
   toast(`<b>Riddle solved: ${T1.name}!</b><br>A folded note waits for you here, sealed with Enigma’s mark. Inside: <span style="color:var(--good)">${c} coin</span>.`, 6000);
@@ -10033,7 +10095,7 @@ function starTap(i) {
 let GLADES = null;
 function secretGlades() {
   if (GLADES) return GLADES; GLADES = []; let sd = SEED*7 + 12345; const rnd = () => { sd = (sd*16807) % 2147483647; return sd/2147483647; };
-  for (let k = 0; k < 40000 && GLADES.length < 12; k++) { const x = Math.floor(rnd()*W), y = Math.floor(rnd()*WORLD_H); if (!inB(x, y) || !passable(x + .5, y + .5) || townAt(x, y, 18) || [T.ROAD, T.SAND, T.SHAL, T.DEEP, T.BRIDGE].includes(map[idx(x, y)]) || GLADES.some(q => Math.hypot(q.x - x, q.y - y) < 60)) continue; GLADES.push({x: x + .5, y: y + .5}); }
+  for (let k = 0; k < 40000 && GLADES.length < 12; k++) { const x = Math.floor(rnd()*W), y = Math.floor(rnd()*WORLD_H); if (!inB(x, y) || !passable(x + .5, y + .5) || townAt(x, y, 18) || [T.ROAD, T.SAND, T.SHAL, T.DEEP, T.BRIDGE].includes(map[idx(x, y)]) || GLADES.some(q => Math.hypot(q.x - x, q.y - y) < 60*WS)) continue; GLADES.push({x: x + .5, y: y + .5}); }
   return GLADES;
 }
 function gladeTick() {
@@ -10341,7 +10403,7 @@ function ensureSummits() {
   const cand = [];
   for (let y = 6; y < WORLD_H - 6; y += 2) for (let x = 6; x < W - 6; x += 2) { if (map[idx(x, y)] !== T.MOUNT) continue; let c = 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (map[idx(x + dx, y + dy)] === T.MOUNT) c++; if (c >= 40) cand.push([c, x, y]); }
   cand.sort((a, b) => b[0] - a[0]); const out = [];
-  for (const [, x, y] of cand) { if (out.length >= 8) break; if (out.some(q => Math.hypot(q.x - x, q.y - y) < 50)) continue; out.push({x, y, flag: false}); }
+  for (const [, x, y] of cand) { if (out.length >= 8) break; if (out.some(q => Math.hypot(q.x - x, q.y - y) < 50*WS)) continue; out.push({x, y, flag: false}); }
   S.summits = out; return out;
 }
 function summitTarget() {
@@ -10506,7 +10568,7 @@ function ensureWaystones() {
   const out = [];
   for (let seg = 0; seg < 12; seg++) { const x0 = Math.floor(seg/2)*Math.floor(W/6), y0 = seg % 2 ? Math.floor(WORLD_H/2) : 0;
     for (let tries = 0; tries < 400; tries++) { const x = x0 + rint(8, Math.floor(W/6) - 8), y = y0 + rint(8, Math.floor(WORLD_H/2) - 8);
-      if (!inB(x, y) || y >= WORLD_H - 4 || !enemyWalk(x + .5, y + .5) || !enemyWalk(x + .5, y + 1.5) || townAt(x, y, 20) || out.some(w => Math.hypot(w.x - x, w.y - y) < 40)) continue;
+      if (!inB(x, y) || y >= WORLD_H - 4 || !enemyWalk(x + .5, y + .5) || !enemyWalk(x + .5, y + 1.5) || townAt(x, y, 20*WS) || out.some(w => Math.hypot(w.x - x, w.y - y) < 40*WS)) continue;
       const rn = REGION[map[idx(x, y)]]; out.push({x, y, name: rn && !out.some(w => w.name === `${rn} Waystone`) ? `${rn} Waystone` : WS_NAMES[out.length % WS_NAMES.length], on: false}); break; } }
   S.waystones = out; return out;
 }
@@ -10529,9 +10591,9 @@ function drawWaystone(w) {
 let ISLET = null;
 function placeCastaway() {
   const n = NPC_BY.crusoe; if (!n) return;
-  outer: for (let y = 200; y > 40; y -= 3) for (let x = 120; x < 900; x += 3) {
+  outer: for (let y = 200*WS; y > 40*WS; y -= 3*WS) for (let x = 120*WS; x < 900*WS; x += 3*WS) {
     let ok = true; for (let dy = -5; dy <= 5 && ok; dy++) for (let dx = -5; dx <= 5; dx++) if (!inB(x + dx, y + dy) || map[idx(x + dx, y + dy)] !== T.DEEP) { ok = false; break; }
-    if (!ok || townAt(x, y, 30)) continue;
+    if (!ok || townAt(x, y, 30*WS)) continue;
     for (let dy = -1; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) map[idx(x + dx, y + dy)] = Math.abs(dx) === 2 ? T.SHAL : T.SAND;
     for (const [dx, dy] of [[-1, -2], [0, -2], [1, -2], [-1, 2], [0, 2], [1, 2], [-3, 0], [3, 0]]) map[idx(x + dx, y + dy)] = T.SHAL;
     ISLET = {x, y}; n.x = x - .5; n.y = y + .8; break outer;
@@ -10813,7 +10875,7 @@ function ensureShells() {
   for (let tries = 0; tries < 30000 && spots.length < SHELL_N; tries++) {
     const x = rint(6, W - 7), y = rint(6, WORLD_H - 8), t = map[idx(x, y)];
     const beach = t === T.SAND; if (!(beach || Math.random() < .25)) continue;
-    if (!enemyWalk(x + .5, y + .5) || townAt(x, y, 6) || spots.some(([a, b]) => Math.hypot(a - x, b - y) < 18)) continue;
+    if (!enemyWalk(x + .5, y + .5) || townAt(x, y, 6) || spots.some(([a, b]) => Math.hypot(a - x, b - y) < 18*WS)) continue;
     spots.push([x, y]);
   }
   S.shells = {spots, got: {}}; return S.shells;
@@ -11051,7 +11113,7 @@ function ensureVaults() {
   S.vaults = [];
   for (let tries = 0; tries < 8000 && S.vaults.length < 7; tries++) {
     const x = rint(8, W - 9), y = rint(8, WORLD_H - 10), t = map[idx(x, y)];
-    if (![T.RUINS, T.MOOR, T.MESA, T.SAVANNA].includes(t) || townAt(x, y, 18) || S.vaults.some(v => Math.hypot(v.x - x, v.y - y) < 60)) continue;
+    if (![T.RUINS, T.MOOR, T.MESA, T.SAVANNA].includes(t) || townAt(x, y, 18*WS) || S.vaults.some(v => Math.hypot(v.x - x, v.y - y) < 60*WS)) continue;
     if (!enemyWalk(x + .5, y + .5) || !VAULT_LEV.every(([dx, dy]) => enemyWalk(x + dx + .5, y + dy + .5)) || !enemyWalk(x + .5, y + 1.5)) continue;
     const order = [0, 1, 2].sort(() => Math.random() - .5), sym = [0, 1, 2].sort(() => Math.random() - .5);
     S.vaults.push({x, y, order, sym, done: false});
@@ -11730,13 +11792,13 @@ function drawWell(w) {
 }
 // ===== balloon rides =====
 let balloonF = null;
-const balloonCost = (a, b) => Math.round(30 + Math.hypot(TOWNS[a].x - TOWNS[b].x, TOWNS[a].y - TOWNS[b].y)/4);
+const balloonCost = (a, b) => Math.round(30 + Math.hypot(TOWNS[a].x - TOWNS[b].x, TOWNS[a].y - TOWNS[b].y)/(4*WS));
 function balloonTalk(n) {
   const dests = BALLOON_TOWNS.filter(k => k !== n.town);
   say(`“Climb aboard! I fly to every balloon station in the realm, even ones you've never seen. You'll get a fine view of the land below.”`, [
     ...dests.map(k => ({label: `${S.towns[k] ? TOWNS[k].name : TOWNS[k].name + ' (new!)'} · ${balloonCost(n.town, k)}◆`, disabled: S.coins < balloonCost(n.town, k) || bossActive(), fn: () => {
       S.coins -= balloonCost(n.town, k); closeTalk(); renderHUD();
-      const D = NPC_BY['bln_' + k]; balloonF = {fx: S.x, fy: S.y, tx: D.x + 1.2, ty: D.y + .4, t: 0, dur: Math.min(14, 5 + Math.hypot(D.x - S.x, D.y - S.y)/40), to: k, rv: 0};
+      const D = NPC_BY['bln_' + k]; balloonF = {fx: S.x, fy: S.y, tx: D.x + 1.2, ty: D.y + .4, t: 0, dur: Math.min(14, 5 + Math.hypot(D.x - S.x, D.y - S.y)/(40*WS)), to: k, rv: 0};
       S.riding = false; petE = null; compE = null; fishing = null; SFX.travel();
       toast(`<b>Up, up and away!</b><br>Floating to ${TOWNS[k].name}...`, 3500);
     }})),
@@ -11765,8 +11827,8 @@ function ensureDens() {
   S.dens = [];
   for (let tries = 0; tries < 6000 && S.dens.length < 18; tries++) {
     const x = rint(10, W - 11), y = rint(10, WORLD_H - 12), t = map[idx(x, y)];
-    if (t === T.ROAD || t === T.BRIDGE || t === T.FLOOR || !enemyWalk(x + .5, y + .5) || townAt(x, y, 22)) continue;
-    if (S.dens.some(d => Math.hypot(d.x - x, d.y - y) < 40)) continue;
+    if (t === T.ROAD || t === T.BRIDGE || t === T.FLOOR || !enemyWalk(x + .5, y + .5) || townAt(x, y, 22*WS)) continue;
+    if (S.dens.some(d => Math.hypot(d.x - x, d.y - y) < 40*WS)) continue;
     let ty = null; for (let k = 0; k < 12 && !ty; k++) { const c = spawnTypeFor(t, x, false); if (c && ENEMIES[c] && !ENEMIES[c].passive) ty = c; }
     if (!ty) continue;
     S.dens.push({x, y, type: ty, broken: -99});
@@ -12125,7 +12187,7 @@ function spawnTypeFor(t, x, night) {
   const r = Math.random();
   switch (t) {
     case T.FOREST: return night && r < .25 ? 'skeleton' : r < .6 ? 'wolf' : r < .85 ? 'boar' : 'slime';
-    case T.SNOW: return x > 290 ? (r < .6 ? 'harpy' : 'wolf') : night && r < .4 ? 'wraith' : 'wolf';
+    case T.SNOW: return x > 290*WS ? (r < .6 ? 'harpy' : 'wolf') : night && r < .4 ? 'wraith' : 'wolf';
     case T.JUNGLE: return r < .5 ? 'snake' : r < .8 ? 'jaguar' : 'spider';
     case T.BLOSSOM: return r < .5 ? 'sprite' : r < .75 ? 'boar' : 'wolf';
     case T.SHIMMER: return night ? (r < .6 ? 'wisp' : 'wraith') : (r < .5 ? 'harpy' : null);
@@ -12141,7 +12203,7 @@ function spawnTypeFor(t, x, night) {
     case T.GRASS: case T.ROAD:
       return night ? (r < .35 ? 'wolf' : r < .55 ? 'bandit' : r < .7 ? 'archer' : 'skeleton') : (r < .3 ? 'bandit' : r < .45 ? 'archer' : r < .7 ? 'boar' : r < .85 ? 'slime' : null);
     case T.DUNE: return night && r < .25 ? 'skeleton' : 'scorpion';
-    case T.SAND: if (x > 600 && x < 712 && S.y > 222 && night) return r < .7 ? 'ghostpirate' : 'crab'; return x > 170 && x < 360 ? (r < .6 ? 'scorpion' : 'crab') : (r < .45 ? 'crab' : null);
+    case T.SAND: if (x > 600*WS && x < 712*WS && S.y > 222*WS && night) return r < .7 ? 'ghostpirate' : 'crab'; return x > 170*WS && x < OLD_W ? (r < .6 ? 'scorpion' : 'crab') : (r < .45 ? 'crab' : null);
     case T.MARSH: return night && r < .3 ? 'skeleton' : r < .75 ? 'lurker' : 'slime';
     case T.GLOOM: return r < .55 ? 'spider' : r < .8 ? 'bat' : 'wolf';
     case T.ASH: return r < .85 ? 'imp' : 'skeleton';
@@ -12781,6 +12843,7 @@ const SHRINES = [
   {id:'s5', tx:604, ty:100, order:['red','gold','blue','green'], poem:'Fire is first, the king second; the tide third, the forest fourth.'},
   {id:'s6', tx:770, ty:150, order:['blue','red','green','gold'], poem:'Sky above, ember below; then the green things grow, and the sun crowns them.'},
 ];
+for (const sh of SHRINES) wsSpot(sh);
 const LMAP = {skullrock:'bones', crystalspire:'glass', eldest:'grove', shipgrave:'wreck', mossfalls:'falls', shroomking:'grove', bamboogate:'tower', worldsend:'beacon', throne:'tower', redheart:'grove', reef:'glass', vault:'mine', cloudshrine:'shrine', greattree:'grove', bonepit:'bones', eastlight:'tower', spring2:'spring', sleeper:'statue'};
 function drawLandmark(g, L, t) {
   const x = L.x*TS + 8, y = L.y*TS + 12;
@@ -14508,7 +14571,7 @@ function routeValue(a, b) {
   const A = TOWNS[a], B = TOWNS[b]; let best = null;
   for (const g of A.produce) { if (!GOODS[g]) continue; const m = price(b, g) - price(a, g); if (!best || m > best.m) best = {g, m}; }
   if (!best || best.m <= 0) return null;
-  const dist = Math.hypot(A.x - B.x, A.y - B.y), days = Math.max(1, Math.ceil(dist/70));
+  const dist = Math.hypot(A.x - B.x, A.y - B.y), days = Math.max(1, Math.ceil(dist/(70*WS)));
   return {g: best.g, perDay: Math.max(4, Math.round(best.m*3/days)), days};
 }
 function bestRoutes() {
@@ -16765,7 +16828,7 @@ function redrawRect([rx, ry, rw, rh]) {
     for (let y = cy*CH; y < Math.min(H, (cy + 1)*CH); y++) for (let x = cx*CH; x < Math.min(W, (cx + 1)*CH); x++) drawTile(g, x, y);
   }
   for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) { const i = idx(x,y); if (S) S.explored[i] = 0; mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; }
-  mapCtx.putImageData(mapImg, 0, 0);
+  mapCtx.putImageData(mapImg, 0, 0, rx, ry, rw, rh);
 }
 function populateAbyss() {
   const D = DUNGEONS.abyss, f = ABYSS.floor, mul = 1.2 + f*.22;
@@ -17045,8 +17108,8 @@ function weatherNow() {
   if (S.rm && S.rm.step >= 4 && S.time > .24 && S.time < .36 && Math.hypot(S.x - TOWNS.sunreach.x, S.y - TOWNS.sunreach.y) < 30) return 'rain';
   if (g === 'clear') return 'clear';
   if (g === 'fog') return 'fog';
-  if (t === T.DUNE || t === T.MESA || (t === T.SAND && S.x > 170)) return g === 'storm' ? 'sandstorm' : 'clear';
-  if (t === T.SNOW || S.y < 30 || seasonIdx() === 3) return 'snow';
+  if (t === T.DUNE || t === T.MESA || (t === T.SAND && S.x > 170*WS)) return g === 'storm' ? 'sandstorm' : 'clear';
+  if (t === T.SNOW || S.y < 30*WS || seasonIdx() === 3) return 'snow';
   return g;
 }
 const weatherSlow = () => (S && weatherNow() === 'sandstorm' && !townAt(S.x, S.y, 8) && !have('pale_cloak')) ? .85 : 1;
@@ -17696,7 +17759,7 @@ function bossIntroFX(B) {
   clearTimeout(bossIntroFX.t); bossIntroFX.t = setTimeout(() => { el.classList.remove('show'); setTimeout(() => { el.hidden = true; }, 500); }, 2900);
 }
 /* ================= the arena ================= */
-const ARENA = {x0: 812, y0: 256, w: 36, h: 28, cx: 830, cy: 269, rx: 15, ry: 10, gate: {x: 830, y: 280}};
+const ARENA = {x0: 812, y0: 256 + BAND_DY, w: 36, h: 28, cx: 830, cy: 269 + BAND_DY, rx: 15, ry: 10, gate: {x: 830, y: 280 + BAND_DY}};
 const inArena = () => !!(S && S.y >= WORLD_H && S.x >= ARENA.x0 && S.x < ARENA.x0 + ARENA.w);
 function carveArena() {
   const A = ARENA;
@@ -17935,7 +17998,7 @@ function fadeThen(fn) { const f = $('fade'); f.style.opacity = 1; setTimeout(() 
 /* ================= fast travel ================= */
 const bossActive = () => enemies.some(e => e.boss);
 const ownBoss = () => enemies.some(e => e.boss && !e.net);
-function travelCost(k) { if (k.startsWith('ws:')) return 0; if (facPerk('league') >= 3 || k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / 6)); }
+function travelCost(k) { if (k.startsWith('ws:')) return 0; if (facPerk('league') >= 3 || k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / (6*WS))); }
 function renderTravel() {
   const list = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle');
   const blocked = bossActive() || !!inDungeon() || inArena();
@@ -17988,8 +18051,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 50;
+const WN_VER = 51;
 const WHATS_NEW = [
+  ['A much bigger world', 'The whole world is now three times as wide and three times as tall: nine times the land, with wild country between every town. Journeys take longer, so mounts, balloons and fast travel matter more. Your save carries over.'],
   ['Walk inside your home', 'Step through your front door to walk around your house, see the furniture you placed, sleep, cook and decorate.'],
   ['Table hockey', 'Breda Stormhand in Stormwatch challenges all comers to table hockey.'],
   ['Soap bubbles', 'Suds McGee in Reedholm needs help popping an overflowing tub of soap bubbles.'],
@@ -18247,7 +18311,7 @@ $('creatorSheet').addEventListener('keydown', e => { if (e.key === 'Enter') $('c
 /* ================= title camera ================= */
 const TITLE_PATH = ['wren','hollow','highcairn','frost','ashfall','storm','jade','lantern','skyhold','petal','tidewatch','maplehold','crownfall','greenstem','sporehaven','driftport','mossbridge','tallpine','prismvale','farhaven','sunreach','redrock','graven','reed','thorn'];
 function titleCam(dt) {
-  const u = (frameT * .018) % TITLE_PATH.length, i = Math.floor(u), f = u - i, k = f*f*(3 - 2*f);
+  const u = (frameT * .018/WS) % TITLE_PATH.length, i = Math.floor(u), f = u - i, k = f*f*(3 - 2*f);
   const A = TOWNS[TITLE_PATH[i]], B = TOWNS[TITLE_PATH[(i + 1) % TITLE_PATH.length]];
   S.x = A.x + (B.x - A.x)*k + .5; S.y = A.y + (B.y - A.y)*k + 2;
   S.time = (.25 + frameT*.006) % 1;
@@ -18260,7 +18324,7 @@ function musicContext() {
   if (townAt(S.x, S.y, 9)) return 'town';
   if (Math.cos((S.time - .5) * Math.PI * 2) < -.2) return 'night';
   const t = tileAt(Math.floor(S.x), Math.floor(S.y));
-  if (t === T.DUNE || t === T.MESA || t === T.SAND && S.x > 170) return 'desert';
+  if (t === T.DUNE || t === T.MESA || t === T.SAND && S.x > 170*WS) return 'desert';
   if (t === T.SNOW) return 'snow';
   if (t === T.GLOOM || t === T.MOOR) return 'gloom';
   if (t === T.ASH || t === T.LAVA) return 'ash';
@@ -18305,7 +18369,7 @@ function step(ts) {
 function begin(state) {
   state.heroicRun = null;
   if (state.story && state.story.heir && state.story.heir.crowned) { NPC_BY.elowen.name = 'Queen Elowen'; NPC_BY.elowen.role = 'Queen of the Old Kingdom'; }
-  S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling'); invalidateChunks(); placeTitan(); CIRCUS = null; setTimeout(placeCircus, 60);
+  S = state; wsSettle(); petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling'); invalidateChunks(); placeTitan(); CIRCUS = null; setTimeout(placeCircus, 60);
   if (S.y >= WORLD_H && (dungeonAtX(S.x) === 'mine' || (S.x >= 812 && S.x < 848))) { const E = S.x >= 812 && S.x < 848 ? {x: TOWNS.crownfall.x - 2, y: TOWNS.crownfall.y + 2} : DUNGEONS.mine.entrance; S.x = E.x + .5; S.y = E.y + 1.4; S.arena = null; }
   if (!S.home.barn) S.home.barn = {cow:0, sheep:0, pig:0};
   if (!S.home.prod) S.home.prod = {milk:0, wool:0, truffle:0};
@@ -18343,7 +18407,7 @@ window.__vg = {get hin(){return hin;}, homeXY: () => ({x: HOME.x, y: HOME.y}), g
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
-window.__sw = {mgPay: (k, a, f) => mgPay(k, a, f), get skyWhale(){return skyWhale;}, set whaleT(v){whaleT=v;}, get meteor(){return meteor;}, set meteorT(v){meteorT=v;}, get cloudPearls(){return cloudPearls;}, ensureSummits: () => ensureSummits(), get moonRabbit(){return moonRabbit;}, guardianCheck: () => guardianCheck(), get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {dims: () => ({W, H, WORLD_H, WS}), map, TILE_COL, ROAD_PATHS, set petFindT(v){petFindT=v;}, mgPay: (k, a, f) => mgPay(k, a, f), get skyWhale(){return skyWhale;}, set whaleT(v){whaleT=v;}, get meteor(){return meteor;}, set meteorT(v){meteorT=v;}, get cloudPearls(){return cloudPearls;}, ensureSummits: () => ensureSummits(), get moonRabbit(){return moonRabbit;}, guardianCheck: () => guardianCheck(), get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
