@@ -308,6 +308,32 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 .petname, .hatsel { font-family: var(--mono); font-size: 12px; background: rgba(255,255,255,.06); color: var(--text); border: 1px solid var(--line); border-radius: 3px; padding: 7px 9px; }
 .petname { width: 130px; } .hatsel option { background: var(--panel-solid); }
 #sPet { margin-top: 4px; color: #ffb0d0; }
+.stars { color: #ffc23a; letter-spacing: 1px; font-size: 11px; }
+.exp-run { display: grid; gap: 3px; margin-top: 8px; font-size: 12px; }
+.exp-run span { color: var(--dim); }
+.exp-bar { height: 5px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
+.exp-bar i { display: block; height: 100%; background: var(--good); box-shadow: 0 0 8px var(--good); }
+.item.exp-on { border-color: var(--ember); }
+.item.exp-pick { background: rgba(255,138,61,.06); }
+.roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; margin-top: 8px; }
+.crew { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; padding: 7px 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; cursor: pointer; font-size: 12px; }
+.crew input { grid-row: span 2; accent-color: var(--ember); width: 16px; height: 16px; }
+.crew span { color: var(--dim); font-size: 11px; }
+.crew.match { border-color: rgba(125,255,176,.4); }
+.crew.busy { opacity: .45; cursor: not-allowed; }
+#expPanel .panel { width: min(860px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(8px); margin-block: 24px; }
+#expPanel header { display: flex; justify-content: space-between; align-items: start; padding: 18px 22px 12px; border-bottom: 1px solid var(--line); }
+#expPanel header h2 { margin: 4px 0 0; font-family: var(--display); font-size: 26px; }
+#expPanel header .eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--ember); }
+#expReport { z-index: 23; }
+#expReport .center-card { max-width: 520px; text-align: left; justify-items: start; }
+#expReport .eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--ember); }
+.rep-body { display: grid; gap: 10px; }
+.rep-story { color: var(--text) !important; font-size: 14px; line-height: 1.6; }
+#cityBubble { position: fixed; z-index: 6; transform: translate(-50%, -100%); background: rgba(250,246,240,.96); color: #1a1420; border-radius: 10px; padding: 8px 12px; max-width: 260px; pointer-events: none; font-size: 12px; line-height: 1.45; box-shadow: 0 4px 14px rgba(0,0,0,.35); text-shadow: none; }
+#cityBubble b { font-family: var(--display); font-size: 14px; margin-right: 6px; } #cityBubble span { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8a5a3a; } #cityBubble p { margin: 4px 0 0; }
+#bbCity { font-size: 11px; color: var(--good); }
+#sCity { margin-top: 4px; color: #9fe8b0; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -352,7 +378,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
   <div class="mats" id="sMats"></div>
 </div>
 <div class="hud hud-tr" id="sHudTR" hidden>
-  <div class="card"><div class="eyebrow">On foot</div><h3>Explore Verdance</h3><p id="sHint"></p><p id="sDisc" style="margin-top:6px;color:var(--ember-hi)"></p><p id="sTime" style="margin-top:4px"></p><p id="sPet"></p></div>
+  <div class="card"><div class="eyebrow">On foot</div><h3>Explore Verdance</h3><p id="sHint"></p><p id="sDisc" style="margin-top:6px;color:var(--ember-hi)"></p><p id="sTime" style="margin-top:4px"></p><p id="sPet"></p><p id="sCity"></p></div>
 </div>
 <div class="hud hud-b" id="sHudB" hidden>
   <div class="bars">
@@ -367,6 +393,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 </div>
 <div id="buildBar" hidden>
   <div class="bb-pieces" id="bbPieces"></div>
+  <div id="bbCity"></div>
   <div class="bb-actions"><button class="btn" id="bbPlace">Place (E)</button><button class="ghost" id="bbRot">Rotate (R)</button><button class="ghost" id="bbDel">Remove (X)</button><button class="ghost" id="bbDone">Done (B)</button></div>
 </div>
 <div id="cratePanel" class="center-card" hidden>
@@ -426,6 +453,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
       <button class="tab" role="tab" data-tab="station" aria-selected="false" hidden>Station</button>
       <button class="tab" role="tab" data-tab="races" aria-selected="false" hidden>Races</button>
       <button class="tab" role="tab" data-tab="pets" aria-selected="false">Pets</button>
+      <button class="tab" role="tab" data-tab="expeditions" aria-selected="false">Expeditions</button>
       <button class="tab" role="tab" data-tab="ships" aria-selected="false">Ships</button>
       <button class="tab" role="tab" data-tab="crew" aria-selected="false">Crew</button>
       <button class="tab" role="tab" data-tab="crafting" aria-selected="false">Crafting</button>
@@ -465,6 +493,9 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 
 <div class="overlay" id="wanderPanel" hidden><div class="center-card"><h2>Derelict worldship</h2><p id="wanderText"></p><div class="row-btns"><button class="btn" id="wanderBuy">Restore for 100,000 cr</button><button class="ghost" id="wanderClose">Leave it</button></div></div></div>
 <div id="raceCount" hidden></div>
+<div id="cityBubble" hidden></div>
+<div class="overlay" id="expPanel" hidden><div class="panel"><header><div><div class="eyebrow">Genesis Ark · bridge terminal</div><h2>Expedition board</h2></div><button class="ghost" id="expClose">Close</button></header><div class="tabbody" id="expBody"></div></div></div>
+<div class="overlay" id="expReport" hidden><div class="center-card"><div class="rep-body"></div><button class="btn" id="expReportClose">Close report</button></div></div>
 <div id="ionFx"></div>
 <div id="flareFx"></div>
 <div id="wxBadge" hidden></div>
@@ -905,8 +936,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -1130,12 +1161,12 @@ addEventListener('keydown', e => {
     const now = performance.now();
     if (lastTap.code === e.code && now - lastTap.t < 280) { startRoll(e.code === 'KeyA' ? 1 : -1); lastTap.t = 0; } else { lastTap.code = e.code; lastTap.t = now; }
   }
-  if (G.state === 'surface' && !e.repeat) { if (e.code === 'KeyE') harvest(); if (e.code === 'KeyF') board(); if (e.code === 'KeyC') scan(); if (e.code === 'KeyB') toggleBuild(); if (S.build) { if (e.code === 'KeyR') rotateBuild(); if (e.code === 'KeyX') removePiece(); const n = '12345'.indexOf(e.key); if (n >= 0) selectPiece(Object.keys(PIECES)[n]); } }
+  if (G.state === 'surface' && !e.repeat) { if (e.code === 'KeyE') harvest(); if (e.code === 'KeyF') board(); if (e.code === 'KeyC') scan(); if (e.code === 'KeyB') toggleBuild(); if (S.build) { if (e.code === 'KeyR') rotateBuild(); if (e.code === 'KeyX') removePiece(); const n = '1234567890-'.indexOf(e.key); if (n >= 0) selectPiece(Object.keys(PIECES)[n]); } }
   if (e.code === 'KeyP' && !e.repeat) { if (G.state === 'fly' || G.state === 'surface') enterPhoto(); else if (G.state === 'photo') exitPhoto(); }
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyG' && G.state === 'surface' && !e.repeat) petInteract();
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -1222,6 +1253,8 @@ function renderDock() {
       const lv = G.up[k], max = lv >= MAXLV, cost = upgradeCost(k);
       h += `<div class="item"><div><h4>${UPG[k].name}${pips(lv)}</h4><p>Now: ${UPG[k].desc(lv)}${max ? '' : `<br>Next: ${UPG[k].desc(lv + 1)}`}</p></div><div>${max ? '<div class="reward">Maxed</div>' : `<div class="reward">${cost.toLocaleString()} cr</div><button class="btn" data-act="upgrade" data-k="${k}" ${G.credits < cost ? 'disabled' : ''}>Install</button>`}</div></div>`;
     }
+  } else if (dockTab === 'expeditions') {
+    h += renderExpeditions();
   } else if (dockTab === 'pets') {
     h += renderPets();
   } else if (dockTab === 'races') {
@@ -1257,6 +1290,7 @@ $('#tabBody').addEventListener('click', e => {
   const act = b.dataset.act, st = G.docked;
   shipAct(act, b, st); tradeAct(act, b, st); fishAct(act, b, st); ownAct(act, b, st); abyssAct(act); petAct(act, b);
   if (act === 'openlog') openLog();
+  expAct(act, b);
   if (act === 'race') { armRace(b.dataset.k); renderDock(); }
   if (act === 'cancelrace') { cancelRace('Race cancelled.'); renderDock(); }
   if (act === 'craft') craft(b.dataset.k);
@@ -2119,7 +2153,7 @@ function updateSurface(dt) {
 function harvest() {
   if (G.state !== 'surface') return;
   if (S.build) { placePiece(); return; }
-  if (!S.near) { if (!interactArk() && !ruinInteract()) { if (nearPiece()) interactPiece(); else petInteract(); } return; }
+  if (!S.near) { if (!expInteract() && !interactArk() && !ruinInteract()) { if (nearPiece()) interactPiece(); else if (!cityInteract()) petInteract(); } return; }
   const it = S.near, t = ITEMS[it.type];
   if (it.type === 'egg') { surf.remove(it.obj); S.items.splice(S.items.indexOf(it), 1); S.near = null; G.eggs.push({ kind: it.kind, t: 0 }); sfx('win'); say(`You found a ${PET_KINDS[it.kind].name} egg! Incubate it in the Pets tab at any station.`, 'good'); save(); return; }
   if (it.type === 'ledger') { surf.remove(it.obj); S.items.splice(S.items.indexOf(it), 1); S.near = null; sfx('win'); if (G.mission && G.mission.type === 'fetch') completeMission('You found the Paymaster ledger!'); return; }
@@ -2195,9 +2229,9 @@ function updateSurfHUD() {
   $('#bScan').style.width = ((1 - S.scanCd / 5) * 100) + '%'; $('#tScan').textContent = S.scanCd > 0 ? S.scanCd.toFixed(1) + 's' : 'Ready';
   const hint = isTouch ? 'Stick to walk. Drag the right side to look. JET to fly, SCAN to find things, GRAB to harvest, BUILD to make a base, SHIP to leave.' : 'WASD walk · Shift run · Space jetpack · Drag mouse to look · C scan · E harvest · B build · F board ship';
   const hint2 = W.hint || hint; if ($('#sHint')._h !== hint2) { $('#sHint').textContent = hint2; $('#sHint')._h = hint2; }
-  $('#sDisc').textContent = `${Object.keys(G.disc).length} of ${DISC_TOTAL} discoveries catalogued`; $('#sTime').textContent = todLabel(); { const ap = activePet(); $('#sPet').textContent = ap ? `${ap.name} the ${PET_KINDS[ap.kind].name} · Lv ${ap.lvl}${ap.food < 20 ? ' · hungry!' : ''}` : ''; }
+  $('#sDisc').textContent = `${Object.keys(G.disc).length} of ${DISC_TOTAL} discoveries catalogued`; $('#sTime').textContent = todLabel(); $('#sCity').textContent = W === VERD_W ? cityLine() : ''; { const ap = activePet(); $('#sPet').textContent = ap ? `${ap.name} the ${PET_KINDS[ap.kind].name} · Lv ${ap.lvl}${ap.food < 20 ? ' · hungry!' : ''}` : ''; }
   const dShip = Math.hypot(S.pos.x - PAD.x, S.pos.z - PAD.z);
-  let pr = fishPrompt() || ruinPrompt() || arkPrompt() || basePrompt() || petPrompt();
+  let pr = fishPrompt() || expPrompt() || ruinPrompt() || arkPrompt() || basePrompt() || cityPrompt() || petPrompt();
   if (pr) { /* base or build prompt */ } else if (S.near) pr = isTouch ? `Tap GRAB to harvest ${ITEMS[S.near.type].name}` : `Press <kbd>E</kbd> to harvest ${ITEMS[S.near.type].name}`;
   else if (dShip < 11 && !W.interior) pr = isTouch ? 'Tap SHIP to return to orbit' : 'Press <kbd>F</kbd> to board your ship and return to orbit';
   setPrompt(pr);
@@ -2417,7 +2451,7 @@ function planFor(t, r) {
   else y = fl ? fl.rec.y : hgt(x, z);
   const dp = Math.hypot(cx * CELL - PAD.x, cz * CELL - PAD.z);
   let bad = '';
-  if (dp > 72) bad = 'Too far from your landing pad';
+  if (dp > 150) bad = 'Too far from your landing pad';
   else if (dp < 16) bad = 'Too close to the landing pad';
   else if (hgt(cx * CELL, cz * CELL) < 0.6) bad = 'You can’t build in the water';
   else if (t === 'floor' && fl) bad = 'There is already a floor here';
@@ -5176,6 +5210,234 @@ $('#logShare').addEventListener('click', async () => {
   }, 'image/png');
 });
 
+/* ============ crew expeditions ============ */
+const JOBS_E = { pilot: 'Pilot', engineer: 'Engineer', scout: 'Scout', medic: 'Medic', miner: 'Miner', gunner: 'Gunner' };
+const LAST = ['Okafor', 'Varga', 'Lindqvist', 'Moreau', 'Tanaka', 'Reyes', 'Kowal', 'Achebe', 'Sato', 'Brandt', 'Quill', 'Haddad', 'Novak', 'Ferro', 'Ishii', 'Dunmore'];
+const EXP_TYPES = {
+  mining: { name: 'Mining run', jobs: ['miner', 'engineer'], mats: ['prism', 'cryo', 'obs', 'meteor'] },
+  scout: { name: 'Scouting', jobs: ['scout', 'pilot'], mats: ['sun', 'comet'] },
+  rescue: { name: 'Rescue', jobs: ['medic', 'pilot'], mats: ['sap', 'resin'] },
+  treasure: { name: 'Treasure hunt', jobs: ['scout', 'engineer'], mats: ['void', 'sun', 'comet'] },
+  escort: { name: 'Escort duty', jobs: ['gunner', 'pilot'], mats: ['prism'] },
+};
+const EXP_PLACES = { ember: ['the Kessel belt', 'the Wanderer’s debris field', 'the Haven shipping lanes', 'the Ember nebula'], frost: ['the Hoarfrost ice rings', 'the Frostfall drift', 'a frozen comet near Rimeholt'], cinder: ['the ash clouds of Pyre', 'the red giant’s corona', 'a lava moon near Cinderwatch'], abyss: ['the edge of the event horizon', 'the alien ruin’s outer halls', 'a drifting probe near Horizon Watch'] };
+G.roster = G.roster || []; G.expeditions = G.expeditions || []; G.expBoard = G.expBoard || []; G.reports = G.reports || []; G.expStats = G.expStats || { ok: 0, sent: 0 };
+const EXP = { sel: null, pick: new Set(), panel: false };
+function syncRoster() {
+  const want = clamp(4 + Math.floor(G.crew / 150), 4, 12);
+  while (G.roster.length < want) {
+    const job = Object.keys(JOBS_E)[G.roster.length % 6];
+    G.roster.push({ id: Date.now() + Math.floor(Math.random() * 1e6), name: `${pick(FIRST)} ${pick(LAST)}`, job, skill: 1 + (Math.random() * 3 | 0), xp: 0, hurt: 0 });
+  }
+}
+const unlockedSys = () => Object.keys(SYS).filter(k => (k !== 'cinder' || G.cinderLane) && (k !== 'abyss' || G.abyssLane));
+function newMission() {
+  const type = pick(Object.keys(EXP_TYPES)), sys = pick(unlockedSys()), dz = SYS[sys].danger || 1, diff = clamp(Math.round(dz + rand(-0.4, 1.6)), 1, 5), et = EXP_TYPES[type];
+  const mats = {}; const mk = pick(et.mats); mats[mk] = 1 + diff + (Math.random() * 3 | 0);
+  return { id: Date.now() + Math.floor(Math.random() * 1e6), type, sys, diff, mins: 2 + diff + (Math.random() * 2 | 0), place: pick(EXP_PLACES[sys]), reward: { cr: Math.round((600 + diff * 700) * dz * rand(0.8, 1.2) / 50) * 50, mats, crew: type === 'rescue' ? 2 + diff : 0 } };
+}
+function fillBoard() { while (G.expBoard.length < 4) G.expBoard.push(newMission()); }
+const crewFree = c => !G.expeditions.some(e => e.crew.includes(c.id)) && (c.hurt || 0) < Date.now();
+function teamChance(m, ids) {
+  const team = G.roster.filter(c => ids.includes(c.id)); if (!team.length) return 0;
+  const power = team.reduce((a, c) => a + c.skill + (EXP_TYPES[m.type].jobs.includes(c.job) ? 2 : 0), 0);
+  return clamp(power / (m.diff * 4 + 3), 0.15, 0.95);
+}
+const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+const fmtLeft = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`; };
+const rewardText = r => [`${r.cr.toLocaleString()} cr`].concat(Object.entries(r.mats).map(([k, n]) => `${n} ${MATS[k].name}`)).concat(r.crew ? [`${r.crew} rescued crew`] : []).join(' · ');
+function renderExpeditions() {
+  syncRoster(); fillBoard();
+  const now = Date.now();
+  let h = `<p class="craft-note">Send 2 to 4 crew members on expeditions across the Reach. They finish in real time while you play. Matching jobs and higher skill mean a better chance of success. Three teams can be out at once.</p>`;
+  if (G.reports.length) h += `<div class="item"><div><h4>Expedition reports</h4><div class="chips">${G.reports.map((r, i) => `<span class="chip ${r.outcome === 'trouble' ? 'miss' : 'ok'}">${r.title} · ${r.outcome === 'success' ? 'success' : r.outcome === 'partial' ? 'partial success' : 'trouble'} <button class="xbtn" style="color:var(--good)" data-act="expread" data-i="${i}">read</button></span>`).join('')}</div></div><div></div></div>`;
+  if (G.expeditions.length) h += `<div class="item"><div><h4>Teams in the field</h4>${G.expeditions.map(e => { const k = clamp((now - e.start) / (e.end - e.start), 0, 1); return `<div class="exp-run"><b>${e.title}</b><span>${e.crew.map(id => (G.roster.find(c => c.id === id) || {}).name || 'crew').join(', ')} · ${fmtLeft(e.end - now)} left · ${Math.round(e.chance * 100)}% chance</span><div class="exp-bar"><i style="width:${k * 100}%"></i></div></div>`; }).join('')}</div><div></div></div>`;
+  h += `<h4 class="craft-sub">Mission board</h4>`;
+  for (const m of G.expBoard) {
+    const et = EXP_TYPES[m.type], on = EXP.sel === m.id;
+    h += `<div class="item ${on ? 'exp-on' : ''}"><div><h4>${et.name}: ${m.place} <span class="tag delivery">${SYS[m.sys].name}</span></h4><p>Difficulty <span class="stars">${stars(m.diff)}</span> · ${m.mins} min · best with ${et.jobs.map(j => JOBS_E[j]).join(' + ')}</p><p class="shipstats">Reward: ${rewardText(m.reward)}</p></div><div><button class="${on ? 'ghost' : 'btn'}" data-act="expsel" data-id="${m.id}" ${G.expeditions.length >= 3 ? 'disabled' : ''}>${on ? 'Cancel' : 'Plan'}</button></div></div>`;
+    if (on) {
+      const ids = [...EXP.pick], ch = teamChance(m, ids);
+      h += `<div class="item exp-pick"><div><h4>Pick your team (${ids.length} of 2 to 4)</h4><div class="roster">${G.roster.map(c => { const free = crewFree(c), match = et.jobs.includes(c.job); return `<label class="crew ${free ? '' : 'busy'} ${match ? 'match' : ''}"><input type="checkbox" class="expchk" data-id="${c.id}" ${EXP.pick.has(c.id) ? 'checked' : ''} ${free ? '' : 'disabled'}><b>${c.name}</b><span>${JOBS_E[c.job]} <span class="stars">${stars(c.skill)}</span>${free ? '' : (c.hurt || 0) > now ? ' · in the medbay' : ' · on a mission'}</span></label>`; }).join('')}</div></div><div><div class="reward">${Math.round(ch * 100)}% success</div><button class="btn" data-act="expsend" ${ids.length >= 2 && ids.length <= 4 ? '' : 'disabled'}>Send team</button></div></div>`;
+    }
+  }
+  h += `<div class="item"><div><h4>Crew roster · ${G.roster.length} specialists</h4><div class="chips">${G.roster.map(c => `<span class="chip">${c.name} · ${JOBS_E[c.job]} <span class="stars">${stars(c.skill)}</span>${(c.hurt || 0) > now ? ' · hurt' : ''}</span>`).join('')}</div><p style="margin-top:6px">Specialists gain skill on expeditions. More crew aboard means more specialists, up to 12.</p></div><div></div></div>`;
+  return h;
+}
+function expRefresh() { if (EXP.panel) $('#expBody').innerHTML = renderExpeditions(); else if (G.state === 'docked') renderDock(); }
+function expAct(act, b) {
+  if (act === 'expsel') { const id = +b.dataset.id; EXP.sel = EXP.sel === id ? null : id; EXP.pick.clear(); sfx('ui'); expRefresh(); }
+  else if (act === 'expsend') {
+    const m = G.expBoard.find(q => q.id === EXP.sel), ids = [...EXP.pick]; if (!m || ids.length < 2 || ids.length > 4 || G.expeditions.length >= 3) return;
+    const now = Date.now(); G.expeditions.push({ id: m.id, title: `${EXP_TYPES[m.type].name}: ${m.place}`, m, crew: ids, start: now, end: now + m.mins * 60000, chance: teamChance(m, ids) });
+    G.expBoard = G.expBoard.filter(q => q !== m); G.expStats.sent++; EXP.sel = null; EXP.pick.clear();
+    say(`Team launched: ${EXP_TYPES[m.type].name} to ${m.place}. Back in about ${m.mins} minutes.`, 'good'); sfx('win'); save(); expRefresh();
+  }
+  else if (act === 'expread') { const r = G.reports.splice(+b.dataset.i, 1)[0]; if (r) showReport(r); save(); expRefresh(); }
+}
+const STORY_T = {
+  mining: { success: (a, b, p) => `${a} cracked open a rich vein in ${p} while ${b} kept the drills from overheating. The hold came back heavy.`, partial: (a, b, p) => `The rocks in ${p} were stubborn. ${a} and ${b} chipped out what they could before the drills gave up.`, trouble: (a, b, p) => `A rockslide in ${p} buried the drills. ${a} dragged ${b} clear, but ${b} needs some time in the medbay.` },
+  scout: { success: (a, b, p) => `${a} charted a hidden route through ${p}, and ${b} spotted something shiny on the way home.`, partial: (a, b, p) => `${p} was foggier than expected. ${a} still brought back half decent charts.`, trouble: (a, b, p) => `Pirates chased the scout ship out of ${p}. ${b} got bruised when ${a} pulled a very sharp turn.` },
+  rescue: { success: (a, b, p) => `${a} found the stranded crew in ${p}. ${b} patched them up and they all signed on with us.`, partial: (a, b, p) => `${a} reached ${p} late. Some of the stranded crew had already been picked up by Patrol.`, trouble: (a, b, p) => `The wreck in ${p} was booby-trapped. ${b} took a nasty knock, and ${a} flew everyone home on one engine.` },
+  treasure: { success: (a, b, p) => `${a} decoded an old map and ${b} dug up a sealed cache in ${p}. Jackpot.`, partial: (a, b, p) => `The cache in ${p} had been raided long ago. ${b} found a few leftovers in the corners.`, trouble: (a, b, p) => `The treasure in ${p} turned out to be a trap. ${b} is fine, mostly. ${a} is not allowed to read old maps any more.` },
+  escort: { success: (a, b, p) => `${a} and ${b} escorted a freighter convoy through ${p} without a scratch. The captain paid a bonus.`, partial: (a, b, p) => `Raiders hit the convoy in ${p}. ${a} and ${b} saved most of it.`, trouble: (a, b, p) => `The convoy in ${p} was ambushed by three gunships. ${b} is in the medbay and the pay was docked.` },
+};
+function finishExpedition(e) {
+  const m = e.m, team = G.roster.filter(c => e.crew.includes(c.id)).sort((x, y) => y.skill - x.skill), roll = Math.random();
+  const outcome = roll < e.chance ? 'success' : roll < e.chance + 0.25 ? 'partial' : 'trouble';
+  const a = team[0] ? team[0].name.split(' ')[0] : 'The lead', bb = team[1] ? team[1].name.split(' ')[0] : 'the team';
+  const got = { cr: 0, mats: {}, crew: 0 }, mult = outcome === 'success' ? 1 : outcome === 'partial' ? 0.5 : 0;
+  got.cr = Math.round(m.reward.cr * mult); for (const [k, n] of Object.entries(m.reward.mats)) { const v = Math.floor(n * mult); if (v) got.mats[k] = v; } got.crew = Math.floor(m.reward.crew * mult);
+  let bonus = '';
+  if (outcome === 'success' && Math.random() < 0.15) { const k = pick(['void', 'comet', 'sun']), n = 2 + (Math.random() * 3 | 0); got.mats[k] = (got.mats[k] || 0) + n; bonus = `Bonus find: ${n} ${MATS[k].name}!`; }
+  G.credits += got.cr; for (const [k, n] of Object.entries(got.mats)) G.mats[k] += n; G.crew += got.crew;
+  const ups = [];
+  team.forEach(c => { c.xp += outcome === 'success' ? 3 : outcome === 'partial' ? 2 : 1; if (c.skill < 5 && c.xp >= c.skill * 6) { c.xp = 0; c.skill++; ups.push(`${c.name} is now ${stars(c.skill)}`); } });
+  if (outcome === 'trouble' && team[1]) team[1].hurt = Date.now() + 4 * 60000;
+  if (outcome === 'success') { G.expStats.ok++; if (G.expStats.ok === 1) logAdd(['First expedition home', `${a}'s team came back from ${m.place} with full holds and a story they will not stop telling.`]); }
+  const story = STORY_T[m.type][outcome](a, bb, m.place);
+  G.reports.unshift({ title: e.title, outcome, story, got, bonus, ups, crew: team.map(c => c.name), sys: SYS[m.sys].name }); if (G.reports.length > 10) G.reports.length = 10;
+  say(`Expedition back: ${e.title} (${outcome === 'success' ? 'success!' : outcome === 'partial' ? 'partial success' : 'trouble'}). Read the report in the Expeditions tab.`, outcome === 'trouble' ? 'bad' : 'good'); sfx(outcome === 'trouble' ? 'fail' : 'win');
+}
+function showReport(r) {
+  const card = $('#expReport');
+  card.querySelector('.rep-body').innerHTML = `<div class="eyebrow">${r.sys} · ${r.outcome === 'success' ? 'Mission success' : r.outcome === 'partial' ? 'Partial success' : 'Trouble'}</div><h2>${r.title}</h2><p class="rep-story">${r.story}</p><p><b>Team:</b> ${r.crew.join(', ')}</p><p><b>Brought back:</b> ${r.got.cr || Object.keys(r.got.mats).length || r.got.crew ? rewardText(r.got) : 'nothing this time'}</p>${r.bonus ? `<p class="tip">${r.bonus}</p>` : ''}${r.ups.length ? `<p class="tip">${r.ups.join(' · ')}</p>` : ''}`;
+  card.hidden = false; sfx('ring');
+}
+$('#expReportClose').addEventListener('click', () => { $('#expReport').hidden = true; });
+let expT = 1;
+function expTick(dt) {
+  if ((expT -= dt) > 0) return; expT = 1;
+  syncRoster();
+  const now = Date.now();
+  for (const e of G.expeditions.slice()) if (now >= e.end) { G.expeditions.splice(G.expeditions.indexOf(e), 1); finishExpedition(e); save(); if (G.state === 'docked' && dockTab === 'expeditions') renderDock(); }
+  if (EXP.panel) $('#expBody').innerHTML = renderExpeditions();
+}
+function onExpChange(e) { const c = e.target.closest('.expchk'); if (!c) return; const id = +c.dataset.id; if (c.checked) { if (EXP.pick.size >= 4) { c.checked = false; return; } EXP.pick.add(id); } else EXP.pick.delete(id); expRefresh(); }
+$('#tabBody').addEventListener('change', onExpChange);
+$('#expBody').addEventListener('change', onExpChange);
+$('#expBody').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) expAct(b.dataset.act, b); });
+$('#expClose').addEventListener('click', closeExpPanel);
+function openExpPanel() { EXP.panel = true; setState('board'); $('#expPanel').hidden = false; $('#expBody').innerHTML = renderExpeditions(); sfx('ui'); }
+function closeExpPanel() { EXP.panel = false; $('#expPanel').hidden = true; if (G.state === 'board') setState('surface'); }
+// mission terminal on the Ark bridge
+const EXP_TERM = { x: 26, z: -116 };
+{ const _ab = ARK_W.build; ARK_W.build = function () { const first = !S.built; _ab(); if (first) { const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; }; add(new THREE.BoxGeometry(2.4, 1.6, 1.2), smat(0x2a2c34, 0.5, { metalness: 0.5 }), EXP_TERM.x, 0.8, EXP_TERM.z); const sc = add(new THREE.BoxGeometry(2.2, 1.3, 0.1), mGlow(0x7dffb0), EXP_TERM.x, 2.2, EXP_TERM.z - 0.3); sc.rotation.x = -0.3; const gl = glowSprite(0x7dffb0, 3); gl.position.set(EXP_TERM.x, 2.4, EXP_TERM.z); surf.add(gl); S.colliders.push({ x: EXP_TERM.x, z: EXP_TERM.z, r: 1.4, top: 2 }); } }; }
+const nearTerm = () => W === ARK_W && Math.hypot(S.pos.x - EXP_TERM.x, S.pos.z - EXP_TERM.z) < 3.2;
+function expPrompt() { return nearTerm() ? `${isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'} to open the expedition board${G.reports.length ? ` (${G.reports.length} new report${G.reports.length > 1 ? 's' : ''})` : ''}` : ''; }
+function expInteract() { if (!nearTerm()) return false; openExpPanel(); return true; }
+
+/* ============ the Verdance colony ============ */
+G.city = G.city || { pop: 0, bank: 0, food: 30, best: 0 };
+const CITY_T = ['house', 'farm', 'market', 'tower', 'park', 'power'];
+Object.assign(PIECES, {
+  house: { name: 'House', cost: { cr: 1500 } },
+  farm: { name: 'Farm', cost: { cr: 1200, sap: 2 } },
+  market: { name: 'Market', cost: { cr: 3000 } },
+  tower: { name: 'Landing tower', cost: { cr: 5000, prism: 2 } },
+  park: { name: 'Park', cost: { cr: 800, resin: 1 } },
+  power: { name: 'Solar plant', cost: { cr: 2000, prism: 1 } },
+});
+function makeCityPiece(t) {
+  const g = new THREE.Group(), add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
+  if (t === 'house') {
+    const wall = smat(pick([0xe8dcc8, 0xc8e0e8, 0xf0d0c0, 0xd8e8c8, 0xe0d0f0]), 0.8);
+    add(new THREE.BoxGeometry(3.4, 2.8, 3.4), wall, 0, 1.4, 0);
+    const roof = add(new THREE.ConeGeometry(2.9, 1.8, 4), smat(pick([0xc8402a, 0x3b66d9, 0x2a8a7a, 0xd9a520]), 0.7, { flatShading: true }), 0, 3.7, 0); roof.rotation.y = Math.PI / 4;
+    add(new THREE.BoxGeometry(0.8, 1.5, 0.08), smat(0x5a3a2a), 0, 0.75, 1.72);
+    for (const x of [-1, 1]) add(new THREE.BoxGeometry(0.7, 0.6, 0.08), mGlow(0xffd8a0), x, 1.8, 1.72);
+  } else if (t === 'farm') {
+    add(new THREE.BoxGeometry(3.8, 0.3, 3.8), smat(0x5a3a22, 1), 0, 0.15, 0);
+    const crop = smat(pick([0x6ab04c, 0xf28a2c, 0xff6fb0]), 0.8, { flatShading: true });
+    for (let i = -1.4; i <= 1.41; i += 0.7) for (let j = -1.4; j <= 1.41; j += 0.93) add(new THREE.ConeGeometry(0.18, 0.6, 5), crop, i, 0.6, j);
+    add(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 10), smat(0xd8d4cc), 1.6, 1.1, -1.6);
+  } else if (t === 'market') {
+    add(new THREE.BoxGeometry(3.6, 0.3, 3.2), smat(0x7a5a3a), 0, 0.15, 0);
+    for (const x of [-1.6, 1.6]) for (const z of [-1.4, 1.4]) add(new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6), smat(0x4a3a2a), x, 1.4, z);
+    const awn = canvasTex(64, 64, (c) => { for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#fff3e6' : '#ff8a3d'; c.fillRect(i * 8, 0, 8, 64); } });
+    const roof = add(new THREE.BoxGeometry(3.8, 0.12, 3.4), new THREE.MeshStandardMaterial({ map: awn, roughness: 0.8 }), 0, 2.65, 0); roof.rotation.x = 0.12;
+    for (let i = 0; i < 4; i++) add(new THREE.BoxGeometry(0.6, 0.5, 0.6), smat(pick([0xd7712c, 0x6ab04c, 0xffc23a])), rand(-1.2, 1.2), 0.55, rand(-1, 1));
+    const sign = add(new THREE.PlaneGeometry(2.4, 0.6), new THREE.MeshBasicMaterial({ map: textTex('MARKET', '#c8401c', '#fff') }), 0, 3.1, 1.72);
+  } else if (t === 'tower') {
+    add(new THREE.CylinderGeometry(0.5, 0.9, 12, 8), smat(0xd8dde8, 0.5, { metalness: 0.4 }), 0, 6, 0);
+    add(new THREE.CylinderGeometry(2.6, 2.6, 0.3, 20), smat(0x4a4c55, 0.5, { metalness: 0.4 }), 0, 12.1, 0);
+    const r = add(new THREE.TorusGeometry(2.4, 0.08, 6, 32), mGlow(0x7dffb0), 0, 12.3, 0); r.rotation.x = Math.PI / 2;
+    const b = glowSprite(0xff4040, 3); b.position.set(0, 13.2, 0); b.userData.blink = 0; g.add(b); g.userData.beacon = b;
+  } else if (t === 'park') {
+    const gr = add(new THREE.CylinderGeometry(1.95, 1.95, 0.12, 24), smat(0x4f9a3a, 1), 0, 0.06, 0);
+    add(new THREE.CylinderGeometry(0.15, 0.22, 1.6, 6), smat(0x4a3a30), -0.8, 0.8, -0.6);
+    add(new THREE.IcosahedronGeometry(0.9, 1), smat(pick([0xe8662a, 0x6ab04c, 0xf5ab3c]), 0.8, { flatShading: true }), -0.8, 2.0, -0.6);
+    add(new THREE.BoxGeometry(1.2, 0.3, 0.4), smat(0x7a5a3a), 0.8, 0.35, 0.8);
+    for (let i = 0; i < 10; i++) add(new THREE.SphereGeometry(0.08, 6, 4), mGlow(pick([0xff6fb0, 0xffc23a, 0xffffff, 0x9fe8ff])), rand(-1.6, 1.6), 0.2, rand(-1.6, 1.6));
+  } else if (t === 'power') {
+    for (const x of [-1.1, 1.1]) { const p = add(new THREE.BoxGeometry(1.8, 0.08, 2.8), new THREE.MeshStandardMaterial({ color: 0x1a3a7a, metalness: 0.7, roughness: 0.25, emissive: 0x0a1a40, emissiveIntensity: 0.4 }), x, 1.2, 0); p.rotation.x = -0.5; add(new THREE.CylinderGeometry(0.06, 0.06, 1.2, 4), smat(0x8a8f99), x, 0.6, 0); }
+    add(new THREE.BoxGeometry(0.8, 0.8, 0.8), smat(0x2a2c34), 0, 0.4, 1.5);
+    const gl = glowSprite(0x6fd8ff, 1.2); gl.position.set(0, 0.95, 1.5); g.add(gl);
+  }
+  return g;
+}
+{ const _mp = makePiece; makePiece = function (t) { return CITY_T.includes(t) ? makeCityPiece(t) : _mp(t); }; }
+{ const _sp = spawnPiece; spawnPiece = function (rec) { const b = _sp(rec); const R = { house: [2.2, 4.6], market: [2, 3], tower: [1.2, 13], power: [1.8, 2] }[rec.t]; if (R) { const c = { x: b.obj.position.x, z: b.obj.position.z, r: R[0], top: rec.y + R[1] }; S.colliders.push(c); b.cols.push(c); } return b; }; }
+const cityCount = t => G.base.pieces.filter(p => p.t === t).length;
+const CITY = { walkers: [], payT: 60, stats: {} };
+function citySim(dt) {
+  const n = {}; CITY_T.forEach(t => n[t] = cityCount(t));
+  if (!CITY_T.some(t => n[t])) { CITY.stats = null; return; }
+  const c = G.city, cap = n.house * 6, made = n.power * 10 + 2, use = n.house + n.farm + n.market * 2 + n.tower * 3, powered = use <= made ? 1 : made / Math.max(1, use);
+  const foodPerMin = n.farm * 8 * powered - c.pop * 0.6;
+  c.food = clamp(c.food + foodPerMin / 60 * dt, 0, 200);
+  const happy = clamp(0.55 + n.park * 0.12 + (c.food > 10 ? 0.2 : -0.35) + (powered >= 1 ? 0.1 : -0.25), 0, 1.6);
+  if (c.pop < cap && c.food > 5 && powered > 0.6) c.pop = Math.min(cap, c.pop + dt * 0.04 * (1 + n.tower * 0.6) * happy);
+  if (c.pop > cap) c.pop = cap;
+  if (c.food <= 0 && c.pop > 0) c.pop = Math.max(0, c.pop - dt * 0.03);
+  const income = (n.market * Math.min(c.pop, 30) * 0.03 * powered + c.pop * 0.01) * (1 + n.tower * 0.25);
+  c.bank += income * dt;
+  CITY.stats = { n, cap, made, use, powered, foodPerMin, happy, income };
+  if ((CITY.payT -= dt) <= 0) { CITY.payT = 60; const v = Math.floor(c.bank); if (v > 0 && G.state !== 'title') { G.credits += v; c.bank -= v; say(`Verdance colony taxes: +${v.toLocaleString()} cr`, 'good'); } }
+  const p = Math.floor(c.pop);
+  if (p >= 1 && !c.best) logAdd(['The first colonists', 'A family of three moved into the first house on Verdance. They brought a goat. Nobody asked about the goat.']);
+  for (const m of [25, 50, 100]) if (p >= m && c.best < m) logAdd([`Colony of ${m}`, `${m} people now live in the Verdance colony. Somebody already wants a second market and a karaoke bar.`]);
+  c.best = Math.max(c.best, p);
+}
+function cityLine() {
+  const s = CITY.stats; if (!s) return '';
+  const c = G.city;
+  return `Colony: ${Math.floor(c.pop)}/${s.cap} people · food ${s.foodPerMin >= 0 ? '+' : ''}${s.foodPerMin.toFixed(0)}/min (${Math.floor(c.food)} stored) · power ${s.made - s.use >= 0 ? 'ok' : 'short'} ${s.use}/${s.made} · +${(s.income * 60).toFixed(0)} cr/min`;
+}
+const COLONIST_LINES = () => {
+  const s = CITY.stats, c = G.city, l = ['Lovely morning on Verdance, captain!', 'The view of the sea from my porch is worth every credit.', 'Have you seen the Dunehoppers by the farms? Cheeky things.', 'I moved here from Haven Ring. So much more room!'];
+  if (s && c.food < 10) l.push('We need more farms, captain. My stomach is louder than the generators.');
+  if (s && s.powered < 1) l.push('The power keeps flickering. Could we get another solar plant?');
+  if (s && s.n.park) l.push('The park is my favourite place in the whole Reach.');
+  if (s && s.n.tower) l.push('Shuttles land at the tower every day now. Business is booming.');
+  if (s && c.pop >= s.cap - 0.5) l.push('All the houses are full. My cousin wants to move here too!');
+  return l;
+};
+VERD_W.update = function (dt) {
+  const s = CITY.stats, want = s ? Math.min(18, Math.floor(G.city.pop / 2)) : 0, spots = S.base.filter(b => CITY_T.includes(b.rec.t)).map(b => b.obj.position);
+  while (CITY.walkers.length < want && spots.length) { const p = makePerson(pick([0x3b66d9, 0xd7712c, 0x4f9a3a, 0xb05ad9, 0xe8e2dc, 0xd9a520])); const at = pick(spots); p.g.position.set(at.x + rand(-3, 3), 0, at.z + rand(-3, 3)); surf.add(p.g); CITY.walkers.push(Object.assign(p, { name: pick(FIRST), goal: null, wait: rand(0, 3), t: 0 })); }
+  while (CITY.walkers.length > want) surf.remove(CITY.walkers.pop().g);
+  for (const w of CITY.walkers) {
+    if (w.g.parent !== surf) surf.add(w.g);
+    let moving = false;
+    if (w.talkT > 0) { w.talkT -= dt; w.g.rotation.y = lerpAngle(w.g.rotation.y, Math.atan2(-(S.pos.x - w.g.position.x), -(S.pos.z - w.g.position.z)), dt * 6); }
+    else if (w.wait > 0) w.wait -= dt;
+    else {
+      if (!w.goal && spots.length) { const t = pick(spots); w.goal = new V3(t.x + rand(-3, 3), 0, t.z + rand(-3, 3)); }
+      if (w.goal) { const dx = w.goal.x - w.g.position.x, dz = w.goal.z - w.g.position.z, d = Math.hypot(dx, dz); if (d < 0.6) { w.goal = null; w.wait = rand(2, 6); } else { w.g.position.x += dx / d * 1.5 * dt; w.g.position.z += dz / d * 1.5 * dt; w.g.rotation.y = Math.atan2(-dx, -dz); moving = true; } }
+    }
+    w.g.position.y = Math.max(hgt(w.g.position.x, w.g.position.z), 0);
+    w.t += dt * (moving ? 7 : 0); const sw = moving ? Math.sin(w.t) * 0.5 : 0; w.legs[0].rotation.x = sw; w.legs[1].rotation.x = -sw; w.arms[0].rotation.x = -sw; w.arms[1].rotation.x = sw;
+  }
+  const tk = CITY.talk, bub = $('#cityBubble');
+  if (tk && tk.t > 0 && G.state === 'surface') { tk.t -= dt; const pp = tmp.copy(tk.w.g.position).add(new V3(0, 2.3, 0)).project(camera); if (pp.z < 1) { bub.hidden = false; bub.innerHTML = `<b>${tk.w.name}</b><span>Colonist</span><p>${tk.text}</p>`; bub.style.left = ((pp.x * 0.5 + 0.5) * innerWidth) + 'px'; bub.style.top = ((-pp.y * 0.5 + 0.5) * innerHeight) + 'px'; } else bub.hidden = true; } else bub.hidden = true;
+  S.base.forEach(b => { if (b.obj.userData.beacon) b.obj.userData.beacon.material.opacity = Math.sin(T * 3) > 0.3 ? 1 : 0.1; });
+  if (S.build) $('#bbCity').textContent = cityLine() || 'Place houses, farms, a market, a landing tower, parks and solar plants to start a colony. Colonists need food (farms) and power (solar plants).';
+};
+const nearColonist = () => { let best = null, bd = 3; for (const w of CITY.walkers) { const d = Math.hypot(w.g.position.x - S.pos.x, w.g.position.z - S.pos.z); if (d < bd) { bd = d; best = w; } } return W === VERD_W ? best : null; };
+function cityPrompt() { const w = nearColonist(); return w ? `${isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'} to chat with ${w.name}` : ''; }
+function cityInteract() { const w = nearColonist(); if (!w) return false; CITY.talk = { w, text: pick(COLONIST_LINES()), t: 5 }; w.talkT = 5; sfx('ui'); return true; }
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
   if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
@@ -5214,10 +5476,10 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board';
   const onSurf = renderScene !== scene;
   if (running) {
-    T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt);
+    T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt); expTick(dt); citySim(dt);
     if (!onSurf) {
       if (G.state === 'fly') { updatePlayer(dt); updateMission(dt); updatePatrols(dt); }
       if (G.state === 'descent') updateDescent(dt);
