@@ -209,6 +209,31 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
 #gxInfo p { margin: 0; color: var(--dim); line-height: 1.55; font-size: 13px; }
 #gxInfo b { color: var(--text); }
 #gxInfo .here-note { color: var(--good); font-size: 12px; }
+.tag.convoy, .tag.fetch, .tag.final { background: rgba(255,192,58,.2); color: #ffd27a; }
+.mk.wing { color: var(--good); } .mk.wing .dia { width: 8px; height: 8px; }
+.mk.salvage { color: #ffd040; }
+#gxSvg .arkmark { fill: var(--ice); font-family: var(--mono); font-size: 9px; letter-spacing: .14em; }
+#comms { position: fixed; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 25; width: min(560px, calc(100vw - 32px)); }
+.comms-card { background: var(--panel); border: 1px solid rgba(255,192,58,.45); border-radius: 6px; padding: 16px 18px; display: grid; gap: 10px; backdrop-filter: blur(8px); box-shadow: 0 0 30px rgba(255,138,61,.2); }
+.comms-who { display: flex; gap: 12px; align-items: center; }
+.comms-who .eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--ember); }
+.comms-who b { font-family: var(--display); font-size: 17px; }
+#commsAvatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(160deg, #3b66d9, #1a2a5a); font-family: var(--display); font-weight: 700; color: #fff; flex: none; }
+#commsText { margin: 0; color: #e6dcd2; line-height: 1.55; font-size: 13px; }
+#comms .btn { justify-self: end; padding: 9px 18px; font-size: 12px; }
+#bubble { position: fixed; z-index: 6; transform: translate(-50%, -100%); background: rgba(250,246,240,.96); color: #1a1420; border-radius: 10px; padding: 8px 12px; max-width: 260px; pointer-events: none; font-size: 12px; line-height: 1.45; box-shadow: 0 4px 14px rgba(0,0,0,.35); text-shadow: none; }
+#bubble b { font-family: var(--display); font-size: 14px; margin-right: 6px; }
+#bubble span { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8a5a3a; }
+#bubble p { margin: 4px 0 0; }
+#bubble::after { content: ""; position: absolute; left: 50%; bottom: -8px; margin-left: -8px; border: 8px solid transparent; border-top-color: rgba(250,246,240,.96); border-bottom: 0; }
+.item.trade { grid-template-columns: 1fr; }
+.ttable { display: grid; margin-top: 10px; overflow-x: auto; }
+.trow { display: grid; grid-template-columns: minmax(130px, 1fr) 56px 56px 48px 178px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 440px; }
+.trow.th { color: var(--dim); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+.trow .tn { color: var(--text); }
+.trow .tb { display: flex; gap: 4px; justify-content: flex-end; }
+.trow .tb button { padding: 5px 9px; font-size: 10px; }
+.tip { color: var(--good) !important; margin-top: 6px !important; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -298,6 +323,7 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
       <div><kbd>B</kbd> build a base (on foot)</div>
       <div><kbd>M</kbd> galaxy map and warp</div>
       <div><kbd>V</kbd> swap weapon</div>
+      <div><kbd>I</kbd> walk aboard the Genesis Ark</div>
     </div>
     <div class="row-btns">
       <button class="btn" id="startBtn">Launch</button>
@@ -341,6 +367,8 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
   </div>
 </div>
 
+<div id="comms" hidden><div class="comms-card"><div class="comms-who"><span id="commsAvatar"></span><div><div class="eyebrow">Incoming transmission</div><b id="commsName"></b></div></div><p id="commsText"></p><button class="btn" id="commsOk">Continue</button></div></div>
+
 <div class="overlay" id="dead" hidden>
   <div class="center-card">
     <h2 style="color:var(--bad)">Ship lost</h2>
@@ -369,6 +397,7 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
     <button id="tMsl">MSL</button>
     <button id="tWpn">WPN</button>
     <button id="tMap">MAP</button>
+    <button id="tArk">ARK</button>
     <button id="tDock">DOCK</button>
   </div>
   <div class="tbtns sf">
@@ -759,7 +788,7 @@ const SAVE_KEY = 'ember-reach-save-v1';
 const G = {
   state: 'title', credits: 400, ore: 0, hull: 100, shield: 60, boost: 100, throttle: 0.35,
   up: { laser: 1, shield: 1, engine: 1, hold: 1 }, mission: null, lastDock: 'haven',
-  stats: { kills: 0, ore: 0, missions: 0 }, mats: { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 }, disc: {}, craft: { shield: 0, scan: 0, fuel: 0, frost: 0, heat: 0 }, weapon: 'laser', ship: 'lancer', ships: ['lancer'], crew: 1, recruit: {}, missiles: 0, mslCd: 0, paint: 'blue', paints: ['blue'], base: { pieces: [], stash: { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 } }, tod: 0.4, docked: null, lastHit: -99, fireCd: 0, patrolT: 45, board: {}
+  stats: { kills: 0, ore: 0, missions: 0 }, mats: { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0, obs: 0 }, disc: {}, craft: { shield: 0, scan: 0, fuel: 0, frost: 0, heat: 0, cool: 0 }, weapon: 'laser', ship: 'lancer', ships: ['lancer'], crew: 1, recruit: {}, missiles: 0, mslCd: 0, paint: 'blue', paints: ['blue'], base: { pieces: [], stash: { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 } }, tod: 0.4, story: 0, cinderLane: false, cargo: {}, drift: {}, wing: 0, wrecks: {}, arkPark: null, arkBank: 0, storyIntro: false, docked: null, lastHit: -99, fireCd: 0, patrolT: 45, board: {}
 };
 const MAXLV = 5;
 const D = {
@@ -771,8 +800,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -870,8 +899,8 @@ function spawnPirate(pos, opt = {}) {
   const obj = makeFighter(heavy ? STYLE_PIRATE_HEAVY : STYLE_PIRATE);
   obj.position.copy(pos).add(randDir().multiplyScalar(rand(20, 90)));
   scene.add(obj);
-  const hp = heavy ? 110 : 45;
-  const e = { obj, vel: new V3(), hp, maxHp: hp, heavy, cd: rand(0.5, 2), state: 'attack', stateT: 0, breakDir: new V3(), mission: !!opt.mission, speed: heavy ? 125 : 150, turn: heavy ? 1.2 : 1.7, dmg: heavy ? 9 : 6, r: heavy ? 9 : 7, bounty: heavy ? 120 : 50 };
+  const dz = (SYS[G.sys] && SYS[G.sys].danger) || 1, hp = Math.round((heavy ? 110 : 45) * (1 + (dz - 1) * 0.5));
+  const e = { obj, vel: new V3(), hp, maxHp: hp, heavy, cd: rand(0.5, 2), state: 'attack', stateT: 0, breakDir: new V3(), mission: !!opt.mission, speed: heavy ? 125 : 150, turn: heavy ? 1.2 : 1.7, dmg: heavy ? 9 : 6, r: heavy ? 9 : 7, bounty: Math.round((heavy ? 120 : 50) * dz) };
   orientTo(obj, player.position);
   enemies.push(e); return e;
 }
@@ -880,7 +909,7 @@ function orientTo(obj, target) { _m.lookAt(obj.position, target, UP); obj.quater
 function turnToward(obj, target, rate) { _m.lookAt(obj.position, target, UP); _q.setFromRotationMatrix(_m); obj.quaternion.rotateTowards(_q, rate); }
 
 /* ============ missions ============ */
-const MTYPES = { bounty: 'Bounty', delivery: 'Delivery', mining: 'Mining', race: 'Ring race', supply: 'Supply', boss: 'Capital bounty' };
+const MTYPES = { bounty: 'Bounty', delivery: 'Delivery', mining: 'Mining', race: 'Ring race', supply: 'Supply', boss: 'Capital bounty', convoy: 'Story', fetch: 'Story', final: 'Story' };
 const CARGO = ['medical crates', 'reactor coolant', 'sealed diplomatic pouch', 'hydroponic seed stock', 'spare drive coils', 'a crate of live crickets', 'navigation charts', 'ration packs'];
 const PIRATE_GANGS = ['the Rustjaw crew', 'Cinder Wolves', 'the Hollow Saints', 'Vex Kara’s raiders', 'the Brine Knives'];
 function genMissions(st) {
@@ -915,6 +944,8 @@ function genMissions(st) {
     out.push(mkBounty(true), { type: 'supply', title: `Cryo order: ${need} crystals`, desc: `Rimeholt's refinery needs ${need} Cryo crystals from the caves of Hoarfrost. Bring them here.`, mat: 'cryo', need, at: st.id, reward: need * 110 },
       { type: 'boss', title: 'Sink the Iron Leviathan', desc: 'A pirate capital ship is raiding Frostfall. Knock out its six turrets, then hit the exposed reactor. Missiles and the frost cannon help.', at: st.pos.clone().add(new V3(-2600, 400, -3600)), reward: G.stats.bosses ? 3000 : 6000 });
   }
+  if (st.id === 'cinderwatch') { const need = 3 + (Math.random() * 3 | 0); out.push(mkBounty(true), mkBounty(true), { type: 'supply', title: `Obsidian order: ${need} shards`, desc: `Cinderwatch engineers need ${need} Obsidian glass from the caves of Pyre for heat shielding.`, mat: 'obs', need, at: st.id, reward: need * 160 }); }
+  const dzm = (SYS[st.sys] && SYS[st.sys].danger) || 1; out.forEach(m => { if (m.type !== 'boss') m.reward = Math.round(m.reward * dzm); });
   return out;
 }
 
@@ -943,6 +974,8 @@ function acceptMission(m) {
   if (m.type === 'delivery') m.left = m.time;
   if (m.type === 'race') setupRace(m);
   if (m.type === 'boss') spawnBoss(m.at);
+  if (m.type === 'final') spawnBoss(m.at, 'gilded');
+  if (m.type === 'convoy') spawnConvoy(m.at);
   sfx('ui'); say(`Contract accepted: ${m.title}`);
   renderDock();
 }
@@ -952,12 +985,14 @@ function completeMission(text) {
   G.crew += crewGain;
   say(`${text} +${m.reward} credits`, 'good'); sfx('win');
   if (crewGain) say(`${crewGain} rescued spacer${crewGain > 1 ? 's' : ''} joined your crew.`, 'good');
+  if (m.story) storyDone(m.story);
   save();
 }
 function failMission(text) {
   const m = G.mission; G.mission = null;
   if (m && m.type === 'race') clearRings();
-  if (m && m.type === 'boss') despawnBoss();
+  if (m && (m.type === 'boss' || m.type === 'final')) despawnBoss();
+  if (m && m.type === 'convoy') enemies.slice().forEach(e => { if (e.hauler) removeEnemy(e); else e.mission = false; });
   if (m && m.type === 'bounty') enemies.forEach(e => e.mission = false);
   say(text, 'bad'); sfx('fail');
 }
@@ -973,6 +1008,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape' && G.state === 'map') { toggleMap(); return; }
   if (e.code === 'KeyM' && (G.state === 'fly' || G.state === 'map')) toggleMap();
   if (e.code === 'KeyV' && G.state === 'fly') toggleWeapon();
+  if (e.code === 'KeyI' && G.state === 'fly') tryEnterArk();
   if (e.code === 'Escape' && G.state === 'surface' && (S.build || !$('#cratePanel').hidden)) { closeBuild(); closeCrate(); return; }
   if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code) && (G.state === 'fly' || G.state === 'surface')) e.preventDefault();
   if (e.code === 'KeyE' && G.state === 'fly') tryDock();
@@ -1007,7 +1043,7 @@ if (isTouch) {
   hold('#tJet', 'jet');
   const tap = (id, fn) => $(id).addEventListener('touchstart', e => { fn(); e.preventDefault(); }, { passive: false });
   tap('#tDock', tryDock); tap('#tRoll', () => startRoll(stick.x < -0.2 ? 1 : -1));
-  tap('#tScanB', () => scan()); tap('#tMsl', () => fireMissile()); tap('#tWpn', () => toggleWeapon()); tap('#tMap', () => toggleMap()); tap('#tBuild', () => toggleBuild()); tap('#tGrab', () => harvest()); tap('#tShip', () => board());
+  tap('#tScanB', () => scan()); tap('#tMsl', () => fireMissile()); tap('#tWpn', () => toggleWeapon()); tap('#tMap', () => toggleMap()); tap('#tArk', () => tryEnterArk()); tap('#tBuild', () => toggleBuild()); tap('#tGrab', () => harvest()); tap('#tShip', () => board());
   const look = $('#lookZone'); let lk = null;
   look.addEventListener('touchstart', e => { const t = e.changedTouches[0]; lk = { id: t.identifier, x: t.clientX, y: t.clientY }; e.preventDefault(); }, { passive: false });
   look.addEventListener('touchmove', e => { for (const t of e.changedTouches) if (lk && t.identifier === lk.id) { S.yaw -= (t.clientX - lk.x) * 0.008; S.pitch = clamp(S.pitch + (t.clientY - lk.y) * 0.006, -0.3, 1.15); lk.x = t.clientX; lk.y = t.clientY; } e.preventDefault(); }, { passive: false });
@@ -1034,7 +1070,7 @@ function setState(s) {
   $('#dead').hidden = s !== 'dead';
   $('#pause').hidden = s !== 'pause';
   $('#galaxy').hidden = s !== 'map';
-  if (s !== 'surface') $('#frostV').style.opacity = 0;
+  if (s !== 'surface') { $('#frostV').style.opacity = 0; const bb = document.getElementById('bubble'); if (bb) bb.hidden = true; }
   $('#markers').style.display = flying || onFoot ? '' : 'none';
   $('#prompt').textContent = ''; $('#prompt')._h = '';
   canvas.style.cursor = flying && !isTouch ? 'crosshair' : onFoot ? 'grab' : 'default';
@@ -1071,10 +1107,11 @@ function renderDock() {
   } else if (dockTab === 'ships') {
     h += renderShips(st);
   } else if (dockTab === 'crew') {
-    h += renderCrew(st);
+    h += renderCrew(st) + renderWing();
   } else if (dockTab === 'crafting') {
     h += renderCrafting();
   } else if (dockTab === 'market') {
+    h += renderTrade(st);
     const val = G.ore * st.orePrice;
     h += `<div class="item"><div><h4>Raw ore</h4><p>You carry ${G.ore} of ${D.hold} units. ${st.name} pays ${st.orePrice} cr per unit.<br>Prices: ${STATIONS.filter(s => s.sys === st.sys).map(s => `${s.name} ${s.orePrice}`).join(' · ')}</p></div><div><div class="reward">${val.toLocaleString()} cr</div><button class="btn" data-act="sell" ${G.ore ? '' : 'disabled'}>Sell all</button></div></div>`;
     const matVal = Object.keys(MATS).reduce((a, k) => a + G.mats[k] * MATS[k].price, 0);
@@ -1093,7 +1130,7 @@ document.querySelector('.tabs').addEventListener('click', e => { const t = e.tar
 $('#tabBody').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   const act = b.dataset.act, st = G.docked;
-  shipAct(act, b, st);
+  shipAct(act, b, st); tradeAct(act, b, st);
   if (act === 'craft') craft(b.dataset.k);
   if (act === 'paint') paintAct(b.dataset.k);
   if (act === 'accept') acceptMission(G.board[st.id][+b.dataset.i]);
@@ -1123,9 +1160,10 @@ function dock(st) {
   const m = G.mission;
   if (m && m.type === 'delivery' && m.dest === st.id) completeMission(`Delivered to ${st.name}.`);
   if (m && m.type === 'mining' && m.at === st.id && G.ore >= m.need) { G.ore -= m.need; completeMission(`Ore order filled.`); }
-  if (m && m.type === 'supply' && m.at === st.id && G.mats[m.mat] >= m.need) { G.mats[m.mat] -= m.need; completeMission('Cryo order delivered.'); }
+  if (m && m.type === 'supply' && m.at === st.id && G.mats[m.mat] >= m.need) { G.mats[m.mat] -= m.need; completeMission(`${MATS[m.mat].name} order delivered.`); }
   if (!G.board[st.id] || !G.board[st.id].length || G.boardFresh !== st.id) { G.board[st.id] = genMissions(st); }
-  G.boardFresh = st.id;
+  G.boardFresh = st.id; refreshDrift(st); injectStory(st);
+  if (!G.storyIntro && !G.story) { G.storyIntro = true; setTimeout(() => showComms('Commander Ilsa Vale', 'Captain, this is Reach Patrol. Something strange is going on with the pirate gangs. Come and see me at Bastion Spire, and look for the story contract on my board.'), 700); }
   dockTab = 'contracts'; save(); setState('docked'); renderDock(); sfx('ring');
 }
 function undock() {
@@ -1134,7 +1172,7 @@ function undock() {
   orientTo(player, player.position.clone().add(st.exit));
   P.vel.copy(st.exit).multiplyScalar(60); G.throttle = 0.4;
   camPos.copy(player.position).addScaledVector(st.exit, -30 * SH().cam).add(new V3(0, 8 * SH().cam, 0)); camera.near = shipNear(); camera.updateProjectionMatrix();
-  setState('fly'); sfx('ui');
+  setState('fly'); sfx('ui'); wingSnap();
 }
 $('#undockBtn').addEventListener('click', undock);
 $('#startBtn').addEventListener('click', () => {
@@ -1146,7 +1184,7 @@ let resetArmed = false;
 $('#resetBtn').addEventListener('click', e => {
   if (!resetArmed) { resetArmed = true; e.target.textContent = 'Click again to erase'; setTimeout(() => { resetArmed = false; e.target.textContent = 'New pilot'; }, 3000); return; }
   try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
-  Object.assign(G, { credits: 400, ore: 0, hull: 100, lastDock: 'haven' }); Object.assign(G.up, { laser: 1, shield: 1, engine: 1, hold: 1 }); Object.assign(G.stats, { kills: 0, ore: 0, missions: 0 }); Object.assign(G.mats, { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 }); G.disc = {}; Object.assign(G.craft, { shield: 0, scan: 0, fuel: 0 }); G.missiles = 0; G.paint = 'blue'; G.paints = ['blue']; resetBaseScene(); G.base = { pieces: [], stash: { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 } }; applyPaint(); G.ships = ['lancer']; G.crew = 1; G.recruit = {}; G.craft.frost = 0; G.craft.heat = 0; G.weapon = 'laser'; switchShip('lancer');
+  Object.assign(G, { credits: 400, ore: 0, hull: 100, lastDock: 'haven' }); Object.assign(G.up, { laser: 1, shield: 1, engine: 1, hold: 1 }); Object.assign(G.stats, { kills: 0, ore: 0, missions: 0 }); Object.assign(G.mats, { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 }); G.disc = {}; Object.assign(G.craft, { shield: 0, scan: 0, fuel: 0 }); G.missiles = 0; G.paint = 'blue'; G.paints = ['blue']; resetBaseScene(); G.base = { pieces: [], stash: { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 } }; applyPaint(); G.ships = ['lancer']; G.crew = 1; G.recruit = {}; G.craft.frost = 0; G.craft.heat = 0; G.craft.cool = 0; G.weapon = 'laser'; G.mats.obs = 0; G.story = 0; G.cinderLane = false; G.cargo = {}; G.wing = 0; G.wrecks = {}; G.arkBank = 0; G.storyIntro = false; unparkArk(); switchShip('lancer');
   e.target.hidden = true; $('#startBtn').textContent = 'Launch'; $('#saveNote').textContent = '';
 });
 $('#respawnBtn').addEventListener('click', () => { G.hull = D.maxHull; dock(stationById(G.lastDock)); });
@@ -1173,7 +1211,7 @@ function die() {
   explode(player.position, 2.2, 0x9fe8ff); sfx('boom', 1.4);
   player.visible = false;
   const loss = Math.min(G.credits, Math.round(150 + G.credits * 0.1));
-  G.credits -= loss; const lostOre = G.ore; G.ore = 0;
+  G.credits -= loss; const lostOre = G.ore; G.ore = 0; G.cargo = {};
   if (G.mission) failMission('Contract failed: your ship was destroyed.');
   enemies.slice().forEach(e => { if (!e.mission) removeEnemy(e); });
   $('#deadText').textContent = `Insurance rebuilt your ship at ${stationById(G.lastDock).name}. The deductible cost ${loss} credits${lostOre ? ` and your ${lostOre} ore was lost` : ''}.`;
@@ -1232,7 +1270,7 @@ function updatePlayer(dt) {
     if (d < rr) { tmp.subVectors(player.position, a.mesh.position).normalize(); player.position.copy(a.mesh.position).addScaledVector(tmp, rr); const vn = P.vel.dot(tmp); if (vn < 0) { P.vel.addScaledVector(tmp, -vn * 1.4); damagePlayer(Math.abs(vn) * 0.1); } }
   }
   for (const pl of PLANETS) { const dpl = player.position.distanceTo(pl.pos), lim = pl.R + 40 + P.r; if (dpl < lim) { tmp.subVectors(player.position, pl.pos).normalize(); player.position.copy(pl.pos).addScaledVector(tmp, lim); const vn = P.vel.dot(tmp); if (vn < 0) P.vel.addScaledVector(tmp, -vn); } }
-  bossCollide();
+  bossCollide(); arkCollide();
   // world boundary: soft push back
   const far = player.position.distanceTo(SYS[G.sys].c);
   if (far > 9000) { P.vel.addScaledVector(tmp.copy(player.position).sub(SYS[G.sys].c).normalize(), -dt * 200); if (Math.random() < dt) say('Leaving patrolled space. Turn back.', 'bad'); }
@@ -1241,6 +1279,7 @@ function updatePlayer(dt) {
 function updateEnemies(dt) {
   for (const e of enemies.slice()) {
     if (e.turret || e.core) { updateTurret(e, dt); continue; }
+    if (e.hauler) { moveHauler(e, dt); continue; }
     const o = e.obj; const slow = e.slowT > 0 ? 0.4 : 1; if (e.slowT > 0) e.slowT -= dt; frostFx(e); e.cd -= dt * slow; e.stateT -= dt;
     const toP = tmp.subVectors(player.position, o.position); const dist = toP.length();
     if (!e.mission && dist > 4500) { removeEnemy(e); continue; }
@@ -1278,6 +1317,7 @@ function killEnemy(e) {
   const wasMission = e.mission;
   removeEnemy(e);
   if (e.turret || e.core) { bossPartDown(e); return; }
+  if (e.hauler && G.mission && G.mission.type === 'convoy' && !enemies.some(q => q.hauler)) { enemies.forEach(q => q.mission = false); completeMission('Convoy destroyed. Nav charts recovered!'); return; }
   if (wasMission && G.mission && G.mission.type === 'bounty') {
     G.mission.left = enemies.filter(x => x.mission).length;
     if (G.mission.left === 0) completeMission('Bounty complete.');
@@ -1289,7 +1329,7 @@ function updateBolts(dt) {
     const b = bolts[i]; b.prev.copy(b.m.position); b.m.position.addScaledVector(b.vel, dt); b.life -= dt;
     let hit = false;
     if (b.owner === 'player') {
-      for (const e of enemies) if (segHit(b.prev, b.m.position, e.obj.position, e.r)) { e.hp -= b.dmg; e.aggro = true; if (b.frost) e.slowT = 3.5; spark(b.m.position, 0xffd0a0, 10); sfx('thud', 0.6); if (e.hp <= 0) killEnemy(e); hit = true; break; }
+      for (const e of enemies) if (segHit(b.prev, b.m.position, e.obj.position, e.r)) { e.hp -= b.dmg; e.aggro = true; G.target = e; if (b.frost) e.slowT = 3.5; spark(b.m.position, 0xffd0a0, 10); sfx('thud', 0.6); if (e.hp <= 0) killEnemy(e); hit = true; break; }
       if (!hit) for (let j = asteroids.length - 1; j >= 0; j--) {
         const a = asteroids[j]; if (b.m.position.distanceToSquared(a.mesh.position) > (a.r + 20) ** 2) continue;
         if (segHit(b.prev, b.m.position, a.mesh.position, a.r)) { a.hp -= b.dmg; spark(b.m.position, 0xffb070, 9); hit = true; if (a.hp <= 0) breakRock(a); break; }
@@ -1310,11 +1350,11 @@ function updatePickups(dt) {
   for (let i = pickups.length - 1; i >= 0; i--) {
     const p = pickups[i]; p.life -= dt; p.m.rotation.y += dt * 2; p.m.rotation.x += dt;
     const d = p.m.position.distanceTo(player.position);
-    if (G.state === 'fly' && d < 130 + P.r && G.ore < D.hold) { p.vel.lerp(tmp.subVectors(player.position, p.m.position).normalize().multiplyScalar(220), Math.min(1, dt * 4)); }
+    if (G.state === 'fly' && d < 130 + P.r && cargoUsed() < D.hold) { p.vel.lerp(tmp.subVectors(player.position, p.m.position).normalize().multiplyScalar(220), Math.min(1, dt * 4)); }
     else p.vel.multiplyScalar(1 - dt * 0.5);
     p.m.position.addScaledVector(p.vel, dt);
     if (G.state === 'fly' && d < 9 + P.r * 0.8) {
-      if (G.ore < D.hold) { G.ore++; G.stats.ore++; sfx('pickup'); if (G.ore === D.hold) say('Cargo hold full. Sell ore at a station.', 'good'); scene.remove(p.m); pickups.splice(i, 1); continue; }
+      if (cargoUsed() < D.hold) { G.ore++; G.stats.ore++; sfx('pickup'); if (cargoUsed() >= D.hold) say('Cargo hold full. Sell ore at a station.', 'good'); scene.remove(p.m); pickups.splice(i, 1); continue; }
     }
     if (p.life <= 0) { scene.remove(p.m); pickups.splice(i, 1); }
   }
@@ -1406,7 +1446,7 @@ function setPrompt(h) { const el = $('#prompt'); if (el._h !== h) { el.innerHTML
 const fmtD = d => d > 999 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
 function updateHUD(dt) {
   $('#hCredits').textContent = G.credits.toLocaleString();
-  $('#hOre').textContent = G.ore; $('#hMsl').textContent = G.mslCd > 0 ? G.mslCd.toFixed(1) + 's' : 'Ready'; $('#hWpn').textContent = G.weapon === 'frost' && G.craft.frost ? 'Frost' : 'Pulse'; $('#hHold').textContent = `ore / ${D.hold}`;
+  $('#hOre').textContent = cargoUsed(); $('#hMsl').textContent = G.mslCd > 0 ? G.mslCd.toFixed(1) + 's' : 'Ready'; $('#hWpn').textContent = G.weapon === 'frost' && G.craft.frost ? 'Frost' : 'Pulse'; $('#hHold').textContent = `cargo / ${D.hold}`;
   const sp = P.vel.length(); $('#hSpeed').firstChild.nodeValue = Math.round(sp);
   const thr = Math.round(G.throttle * 100); $('#hThrPct').textContent = thr + '%'; $('#hThr').style.width = Math.max(0, thr) + '%';
   $('#bShield').style.width = (G.shield / D.maxShield * 100) + '%'; $('#tShield').textContent = Math.round(G.shield);
@@ -1419,10 +1459,12 @@ function updateHUD(dt) {
   else {
     let status = '';
     if (m.type === 'bounty') status = `${enemies.filter(e => e.mission).length} raiders left`;
-    if (m.type === 'delivery') status = `<span class="timer">${Math.max(0, m.left).toFixed(0)} s</span> to reach ${stationById(m.dest).name}`;
+    if (m.type === 'delivery' && m.noTimer) status = `Deliver to ${stationById(m.dest).name}${stationById(m.dest).sys !== G.sys ? ' (warp with M)' : ''}. No time limit.`; else if (m.type === 'delivery') status = `<span class="timer">${Math.max(0, m.left).toFixed(0)} s</span> to reach ${stationById(m.dest).name}`;
     if (m.type === 'mining') status = `Ore ${Math.min(G.ore, m.need)} / ${m.need}${G.ore >= m.need ? `, return to ${stationById(m.at).name}` : ''}`;
-    if (m.type === 'supply') status = `Cryo crystals ${Math.min(G.mats.cryo, m.need)} / ${m.need}${G.mats.cryo >= m.need ? ', return to Rimeholt' : ', found on Hoarfrost'}`;
-    if (m.type === 'boss') { const tl = enemies.filter(e => e.turret).length; status = tl ? `${tl} turrets left` : enemies.some(e => e.core) ? 'Reactor exposed. Destroy it!' : 'Find the Leviathan'; }
+    if (m.type === 'supply') status = `${MATS[m.mat].name} ${Math.min(G.mats[m.mat], m.need)} / ${m.need}${G.mats[m.mat] >= m.need ? `, return to ${stationById(m.at).name}` : m.mat === 'obs' ? ', found on Pyre' : ', found on Hoarfrost'}`;
+    if (m.type === 'convoy') status = `${enemies.filter(e => e.hauler).length} Halcyon haulers left`;
+    if (m.type === 'fetch') status = G.sys === 'cinder' ? 'Land on Pyre and search the obsidian caves' : 'Warp to Cinder Gate (M), then land on Pyre';
+    if (m.type === 'boss' || m.type === 'final') { const tl = enemies.filter(e => e.turret).length; status = tl ? `${tl} turrets left` : enemies.some(e => e.core) ? 'Reactor exposed. Destroy it!' : 'Find the Leviathan'; }
     if (m.type === 'race') status = `<span class="timer">${Math.max(0, m.left).toFixed(1)} s</span> · gate ${m.next + 1} / ${m.n}`;
     html = `<div class="eyebrow">${MTYPES[m.type]} · ${m.reward} cr</div><h3>${m.title}</h3><p>${status}</p>`;
   }
@@ -1432,6 +1474,7 @@ function updateHUD(dt) {
   let pr = '';
   if (ns.d < ns.st.dockR + P.r) pr = isTouch ? `Tap DOCK to enter ${ns.st.name}` : `Press <kbd>E</kbd> to dock at ${ns.st.name}`;
   else if (dpl < LP.landR + P.r) pr = isTouch ? `Tap DOCK to land on ${LP.name}` : `Press <kbd>L</kbd> to land on ${LP.name}`;
+  if (!pr) pr = arkSpacePrompt();
   setPrompt(pr);
   // aim reticle
   if (!isTouch) { const a = $('#aim'); a.style.left = ((mouse.x * 0.5 + 0.5) * innerWidth) + 'px'; a.style.top = ((mouse.y * 0.5 + 0.5) * innerHeight) + 'px'; }
@@ -1442,7 +1485,7 @@ function updateHUD(dt) {
   for (const k in mkPool) mkPool[k].dataset.used = '';
   for (const s of STATIONS) {
     if (s.sys !== G.sys) continue;
-    const tgt = m && ((m.type === 'delivery' && m.dest === s.id) || (m.type === 'mining' && m.at === s.id && G.ore >= m.need));
+    const tgt = (m && ((m.type === 'delivery' && m.dest === s.id) || (m.type === 'mining' && m.at === s.id && G.ore >= m.need) || (m.type === 'supply' && m.at === s.id && G.mats[m.mat] >= m.need))) || (!m && storyGiver() === s.id);
     const el = marker('st-' + s.id, 'station' + (tgt ? ' target' : ''), s.name);
     el.querySelector('.dst').textContent = fmtD(s.pos.distanceTo(player.position));
     placeMarker(el, s.pos);
@@ -1450,6 +1493,7 @@ function updateHUD(dt) {
   for (const pl of PLANETS) { if (pl.sys !== G.sys) continue; const el = marker('planet-' + pl.name, 'station', pl.name); el.querySelector('.dst').textContent = fmtD(Math.max(0, player.position.distanceTo(pl.pos) - pl.R)); placeMarker(el, pl.pos); }
   if (m && m.type === 'mining' && G.ore < m.need) { const el = marker('belt', 'target', 'Kessel belt'); el.querySelector('.dst').textContent = fmtD(FIELD_C.distanceTo(player.position)); placeMarker(el, FIELD_C); }
   if (m && m.type === 'race' && rings[m.next]) { const el = marker('ring', 'target', `Gate ${m.next + 1}`); el.querySelector('.dst').textContent = fmtD(rings[m.next].position.distanceTo(player.position)); placeMarker(el, rings[m.next].position); }
+  extraMarkers();
   enemies.forEach((e, i) => {
     const d = e.obj.position.distanceTo(player.position);
     if (d > 2600 && !e.mission) return;
@@ -1495,8 +1539,10 @@ const ITEMS = {
   prism: { name: 'Prism crystal', mat: 'prism', color: 0xb07bff, css: '#c39bff' },
   sun: { name: 'Sunstone', mat: 'sun', color: 0xffc23a, css: '#ffc23a' },
   cryo: { name: 'Cryo crystal', mat: 'cryo', color: 0x7fe0ff, css: '#8fe8ff' },
+  obs: { name: 'Obsidian glass', mat: 'obs', color: 0xc07aff, css: '#d0a0ff' },
+  ledger: { name: 'Paymaster ledger', mat: null, color: 0xffd060, css: '#ffd060' },
 };
-const MATS = { sap: { name: 'Lumen sap', price: 28 }, resin: { name: 'Ember resin', price: 36 }, prism: { name: 'Prism shard', price: 52 }, sun: { name: 'Sunstone', price: 140 }, cryo: { name: 'Cryo crystal', price: 65 } };
+const MATS = { sap: { name: 'Lumen sap', price: 28 }, resin: { name: 'Ember resin', price: 36 }, prism: { name: 'Prism shard', price: 52 }, sun: { name: 'Sunstone', price: 140 }, cryo: { name: 'Cryo crystal', price: 65 }, obs: { name: 'Obsidian glass', price: 80 } };
 const tmpC = new THREE.Color(), colr = new THREE.Color();
 
 function hash2(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
@@ -1592,6 +1638,8 @@ function makeCritter() {
 }
 function makeItem(type) {
   if (type === 'cryo') return makeCryo();
+  if (type === 'obs') return makeObs();
+  if (type === 'ledger') return makeLedger();
   const t = ITEMS[type], g = new THREE.Group();
   const glowMat = (c, k = 1.2) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: k, roughness: 0.3, metalness: 0.1, flatShading: true });
   let glowY = 0.8, gs = 2.4;
@@ -1784,7 +1832,7 @@ function spawnItems() {
     while (made < count && tries++ < 600) {
       let x, z;
       if (type === 'sun' && S.spires.length) { const sp = pick(S.spires.filter(q => hgt(q.x, q.z) > 3) .concat(S.spires)); const a = Math.random() * TAU; x = sp.x + Math.cos(a) * (sp.r + rand(3, 8)); z = sp.z + Math.sin(a) * (sp.r + rand(3, 8)); }
-      else if (type === 'cryo' && S.caves && S.caves.length && made < 9) { const cv = S.caves[made % S.caves.length], a = Math.random() * TAU, r = Math.random() * 8; x = cv.x + Math.cos(a) * r; z = cv.z + Math.sin(a) * r; }
+      else if ((type === 'cryo' || type === 'obs') && S.caves && S.caves.length && made < 9) { const cv = S.caves[made % S.caves.length], a = Math.random() * TAU, r = Math.random() * 8; x = cv.x + Math.cos(a) * r; z = cv.z + Math.sin(a) * r; }
       else { const a = Math.random() * TAU, r = Math.sqrt(Math.random()) * 470; x = PAD.x + Math.cos(a) * r; z = PAD.z + Math.sin(a) * r; }
       const y = hgt(x, z); if (y < minH || Math.hypot(x - PAD.x, z - PAD.z) < 25 || Math.hypot(x - PAD.x, z - PAD.z) > 500) continue;
       const obj = makeItem(type); obj.position.set(x, y - 0.05, z); obj.rotation.y = rand(0, TAU); surf.add(obj);
@@ -1819,7 +1867,7 @@ function updateDescent(dt) {
   if (t >= 3.4) enterSurface();
 }
 function enterSurface() {
-  W.build(); spawnItems();
+  W.build(); spawnItems(); spawnStoryItems();
   renderScene = surf; applyBloom(true);
   camera.near = 0.1; camera.fov = 60; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
   G.state = 'landing'; G.seqT = 0;
@@ -1843,10 +1891,11 @@ function finishLanding() {
   setState('surface'); updateSurfCamera(1);
   say(`Touchdown on ${LAND.name}. Press C to scan for resources.`, 'good');
   if (W.cold) say('It is freezing out here. Watch your body heat and warm up by the lamps at your ship.', 'bad');
+  if (W.hot) say('It is scorching out here. Watch your suit cooling, stay out of the lava, and cool off by your ship.', 'bad');
   if (isTouch) say('Use SCAN to find resources, GRAB to harvest.');
 }
 function board() {
-  if (G.state !== 'surface') return;
+  if (G.state !== 'surface' || W.interior) return;
   if (Math.hypot(S.pos.x - PAD.x, S.pos.z - PAD.z) > 11) return;
   closeBuild(); closeCrate();
   setState('takeoff'); G.seqT = 0; S.astro.g.visible = false; S.drone.visible = false; sfx('lift'); save();
@@ -1873,7 +1922,7 @@ function exitToSpace() {
   player.position.copy(LAND.pos).addScaledVector(dir, LAND.R + 420 + P.r);
   orientTo(player, player.position.clone().add(dir)); P.vel.copy(dir).multiplyScalar(90); G.throttle = 0.45;
   camPos.copy(player.position).addScaledVector(dir, -25).add(new V3(0, 6, 0)); camera.quaternion.copy(player.quaternion);
-  setState('fly'); fadeEntry(); save();
+  setState('fly'); fadeEntry(); save(); wingSnap();
   say('Back in orbit. Sell planet materials at any station market.');
 }
 
@@ -1910,7 +1959,8 @@ function updateSurface(dt) {
     if (d < r && d > 1e-4) { S.pos.x = c.x + dx / d * r; S.pos.z = c.z + dz / d * r; }
   }
   const bx = S.pos.x - PAD.x, bz = S.pos.z - PAD.z, bd = Math.hypot(bx, bz);
-  if (bd > 520) { S.pos.x = PAD.x + bx / bd * 520; S.pos.z = PAD.z + bz / bd * 520; if (T - S.warnT > 4) { say('Suit range limit reached. Head back toward your ship.', 'bad'); S.warnT = T; } }
+  if (W.bounds) W.bounds(S.pos);
+  else if (bd > 520) { S.pos.x = PAD.x + bx / bd * 520; S.pos.z = PAD.z + bz / bd * 520; if (T - S.warnT > 4) { say('Suit range limit reached. Head back toward your ship.', 'bad'); S.warnT = T; } }
   // explorer animation
   const a = S.astro; a.g.position.copy(S.pos); a.g.rotation.y = S.heading;
   const moving = S.grounded && len > 0.1;
@@ -1931,8 +1981,9 @@ function updateSurface(dt) {
 function harvest() {
   if (G.state !== 'surface') return;
   if (S.build) { placePiece(); return; }
-  if (!S.near) { interactPiece(); return; }
+  if (!S.near) { if (!interactArk()) interactPiece(); return; }
   const it = S.near, t = ITEMS[it.type];
+  if (it.type === 'ledger') { surf.remove(it.obj); S.items.splice(S.items.indexOf(it), 1); S.near = null; sfx('win'); if (G.mission && G.mission.type === 'fetch') completeMission('You found the Paymaster ledger!'); return; }
   G.mats[t.mat]++; sfx('pickup');
   const f = glowSprite(t.color, 3); f.position.copy(it.obj.position).add(new V3(0, 1, 0)); surf.add(f); S.pulses.push({ obj: f, t: 0, life: 0.5, kind: 'flash' });
   if (!G.disc[it.type]) { G.disc[it.type] = true; G.credits += 50; say(`New discovery: ${t.name}. Data sold for 50 cr`, 'good'); }
@@ -1953,7 +2004,7 @@ function scan() {
 }
 function updateSurfaceWorld(dt) {
   if (!S.built) return;
-  updateDayNight(); updateGlims(dt); updateBaseWorld();
+  updateDayNight(); updateGlims(dt); updateBaseWorld(); if (W.update) W.update(dt);
   S.sky.position.copy(camera.position);
   if (W.bob) S.water.position.y = Math.sin(T * 0.8) * 0.12;
   if (W.snow && S.snow) updateSnow(dt);
@@ -2004,21 +2055,22 @@ function updateSurfHUD() {
   $('#bFuel').style.width = (S.fuel / fuelMax() * 100) + '%'; $('#tFuel').textContent = Math.round(S.fuel);
   $('#bScan').style.width = ((1 - S.scanCd / 5) * 100) + '%'; $('#tScan').textContent = S.scanCd > 0 ? S.scanCd.toFixed(1) + 's' : 'Ready';
   const hint = isTouch ? 'Stick to walk. Drag the right side to look. JET to fly, SCAN to find things, GRAB to harvest, BUILD to make a base, SHIP to leave.' : 'WASD walk · Shift run · Space jetpack · Drag mouse to look · C scan · E harvest · B build · F board ship';
-  if ($('#sHint')._h !== hint) { $('#sHint').textContent = hint; $('#sHint')._h = hint; }
+  const hint2 = W.hint || hint; if ($('#sHint')._h !== hint2) { $('#sHint').textContent = hint2; $('#sHint')._h = hint2; }
   $('#sDisc').textContent = `${Object.keys(G.disc).length} of ${DISC_TOTAL} discoveries catalogued`; $('#sTime').textContent = todLabel();
   const dShip = Math.hypot(S.pos.x - PAD.x, S.pos.z - PAD.z);
-  let pr = basePrompt();
+  let pr = arkPrompt() || basePrompt();
   if (pr) { /* base or build prompt */ } else if (S.near) pr = isTouch ? `Tap GRAB to harvest ${ITEMS[S.near.type].name}` : `Press <kbd>E</kbd> to harvest ${ITEMS[S.near.type].name}`;
-  else if (dShip < 11) pr = isTouch ? 'Tap SHIP to return to orbit' : 'Press <kbd>F</kbd> to board your ship and return to orbit';
+  else if (dShip < 11 && !W.interior) pr = isTouch ? 'Tap SHIP to return to orbit' : 'Press <kbd>F</kbd> to board your ship and return to orbit';
   setPrompt(pr);
   for (const k in mkPool) mkPool[k].dataset.used = '';
-  { const el = marker('ship', 'station', 'Your ship'); el.querySelector('.dst').textContent = fmtD(dShip); placeMarker(el, tmp.set(PAD.x, PAD_H + 5, PAD.z)); }
+  if (!W.interior) { const el = marker('ship', 'station', 'Your ship'); el.querySelector('.dst').textContent = fmtD(dShip); placeMarker(el, tmp.set(PAD.x, PAD_H + 5, PAD.z)); }
   for (const it of S.items) {
     if (!it.tagged) continue;
     const el = marker('it-' + it.id, 'target', ITEMS[it.type].name); el.style.color = ITEMS[it.type].css;
     el.querySelector('.dst').textContent = fmtD(it.obj.position.distanceTo(S.pos));
     placeMarker(el, tmp.copy(it.obj.position).add(new V3(0, 1.6, 0)));
   }
+  if (W.surfMarkers) W.surfMarkers();
   for (const k in mkPool) { const el = mkPool[k]; if (!el.dataset.used) { el.remove(); delete mkPool[k]; } }
 }
 
@@ -2133,7 +2185,7 @@ function updateDayNight() {
   S.moonLight.intensity = 0.3 * night;
   S.hemi.intensity = 0.12 + 0.38 * day + 0.08 * night;
   S.hemi.color.setRGB(0.81, 0.91, 1).lerp(tmpC.setRGB(0.35, 0.42, 0.8), night);
-  S.water.material.color.copy(pal.water).lerp(tmpC.setHex(0x0b3346), night * 0.85).lerp(tmpC.setHex(0xff9a70), set * 0.25);
+  if (S.water && S.water.material.color) S.water.material.color.copy(pal.water).lerp(tmpC.setHex(0x0b3346), night * 0.85).lerp(tmpC.setHex(0xff9a70), set * 0.25);
   S.clouds.forEach(c => c.material.color.setRGB(1, 1, 1).lerp(tmpC.setHex(0x2a3050), night * 0.85).lerp(tmpC.setHex(0xffb28a), set * 0.6));
   if (bloomPass) { bloomPass.strength = 0.22 + night * 0.55; bloomPass.threshold = 0.93 - night * 0.33; }
   if (S.aurora) S.aurora.forEach(a => { a.visible = night > 0.02; a.material.uniforms.alpha.value = night; a.material.uniforms.t.value = T; });
@@ -2359,7 +2411,7 @@ function setSystem(id) {
   sky.material.map = s.sky; sky.material.needsUpdate = true;
   SUN_DIR.copy(s.sunDir); sunLight.position.copy(SUN_DIR); sunLight.color.setHex(s.sunColor); sunLight.intensity = s.sunI;
   sunSprite.material.color.setHex(s.sprite); ambLight.color.setHex(s.amb); hemiLight.color.setHex(s.hemi[0]); hemiLight.groundColor.setHex(s.hemi[1]);
-  dust.material.color.setHex(s.dust);
+  dust.material.color.setHex(s.dust); sunSprite.scale.setScalar(s.sunScale || 9000); sunCore.scale.setScalar((s.sunScale || 9000) * 0.25);
   $('#hudTL .brand').textContent = s.name.toUpperCase();
 }
 stationById('haven').fuel = true;
@@ -2447,17 +2499,17 @@ function makeTitan() {
 }
 function makeArk() {
   const g = new THREE.Group();
-  const base = canvasTex(2048, 1024, (c, Wd, Ht) => {
+  const base = makeArk.base || (makeArk.base = canvasTex(2048, 1024, (c, Wd, Ht) => {
     c.fillStyle = '#3a4252'; c.fillRect(0, 0, Wd, Ht);
     for (let i = 0; i < 2600; i++) { c.fillStyle = `rgba(${pick(['80,90,110', '50,58,72', '110,120,140', '40,90,70'])},${rand(0.3, 0.8)})`; c.fillRect(Math.random() * Wd, Math.random() * Ht, rand(8, 60), rand(6, 40)); }
     for (let i = 0; i < 14; i++) { c.fillStyle = 'rgba(30,70,110,.85)'; wrapCircle(c, Wd, Math.random() * Wd, rand(0.2, 0.8) * Ht, rand(40, 120)); }
     c.strokeStyle = 'rgba(160,200,230,.25)'; c.lineWidth = 2; for (let x = 0; x < Wd; x += 64) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, Ht); c.stroke(); } for (let y = 0; y < Ht; y += 64) { c.beginPath(); c.moveTo(0, y); c.lineTo(Wd, y); c.stroke(); }
-  });
-  const lights = canvasTex(2048, 1024, (c, Wd, Ht) => {
+  }));
+  const lights = makeArk.lights || (makeArk.lights = canvasTex(2048, 1024, (c, Wd, Ht) => {
     c.fillStyle = '#000'; c.fillRect(0, 0, Wd, Ht);
     for (let k = 0; k < 420; k++) { const cx = Math.random() * Wd, cy = rand(0.08, 0.92) * Ht; for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(${pick(['255,190,110', '255,230,190', '160,220,255'])},${rand(0.4, 1)})`; c.fillRect(cx + rand(-30, 30), cy + rand(-18, 18), rand(1, 3), rand(1, 3)); } }
     c.fillStyle = 'rgba(255,200,130,.9)'; c.fillRect(0, Ht * 0.495, Wd, Ht * 0.01);
-  });
+  }));
   const H = mStd(0x3b66d9, 0.5, 0.45), T = mStd(0xd8dde8, 0.4, 0.5), Dk = mStd(0x23242c, 0.55, 0.5);
   const sphere = new THREE.Mesh(new THREE.SphereGeometry(600, 96, 64), new THREE.MeshStandardMaterial({ map: base, emissiveMap: lights, emissive: 0xffffff, emissiveIntensity: 1, roughness: 0.8, metalness: 0.3 }));
   g.add(sphere);
@@ -2486,6 +2538,8 @@ const SH = () => SHIPS[G.ship] || SHIPS.lancer;
 const shipNear = () => SH().r > 100 ? 4 : SH().r > 20 ? 1 : 0.5;
 function switchShip(id, keepHull) {
   if (!SHIPS[id]) id = 'lancer';
+  if (G.ship === 'ark' && id !== 'ark' && !ARK.obj && G.ships.includes('ark')) { const st = G.docked; parkArkAt(st ? st.pos.clone().addScaledVector(st.exit, st.colR + 1700) : player.position.clone(), player.quaternion.clone()); }
+  if (id === 'ark' && ARK.obj) unparkArk();
   G.ship = id; const sh = SH();
   player.remove(playerModel); playerModel = sh.make(); player.add(playerModel);
   player.userData.engines = playerModel.userData.engines;
@@ -2563,9 +2617,10 @@ function makeTurret() {
   const eye = glowSprite(0xff3020, 3); eye.position.set(0, 1.5, -3.2); g.add(eye);
   return g;
 }
-function buildLeviathan() {
+function buildLeviathan(variant) {
+  const gold = variant === 'gilded';
   const g = new THREE.Group();
-  const Gm = mStd(0x3a3d48, 0.65, 0.45), Rs = mStd(0x8a2a20, 0.4, 0.55), Dk = mStd(0x1c1d24, 0.6, 0.5);
+  const Gm = mStd(gold ? 0x4a3a1a : 0x3a3d48, 0.65, 0.45), Rs = mStd(gold ? 0xd9a520 : 0x8a2a20, gold ? 0.8 : 0.4, gold ? 0.3 : 0.55), Dk = mStd(0x1c1d24, 0.6, 0.5);
   const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
   add(new THREE.BoxGeometry(60, 34, 260), Gm, 0, 0, 0);
   const nose = add(new THREE.CylinderGeometry(6, 42, 90, 4), Gm, 0, 0, -170); nose.rotation.set(-Math.PI / 2, Math.PI / 4, 0); nose.scale.set(1.2, 1, 0.75);
@@ -2580,14 +2635,14 @@ function buildLeviathan() {
   const hatch = add(new THREE.BoxGeometry(26, 6, 26), Rs, 0, 20, 10);
   const core = add(new THREE.SphereGeometry(10, 16, 12), new THREE.MeshStandardMaterial({ color: 0xff4a20, emissive: 0xff3010, emissiveIntensity: 0.6 }), 0, 17, 10);
   g.userData.engines = engines;
-  return { g, hatch, core, corePos: new V3(0, 22, 10), mounts: [new V3(-30, 20, -80), new V3(30, 20, -80), new V3(-62, 2, 40), new V3(62, 2, 40), new V3(0, 48, 100), new V3(0, -20, -40)] };
+  return { g, hatch, core, corePos: new V3(0, 22, 10), mounts: [new V3(-30, 20, -80), new V3(30, 20, -80), new V3(-62, 2, 40), new V3(62, 2, 40), new V3(0, 48, 100), new V3(0, -20, -40)].concat(gold ? [new V3(-36, 22, 130), new V3(36, 22, 130)] : []) };
 }
-function spawnBoss(at) {
+function spawnBoss(at, variant) {
   despawnBoss();
-  const b = buildLeviathan(); BOSS.obj = b.g; BOSS.hatch = b.hatch; BOSS.coreMesh = b.core; BOSS.corePos = b.corePos;
+  const b = buildLeviathan(variant); BOSS.name = variant === 'gilded' ? 'The Gilded Maw' : 'The Leviathan'; BOSS.obj = b.g; BOSS.hatch = b.hatch; BOSS.coreMesh = b.core; BOSS.corePos = b.corePos;
   BOSS.center.copy(at); BOSS.t = 0; BOSS.active = true; BOSS.escortT = 12;
   BOSS.obj.position.copy(at).add(new V3(600, 0, 0)); scene.add(BOSS.obj); BOSS.obj.updateMatrixWorld();
-  b.mounts.forEach(mp => { const obj = makeTurret(); scene.add(obj); enemies.push({ obj, vel: new V3(), hp: 160, maxHp: 160, heavy: true, turret: true, mount: mp, cd: rand(0.5, 2), dmg: 9, r: 7, bounty: 200, mission: true, label: 'Turret', turn: 1.8, state: 'attack', slowT: 0, aggro: true }); });
+  b.mounts.forEach(mp => { const obj = makeTurret(); scene.add(obj); enemies.push({ obj, vel: new V3(), hp: variant === 'gilded' ? 240 : 160, maxHp: variant === 'gilded' ? 240 : 160, heavy: true, turret: true, mount: mp, cd: rand(0.5, 2), dmg: 9, r: 7, bounty: 200, mission: true, label: 'Turret', turn: 1.8, state: 'attack', slowT: 0, aggro: true }); });
 }
 function despawnBoss() { if (!BOSS.obj) return; scene.remove(BOSS.obj); enemies.slice().forEach(e => { if (e.turret || e.core) removeEnemy(e); }); BOSS.obj = null; BOSS.active = false; }
 function updateBoss(dt) {
@@ -2599,7 +2654,7 @@ function updateBoss(dt) {
   if (BOSS.coreMesh && !BOSS.hatch.visible) BOSS.coreMesh.material.emissiveIntensity = 2 + Math.sin(T * 6) * 0.8;
   if (G.state === 'fly' && player.position.distanceTo(BOSS.obj.position) < 2500) {
     BOSS.escortT -= dt;
-    if (BOSS.escortT <= 0) { BOSS.escortT = 30; if (enemies.filter(e => !e.mission).length < 3) { spawnPirate(BOSS.obj.position); spawnPirate(BOSS.obj.position); say('The Leviathan launches fighters!', 'bad'); } }
+    if (BOSS.escortT <= 0) { BOSS.escortT = 30; if (enemies.filter(e => !e.mission).length < 3) { spawnPirate(BOSS.obj.position); spawnPirate(BOSS.obj.position); say(`${BOSS.name} launches fighters!`, 'bad'); } }
   }
 }
 function updateTurret(e, dt) {
@@ -2630,6 +2685,7 @@ function bossPartDown(e) {
     setTimeout(() => { explode(at, 6, 0xffd0a0); despawnBoss(); }, 2100);
     G.stats.bosses = (G.stats.bosses || 0) + 1; G.mats.cryo += 6;
     if (G.mission && G.mission.type === 'boss') completeMission('The Iron Leviathan is destroyed! +6 Cryo crystals.');
+    else if (G.mission && G.mission.type === 'final') completeMission('The Gilded Maw is destroyed!');
   }
 }
 const _bh = new V3();
@@ -2653,7 +2709,7 @@ function toggleMap() {
   if (G.state !== 'fly') return;
   setState('map'); renderMap(G.sys === 'ember' ? 'frost' : 'ember'); sfx('ui');
 }
-function renderMap(sel) {
+function renderMapOld(sel) {
   const svg = $('#gxSvg'), nodes = [['ember', SYS.ember], ['frost', SYS.frost], ['cinder', MAP_LOCKED]];
   let h = '<defs>' + nodes.map(([k, s]) => `<radialGradient id="g-${k}"><stop offset="0" stop-color="${s.color || '#8a8590'}" stop-opacity="1"/><stop offset="1" stop-color="${s.color || '#8a8590'}" stop-opacity="0"/></radialGradient>`).join('') + '</defs>';
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -2719,7 +2775,7 @@ function arrive(id) {
   P.vel.set(0, 0, -80).applyQuaternion(player.quaternion);
   camPos.copy(player.position).add(new V3(0, 4.2, 15).multiplyScalar(SH().cam).applyQuaternion(player.quaternion));
   camera.position.copy(camPos); camera.quaternion.copy(player.quaternion);
-  G.patrolT = 40;
+  G.patrolT = 40; wingSnap();
 }
 
 /* ============ Hoarfrost surface ============ */
@@ -2941,7 +2997,7 @@ function buildRime() {
 
 /* ============ worlds ============ */
 const WKEYS = ['built', 'items', 'critters', 'colliders', 'spires', 'pulses', 'clouds', 'ship', 'shipModel', 'astro', 'drone', 'water', 'sky', 'sun', 'hemi', 'moonLight', 'glims', 'base', 'fauna', 'snow', 'caves', 'aurora'];
-const DISC_TOTAL = 8;
+const DISC_TOTAL = 10;
 S.fauna = { id: 'hopper', name: 'Dunehopper', bonus: 75 }; S.caves = []; S.aurora = []; S.heat = 100; S.coldT = 0;
 const VERD_W = { id: 'verdance', brand: 'VERDANCE · SURFACE', title: 'Explore Verdance', scene: surf, pad: { x: PAD.x, z: PAD.z }, padH: 0, hgtFn: verdHgt,
   build() { buildSurface(); VERD_W.padH = PAD_H; }, itemPlan: [['lumen', 16, 4], ['ember', 14, 4], ['prism', 12, 10], ['sun', 5, 3]], critterMinH: 4, bob: true, buildable: true,
@@ -2962,15 +3018,15 @@ function useWorld(w) {
   W = w; for (const k of WKEYS) S[k] = w.st[k];
   surf = w.scene; PAD.x = w.pad.x; PAD.z = w.pad.z; PAD_H = w.padH;
   SHIP_REST.set(PAD.x, PAD_H + 2.5, PAD.z); SHIP_START.set(PAD.x + 240, PAD_H + 160, PAD.z - 140);
-  $('#sHudTL .brand').textContent = w.brand; $('#sHudTR h3').textContent = w.title; $('#heatRow').hidden = !w.cold;
+  $('#sHudTL .brand').textContent = w.brand; $('#sHudTR h3').textContent = w.title; $('#heatRow').hidden = !(w.cold || w.hot); $('#heatRow span').textContent = w.hot ? 'Suit cooling' : 'Body heat'; $('#frostV').style.boxShadow = w.hot ? 'inset 0 0 220px 40px rgba(255,110,40,.85)' : '';
   applyPaint();
 }
 function updateHeat(dt) {
-  if (!W.cold) return;
+  if (!W.cold && !W.hot) return;
   const warm = Math.hypot(S.pos.x - PAD.x, S.pos.z - PAD.z) < 16;
   if (warm) S.heat = Math.min(100, S.heat + 20 * dt);
-  else S.heat = Math.max(0, S.heat - HEAT_DRAIN[G.craft.heat] * (S.night > 0.5 ? 1.4 : 1) * dt);
-  if (!warm && S.heat < 30 && !S.coldWarned) { S.coldWarned = true; say('You are getting cold. Head back to the heat lamps by your ship.', 'bad'); }
+  else S.heat = Math.max(0, S.heat - (W.hot ? COOL_DRAIN[G.craft.cool] * (S.night > 0.5 ? 0.7 : 1) : HEAT_DRAIN[G.craft.heat] * (S.night > 0.5 ? 1.4 : 1)) * dt);
+  if (!warm && S.heat < 30 && !S.coldWarned) { S.coldWarned = true; say(W.hot ? 'Your suit is overheating. Get back to the coolers by your ship.' : 'You are getting cold. Head back to the heat lamps by your ship.', 'bad'); }
   if (S.heat > 50) S.coldWarned = false;
   if (S.heat <= 0) { S.coldT += dt; if (S.coldT > 4) rescueCold(); } else S.coldT = 0;
   $('#bHeat').style.width = S.heat + '%'; $('#tHeat').textContent = Math.round(S.heat);
@@ -2978,10 +3034,614 @@ function updateHeat(dt) {
 }
 function rescueCold() {
   S.pos.set(PAD.x + 6, PAD_H, PAD.z + 9); S.vel.set(0, 0, 0); S.heat = 60; S.coldT = 0;
-  const lost = Math.ceil(G.mats.cryo * 0.3); G.mats.cryo -= lost;
-  say(`You nearly froze! Your drone guided you back to the ship${lost ? ` but ${lost} Cryo crystal${lost > 1 ? 's were' : ' was'} dropped on the way` : ''}.`, 'bad'); sfx('fail');
+  const mk = W.hot ? 'obs' : 'cryo', lost = Math.ceil(G.mats[mk] * 0.3); G.mats[mk] -= lost;
+  say(`${W.hot ? 'You nearly cooked!' : 'You nearly froze!'} Your drone guided you back to the ship${lost ? ` but ${lost} ${MATS[mk].name} ${lost > 1 ? 'were' : 'was'} dropped on the way` : ''}.`, 'bad'); sfx('fail');
 }
 switchShip(G.ship || 'lancer', true);
+
+/* ============ Cinder Gate (third system) ============ */
+const CINDER_C = new V3(0, 0, 400000);
+const skyTexCinder = canvasTex(2048, 1024, (g, W2, H2) => {
+  g.fillStyle = '#080203'; g.fillRect(0, 0, W2, H2);
+  g.globalCompositeOperation = 'lighter';
+  const blob = (x, y, r, col, a) => { for (const dx of [-W2, 0, W2]) { if (x + dx + r < 0 || x + dx - r > W2) continue; const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, r); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.beginPath(); g.arc(x + dx, y, r, 0, TAU); g.fill(); } };
+  const hot = ['160,30,10', '200,60,20', '120,20,20', '230,110,40', '90,20,30'];
+  for (let i = 0; i < 560; i++) { const t = Math.random(), x = t * W2, y = H2 * 0.55 + Math.sin(t * TAU + 2) * H2 * 0.16 + (Math.random() - 0.5) * H2 * 0.3; blob(x, y, rand(40, 260), pick(hot), rand(0.02, 0.07)); }
+  g.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 200; i++) blob(Math.random() * W2, H2 * rand(0.3, 0.75), rand(30, 140), '8,2,3', rand(0.08, 0.2));
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 4000; i++) { const b = Math.pow(Math.random(), 3); g.fillStyle = `rgba(${pick(['255,220,200', '255,190,160', '255,255,255'])},${0.2 + b * 0.7})`; g.fillRect(Math.random() * W2, Math.random() * H2, b > 0.8 ? 1.8 : 1, b > 0.8 ? 1.8 : 1); }
+});
+SYS.ember.danger = 1; SYS.frost.danger = 1.6;
+SYS.cinder = { name: 'Cinder Gate', c: CINDER_C, sky: skyTexCinder, sunDir: new V3(0.35, 0.18, -1).normalize(), sunColor: 0xff8a5a, sunI: 1.8, sprite: 0xff5a2a, sunScale: 26000, amb: 0x4a2018, hemi: [0xff7a50, 0x2a0a06], dust: 0xffb08a,
+  arrive: CINDER_C.clone().add(new V3(0, 90, 1500)), look: CINDER_C.clone(), star: 'Red giant star', mapX: 505, mapY: 285, color: '#ff5a3a', danger: 2.4,
+  desc: 'A dying red giant, a burning lava world called Pyre, and the Patrol outpost Cinderwatch. Pirates here are the toughest in the Reach, and pay the best bounties.' };
+function buildCinderwatch() {
+  const g = new THREE.Group();
+  const rockGeo = new THREE.IcosahedronGeometry(60, 1); jitterGeo(rockGeo, 0.25, 9);
+  g.add(new THREE.Mesh(rockGeo, mStd(0x2a2220, 0.1, 1)));
+  const M = mStd(0x55575f, 0.6, 0.4), O = mStd(0xc8401c, 0.35, 0.5);
+  const dish = new THREE.Mesh(new THREE.CylinderGeometry(95, 80, 6, 28), M); dish.position.set(0, 20, -70); dish.rotation.x = Math.PI / 2 - 0.2; g.add(dish);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(95, 2.5, 6, 48), O); rim.position.copy(dish.position); rim.rotation.x = -0.2; g.add(rim);
+  for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.4, dome = new THREE.Mesh(new THREE.SphereGeometry(16, 14, 8, 0, TAU, 0, Math.PI / 2), M); dome.position.set(Math.cos(a) * 52, 44, Math.sin(a) * 52 + 20); g.add(dome); }
+  windows(g, 40, (w, k) => { const a = k / 40 * TAU; w.position.set(Math.cos(a) * 61, rand(-20, 30), Math.sin(a) * 61); w.rotation.y = -a + Math.PI / 2; }, 0xffb070);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 90, 6), M); mast.position.y = 100; g.add(mast);
+  blinker(g, new V3(0, 148, 0), 0xff2a2a, 20, 0);
+  for (let i = 0; i < 3; i++) blinker(g, new V3(Math.cos(i * 2.1) * 70, -10, Math.sin(i * 2.1) * 70), 0xffa040, 10, i);
+  return g;
+}
+STATIONS.push({ id: 'cinderwatch', sys: 'cinder', name: 'Cinderwatch', kind: 'Patrol outpost', build: buildCinderwatch, pos: CINDER_C.clone(), dockR: 280, colR: 110, exit: new V3(0, 0, 1), orePrice: 34, view: 560, fuel: true,
+  blurb: 'Reach Patrol’s forward base in the glare of a red giant. Everything here is scarce, so everything sells high.' });
+{ const s = STATIONS[STATIONS.length - 1]; s.obj = s.build(); s.obj.position.copy(s.pos); scene.add(s.obj); s.obj.traverse(o => { if (o.isSprite && o.userData.blink !== undefined) blinkers.push(o); }); }
+RECRUIT_CAP.cinderwatch = 40;
+const lavaCracks = canvasTex(1024, 512, (g, W2, H2) => { g.fillStyle = '#000'; g.fillRect(0, 0, W2, H2); g.strokeStyle = 'rgba(255,120,30,.9)'; for (let i = 0; i < 220; i++) { g.lineWidth = rand(0.6, 2.5); g.beginPath(); let x = Math.random() * W2, y = Math.random() * H2; g.moveTo(x, y); for (let k = 0; k < 8; k++) { x += rand(-30, 30); y += rand(-14, 14); g.lineTo(x, y); } g.stroke(); } });
+const PYREP = { name: 'Pyre', sys: 'cinder', world: 'pyre', pos: CINDER_C.clone().add(new V3(-2600, -400, -3800)), R: 800 };
+PYREP.landR = PYREP.R + 480;
+{ const m = makePlanet(PYREP.R, PYREP.pos, planetTex('#2a1c18', '70,50,40', '10,6,5'), 0xff6a30); m.material.emissiveMap = lavaCracks; m.material.emissive = new THREE.Color(0xffffff); m.material.emissiveIntensity = 1; m.material.needsUpdate = true; }
+PLANETS.push(PYREP);
+
+/* ============ story: the Paymaster ============ */
+const STORY = [null,
+  { giver: 'bastion', make: () => ({ type: 'bounty', story: 1, title: 'Story 1/5: Strange credits', desc: 'Raiders hit a Patrol courier near the Kessel belt and took a data chip. Destroy them and recover it.', n: 3, heavy: 0, at: FIELD_C.clone().add(new V3(-500, 200, 500)), reward: 900 }),
+    outro: ['Commander Ilsa Vale', 'The chip is full of payments to raider gangs, all from one account: Halcyon Logistics. Halcyon is a respectable shipping company. Why would they pay pirates? I have a new contract for you on the Bastion board.'] },
+  { giver: 'bastion', make: () => ({ type: 'delivery', story: 2, noTimer: true, title: 'Story 2/5: Follow the money', desc: 'Take the chip to Patrol analyst Oren Pike at Rimeholt in Frostfall. Open the galaxy map (M) and warp there. No time limit.', dest: 'rimeholt', time: 1e9, reward: 1500 }),
+    outro: ['Analyst Oren Pike', 'Halcyon convoys run between Frostfall and an uncharted system. Every time one passes, pirates hit Halcyon’s rivals a week later. Catch a convoy and we can pull its nav charts. Check my board.'] },
+  { giver: 'rimeholt', make: () => ({ type: 'convoy', story: 3, title: 'Story 3/5: Silent convoy', desc: 'A Halcyon convoy is crossing Frostfall right now. Destroy both haulers. Their escorts will fight back.', at: FROST_C.clone().add(new V3(1800, 300, -2400)), reward: 2500 }),
+    outro: ['Analyst Oren Pike', 'Got the charts! The convoy was heading to Cinder Gate, a red giant system nobody has surveyed. The lane is open on your galaxy map now. I have one more job for you here.'], after() { G.cinderLane = true; } },
+  { giver: 'rimeholt', make: () => ({ type: 'fetch', story: 4, title: 'Story 4/5: Into the ash', desc: 'Warp to Cinder Gate, land on the lava world Pyre, and search the obsidian caves for the Paymaster’s ledger. Craft a heat-proof suit first if you can.', reward: 4000 }),
+    outro: ['Commander Ilsa Vale', 'The ledger names the Paymaster: Halcyon’s director, Corwin Ash. He has built a dreadnought, the Gilded Maw, out at Cinder Gate. Patrol has an outpost there called Cinderwatch. Meet me on its board.'] },
+  { giver: 'cinderwatch', make: () => ({ type: 'final', story: 5, title: 'Story 5/5: The Paymaster', desc: 'Corwin Ash’s dreadnought, the Gilded Maw, guards Cinder Gate. Destroy its eight turrets, then its reactor. Bring wingmen. End this.', at: CINDER_C.clone().add(new V3(2400, 300, -3000)), reward: 25000 }),
+    outro: ['Commander Ilsa Vale', 'The Gilded Maw is gone and Corwin Ash is in a Patrol cell. The raider gangs have lost their paymaster. You saved the Reach, captain. Every station will know your name. (Story complete. Thanks for playing!)'] },
+];
+function storyGiver() { const n = (G.story || 0) + 1; return n <= 5 ? STORY[n].giver : null; }
+function injectStory(st) {
+  const n = (G.story || 0) + 1; if (n > 5 || STORY[n].giver !== st.id) return;
+  if (G.mission && G.mission.story) return;
+  if (!G.board[st.id].some(m => m.story)) G.board[st.id].unshift(STORY[n].make());
+}
+function storyHint() { return ['Commander Vale at Bastion Spire has a job for you.', 'Patrol wants that data chip taken to Rimeholt in Frostfall.', 'Pike at Rimeholt says a Halcyon convoy is on the move.', 'Pike wants you on Pyre, in the Cinder Gate system.', 'Cinderwatch is waiting. The Gilded Maw is out there.', 'The Reach is quiet, thanks to you.'][G.story || 0]; }
+function showComms(who, text) {
+  $('#commsName').textContent = who; $('#commsText').textContent = text;
+  $('#commsAvatar').textContent = who.split(' ').filter(w => /^[A-Z]/.test(w)).slice(-2).map(w => w[0]).join('');
+  $('#comms').hidden = false; sfx('ring');
+}
+$('#commsOk').addEventListener('click', () => { $('#comms').hidden = true; sfx('ui'); });
+function storyDone(n) {
+  G.story = Math.max(G.story || 0, n);
+  const s = STORY[n]; if (s.after) s.after();
+  showComms(s.outro[0], s.outro[1]);
+}
+function spawnConvoy(at) {
+  const dir = new V3(1, 0, 0.3).normalize();
+  for (let i = 0; i < 2; i++) {
+    const obj = makeHauler(); obj.scale.setScalar(1.7); obj.userData.mats.H.color.setHex(0x8a2a20); obj.userData.mats.T.color.setHex(0xd9a520);
+    obj.position.copy(at).addScaledVector(dir, i * 120 - 60).add(new V3(0, i * 30, 0)); orientTo(obj, obj.position.clone().add(dir)); scene.add(obj);
+    enemies.push({ obj, vel: new V3(), hp: 320, maxHp: 320, heavy: true, hauler: true, start: obj.position.clone(), dir: dir.clone(), cd: 99, dmg: 0, r: 18, bounty: 400, mission: true, label: 'Halcyon hauler', turn: 0.5, state: 'attack', slowT: 0, speed: 40 });
+  }
+  for (let i = 0; i < 3; i++) spawnPirate(at, { mission: true, heavy: i === 0 });
+}
+function moveHauler(e, dt) {
+  const slow = e.slowT > 0 ? 0.4 : 1; if (e.slowT > 0) e.slowT -= dt; frostFx(e);
+  e.obj.position.addScaledVector(e.dir, e.speed * slow * dt);
+  if (e.obj.position.distanceTo(e.start) > 2500) { e.dir.negate(); e.start.copy(e.obj.position); }
+  turnToward(e.obj, e.obj.position.clone().add(e.dir), dt * 0.6);
+  e.obj.userData.engines.forEach(s => s.scale.setScalar(6 + Math.random()));
+}
+
+/* ============ wingmen ============ */
+const WING_NAMES = [['Kestrel', 0x3fbf7f], ['Juno', 0xd9a520], ['Vex', 0xb05ad9]], WING_COST = 2500;
+const WING_OFF = [[-1, 0.3, 1.2], [1, 0.3, 1.2], [0, 1.0, 2.2]];
+const wingmen = [];
+function syncWingmen() {
+  while (wingmen.length < G.wing) { const i = wingmen.length, obj = makeFighter({ hull: WING_NAMES[i][1], trim: 0xd8dde8, glass: 0x7fd4ff, glow: 0x7dffb0, sweep: -0.4 }); scene.add(obj); const w = { obj, i, vel: new V3(), cd: rand(0, 0.5) }; wingmen.push(w); w.obj.position.copy(wingSlot(w)); w.obj.quaternion.copy(player.quaternion); }
+  while (wingmen.length > G.wing) scene.remove(wingmen.pop().obj);
+}
+function wingSlot(w) { const s = Math.max(16, P.r * 1.6), o = WING_OFF[w.i]; return new V3(o[0] * s, o[1] * s, o[2] * s).applyQuaternion(player.quaternion).add(player.position); }
+function wingSnap() { syncWingmen(); wingmen.forEach(w => { w.obj.position.copy(wingSlot(w)); w.obj.quaternion.copy(player.quaternion); w.vel.copy(P.vel); }); }
+function updateWingmen(dt) {
+  syncWingmen();
+  let tgt = G.target && enemies.includes(G.target) ? G.target : null;
+  if (!tgt) { let bd = 1600 + P.r; for (const e of enemies) { const d = e.obj.position.distanceTo(player.position); if (d < bd) { bd = d; tgt = e; } } }
+  for (const w of wingmen) {
+    const o = w.obj; w.cd -= dt;
+    if (tgt) {
+      const dist = o.position.distanceTo(tgt.obj.position);
+      const aim = tgt.obj.position.clone().addScaledVector(tgt.vel || new V3(), dist / 950 * 0.8);
+      if (dist < 70 + tgt.r) aim.add(new V3(0, 120, 0)).addScaledVector(new V3(w.i - 1, 0, 0), 120);
+      turnToward(o, aim, 2.4 * dt);
+      const f = new V3(0, 0, -1).applyQuaternion(o.quaternion);
+      w.vel.lerp(f.clone().multiplyScalar(dist > 300 ? 270 : 170), Math.min(1, dt * 2));
+      if (dist < 750 + tgt.r && w.cd <= 0 && f.dot(aim.clone().sub(o.position).normalize()) > 0.97) { w.cd = 0.3; fireBolt(o.position, o.quaternion, w.vel, 'player', D.dmg * 0.8, new V3(0, 0, -3)); if (dist < 900) sfx('laser', 0.3); }
+    } else {
+      const slot = wingSlot(w), d = o.position.distanceTo(slot), to = slot.clone().sub(o.position);
+      w.vel.lerp(to.normalize().multiplyScalar(Math.min(700, d * 1.6 + P.vel.length())), Math.min(1, dt * 3));
+      if (d < 40) o.quaternion.slerp(player.quaternion, Math.min(1, dt * 3)); else turnToward(o, slot, 3 * dt);
+      if (d > 3000) o.position.copy(slot);
+    }
+    o.position.addScaledVector(w.vel, dt);
+    o.userData.engines.forEach(s => s.scale.setScalar(2 + Math.random()));
+  }
+}
+function renderWing() {
+  const spare = G.crew - SH().crew - 2 * G.wing;
+  return `<div class="item"><div><h4>Wingmen: ${G.wing} of 3</h4><p>Wingmen fly fighters beside you, attack whatever you shoot, and fight pirates on their own. Signing one costs ${WING_COST.toLocaleString()} cr, and each needs 2 spare crew to fly (you have ${Math.max(0, spare)} spare).</p>${G.wing ? `<p style="margin-top:6px">Flying with you: ${WING_NAMES.slice(0, G.wing).map(w => w[0]).join(', ')}</p>` : ''}<div class="row-btns" style="margin-top:10px"><button class="btn" data-act="hirewing" ${G.wing < 3 && G.credits >= WING_COST && spare >= 2 ? '' : 'disabled'}>Hire wingman</button><button class="ghost" data-act="dismisswing" ${G.wing ? '' : 'disabled'}>Dismiss one</button></div></div><div></div></div>`;
+}
+
+/* ============ money: trade goods, salvage, Ark income ============ */
+const GOODS = { food: { name: 'Hydroponic food', base: 40 }, ice: { name: 'Purified ice', base: 30 }, parts: { name: 'Machine parts', base: 85 }, med: { name: 'Medical supplies', base: 110 }, fuel: { name: 'Reactor fuel rods', base: 160 }, lux: { name: 'Luxury goods', base: 220 } };
+const PROFILE = {
+  haven: { food: 0.8, ice: 1.3, parts: 1.1, med: 1.25, fuel: 1.2, lux: 0.75 },
+  forge: { food: 1.3, ice: 1.5, parts: 0.7, med: 1.2, fuel: 0.8, lux: 1.4 },
+  bastion: { food: 1.2, ice: 1.2, parts: 1.3, med: 0.8, fuel: 1.1, lux: 1.2 },
+  rimeholt: { food: 1.6, ice: 0.5, parts: 1.3, med: 1.4, fuel: 1.4, lux: 1.6 },
+  cinderwatch: { food: 1.8, ice: 2.2, parts: 1.2, med: 1.7, fuel: 0.7, lux: 1.8 },
+};
+const cargoGoods = () => Object.values(G.cargo).reduce((a, b) => a + b, 0);
+const cargoUsed = () => G.ore + cargoGoods();
+function refreshDrift(st) { G.drift[st.id] = {}; for (const k in GOODS) G.drift[st.id][k] = rand(0.88, 1.12); }
+function goodPrice(st, k, buy) { const d = (G.drift[st.id] && G.drift[st.id][k]) || 1; return Math.max(1, Math.round(GOODS[k].base * (PROFILE[st.id][k] || 1) * d * (buy ? 1.04 : 0.96))); }
+function bestDeal(st) {
+  let best = null;
+  for (const k in GOODS) { const buy = goodPrice(st, k, true); for (const o of STATIONS) { if (o === st || (o.sys === 'cinder' && !G.cinderLane)) continue; const gain = Math.round(GOODS[k].base * (PROFILE[o.id][k] || 1) * 0.96) - buy; if (!best || gain > best.gain) best = { k, o, gain }; } }
+  return best && best.gain > 0 ? `Best known deal from here: buy ${GOODS[best.k].name}, sell at ${best.o.name} for about ${best.gain} cr profit each.` : '';
+}
+function renderTrade(st) {
+  const free = D.hold - cargoUsed();
+  let h = '';
+  if (st.id === 'rimeholt' && !G.cinderLane) h += `<div class="item"><div><h4>Cinder Gate lane charts</h4><p>Pike’s office will sell you the warp charts for the uncharted Cinder Gate system. The story mission "Silent convoy" also unlocks them.</p></div><div><div class="reward">3,000 cr</div><button class="btn" data-act="buylane" ${G.credits >= 3000 ? '' : 'disabled'}>Buy charts</button></div></div>`;
+  const rows = Object.entries(GOODS).map(([k, g]) => { const buy = goodPrice(st, k, true), sell = goodPrice(st, k, false), have = G.cargo[k] || 0, can = free > 0 && G.credits >= buy;
+    return `<div class="trow"><span class="tn">${g.name}</span><span>${buy}</span><span>${sell}</span><span>${have}</span><span class="tb"><button class="ghost" data-act="buyg" data-k="${k}" data-n="1" ${can ? '' : 'disabled'}>+1</button><button class="ghost" data-act="buyg" data-k="${k}" data-n="max" ${can ? '' : 'disabled'}>Max</button><button class="btn" data-act="sellg" data-k="${k}" ${have ? '' : 'disabled'}>Sell</button></span></div>`; }).join('');
+  const tip = bestDeal(st);
+  h += `<div class="item trade"><div><h4>Trade goods</h4><p>Buy where it is cheap, sell where it is scarce. Prices shift a little every time you dock. Hold space left: <b>${free.toLocaleString()}</b> of ${D.hold.toLocaleString()}. Bigger ships carry far more.</p>${tip ? `<p class="tip">${tip}</p>` : ''}<div class="ttable"><div class="trow th"><span>Good</span><span>Buy</span><span>Sell</span><span>Held</span><span></span></div>${rows}</div></div></div>`;
+  return h;
+}
+function tradeAct(act, b, st) {
+  if (act === 'buyg') { const k = b.dataset.k, price = goodPrice(st, k, true), free = D.hold - cargoUsed(); const n = b.dataset.n === 'max' ? Math.min(free, Math.floor(G.credits / price)) : Math.min(1, free); if (n <= 0) return; G.credits -= price * n; G.cargo[k] = (G.cargo[k] || 0) + n; sfx('ui'); save(); renderDock(); }
+  if (act === 'sellg') { const k = b.dataset.k, n = G.cargo[k] || 0; if (!n) return; const v = goodPrice(st, k, false) * n; G.credits += v; G.cargo[k] = 0; G.stats.trade = (G.stats.trade || 0) + v; say(`Sold ${n} ${GOODS[k].name} for ${v.toLocaleString()} cr.`, 'good'); sfx('pickup'); save(); renderDock(); }
+  if (act === 'buylane') { if (G.credits < 3000 || G.cinderLane) return; G.credits -= 3000; G.cinderLane = true; say('Cinder Gate lane charts installed. Open the galaxy map with M.', 'good'); sfx('win'); save(); renderDock(); }
+  if (act === 'hirewing') { if (G.wing >= 3 || G.credits < WING_COST || G.crew - SH().crew - 2 * G.wing < 2) return; G.credits -= WING_COST; G.wing++; say(`${WING_NAMES[G.wing - 1][0]} joins your wing.`, 'good'); sfx('win'); save(); renderDock(); }
+  if (act === 'dismisswing') { if (!G.wing) return; G.wing--; say(`${WING_NAMES[G.wing][0]} heads home.`); sfx('ui'); save(); renderDock(); }
+}
+const WRECK_SPOTS = [['w1', 'ember', new V3(1800, -400, 1600)], ['w2', 'ember', new V3(-1500, 600, -800)], ['w3', 'ember', new V3(4200, -200, 900)],
+  ['w4', 'frost', FROST_C.clone().add(new V3(1600, 300, 1400))], ['w5', 'frost', FROST_C.clone().add(new V3(-3200, -200, 600))], ['w6', 'frost', FROST_C.clone().add(new V3(500, 800, -2600))],
+  ['w7', 'cinder', CINDER_C.clone().add(new V3(1800, -300, 1500))], ['w8', 'cinder', CINDER_C.clone().add(new V3(-1200, 500, -1800))], ['w9', 'cinder', CINDER_C.clone().add(new V3(3600, 200, -800))]];
+const wrecks = WRECK_SPOTS.map(([id, sys, pos]) => {
+  const g = new THREE.Group(), h = makeHauler(); h.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); if (o.material.color) o.material.color.multiplyScalar(0.4); } if (o.isSprite) o.visible = false; });
+  h.rotation.set(rand(0, TAU), rand(0, TAU), rand(0, TAU)); h.scale.setScalar(1.6); g.add(h);
+  for (let i = 0; i < 6; i++) { const d = new THREE.Mesh(new THREE.BoxGeometry(rand(2, 6), rand(1, 3), rand(2, 8)), mStd(0x3a3a40, 0.6, 0.6)); d.position.copy(randDir().multiplyScalar(rand(14, 30))); d.rotation.set(rand(0, TAU), rand(0, TAU), 0); g.add(d); }
+  const beacon = glowSprite(0xffd040, 14); g.add(beacon); g.userData.beacon = beacon;
+  g.position.copy(pos); scene.add(g);
+  return { id, sys, g };
+});
+function updateWrecks(dt) {
+  const now = Date.now();
+  for (const w of wrecks) {
+    const ready = (G.wrecks[w.id] || 0) <= now; w.g.visible = ready;
+    if (!ready || w.sys !== G.sys) continue;
+    w.g.rotation.y += dt * 0.05; w.g.userData.beacon.material.opacity = Math.sin(T * 4) > 0 ? 1 : 0.2;
+    if (G.state === 'fly' && player.position.distanceTo(w.g.position) < 60 + P.r) {
+      const dz = SYS[G.sys].danger || 1, cr = Math.round(rand(300, 900) * dz), mk = pick(G.sys === 'ember' ? ['sap', 'resin', 'prism', 'sun'] : G.sys === 'frost' ? ['cryo', 'prism', 'sun'] : ['obs', 'sun', 'cryo']), n = 1 + (Math.random() * 3 | 0);
+      G.credits += cr; G.mats[mk] += n; G.wrecks[w.id] = now + 240000; G.stats.salvage = (G.stats.salvage || 0) + 1;
+      say(`Salvaged a wreck: +${cr} cr and ${n} ${MATS[mk].name}. More wrecks drift in over time.`, 'good'); sfx('win'); save();
+    }
+  }
+}
+let arkPayT = 60;
+function arkIncome(dt) {
+  if (!G.ships.includes('ark')) return;
+  G.arkBank = (G.arkBank || 0) + dt * (2 + G.crew / 40);
+  if ((arkPayT -= dt) <= 0) { arkPayT = 60; const v = Math.floor(G.arkBank); if (v > 0 && G.state !== 'title') { G.credits += v; G.arkBank -= v; say(`Genesis Ark shops and farms paid +${v.toLocaleString()} cr.`, 'good'); } }
+}
+
+/* ============ parked Ark ============ */
+const ARK = { obj: null, sys: null };
+function parkArkAt(pos, quat, sys) {
+  if (ARK.obj) scene.remove(ARK.obj);
+  ARK.obj = makeArk(); ARK.obj.position.copy(pos); ARK.obj.quaternion.copy(quat); ARK.obj.userData.engines.forEach(s => s.scale.setScalar(120));
+  ARK.sys = sys || G.sys; scene.add(ARK.obj);
+  G.arkPark = { sys: ARK.sys, p: pos.toArray(), q: quat.toArray() };
+}
+function unparkArk() { if (ARK.obj) scene.remove(ARK.obj); ARK.obj = null; ARK.sys = null; G.arkPark = null; }
+function arkCollide() {
+  if (!ARK.obj || ARK.sys !== G.sys) return;
+  const lim = 640 + P.r * 0.8, d = player.position.distanceTo(ARK.obj.position);
+  if (d < lim) { const n = new V3().subVectors(player.position, ARK.obj.position).normalize(); player.position.copy(ARK.obj.position).addScaledVector(n, lim); const vn = P.vel.dot(n); if (vn < 0) P.vel.addScaledVector(n, -vn); }
+}
+function arkSpacePrompt() {
+  if (!G.ships.includes('ark')) return '';
+  if (G.ship === 'ark') return '';
+  if (ARK.obj && ARK.sys === G.sys && player.position.distanceTo(ARK.obj.position) < 1200 + P.r) return isTouch ? 'Tap ARK to fly into the Genesis Ark hangar' : 'Press <kbd>I</kbd> to fly into the Genesis Ark hangar';
+  return '';
+}
+function tryEnterArk() {
+  if (!G.ships.includes('ark')) return;
+  if (G.ship === 'ark' || (ARK.obj && ARK.sys === G.sys && player.position.distanceTo(ARK.obj.position) < 1200 + P.r)) arkTransition(enterArk, 'Walking aboard');
+  else if (ARK.obj && ARK.sys !== G.sys) say(`Your Genesis Ark is parked in ${SYS[ARK.sys].name}.`);
+  else if (ARK.obj) say('Fly closer to your Genesis Ark to land in its hangar.');
+}
+function arkTransition(fn, eyebrow) {
+  showEntry(eyebrow); $('#entryTitle').textContent = 'Genesis Ark'; $('#entryAlt').textContent = ''; entryLayers(1, 0, 0, 0);
+  setState('arktrans'); sfx('whoosh');
+  setTimeout(() => { fn(); fadeEntry(); }, 550);
+}
+
+/* ============ Genesis Ark interior ============ */
+const ARK_W = { id: 'ark', interior: true, brand: 'GENESIS ARK · ON BOARD', title: 'Genesis Ark', scene: new THREE.Scene(), pad: { x: 0, z: -118 }, padH: 0, hgtFn: () => 0, itemPlan: [], critterMinH: 99, bob: false, buildable: false,
+  pal: { dayTop: new THREE.Color(0x5aa0e8), dayHor: new THREE.Color(0xf4ead8), setTop: new THREE.Color(0x5a5a9a), setHor: new THREE.Color(0xffb070), nightTop: new THREE.Color(0x050a1e), nightHor: new THREE.Color(0x18203c), water: new THREE.Color(0x3a9fd0) },
+  nightMsg: 'Night cycle on the Ark. The sky dome dims and the street lights come on.',
+  hint: 'WASD walk · Shift run · Drag mouse to look · E talk to crew, launch ships or take the helm',
+  bounds(p) { p.x = clamp(p.x, -57, 57); p.z = clamp(p.z, -146, 146); if (p.z > -102 && p.z < 2) p.x = clamp(p.x, -13, 13); if (p.y > 30) { p.y = 30; S.vel.y = Math.min(0, S.vel.y); } },
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] },
+  npcs: [], pads: [], bubble: null };
+WORLDS.ark = ARK_W;
+const FIRST = ['Mara', 'Teo', 'Ilya', 'Sana', 'Pip', 'Odette', 'Ravi', 'Lune', 'Bram', 'Kito', 'Nell', 'Arjun', 'Yuki', 'Fen', 'Dot', 'Caspian', 'Zuri', 'Hal', 'Ines', 'Moss'];
+const JOBS = {
+  engineer: { color: 0xd7712c, at: [-20, -132], lines: ['Reactor is humming nicely, captain.', () => `Warp drive is ready. A jump in the Ark burns ${SHIPS.ark.warp} Sunstone.`, 'If you hear a clank, that was not me.'] },
+  navigator: { color: 0x3b66d9, at: [20, -132], lines: [() => `We are holding position in ${SYS[G.sys].name}.`, () => storyHint()] },
+  gardener: { color: 0x4f9a3a, at: [-30, 40], lines: ['The orange trees grew from Verdance seeds. They love the fake sunshine.', 'Please do not step on the moss. It took me a month.', () => `Our farms feed ${G.crew.toLocaleString()} people. And one very greedy goat.`] },
+  chef: { color: 0xe8e2dc, at: [-9, -60], lines: ['Snowpuff-shaped dumplings today! No real Snowpuffs were harmed.', 'Cryo crystals make amazing ice cream. Do not tell the engineers.'] },
+  doctor: { color: 0x7fd4ff, at: [9, -30], lines: ['Warm up properly after Hoarfrost. Frostbitten pilots are my least favourite patients.', 'Lava burns heal slowly. Get a heat-proof suit before you walk on Pyre.'] },
+  pilot: { color: 0xff3fb4, at: [0, 104], lines: [() => `${G.ships.filter(k => k !== 'ark').length} ships are fuelled in the hangar. Walk up to a pad and press E to launch.`, 'Wingmen follow your target. Shoot something first and they pile on.'] },
+  kid: { color: 0xffc23a, at: [24, 60], lines: ['Is it true you fought the Iron Leviathan?!', 'When I grow up I want a Lancer. A pink one.', 'My mum says the sky dome is fake. It looks real to me.'] },
+  merchant: { color: 0xb05ad9, at: [-9, -85], lines: ['Buy low, sell high. Ice is cheap at Rimeholt and worth a fortune at Cinderwatch.', 'Luxury goods from Haven sell for a lot in Frostfall and Cinder Gate.', 'Big ships carry big cargo. That is where the real money is, captain.'] },
+};
+const CREW_LINES = ['Morning, captain!', 'Have you tried the dumplings on Market Street?', 'I signed on at Haven. Best decision I ever made.', 'The park is my favourite spot on the ship.', 'Heard we sank a capital ship. Is that true?', 'I am on night shift in the hydroponics bay.', 'Fly safe out there, captain.', 'My cousin crews a hauler for Halcyon. I do not trust them.'];
+function makePerson(shirt) {
+  const g = new THREE.Group(), add = (geo, mat, x, y, z, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+  const skin = smat(pick([0xf1c7a1, 0xd9a07a, 0xa86e4a, 0x6e4430, 0xe8b894])), pants = smat(0x2a2f3a), top = smat(shirt), hair = smat(pick([0x1a1410, 0x5a3a20, 0xc89a50, 0x8a2a1a, 0xe8e2dc]));
+  add(new THREE.CylinderGeometry(0.21, 0.19, 0.6, 10), top, 0, 1.15, 0);
+  add(new THREE.SphereGeometry(0.17, 12, 10), skin, 0, 1.62, 0);
+  const hr = add(new THREE.SphereGeometry(0.18, 12, 8, 0, TAU, 0, Math.PI / 2), hair, 0, 1.66, 0.02); hr.scale.set(1, 0.9, 1.05);
+  const legs = [], arms = [];
+  for (const sx of [-1, 1]) {
+    const lp = new THREE.Group(); lp.position.set(sx * 0.1, 0.85, 0); g.add(lp); add(new THREE.CylinderGeometry(0.08, 0.07, 0.84, 8), pants, 0, -0.42, 0, lp); legs.push(lp);
+    const ap = new THREE.Group(); ap.position.set(sx * 0.27, 1.4, 0); g.add(ap); add(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 8), top, 0, -0.3, 0, ap); arms.push(ap);
+  }
+  g.scale.setScalar(rand(0.85, 1.05));
+  return { g, legs, arms };
+}
+function textTex(text, bg, fg) { return canvasTex(256, 64, (g) => { g.fillStyle = bg; g.fillRect(0, 0, 256, 64); g.fillStyle = fg; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 128, 34); }); }
+function buildArkInterior() {
+  if (S.built) return; S.built = true;
+  surf.fog = new THREE.Fog(0xf4ead8, 220, 1100);
+  const sky2 = makeSkyDome(0x5aa0e8, 0xf4ead8); sky2.renderOrder = -10; surf.add(sky2); S.sky = sky2;
+  S.sun = new THREE.DirectionalLight(0xfff1dc, 0.9); surf.add(S.sun);
+  S.hemi = new THREE.HemisphereLight(0xdfefff, 0x8a8070, 0.55); surf.add(S.hemi);
+  S.moonLight = new THREE.DirectionalLight(0x8fa8ff, 0); S.moonLight.position.set(0.6, 0.8, -0.3); surf.add(S.moonLight);
+  surf.add(new THREE.AmbientLight(0xffffff, 0.15));
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; };
+  const tile = canvasTex(256, 256, (g) => { g.fillStyle = '#9aa0aa'; g.fillRect(0, 0, 256, 256); g.strokeStyle = '#7a808a'; g.lineWidth = 4; g.strokeRect(2, 2, 252, 252); g.strokeRect(2, 2, 126, 126); g.strokeRect(128, 128, 126, 126); });
+  tile.wrapS = tile.wrapT = THREE.RepeatWrapping; tile.repeat.set(30, 80);
+  const floor = add(new THREE.PlaneGeometry(120, 300), new THREE.MeshStandardMaterial({ map: tile, roughness: 0.7, metalness: 0.3 }), 0, 0, 0); floor.rotation.x = -Math.PI / 2;
+  const street = add(new THREE.PlaneGeometry(26, 104), smat(0x2a2c32, 0.9), 0, 0.02, -50); street.rotation.x = -Math.PI / 2;
+  for (let z = -98; z < -2; z += 8) { const l = add(new THREE.PlaneGeometry(0.4, 3.5), mGlow(0xf2e6c8), 0, 0.04, z); l.rotation.x = -Math.PI / 2; }
+  const grass = add(new THREE.PlaneGeometry(116, 86), smat(0x4f8a3a, 1), 0, 0.02, 47); grass.rotation.x = -Math.PI / 2;
+  const hang = add(new THREE.PlaneGeometry(116, 58), smat(0x3a3d46, 0.6, { metalness: 0.4 }), 0, 0.02, 120); hang.rotation.x = -Math.PI / 2;
+  for (const x of [-56, 56]) { const s = add(new THREE.PlaneGeometry(1.2, 58), mGlow(0xffc23a), x, 0.04, 120); s.rotation.x = -Math.PI / 2; }
+  // hull walls with window strips and dome ribs
+  const wallMat = smat(0xe6e8ee, 0.6, { metalness: 0.2 });
+  for (const sx of [-1, 1]) { add(new THREE.BoxGeometry(2, 40, 300), wallMat, sx * 61, 20, 0); for (let z = -140; z <= 140; z += 20) add(new THREE.BoxGeometry(0.4, 3, 12), mGlow(0x9fe8ff), sx * 59.9, 30, z); }
+  add(new THREE.BoxGeometry(124, 40, 2), wallMat, 0, 20, 151);
+  for (let z = -140; z <= 150; z += 30) { const rib = add(new THREE.TorusGeometry(61, 0.8, 6, 40, Math.PI), smat(0xc8ccd6, 0.5, { metalness: 0.4 }), 0, 40, z); rib.rotation.y = 0; }
+  // bridge
+  const frame = add(new THREE.BoxGeometry(124, 46, 2), smat(0x2a2c34, 0.5, { metalness: 0.5 }), 0, 23, -151.5);
+  const win = add(new THREE.PlaneGeometry(108, 34), new THREE.MeshBasicMaterial({ map: SYS[G.sys].sky, fog: false }), 0, 20, -150.3);
+  ARK_W.window = win;
+  const planetV = add(new THREE.SphereGeometry(9, 32, 24), new THREE.MeshStandardMaterial({ map: verdTex, roughness: 1 }), 30, 24, -149); planetV.scale.z = 0.1;
+  const deck = add(new THREE.BoxGeometry(80, 0.4, 36), smat(0x2a2c34, 0.5, { metalness: 0.5 }), 0, 0.2, -132);
+  for (let i = 0; i < 9; i++) { const a = -0.9 + i * 0.225, x = Math.sin(a) * 18, z = -128 - Math.cos(a) * 14; const c = add(new THREE.BoxGeometry(3, 1.2, 1.4), smat(0x3a3d48, 0.5, { metalness: 0.4 }), x, 0.8, z); c.rotation.y = -a; const sc = add(new THREE.BoxGeometry(2.6, 0.9, 0.1), mGlow(i % 3 ? 0x6fd8ff : 0xff8a3d), x, 1.7, z + 0.2); sc.rotation.set(-0.4, -a, 0); }
+  const chair = add(new THREE.BoxGeometry(1.6, 1, 1.6), smat(0x8a2a20, 0.6), 0, 0.9, -126); add(new THREE.BoxGeometry(1.6, 2, 0.3), smat(0x8a2a20, 0.6), 0, 1.6, -125.3);
+  const holo = add(new THREE.CylinderGeometry(3, 3.4, 1, 24), smat(0x2a2c34, 0.4, { metalness: 0.6 }), 0, 0.7, -112);
+  const holoP = add(new THREE.SphereGeometry(1.6, 20, 14), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, wireframe: true, transparent: true, opacity: 0.7 }), 0, 3.4, -112); ARK_W.holo = holoP;
+  const hg = glowSprite(0x6fd8ff, 6); hg.position.set(0, 3.4, -112); surf.add(hg);
+  S.colliders.push({ x: 0, z: -112, r: 3.5, top: 2 }, { x: 0, z: -126, r: 1.1, top: 2 });
+  // city street
+  const winTex = canvasTex(128, 256, (g) => { g.fillStyle = '#20232c'; g.fillRect(0, 0, 128, 256); for (let y = 8; y < 256; y += 20) for (let x = 8; x < 128; x += 20) { g.fillStyle = Math.random() < 0.6 ? `rgba(255,${200 + Math.random() * 40 | 0},140,.95)` : 'rgba(60,70,90,1)'; g.fillRect(x, y, 12, 12); } });
+  const bmats = [0x8a8f99, 0xb8b0a4, 0x6a7a8a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, metalness: 0.2, emissiveMap: winTex, emissive: 0xffffff, emissiveIntensity: 0.55 }));
+  for (const sx of [-1, 1]) for (let z = -98; z < 0; z += 16) { const h = rand(12, 34), w = rand(10, 15); const b = add(new THREE.BoxGeometry(36, h, w), pick(bmats), sx * 34, h / 2, z + 8); }
+  const SIGNS = [['DUMPLINGS', '#c8401c'], ['MARKET', '#3b66d9'], ['CLINIC', '#2a8a5a'], ['ARCADE', '#b05ad9'], ['NOODLES', '#d9a520'], ['TAILOR', '#5a6274']];
+  SIGNS.forEach(([t, bg], i) => { const sx = i % 2 ? 1 : -1, z = -92 + i * 16; const s = add(new THREE.PlaneGeometry(7, 1.75), new THREE.MeshBasicMaterial({ map: textTex(t, bg, '#fff') }), sx * 15.9, 5, z); s.rotation.y = -sx * Math.PI / 2; });
+  for (let z = -96; z < 0; z += 12) for (const sx of [-1, 1]) { add(new THREE.CylinderGeometry(0.1, 0.12, 5, 6), smat(0x2a2b33), sx * 12, 2.5, z); const l = glowSprite(0xffd8a0, 3.5); l.position.set(sx * 12, 5.2, z); surf.add(l); }
+  // park
+  const dummy = new THREE.Object3D();
+  const trunkIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.28, 0.42, 1, 6), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true }), 60);
+  const blobIM = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, flatShading: true }), 300);
+  const FOL = [0xe8662a, 0xf28a2c, 0x4f9a3a, 0x6ab04c, 0xf5ab3c].map(c => new THREE.Color(c)); let nT = 0, nB = 0;
+  for (let i = 0; i < 80 && nT < 40; i++) {
+    const x = rand(-54, 54), z = rand(8, 86); if (Math.hypot(x, z - 47) < 14 || Math.hypot(x - JOBS.gardener.at[0], z - JOBS.gardener.at[1]) < 4 || Math.hypot(x - JOBS.kid.at[0], z - JOBS.kid.at[1]) < 4) continue;
+    const H = rand(5, 9); dummy.position.set(x, H / 2, z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, H, 1); dummy.updateMatrix(); trunkIM.setMatrixAt(nT, dummy.matrix); trunkIM.setColorAt(nT++, new THREE.Color(0x4a3a30));
+    for (let k = 0; k < 5; k++) { dummy.position.set(x + rand(-1.6, 1.6), H + rand(-1, 1.2), z + rand(-1.6, 1.6)); dummy.rotation.set(rand(0, TAU), rand(0, TAU), 0); const sc = rand(1.6, 2.6); dummy.scale.set(sc, sc * 0.85, sc); dummy.updateMatrix(); blobIM.setMatrixAt(nB, dummy.matrix); blobIM.setColorAt(nB++, pick(FOL)); }
+    S.colliders.push({ x, z, r: 0.7, top: H });
+  }
+  [[trunkIM, nT], [blobIM, nB]].forEach(([im, n]) => { im.count = n; im.frustumCulled = false; im.instanceColor.needsUpdate = true; surf.add(im); });
+  const pond = add(new THREE.CircleGeometry(10, 40), new THREE.MeshStandardMaterial({ color: 0x3a9fd0, roughness: 0.1, metalness: 0.3 }), 0, 0.06, 47); pond.rotation.x = -Math.PI / 2; S.water = pond;
+  add(new THREE.CylinderGeometry(1.4, 1.8, 2, 16), smat(0xd8d4cc), 0, 1, 47); const fg = glowSprite(0xbfeaff, 5); fg.position.set(0, 3, 47); surf.add(fg);
+  S.colliders.push({ x: 0, z: 47, r: 10.5, top: 1 });
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU, b = add(new THREE.BoxGeometry(2.4, 0.5, 0.8), smat(0x7a5a3a), Math.cos(a) * 14, 0.5, 47 + Math.sin(a) * 14); b.rotation.y = -a + Math.PI / 2; }
+  // hangar door
+  const door = add(new THREE.PlaneGeometry(90, 30), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }), 0, 15, 149.8); ARK_W.door = door;
+  // crew
+  S.astro = makePersonAstro(); surf.add(S.astro.g);
+  S.drone = makeDrone(); surf.add(S.drone);
+  const bub = document.createElement('div'); bub.id = 'bubble'; bub.hidden = true; document.body.appendChild(bub); ARK_W.bubble = bub;
+}
+function makePersonAstro() { return makeAstronaut(); }
+function refreshArk() {
+  // hangar ships
+  ARK_W.pads.forEach(p => { surf.remove(p.obj); surf.remove(p.ring); surf.remove(p.console); }); ARK_W.pads = [];
+  const LEN = { lancer: 13, corsair: 20, bulwark: 62, titan: 420 };
+  G.ships.filter(k => k !== 'ark').forEach((k, i) => {
+    const x = [-42, -14, 14, 42][i] || 0, z = 124;
+    const obj = SHIPS[k].make(); const f = Math.min(1, 24 / LEN[k]); obj.scale.multiplyScalar(f); obj.position.set(x, 3, z); obj.rotation.y = Math.PI; surf.add(obj);
+    if (obj.userData.mats) { const pt = PAINTS[G.paint] || PAINTS.blue; obj.userData.mats.H.color.setHex(pt.hull); obj.userData.mats.T.color.setHex(pt.trim); }
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(10, 0.25, 6, 48), mGlow(0x7dffb0)); ring.rotation.x = Math.PI / 2; ring.position.set(x, 0.1, z); surf.add(ring);
+    const con = new THREE.Group(); const post = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.8), smat(0x2a2c34)); post.position.y = 0.7; con.add(post); const scr = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 0.1), mGlow(0x7dffb0)); scr.position.set(0, 1.5, -0.3); scr.rotation.x = -0.5; con.add(scr); con.position.set(x, 0, 108); surf.add(con);
+    ARK_W.pads.push({ k, x, z: 108, obj, ring, console: con });
+  });
+  // crew NPCs
+  ARK_W.npcs.forEach(n => surf.remove(n.g)); ARK_W.npcs = [];
+  let ni = 0;
+  for (const [job, j] of Object.entries(JOBS)) { const p = makePerson(j.color); p.g.position.set(j.at[0], 0, j.at[1]); p.g.rotation.y = rand(0, TAU); surf.add(p.g); ARK_W.npcs.push(Object.assign(p, { job, name: FIRST[ni++ % FIRST.length], walk: false })); }
+  const walkers = clamp(6 + Math.floor(G.crew / 150), 6, 28);
+  for (let i = 0; i < walkers; i++) { const p = makePerson(pick([0x3b66d9, 0xd7712c, 0x4f9a3a, 0xb05ad9, 0x8a8f99, 0xd9a520, 0xe8e2dc])); const lane = pick([-1, 1]) * rand(3, 10); p.g.position.set(lane, 0, rand(-96, -4)); surf.add(p.g); ARK_W.npcs.push(Object.assign(p, { job: 'crew', name: FIRST[ni++ % FIRST.length], walk: true, dir: pick([-1, 1]), sp: rand(1.1, 1.8), t: rand(0, 6) })); }
+  ARK_W.window.material.map = SYS[G.sys].sky;
+}
+function nearNPC() { let best = null, bd = 3.2; for (const n of ARK_W.npcs) { const d = Math.hypot(n.g.position.x - S.pos.x, n.g.position.z - S.pos.z); if (d < bd) { bd = d; best = n; } } return best; }
+function nearPad() { return ARK_W.pads.find(p => Math.hypot(p.x - S.pos.x, p.z - S.pos.z) < 4.5); }
+const nearHelm = () => Math.hypot(S.pos.x, S.pos.z + 126) < 3.4;
+function arkPrompt() {
+  if (!W.interior) return '';
+  const key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>';
+  if (nearHelm()) return `${key} to take the helm and fly the Genesis Ark`;
+  const pad = nearPad(); if (pad) return G.crew >= SHIPS[pad.k].crew ? `${key} to launch the ${SHIPS[pad.k].name}` : `The ${SHIPS[pad.k].name} needs ${SHIPS[pad.k].crew} crew`;
+  const n = nearNPC(); if (n) return `${key} to talk to ${n.name} (${n.job === 'crew' ? 'crew' : n.job})`;
+  return '';
+}
+function interactArk() {
+  if (!W.interior) return false;
+  if (nearHelm()) { leaveArk('helm'); return true; }
+  const pad = nearPad(); if (pad) { if (G.crew >= SHIPS[pad.k].crew) leaveArk('launch', pad.k); else say(`Not enough crew to fly the ${SHIPS[pad.k].name}.`, 'bad'); return true; }
+  const n = nearNPC(); if (n) { const lines = n.job === 'crew' ? CREW_LINES : JOBS[n.job].lines, l = pick(lines); ARK_W.talk = { n, text: typeof l === 'function' ? l() : l, t: 5 }; n.talkT = 5; sfx('ui'); return true; }
+  return false;
+}
+function enterArk() {
+  const fromHelm = G.ship === 'ark';
+  if (fromHelm) parkArkAt(player.position.clone(), player.quaternion.clone());
+  useWorld(ARK_W); W.build(); refreshArk();
+  renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 60; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
+  if (fromHelm) { S.pos.set(0, 0, -118); S.heading = Math.PI; } else { S.pos.set(0, 0, 100); S.heading = 0; }
+  S.vel.set(0, 0, 0); S.fuel = fuelMax(); S.heat = 100; S.yaw = S.heading; S.pitch = 0.22;
+  S.astro.g.visible = true; S.drone.visible = true; S.drone.position.copy(S.pos).add(new V3(1, 2.4, 1));
+  setState('surface'); updateSurfCamera(1);
+  say(`Welcome aboard the Genesis Ark. ${G.crew.toLocaleString()} crew live here.`, 'good');
+}
+function leaveArk(kind, k) {
+  arkTransition(() => {
+    renderScene = scene; applyBloom(false); ARK_W.bubble.hidden = true;
+    const pp = ARK.obj.position.clone(), pq = ARK.obj.quaternion.clone();
+    if (kind === 'helm') { unparkArk(); switchShip('ark', true); player.position.copy(pp); player.quaternion.copy(pq); P.vel.set(0, 0, 0); }
+    else { switchShip(k); player.position.copy(pp).add(new V3(0, -80, 1150).applyQuaternion(pq)); player.quaternion.copy(pq).multiply(new THREE.Quaternion().setFromAxisAngle(UP, Math.PI)); P.vel.set(0, 0, -90).applyQuaternion(player.quaternion); }
+    camera.near = shipNear(); camera.fov = 68; camera.updateProjectionMatrix();
+    camPos.copy(player.position).add(new V3(0, 4.2 * (SH().camUp || 1), 15).multiplyScalar(SH().cam).applyQuaternion(player.quaternion)); camera.position.copy(camPos); camera.quaternion.copy(player.quaternion);
+    G.throttle = 0.4; setState('fly'); wingSnap(); save();
+    say(kind === 'helm' ? 'You have the helm. The Genesis Ark is under way.' : `${SHIPS[k].name} launched from the Ark hangar.`, 'good');
+  }, kind === 'helm' ? 'Taking the helm' : 'Launching');
+}
+ARK_W.build = buildArkInterior;
+ARK_W.update = function (dt) {
+  ARK_W.holo.rotation.y += dt * 0.6; ARK_W.door.material.opacity = 0.28 + Math.sin(T * 2) * 0.08;
+  for (const n of ARK_W.npcs) {
+    let moving = false;
+    if (n.talkT > 0) { n.talkT -= dt; n.g.rotation.y = lerpAngle(n.g.rotation.y, Math.atan2(-(S.pos.x - n.g.position.x), -(S.pos.z - n.g.position.z)), dt * 6); }
+    else if (n.walk) { n.g.position.z += n.dir * n.sp * dt; if (n.g.position.z > -4 || n.g.position.z < -97) n.dir *= -1; n.g.rotation.y = n.dir > 0 ? Math.PI : 0; moving = true; }
+    n.t = (n.t || 0) + dt * (moving ? 7 : 0); const sw = moving ? Math.sin(n.t) * 0.5 : 0;
+    n.legs[0].rotation.x = sw; n.legs[1].rotation.x = -sw; n.arms[0].rotation.x = -sw; n.arms[1].rotation.x = sw;
+  }
+  const tk = ARK_W.talk, bub = ARK_W.bubble;
+  if (tk && tk.t > 0 && G.state === 'surface') {
+    tk.t -= dt; const p = tmp.copy(tk.n.g.position).add(new V3(0, 2.3, 0)).project(camera);
+    if (p.z < 1) { bub.hidden = false; bub.innerHTML = `<b>${tk.n.name}</b><span>${tk.n.job === 'crew' ? 'Crew' : tk.n.job[0].toUpperCase() + tk.n.job.slice(1)}</span><p>${tk.text}</p>`; bub.style.left = ((p.x * 0.5 + 0.5) * innerWidth) + 'px'; bub.style.top = ((-p.y * 0.5 + 0.5) * innerHeight) + 'px'; } else bub.hidden = true;
+  } else bub.hidden = true;
+};
+ARK_W.surfMarkers = function () {
+  { const el = marker('helm', 'station', 'Helm'); el.querySelector('.dst').textContent = fmtD(Math.hypot(S.pos.x, S.pos.z + 126)); placeMarker(el, tmp.set(0, 3.5, -126)); }
+  if (ARK_W.pads.length) { const el = marker('hangar', 'station', 'Hangar'); el.querySelector('.dst').textContent = fmtD(Math.hypot(S.pos.x, S.pos.z - 115)); placeMarker(el, tmp.set(0, 8, 118)); }
+};
+
+/* ============ Pyre surface ============ */
+const pyreRiver = (x, z) => smooth(0.07, 0.025, Math.abs(fbm(x * 0.0032 + 7, z * 0.0032 - 3)));
+function pyreRaw(x, z) { const hills = (fbm(x * 0.005 + 50, z * 0.005 + 9) * 0.5 + 0.5) * 40 + Math.abs(fbm(x * 0.02, z * 0.02)) * 8, r = pyreRiver(x, z); return (2.5 + hills) * (1 - r) - 3 * r; }
+function pyreBase(x, z) { const h = pyreRaw(x, z), d = Math.hypot(x - PAD.x, z - PAD.z); if (d > 34) return h; const f = smooth(34, 16, d); return h * (1 - f) + PAD_H * f; }
+function pyreHgt(x, z) { return Math.max(0, pyreBase(x, z)); }
+function findPyrePad() {
+  for (let r = 0; r < 900; r += 30) for (let a = 0; a < TAU; a += 0.4) {
+    const x = Math.cos(a) * r, z = Math.sin(a) * r; if (pyreRiver(x, z) > 0.01) continue; const h = pyreRaw(x, z); if (h > 18 || h < 3) continue;
+    let near = false; for (let b = 0; b < TAU && !near; b += 0.4) for (const rr of [50, 90, 130]) if (pyreRiver(x + Math.cos(b) * rr, z + Math.sin(b) * rr) > 0.9) { near = true; break; }
+    let clear = true; for (let b = 0; b < TAU; b += 0.5) if (pyreRiver(x + Math.cos(b) * 40, z + Math.sin(b) * 40) > 0.2) clear = false;
+    if (near && clear) return { x, z };
+  }
+  return { x: 0, z: 0 };
+}
+function makeObs() {
+  const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: 0x1a1424, metalness: 0.7, roughness: 0.08, flatShading: true, emissive: 0x3a1060, emissiveIntensity: 0.6 });
+  for (let i = 0; i < 5; i++) { const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), mat); c.scale.set(0.6, 1.8 + Math.random(), 0.6); c.position.set(rand(-0.3, 0.3), 0.45, rand(-0.3, 0.3)); c.rotation.set(rand(-0.6, 0.6), rand(0, TAU), rand(-0.6, 0.6)); g.add(c); }
+  const glow = glowSprite(0xc07aff, 3); glow.position.y = 0.8; g.add(glow); g.userData.glow = glow; g.userData.gs = 3; return g;
+}
+function makeLedger() {
+  const g = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.65), new THREE.MeshStandardMaterial({ color: 0xd9a520, metalness: 0.8, roughness: 0.25, emissive: 0x6a4a10, emissiveIntensity: 0.6 })); slab.position.y = 0.7; slab.rotation.x = -0.3; g.add(slab);
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.45), mGlow(0x7dffb0)); scr.position.set(0, 0.77, 0.02); scr.rotation.x = -Math.PI / 2 - 0.3; g.add(scr);
+  const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.6, 8), smat(0x2a2224)); ped.position.y = 0.3; g.add(ped);
+  const glow = glowSprite(0xffd060, 4); glow.position.y = 0.9; g.add(glow); g.userData.glow = glow; g.userData.gs = 4; return g;
+}
+function makeEmberback() {
+  const g = new THREE.Group(), dark = smat(0x2a1a16, 0.8, { flatShading: true });
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8, 0, TAU, 0, Math.PI / 2), dark); shell.scale.set(1, 0.75, 1.35); shell.position.y = 0.3; g.add(shell);
+  for (let i = -1; i <= 1; i++) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 1.3), mGlow(0xff7a20)); c.position.set(i * 0.22, 0.3 + 0.43 - Math.abs(i) * 0.1, 0); g.add(c); }
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), dark); head.position.set(0, 0.35, -0.8); g.add(head);
+  for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), mGlow(0xffb030)); e.position.set(sx * 0.1, 0.42, -0.98); g.add(e); for (const z of [-0.4, 0, 0.4]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 4), dark); l.position.set(sx * 0.6, 0.15, z); l.rotation.z = sx * 0.9; g.add(l); } }
+  const gl = glowSprite(0xff6a20, 1.6); gl.position.y = 0.7; g.add(gl);
+  g.scale.setScalar(rand(0.8, 1.3)); return g;
+}
+function makeObsCave(x, z, faceA) {
+  const h = pyreHgt(x, z), R = 16, gap = TAU * 0.2;
+  const geo = new THREE.SphereGeometry(R, 22, 12, Math.PI - faceA + gap / 2, TAU - gap, 0, Math.PI * 0.55); jitterGeo(geo, 0.14, x * 0.013 + z * 0.02);
+  const shell = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x14101a, metalness: 0.6, roughness: 0.15, flatShading: true, side: THREE.DoubleSide })); shell.position.set(x, h - 3, z); surf.add(shell);
+  for (let b = 0; b < TAU; b += 0.26) { const dA = Math.abs(((b - faceA + Math.PI) % TAU + TAU) % TAU - Math.PI); if (dA < gap / 2 + 0.12) continue; S.colliders.push({ x: x + Math.cos(b) * (R - 0.8), z: z + Math.sin(b) * (R - 0.8), r: 1.9, top: h + 11 }); }
+  const cm = new THREE.MeshStandardMaterial({ color: 0xff7a30, emissive: 0xff4a10, emissiveIntensity: 1.2, roughness: 0.2, flatShading: true });
+  for (let i = 0; i < 10; i++) { let b; do { b = rand(0, TAU); } while (Math.abs(((b - faceA + Math.PI) % TAU + TAU) % TAU - Math.PI) < gap / 2 + 0.2); const c = new THREE.Mesh(new THREE.ConeGeometry(rand(0.4, 0.8), rand(2, 5), 6), cm); const rr = R - rand(2, 3.5); c.position.set(x + Math.cos(b) * rr, h + rand(-0.5, 4), z + Math.sin(b) * rr); c.rotation.set(rand(-0.6, 0.6), 0, rand(-0.6, 0.6)); surf.add(c); }
+  const L = new THREE.PointLight(0xff7a30, 1.6, 34); L.position.set(x, h + 5, z); surf.add(L);
+  S.caves.push({ x, z, h });
+}
+function buildPyre() {
+  if (S.built) return; S.built = true;
+  SHIP_REST.set(PAD.x, PAD_H + 2.5, PAD.z); SHIP_START.set(PAD.x + 240, PAD_H + 160, PAD.z - 140);
+  surf.fog = new THREE.Fog(0x8a4a30, 120, 1000);
+  const sky2 = makeSkyDome(0x7a3020, 0xd88a5a); sky2.renderOrder = -10; surf.add(sky2); S.sky = sky2;
+  const big = glowSprite(0xff5a2a, 2400); big.material.fog = false; big.renderOrder = -9; surf.add(big); PYRE_W.bigSun = big;
+  const bigCore = glowSprite(0xffb070, 900); bigCore.material.fog = false; bigCore.renderOrder = -9; surf.add(bigCore); PYRE_W.bigCore = bigCore;
+  S.sun = new THREE.DirectionalLight(0xffa070, 0.95); surf.add(S.sun);
+  S.hemi = new THREE.HemisphereLight(0xff9a70, 0x3a1008, 0.5); surf.add(S.hemi);
+  S.moonLight = new THREE.DirectionalLight(0xff6a30, 0); S.moonLight.position.set(0.2, 0.6, 0.4); surf.add(S.moonLight);
+  const SIZE = 2600, SEG = 260;
+  const tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); tg.rotateX(-Math.PI / 2); tg.translate(PAD.x, 0, PAD.z);
+  const tp = tg.attributes.position;
+  for (let i = 0; i < tp.count; i++) tp.setY(i, pyreBase(tp.getX(i), tp.getZ(i)));
+  tg.computeVertexNormals();
+  const nrm = tg.attributes.normal, cols = new Float32Array(tp.count * 3);
+  for (let i = 0; i < tp.count; i++) {
+    const x = tp.getX(i), y = tp.getY(i), z = tp.getZ(i), n = fbm(x * 0.05, z * 0.05) * 0.5 + 0.5, rv = pyreRiver(x, z);
+    colr.setRGB(0.13, 0.1, 0.1).multiplyScalar(0.8 + n * 0.5).lerp(tmpC.setRGB(0.35, 0.32, 0.3), smooth(0.6, 0.9, fbm(x * 0.012 + 3, z * 0.012)) * 0.6);
+    colr.lerp(tmpC.setRGB(0.55, 0.18, 0.06), smooth(0.0, 0.9, rv) * 0.8);
+    colr.lerp(tmpC.setRGB(0.25, 0.22, 0.2), smooth(0.85, 0.65, nrm.getY(i)) * 0.5);
+    cols[i * 3] = colr.r; cols[i * 3 + 1] = colr.g; cols[i * 3 + 2] = colr.b;
+  }
+  tg.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  surf.add(new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.05 })));
+  const lavaMat = new THREE.ShaderMaterial({ uniforms: { t: { value: 0 } },
+    vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: 'uniform float t; varying vec3 vW; float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); } float n(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1.0, 0.0)), u.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), u.x), u.y); } void main(){ vec2 p = vW.xz * 0.08; float a = n(p + vec2(t * 0.15, t * 0.05)) * 0.6 + n(p * 2.3 - vec2(t * 0.1, t * 0.2)) * 0.4; float crust = smoothstep(0.58, 0.78, a); vec3 hot = mix(vec3(1.0, 0.35, 0.05), vec3(1.0, 0.85, 0.3), smoothstep(0.3, 0.0, a)); gl_FragColor = vec4(mix(hot * 1.3, vec3(0.12, 0.05, 0.04), crust), 1.0); }' });
+  const lava = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), lavaMat); lava.rotation.x = -Math.PI / 2; lava.position.set(PAD.x, 0.06, PAD.z); surf.add(lava); S.water = lava; PYRE_W.lava = lavaMat;
+  // volcano on the horizon
+  const vg = new THREE.ConeGeometry(520, 420, 16, 8, true); jitterGeo(vg, 0.1, 4);
+  const volcano = new THREE.Mesh(vg, smat(0x1e1614, 1, { flatShading: true })); volcano.position.set(PAD.x - 900, 200, PAD.z - 1100); surf.add(volcano);
+  const crater = glowSprite(0xff6a20, 500); crater.position.set(PAD.x - 900, 420, PAD.z - 1100); surf.add(crater);
+  PYRE_W.smoke = [];
+  const smokeTex = canvasTex(128, 128, (g) => { const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(60,50,50,.8)'); gr.addColorStop(1, 'rgba(60,50,50,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); });
+  for (let i = 0; i < 14; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, transparent: true, depthWrite: false, opacity: 0.7 })); s.userData.k = i / 14; s.position.set(PAD.x - 900, 430, PAD.z - 1100); surf.add(s); PYRE_W.smoke.push(s); }
+  // basalt spires
+  const rockMat = smat(0x241c1a, 0.9, { flatShading: true });
+  for (let i = 0; i < 26; i++) {
+    const a = rand(0, TAU), r = rand(40, 520), x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r;
+    if (pyreRiver(x, z) > 0.1) continue; const y = pyreHgt(x, z), hh = rand(8, 26);
+    const geo = new THREE.CylinderGeometry(rand(0.6, 1.5), rand(2, 4), hh, 6); jitterGeo(geo, 0.12, x); const m = new THREE.Mesh(geo, rockMat); m.position.set(x, y + hh / 2 - 1, z); surf.add(m);
+    S.colliders.push({ x, z, r: 3, top: y + hh });
+  }
+  // obsidian caves
+  let tries = 0;
+  while (S.caves.length < 3 && tries++ < 500) {
+    const a = rand(0, TAU), r = rand(90, 320), x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r;
+    if (pyreRiver(x, z) > 0.01 || pyreRaw(x, z) < 4) continue; let ok = true; for (let b = 0; b < TAU; b += 0.5) if (pyreRiver(x + Math.cos(b) * 20, z + Math.sin(b) * 20) > 0.2) ok = false; if (!ok) continue;
+    if (S.caves.some(c => Math.hypot(c.x - x, c.z - z) < 120) || S.colliders.some(c => Math.hypot(c.x - x, c.z - z) < c.r + 22)) continue;
+    makeObsCave(x, z, Math.atan2(PAD.z - z, PAD.x - x));
+  }
+  // fire geysers
+  PYRE_W.geysers = [];
+  for (let i = 0; i < 40 && PYRE_W.geysers.length < 7; i++) {
+    const a = rand(0, TAU), r = rand(40, 380), x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r;
+    if (pyreRiver(x, z) > 0.05 || S.caves.some(c => Math.hypot(c.x - x, c.z - z) < 25)) continue;
+    const y = pyreHgt(x, z);
+    const vent = new THREE.Mesh(new THREE.ConeGeometry(2.4, 2.2, 9, 1, true), smat(0x1a1210, 0.9, { flatShading: true, side: THREE.DoubleSide })); vent.position.set(x, y + 0.8, z); surf.add(vent);
+    const glow = glowSprite(0xff6a20, 3); glow.position.set(x, y + 1.6, z); surf.add(glow);
+    const N = 220, geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3); for (let k = 0; k < N; k++) { pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z; }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffa040, size: 1.1, map: TEX_GLOW, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); pts.frustumCulled = false; surf.add(pts);
+    PYRE_W.geysers.push({ x, y, z, t: rand(2, 9), on: 0, pts, vel: Array.from({ length: N }, () => new V3()), life: new Float32Array(N), glow });
+    S.colliders.push({ x, z, r: 1.6, top: y + 1.6 });
+  }
+  // landing pad with coolers
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(12, 13, 0.6, 32), smat(0x4a4c55, 0.6, { metalness: 0.4 })); pad.position.set(PAD.x, PAD_H + 0.05, PAD.z); surf.add(pad);
+  const padRing = new THREE.Mesh(new THREE.TorusGeometry(10.5, 0.15, 6, 48), mGlow(0x6fd8ff)); padRing.rotation.x = Math.PI / 2; padRing.position.set(PAD.x, PAD_H + 0.4, PAD.z); surf.add(padRing);
+  for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + 0.4, x = PAD.x + Math.cos(a) * 14, z = PAD.z + Math.sin(a) * 14; const post = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.6, 1.2), smat(0xd8dde8, 0.5)); post.position.set(x, PAD_H + 1.3, z); surf.add(post); const gl = glowSprite(0x6fd8ff, 5); gl.position.set(x, PAD_H + 2.8, z); surf.add(gl); }
+  const cool = new THREE.Mesh(new THREE.RingGeometry(15.5, 16, 64), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })); cool.rotation.x = -Math.PI / 2; cool.position.set(PAD.x, PAD_H + 0.3, PAD.z); surf.add(cool);
+  S.ship = new THREE.Group(); const sm = makeFighter(STYLE_PLAYER); S.ship.add(sm); S.shipModel = sm; S.ship.userData.engines = sm.userData.engines;
+  for (const [x, z] of [[0, -3], [2.4, 2.4], [-2.4, 2.4]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 2, 6), mStd(0x2a2b33)); leg.position.set(x, -1.4, z); S.ship.add(leg); }
+  S.ship.position.copy(SHIP_REST); S.ship.rotation.y = SHIP_YAW; surf.add(S.ship);
+  S.colliders.push({ x: PAD.x, z: PAD.z, r: 5, top: PAD_H + 3.5 });
+  S.astro = makeAstronaut(); surf.add(S.astro.g);
+  S.drone = makeDrone(); surf.add(S.drone);
+  for (let i = 0; i < 8; i++) {
+    let x, z, n = 0; do { x = PAD.x + rand(-360, 360); z = PAD.z + rand(-360, 360); n++; } while ((pyreBase(x, z) < 1.5 || Math.hypot(x - PAD.x, z - PAD.z) < 40) && n < 60);
+    const g = makeEmberback(); g.position.set(x, pyreHgt(x, z), z); surf.add(g);
+    S.critters.push({ g, home: new V3(x, 0, z), target: new V3(x, 0, z), t: rand(0, 4), hop: 0 });
+  }
+  S.snow = makeSnow(); S.snow.material.color.setHex(0x8a7a74); S.snow.material.size = 0.28;
+  S.fauna = { id: 'emberback', name: 'Emberback', bonus: 90 };
+  applyPaint();
+}
+const PYRE_W = { id: 'pyre', brand: 'PYRE · SURFACE', title: 'Explore Pyre', scene: new THREE.Scene(), pad: findPyrePad(), hgtFn: pyreHgt, build: buildPyre,
+  itemPlan: [['obs', 16, 1], ['sun', 6, 3], ['prism', 5, 8]], critterMinH: 1.2, bob: false, buildable: false, hot: true, snow: true,
+  pal: { dayTop: new THREE.Color(0x7a3020), dayHor: new THREE.Color(0xd88a5a), setTop: new THREE.Color(0x4a1a1a), setHor: new THREE.Color(0xff6a3a), nightTop: new THREE.Color(0x2a0806), nightHor: new THREE.Color(0x6a2410), water: new THREE.Color(0xff6a20) },
+  nightMsg: 'Night on Pyre. The lava glows brighter and the air cools a little.',
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+PYRE_W.padH = pyreRaw(PYRE_W.pad.x, PYRE_W.pad.z);
+WORLDS.pyre = PYRE_W;
+let lavaMsgT = -9;
+PYRE_W.update = function (dt) {
+  PYRE_W.lava.uniforms.t.value = T;
+  PYRE_W.bigSun.position.copy(camera.position).addScaledVector(SURF_SUN, 3500); PYRE_W.bigCore.position.copy(PYRE_W.bigSun.position);
+  PYRE_W.smoke.forEach(s => { s.userData.k = (s.userData.k + dt * 0.02) % 1; const k = s.userData.k; s.position.set(PAD.x - 900 + k * 260, 430 + k * 520, PAD.z - 1100 - k * 80); s.scale.setScalar(80 + k * 360); s.material.opacity = 0.75 * (1 - k); });
+  for (const g of PYRE_W.geysers) {
+    g.t -= dt; const pos = g.pts.geometry.attributes.position.array;
+    if (g.t <= 0 && g.on <= 0) { g.on = 2.6; g.t = rand(7, 13); if (Math.hypot(S.pos.x - g.x, S.pos.z - g.z) < 120) noiseBurst(); }
+    if (g.on > 0) {
+      g.on -= dt; g.pts.material.opacity = Math.min(1, g.pts.material.opacity + dt * 4); g.glow.scale.setScalar(6 + Math.random() * 3);
+      for (let k = 0; k < g.vel.length; k++) { g.life[k] -= dt; if (g.life[k] <= 0) { g.life[k] = rand(0.6, 1.4); pos[k * 3] = g.x; pos[k * 3 + 1] = g.y + 1.5; pos[k * 3 + 2] = g.z; g.vel[k].set(rand(-2.5, 2.5), rand(14, 26), rand(-2.5, 2.5)); } pos[k * 3] += g.vel[k].x * dt; pos[k * 3 + 1] += g.vel[k].y * dt; pos[k * 3 + 2] += g.vel[k].z * dt; g.vel[k].y -= 9 * dt; }
+      g.pts.geometry.attributes.position.needsUpdate = true;
+      if (G.state === 'surface' && Math.hypot(S.pos.x - g.x, S.pos.z - g.z) < 3.6 && S.pos.y < g.y + 8) { S.vel.y = 24; S.heat = Math.max(0, S.heat - 18 * dt * 4); if (T - lavaMsgT > 3) { say('Whoa! A fire geyser launched you into the air.', 'bad'); lavaMsgT = T; } }
+    } else { g.pts.material.opacity = Math.max(0, g.pts.material.opacity - dt * 2); g.glow.scale.setScalar(3); }
+  }
+  if (G.state === 'surface' && S.grounded && pyreBase(S.pos.x, S.pos.z) < 0.05) { S.heat = Math.max(0, S.heat - 30 * dt); S.vel.y = 7; if (T - lavaMsgT > 3) { say('Lava! Get out of the river!', 'bad'); lavaMsgT = T; sfx('hit'); } }
+};
+function noiseBurst() { if (AC) { try { noise(1.2, 0.18, 900, 120); } catch (e) {} } }
+const COOL_DRAIN = [2.4, 1.2, 0.55];
+RECIPES.cool = { name: 'Heat-proof suit', max: () => G.craft.cool >= 2, cost: () => G.craft.cool === 0 ? { obs: 3, cryo: 2 } : { obs: 5, sun: 2 }, desc: () => `Your suit stays cool for about ${Math.round(100 / COOL_DRAIN[G.craft.cool])} s on Pyre${G.craft.cool < 2 ? `. Next level: ${Math.round(100 / COOL_DRAIN[G.craft.cool + 1])} s` : ''}. Lava still hurts.`, apply() { G.craft.cool++; } };
+function spawnStoryItems() {
+  if (W !== PYRE_W || !G.mission || G.mission.type !== 'fetch' || !S.caves.length) return;
+  const c = S.caves[S.caves.length - 1], obj = makeLedger(); obj.position.set(c.x, pyreHgt(c.x, c.z), c.z); surf.add(obj);
+  S.items.push({ type: 'ledger', obj, tagged: true, phase: 0, id: 'ledger' });
+}
+
+/* ============ galaxy map with three systems ============ */
+function renderMap(sel) {
+  const svg = $('#gxSvg'), nodes = [['ember', SYS.ember], ['frost', SYS.frost], ['cinder', SYS.cinder]];
+  let h = '<defs>' + nodes.map(([k, s]) => `<radialGradient id="g-${k}"><stop offset="0" stop-color="${s.color}" stop-opacity="1"/><stop offset="1" stop-color="${s.color}" stop-opacity="0"/></radialGradient>`).join('') + '</defs>';
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 140; i++) h += `<circle cx="${(rnd() * 600).toFixed(1)}" cy="${(rnd() * 340).toFixed(1)}" r="${(rnd() * 1.2 + 0.3).toFixed(2)}" fill="#cfd8ff" opacity="${(rnd() * 0.6 + 0.2).toFixed(2)}"/>`;
+  h += `<line class="lane" x1="${SYS.ember.mapX}" y1="${SYS.ember.mapY}" x2="${SYS.frost.mapX}" y2="${SYS.frost.mapY}"/>`;
+  h += `<line class="lane ${G.cinderLane ? '' : 'locked'}" x1="${SYS.frost.mapX}" y1="${SYS.frost.mapY}" x2="${SYS.cinder.mapX}" y2="${SYS.cinder.mapY}"/>`;
+  for (const [k, s] of nodes) {
+    const here = k === G.sys, on = k === sel, lock = k === 'cinder' && !G.cinderLane;
+    h += `<g class="node ${on ? 'on' : ''} ${lock ? 'lock' : ''}" data-k="${k}" transform="translate(${s.mapX} ${s.mapY})" tabindex="0"><circle r="${k === 'cinder' ? 44 : 34}" fill="url(#g-${k})" opacity="${lock ? 0.25 : 0.55}"/><circle r="${k === 'cinder' ? 11 : 8}" fill="${lock ? '#6a6570' : s.color}"/>${on ? '<circle class="sel" r="18"/>' : ''}<text y="36" text-anchor="middle">${lock ? 'Uncharted' : s.name}</text>${here ? '<text class="here" y="-24" text-anchor="middle">YOU ARE HERE</text>' : ''}</g>`;
+  }
+  if (ARK.obj) { const s = SYS[ARK.sys]; h += `<text x="${s.mapX}" y="${s.mapY + 52}" text-anchor="middle" class="arkmark">Genesis Ark parked</text>`; }
+  svg.innerHTML = h;
+  const s = SYS[sel], cost = SH().warp, lock = sel === 'cinder' && !G.cinderLane, danger = ['Low', 'Medium', 'High'][s.danger >= 2 ? 2 : s.danger > 1 ? 1 : 0];
+  let info = `<div class="eyebrow">${lock ? 'Uncharted' : s.star} · danger ${danger}</div><h3>${lock ? 'Uncharted system' : s.name}</h3><p>${lock ? 'Nobody has surveyed this warp lane. Finish the story mission "Silent convoy", or buy the lane charts at the Rimeholt market.' : s.desc}</p>`;
+  if (sel === G.sys) info += '<p class="here-note">You are in this system.</p>';
+  else if (lock) info += '<button class="btn" disabled>Lane not charted</button>';
+  else info += `<p>Warping in your ${SH().name} burns <b>${cost} Sunstone</b>. You have ${G.mats.sun}.</p><button class="btn" id="gxWarp" ${G.mats.sun >= cost ? '' : 'disabled'}>Warp to ${s.name}</button>${G.mats.sun >= cost ? '' : '<p class="here-note">Buy Sunstone at Haven Ring, Rimeholt or Cinderwatch, or dig it up on Verdance or Pyre.</p>'}`;
+  $('#gxInfo').innerHTML = info;
+  const wb = $('#gxWarp'); if (wb) wb.addEventListener('click', () => startWarp(sel));
+}
+
+/* ============ markers + restore ============ */
+function extraMarkers() {
+  wingmen.forEach(w => { const el = marker('wing-' + w.i, 'wing', WING_NAMES[w.i][0]); el.querySelector('.dst').textContent = fmtD(w.obj.position.distanceTo(player.position)); placeMarker(el, w.obj.position); });
+  for (const w of wrecks) { if (w.sys !== G.sys || !w.g.visible) continue; const d = w.g.position.distanceTo(player.position); if (d > 4500) continue; const el = marker('wreck-' + w.id, 'salvage', 'Wreck'); el.querySelector('.dst').textContent = fmtD(d); placeMarker(el, w.g.position); }
+  if (ARK.obj && ARK.sys === G.sys) { const el = marker('arkpark', 'station', 'Genesis Ark'); el.querySelector('.dst').textContent = fmtD(Math.max(0, player.position.distanceTo(ARK.obj.position) - 640)); placeMarker(el, ARK.obj.position); }
+}
+if (G.arkPark && G.ships.includes('ark') && G.ship !== 'ark') parkArkAt(new V3().fromArray(G.arkPark.p), new THREE.Quaternion().fromArray(G.arkPark.q), G.arkPark.sys); else G.arkPark = null;
 
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
@@ -3024,12 +3684,12 @@ function frame(now) {
   const running = G.state !== 'pause' && G.state !== 'map';
   const onSurf = renderScene !== scene;
   if (running) {
-    T += dt; advanceTod(dt);
+    T += dt; advanceTod(dt); arkIncome(dt);
     if (!onSurf) {
       if (G.state === 'fly') { updatePlayer(dt); updateMission(dt); updatePatrols(dt); }
       if (G.state === 'descent') updateDescent(dt);
       if (G.state === 'warp') updateWarp(dt);
-      updateBoss(dt);
+      updateBoss(dt); if (G.state === 'fly') updateWingmen(dt); updateWrecks(dt);
       player.visible = G.state === 'fly' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map';
       updateEnemies(dt); updateBolts(dt); updateMissiles(dt); updatePickups(dt); updateFx(dt); updateWorld(dt);
     } else {
