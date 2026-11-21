@@ -267,6 +267,13 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
 .jf { font-size: 11px; padding: 4px 8px; border-radius: 3px; border: 1px dashed rgba(255,255,255,.15); color: var(--dim); }
 .jf.got { border: 1px solid var(--rc); color: var(--text); }
 .jf i { font-style: normal; color: var(--dim); margin-left: 4px; }
+#raceCount { position: fixed; left: 50%; top: 32%; transform: translate(-50%, -50%); z-index: 9; font-family: var(--display); font-weight: 700; font-size: clamp(64px, 14vw, 140px); color: #fff; text-shadow: 0 0 30px rgba(125,255,176,.8), 0 4px 0 rgba(0,0,0,.4); pointer-events: none; }
+#raceResult { position: fixed; left: 50%; top: calc(120px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 9; background: var(--panel); border: 1px solid var(--rc); border-left: 4px solid var(--rc); border-radius: 4px; padding: 12px 18px; min-width: min(360px, 90vw); pointer-events: none; animation: pop .3s ease-out; }
+#raceResult .cc-rar { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--rc); }
+#raceResult h3 { margin: 4px 0; font-family: var(--display); font-size: 24px; font-variant-numeric: tabular-nums; }
+#raceResult p { margin: 0; color: var(--dim); font-size: 12px; }
+.slotmap { width: 170px; height: 170px; display: block; }
+.xbtn { background: none; border: 0; color: var(--bad); font-size: 14px; cursor: pointer; padding: 0 0 0 6px; line-height: 1; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -359,6 +366,7 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
       <div><kbd>I</kbd> walk aboard the Genesis Ark</div>
       <div><kbd>P</kbd> photo mode</div>
       <div><kbd>R</kbd> fish (on foot, by water)</div>
+      <div><kbd>B</kbd> deploy a station core (in flight)</div>
     </div>
     <div class="row-btns">
       <button class="btn" id="startBtn">Launch</button>
@@ -381,6 +389,8 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="contracts" aria-selected="true">Contracts</button>
       <button class="tab" role="tab" data-tab="shipyard" aria-selected="false">Upgrades</button>
+      <button class="tab" role="tab" data-tab="station" aria-selected="false" hidden>Station</button>
+      <button class="tab" role="tab" data-tab="races" aria-selected="false" hidden>Races</button>
       <button class="tab" role="tab" data-tab="ships" aria-selected="false">Ships</button>
       <button class="tab" role="tab" data-tab="crew" aria-selected="false">Crew</button>
       <button class="tab" role="tab" data-tab="crafting" aria-selected="false">Crafting</button>
@@ -418,6 +428,10 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
 <div id="fishGame" hidden><div class="fg-title">Reel it in!</div><div class="fg-bar"><div id="fgZone"></div><div id="fgMark"></div></div><div id="fgPips"></div><small>Press R (or tap here) when the marker is in the green zone</small></div>
 <div id="catchCard" hidden></div>
 
+<div class="overlay" id="wanderPanel" hidden><div class="center-card"><h2>Derelict worldship</h2><p id="wanderText"></p><div class="row-btns"><button class="btn" id="wanderBuy">Restore for 100,000 cr</button><button class="ghost" id="wanderClose">Leave it</button></div></div></div>
+<div id="raceCount" hidden></div>
+<div id="raceResult" hidden></div>
+
 <div class="overlay" id="dead" hidden>
   <div class="center-card">
     <h2 style="color:var(--bad)">Ship lost</h2>
@@ -447,6 +461,7 @@ html, body { height: 100%; margin: 0; background: var(--void); color: var(--text
     <button id="tWpn">WPN</button>
     <button id="tMap">MAP</button>
     <button id="tArk">ARK</button>
+    <button id="tCore">CORE</button>
     <button id="tDock">DOCK</button>
   </div>
   <div class="tbtns sf">
@@ -850,8 +865,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -963,6 +978,7 @@ const MTYPES = { bounty: 'Bounty', delivery: 'Delivery', mining: 'Mining', race:
 const CARGO = ['medical crates', 'reactor coolant', 'sealed diplomatic pouch', 'hydroponic seed stock', 'spare drive coils', 'a crate of live crickets', 'navigation charts', 'ration packs'];
 const PIRATE_GANGS = ['the Rustjaw crew', 'Cinder Wolves', 'the Hollow Saints', 'Vex Kara’s raiders', 'the Brine Knives'];
 function genMissions(st) {
+  if (st.own) return [];
   const out = [];
   const others = STATIONS.filter(s => s !== st && s.sys === st.sys);
   const tough = Math.min(4, 1 + Math.floor((G.up.laser + G.up.shield + G.up.engine) / 4));
@@ -1064,6 +1080,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM' && (G.state === 'fly' || G.state === 'map')) toggleMap();
   if (e.code === 'KeyV' && G.state === 'fly') toggleWeapon();
   if (e.code === 'KeyI' && G.state === 'fly') tryEnterArk();
+  if (e.code === 'KeyB' && G.state === 'fly') deployCore();
   if (e.code === 'Escape' && G.state === 'surface' && (S.build || !$('#cratePanel').hidden)) { closeBuild(); closeCrate(); return; }
   if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code) && (G.state === 'fly' || G.state === 'surface')) e.preventDefault();
   if (e.code === 'KeyE' && G.state === 'fly') tryDock();
@@ -1077,7 +1094,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyP' && !e.repeat) { if (G.state === 'fly' || G.state === 'surface') enterPhoto(); else if (G.state === 'photo') exitPhoto(); }
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -1101,7 +1118,7 @@ if (isTouch) {
   hold('#tJet', 'jet');
   const tap = (id, fn) => $(id).addEventListener('touchstart', e => { fn(); e.preventDefault(); }, { passive: false });
   tap('#tDock', tryDock); tap('#tRoll', () => startRoll(stick.x < -0.2 ? 1 : -1));
-  tap('#tScanB', () => scan()); tap('#tMsl', () => fireMissile()); tap('#tWpn', () => toggleWeapon()); tap('#tMap', () => toggleMap()); tap('#tArk', () => tryEnterArk()); tap('#tFish', () => fishAction()); tap('#tBuild', () => toggleBuild()); tap('#tGrab', () => harvest()); tap('#tShip', () => board());
+  tap('#tScanB', () => scan()); tap('#tMsl', () => fireMissile()); tap('#tWpn', () => toggleWeapon()); tap('#tMap', () => toggleMap()); tap('#tArk', () => tryEnterArk()); tap('#tFish', () => fishAction()); tap('#tCore', () => deployCore()); tap('#tBuild', () => toggleBuild()); tap('#tGrab', () => harvest()); tap('#tShip', () => board());
   const look = $('#lookZone'); let lk = null;
   look.addEventListener('touchstart', e => { const t = e.changedTouches[0]; lk = { id: t.identifier, x: t.clientX, y: t.clientY }; e.preventDefault(); }, { passive: false });
   look.addEventListener('touchmove', e => { for (const t of e.changedTouches) if (lk && t.identifier === lk.id) { S.yaw -= (t.clientX - lk.x) * 0.008; S.pitch = clamp(S.pitch + (t.clientY - lk.y) * 0.006, -0.3, 1.15); lk.x = t.clientX; lk.y = t.clientY; } e.preventDefault(); }, { passive: false });
@@ -1147,6 +1164,7 @@ function renderDock() {
   $('#dkName').textContent = st.name; $('#dkKind').textContent = st.kind; $('#dkBlurb').textContent = st.blurb;
   $('#dkCredits').textContent = G.credits.toLocaleString();
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === dockTab ? 'true' : 'false'));
+  document.querySelector('[data-tab=races]').hidden = st.id !== 'haven'; document.querySelector('[data-tab=station]').hidden = !st.own;
   const body = $('#tabBody'); let h = '';
   if (dockTab === 'contracts') {
     if (G.mission) {
@@ -1162,8 +1180,12 @@ function renderDock() {
       const lv = G.up[k], max = lv >= MAXLV, cost = upgradeCost(k);
       h += `<div class="item"><div><h4>${UPG[k].name}${pips(lv)}</h4><p>Now: ${UPG[k].desc(lv)}${max ? '' : `<br>Next: ${UPG[k].desc(lv + 1)}`}</p></div><div>${max ? '<div class="reward">Maxed</div>' : `<div class="reward">${cost.toLocaleString()} cr</div><button class="btn" data-act="upgrade" data-k="${k}" ${G.credits < cost ? 'disabled' : ''}>Install</button>`}</div></div>`;
     }
+  } else if (dockTab === 'races') {
+    h += renderRaces();
+  } else if (dockTab === 'station') {
+    h += renderOwnStation(st);
   } else if (dockTab === 'ships') {
-    h += renderShips(st);
+    h += renderShips(st) + (st.own ? '' : renderCoreShop(st));
   } else if (dockTab === 'crew') {
     h += renderCrew(st) + renderWing();
   } else if (dockTab === 'crafting') {
@@ -1189,7 +1211,9 @@ document.querySelector('.tabs').addEventListener('click', e => { const t = e.tar
 $('#tabBody').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   const act = b.dataset.act, st = G.docked;
-  shipAct(act, b, st); tradeAct(act, b, st); fishAct(act, b, st);
+  shipAct(act, b, st); tradeAct(act, b, st); fishAct(act, b, st); ownAct(act, b, st);
+  if (act === 'race') { armRace(b.dataset.k); renderDock(); }
+  if (act === 'cancelrace') { cancelRace('Race cancelled.'); renderDock(); }
   if (act === 'craft') craft(b.dataset.k);
   if (act === 'paint') paintAct(b.dataset.k);
   if (act === 'accept') acceptMission(G.board[st.id][+b.dataset.i]);
@@ -1206,6 +1230,7 @@ function nearestStation() {
   return { st: best, d: bd };
 }
 function tryDock() {
+  if (nearDerelict()) { openWanderer(); return; }
   if (nearPlanet()) { startLanding(); return; }
   const { st, d } = nearestStation();
   if (d > st.dockR + P.r) return;
@@ -1223,7 +1248,7 @@ function dock(st) {
   if (!G.board[st.id] || !G.board[st.id].length || G.boardFresh !== st.id) { G.board[st.id] = genMissions(st); }
   G.boardFresh = st.id; refreshDrift(st); injectStory(st);
   if (!G.storyIntro && !G.story) { G.storyIntro = true; setTimeout(() => showComms('Commander Ilsa Vale', 'Captain, this is Reach Patrol. Something strange is going on with the pirate gangs. Come and see me at Bastion Spire, and look for the story contract on my board.'), 700); }
-  dockTab = 'contracts'; save(); setState('docked'); renderDock(); sfx('ring');
+  dockTab = st.own ? 'station' : 'contracts'; save(); setState('docked'); renderDock(); sfx('ring');
 }
 function undock() {
   const st = G.docked; G.docked = null;
@@ -1243,7 +1268,7 @@ let resetArmed = false;
 $('#resetBtn').addEventListener('click', e => {
   if (!resetArmed) { resetArmed = true; e.target.textContent = 'Click again to erase'; setTimeout(() => { resetArmed = false; e.target.textContent = 'New pilot'; }, 3000); return; }
   try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
-  Object.assign(G, { credits: 400, ore: 0, hull: 100, lastDock: 'haven' }); Object.assign(G.up, { laser: 1, shield: 1, engine: 1, hold: 1 }); Object.assign(G.stats, { kills: 0, ore: 0, missions: 0 }); Object.assign(G.mats, { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 }); G.disc = {}; Object.assign(G.craft, { shield: 0, scan: 0, fuel: 0 }); G.missiles = 0; G.paint = 'blue'; G.paints = ['blue']; resetBaseScene(); G.base = { pieces: [], stash: { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 } }; applyPaint(); G.ships = ['lancer']; G.crew = 1; G.recruit = {}; G.craft.frost = 0; G.craft.heat = 0; G.craft.cool = 0; G.weapon = 'laser'; G.mats.obs = 0; G.story = 0; G.cinderLane = false; G.cargo = {}; G.wing = 0; G.wrecks = {}; G.arkBank = 0; G.storyIntro = false; G.rep = { patrol: 0, pirates: 0 }; G.fish = {}; G.fishBest = {}; G.aquarium = {}; G.craft.rod = 0; G.mats.comet = 0; unparkArk(); switchShip('lancer');
+  Object.assign(G, { credits: 400, ore: 0, hull: 100, lastDock: 'haven' }); Object.assign(G.up, { laser: 1, shield: 1, engine: 1, hold: 1 }); Object.assign(G.stats, { kills: 0, ore: 0, missions: 0 }); Object.assign(G.mats, { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 }); G.disc = {}; Object.assign(G.craft, { shield: 0, scan: 0, fuel: 0 }); G.missiles = 0; G.paint = 'blue'; G.paints = ['blue']; resetBaseScene(); G.base = { pieces: [], stash: { sap: 0, resin: 0, prism: 0, sun: 0, cryo: 0 } }; applyPaint(); G.ships = ['lancer']; G.crew = 1; G.recruit = {}; G.craft.frost = 0; G.craft.heat = 0; G.craft.cool = 0; G.weapon = 'laser'; G.mats.obs = 0; G.story = 0; G.cinderLane = false; G.cargo = {}; G.wing = 0; G.wrecks = {}; G.arkBank = 0; G.storyIntro = false; G.rep = { patrol: 0, pirates: 0 }; G.fish = {}; G.fishBest = {}; G.aquarium = {}; G.raceBest = {}; G.trophies = {}; G.coreKits = 0; G.craft.rod = 0; G.mats.comet = 0; unparkArk(); switchShip('lancer');
   e.target.hidden = true; $('#startBtn').textContent = 'Launch'; $('#saveNote').textContent = '';
 });
 $('#respawnBtn').addEventListener('click', () => { G.hull = D.maxHull; dock(stationById(G.lastDock)); });
@@ -1272,6 +1297,7 @@ function die() {
   const loss = Math.min(G.credits, Math.round(150 + G.credits * 0.1));
   G.credits -= loss; const lostOre = G.ore; G.ore = 0; G.cargo = {};
   if (G.mission) failMission('Contract failed: your ship was destroyed.');
+  if (RACE.on) cancelRace('Race abandoned.');
   enemies.slice().forEach(e => { if (!e.mission) removeEnemy(e); });
   $('#deadText').textContent = `Insurance rebuilt your ship at ${stationById(G.lastDock).name}. The deductible cost ${loss} credits${lostOre ? ` and your ${lostOre} ore was lost` : ''}.`;
   save();
@@ -1329,7 +1355,7 @@ function updatePlayer(dt) {
     if (d < rr) { tmp.subVectors(player.position, a.mesh.position).normalize(); player.position.copy(a.mesh.position).addScaledVector(tmp, rr); const vn = P.vel.dot(tmp); if (vn < 0) { P.vel.addScaledVector(tmp, -vn * 1.4); damagePlayer(Math.abs(vn) * 0.1); } }
   }
   for (const pl of PLANETS) { const dpl = player.position.distanceTo(pl.pos), lim = pl.R + 40 + P.r; if (dpl < lim) { tmp.subVectors(player.position, pl.pos).normalize(); player.position.copy(pl.pos).addScaledVector(tmp, lim); const vn = P.vel.dot(tmp); if (vn < 0) P.vel.addScaledVector(tmp, -vn); } }
-  bossCollide(); arkCollide();
+  bossCollide(); arkCollide(); wandererCollide();
   // world boundary: soft push back
   const far = player.position.distanceTo(SYS[G.sys].c);
   if (far > 9000) { P.vel.addScaledVector(tmp.copy(player.position).sub(SYS[G.sys].c).normalize(), -dt * 200); if (Math.random() < dt) say('Leaving patrolled space. Turn back.', 'bad'); }
@@ -1395,7 +1421,7 @@ function updateBolts(dt) {
         const a = asteroids[j]; if (b.m.position.distanceToSquared(a.mesh.position) > (a.r + 20) ** 2) continue;
         if (segHit(b.prev, b.m.position, a.mesh.position, a.r)) { a.hp -= b.dmg; spark(b.m.position, 0xffb070, 9); hit = true; if (a.hp <= 0) breakRock(a); break; }
       }
-    } else if (traderHit(b)) { hit = true;
+    } else if (traderHit(b) || ownStationHit(b)) { hit = true;
     } else if (G.state === 'fly' && P.rollT < 0 && segHit(b.prev, b.m.position, player.position, Math.max(5, P.r * 0.9))) { damagePlayer(b.dmg); spark(b.m.position, 0xff6040, 14); hit = true; }
     if (!hit && b.owner === 'player' && bossHullHit(b)) { hit = true; spark(b.m.position, 0xffc080, 10); }
     if (!hit) for (const s of STATIONS) if (b.m.position.distanceToSquared(s.pos) < s.colR * s.colR * 0.6) { hit = true; spark(b.m.position, 0xffffff, 6); break; }
@@ -1518,7 +1544,8 @@ function updateHUD(dt) {
   // mission card
   const m = G.mission, card = $('#missionCard');
   let html;
-  if (!m) html = `<div class="eyebrow">No contract</div><h3>Free flight</h3><p>Dock at any station (<b>E</b> when close) to take a contract, trade ore or upgrade. Or fly to Verdance and press <b>L</b> to land.</p>`;
+  if (RACE.on) html = raceCard();
+  else if (!m) html = `<div class="eyebrow">No contract</div><h3>Free flight</h3><p>Dock at any station (<b>E</b> when close) to take a contract, trade ore or upgrade. Or fly to Verdance and press <b>L</b> to land.</p>`;
   else {
     let status = '';
     if (m.type === 'bounty') status = `${enemies.filter(e => e.mission).length} raiders left`;
@@ -1537,7 +1564,7 @@ function updateHUD(dt) {
   let pr = '';
   if (ns.d < ns.st.dockR + P.r) pr = isTouch ? `Tap DOCK to enter ${ns.st.name}` : `Press <kbd>E</kbd> to dock at ${ns.st.name}`;
   else if (dpl < LP.landR + P.r) pr = isTouch ? `Tap DOCK to land on ${LP.name}` : `Press <kbd>L</kbd> to land on ${LP.name}`;
-  if (!pr) pr = arkSpacePrompt();
+  if (!pr) pr = arkSpacePrompt() || wanderPrompt() || ownPrompt();
   setPrompt(pr);
   // aim reticle
   if (!isTouch) { const a = $('#aim'); a.style.left = ((mouse.x * 0.5 + 0.5) * innerWidth) + 'px'; a.style.top = ((mouse.y * 0.5 + 0.5) * innerHeight) + 'px'; }
@@ -2629,6 +2656,7 @@ function renderShips(st) {
     if (cur) btn = '<div class="reward">Flying</div>';
     else if (owned) btn = `<button class="btn" data-act="flyship" data-k="${k}" ${crewOk ? '' : 'disabled'}>Fly this</button>`;
     else if (sold) btn = `<div class="reward">${s.price.toLocaleString()} cr</div><button class="btn" data-act="buyship" data-k="${k}" ${canAfford(cost) && crewOk ? '' : 'disabled'}>Buy</button>`;
+    else if (s.restore) btn = `<div class="reward" style="font-size:12px;max-width:170px">Restore the derelict drifting in Ember Reach</div>`;
     else btn = `<div class="reward" style="font-size:12px;max-width:150px">Sold at ${s.yard.map(id => stationById(id).name).join(', ')}</div>`;
     h += `<div class="item"><div><h4>${s.name} <span class="tag ${k === 'ark' ? 'boss' : 'delivery'}">${s.cls}</span></h4><p>${s.desc}</p><p class="shipstats">Length ${s.size} · Hull ${s.hull.toLocaleString()} · Shields ×${s.shield} · Speed ×${s.speed} · Cargo +${s.hold} · Guns ×${s.dmg}${s.volley ? ' (volleys)' : ''} · Warp costs ${s.warp} Sunstone</p>${owned ? '' : `<div class="chips">${costChips(cost)}<span class="chip ${crewOk ? 'ok' : 'miss'}">${s.crew.toLocaleString()} crew<i>have ${G.crew.toLocaleString()}</i></span></div>`}</div><div>${btn}</div></div>`;
   }
@@ -3243,10 +3271,10 @@ const PROFILE = {
 const cargoGoods = () => Object.values(G.cargo).reduce((a, b) => a + b, 0);
 const cargoUsed = () => G.ore + cargoGoods();
 function refreshDrift(st) { G.drift[st.id] = {}; for (const k in GOODS) G.drift[st.id][k] = rand(0.88, 1.12); }
-function goodPrice(st, k, buy) { const d = (G.drift[st.id] && G.drift[st.id][k]) || 1; return Math.max(1, Math.round(GOODS[k].base * (PROFILE[st.id][k] || 1) * d * repPriceMul(buy) * (buy ? 1.04 : 0.96))); }
+function goodPrice(st, k, buy) { const d = (G.drift[st.id] && G.drift[st.id][k]) || 1; return Math.max(1, Math.round(GOODS[k].base * ((PROFILE[st.id] || {})[k] || 1) * d * repPriceMul(buy) * (buy ? 1.04 : 0.96))); }
 function bestDeal(st) {
   let best = null;
-  for (const k in GOODS) { const buy = goodPrice(st, k, true); for (const o of STATIONS) { if (o === st || (o.sys === 'cinder' && !G.cinderLane)) continue; const gain = Math.round(GOODS[k].base * (PROFILE[o.id][k] || 1) * 0.96) - buy; if (!best || gain > best.gain) best = { k, o, gain }; } }
+  for (const k in GOODS) { const buy = goodPrice(st, k, true); for (const o of STATIONS) { if (o === st || (o.sys === 'cinder' && !G.cinderLane)) continue; const gain = Math.round(GOODS[k].base * ((PROFILE[o.id] || {})[k] || 1) * 0.96) - buy; if (!best || gain > best.gain) best = { k, o, gain }; } }
   return best && best.gain > 0 ? `Best known deal from here: buy ${GOODS[best.k].name}, sell at ${best.o.name} for about ${best.gain} cr profit each.` : '';
 }
 function renderTrade(st) {
@@ -3458,6 +3486,7 @@ function arkPrompt() {
   const key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>';
   if (nearHelm()) return `${key} to take the helm and fly the Genesis Ark`;
   const pad = nearPad(); if (pad) return G.crew >= SHIPS[pad.k].crew ? `${key} to launch the ${SHIPS[pad.k].name}` : `The ${SHIPS[pad.k].name} needs ${SHIPS[pad.k].crew} crew`;
+  const tp = trophyPrompt(); if (tp) return tp;
   const aq = aquaPrompt(); if (aq) return aq;
   const n = nearNPC(); if (n) return `${key} to talk to ${n.name} (${n.job === 'crew' ? 'crew' : n.job})`;
   return '';
@@ -3473,7 +3502,7 @@ function interactArk() {
 function enterArk() {
   const fromHelm = G.ship === 'ark';
   if (fromHelm) parkArkAt(player.position.clone(), player.quaternion.clone());
-  useWorld(ARK_W); W.build(); refreshArk(); refreshAquarium();
+  useWorld(ARK_W); W.build(); refreshArk(); refreshAquarium(); refreshTrophies();
   renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 60; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
   if (fromHelm) { S.pos.set(0, 0, -118); S.heading = Math.PI; } else { S.pos.set(0, 0, 100); S.heading = 0; }
   S.vel.set(0, 0, 0); S.fuel = fuelMax(); S.heat = 100; S.yaw = S.heading; S.pitch = 0.22;
@@ -3493,7 +3522,7 @@ function leaveArk(kind, k) {
     say(kind === 'helm' ? 'You have the helm. The Genesis Ark is under way.' : `${SHIPS[k].name} launched from the Ark hangar.`, 'good');
   }, kind === 'helm' ? 'Taking the helm' : 'Launching');
 }
-ARK_W.build = function () { const first = !S.built; buildArkInterior(); if (first) buildAquarium(); };
+ARK_W.build = function () { const first = !S.built; buildArkInterior(); if (first) { buildAquarium(); buildTrophyShelf(); } };
 ARK_W.update = function (dt) {
   updateAquarium(dt);
   ARK_W.holo.rotation.y += dt * 0.6; ARK_W.door.material.opacity = 0.28 + Math.sin(T * 2) * 0.08;
@@ -4019,7 +4048,7 @@ function updateNPCs(dt) {
     const goal = foe ? foe.obj.position : n.pts[n.i];
     turnToward(o, goal, (foe ? 1.8 : 0.8) * dt);
     o.position.addScaledVector(new V3(0, 0, -1).applyQuaternion(o.quaternion), (foe ? 190 : n.speed) * dt);
-    if (!foe && o.position.distanceTo(goal) < 120) n.i = (n.i + 1) % n.pts.length;
+    if (!foe && o.position.distanceTo(goal) < 120) { if (n.own && n.i === 0) ownTradeVisit(n.own); n.i = (n.i + 1) % n.pts.length; }
     if (foe && n.cd <= 0) { const d = o.position.distanceTo(foe.obj.position), f = new V3(0, 0, -1).applyQuaternion(o.quaternion); if (d < 650 && f.dot(foe.obj.position.clone().sub(o.position).normalize()) > 0.96) { n.cd = 0.45; fireBolt(o.position, o.quaternion, new V3(), 'npc', 8, new V3(0, 0, -4)); } }
     o.userData.engines.forEach(s => s.scale.setScalar((n.kind === 'trader' ? 6 : 3) + Math.random()));
   }
@@ -4107,9 +4136,392 @@ function eventMarkers() {
 }
 { const _em = extraMarkers; extraMarkers = function () { _em(); eventMarkers(); }; }
 
+/* ============ the Wanderer: a derelict worldship you can restore ============ */
+const WANDER_POS = new V3(-1800, 1100, 3400);
+function makeWanderer() {
+  const g = makeArk(); g.scale.setScalar(0.8);
+  g.children[0].material = g.children[0].material.clone(); g.children[0].material.color.setHex(0xa8c8c0);
+  return g;
+}
+SHIPS.wanderer = { name: 'Wanderer', cls: 'Worldship', size: '1.4 km', price: 100000, restore: true, crew: 300, hull: 15000, shield: 18, speed: 0.55, turn: 0.2, hold: 1200, dmg: 4, r: 600, cam: 90, camUp: 2.6, warp: 10, yard: [], volley: true, boltScale: 24,
+  guns: Array.from({ length: 8 }, (_, i) => [Math.cos(i / 8 * TAU) * 340, Math.sin(i / 8 * TAU) * 340, -430]), make: makeWanderer,
+  desc: 'An old colony worldship left drifting in Ember Reach. Restore it for 100,000 cr and it flies with just 300 crew.' };
+let derelict = null;
+function spawnDerelict() {
+  if (G.wanderer) return;
+  derelict = makeArk(); derelict.scale.setScalar(0.8);
+  derelict.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); if (o.material.color) o.material.color.multiplyScalar(0.35); if (o.material.emissiveIntensity !== undefined) o.material.emissiveIntensity = 0.04; } if (o.isSprite) o.visible = false; });
+  derelict.position.copy(WANDER_POS); derelict.rotation.set(0.35, 1.1, 0.2); scene.add(derelict);
+  for (let i = 0; i < 18; i++) { const d = new THREE.Mesh(new THREE.BoxGeometry(rand(10, 40), rand(6, 20), rand(10, 60)), mStd(0x2a2b30, 0.6, 0.6)); d.position.copy(WANDER_POS).add(randDir().multiplyScalar(rand(700, 1000))); d.rotation.set(rand(0, TAU), rand(0, TAU), 0); scene.add(d); derelict.userData.debris = (derelict.userData.debris || []).concat(d); }
+  const beacon = glowSprite(0xffb040, 120); beacon.position.copy(WANDER_POS).add(new V3(0, 560, 0)); scene.add(beacon); derelict.userData.beacon = beacon;
+}
+const nearDerelict = () => derelict && G.state === 'fly' && G.sys === 'ember' && player.position.distanceTo(WANDER_POS) < 1150 + P.r;
+function wanderPrompt() { return nearDerelict() ? (isTouch ? 'Tap DOCK to inspect the derelict worldship' : 'Press <kbd>E</kbd> to inspect the derelict worldship') : ''; }
+function openWanderer() {
+  setState('wander'); $('#wanderPanel').hidden = false;
+  $('#wanderText').innerHTML = `The <b>Wanderer</b> is an old colony worldship, abandoned when its reactor failed. A salvage crew could restore it for <b>100,000 cr</b>. It needs 300 crew to fly (you have ${G.crew.toLocaleString()}).`;
+  $('#wanderBuy').disabled = G.credits < 100000;
+}
+function closeWanderer() { $('#wanderPanel').hidden = true; setState('fly'); }
+$('#wanderClose').addEventListener('click', closeWanderer);
+$('#wanderBuy').addEventListener('click', () => {
+  if (G.credits < 100000) return;
+  G.credits -= 100000; G.wanderer = true; if (!G.ships.includes('wanderer')) G.ships.push('wanderer');
+  scene.remove(derelict); (derelict.userData.debris || []).forEach(d => scene.remove(d)); scene.remove(derelict.userData.beacon); derelict = null;
+  $('#wanderPanel').hidden = true; setState('fly');
+  if (G.crew >= 300) { switchShip('wanderer'); player.position.copy(WANDER_POS); say('The Wanderer’s reactor roars back to life. She is yours, captain!', 'good'); }
+  else say('The Wanderer is restored! Hire 300 crew, then fly her from any station’s Ships tab.', 'good');
+  sfx('win'); save();
+});
+function wandererCollide() {
+  if (!derelict || G.sys !== 'ember') return;
+  const lim = 520 + P.r * 0.8, d = player.position.distanceTo(WANDER_POS);
+  if (d < lim) { const n = new V3().subVectors(player.position, WANDER_POS).normalize(); player.position.copy(WANDER_POS).addScaledVector(n, lim); const vn = P.vel.dot(n); if (vn < 0) P.vel.addScaledVector(n, -vn); }
+}
+
+/* ============ race scenery: Hoarfrost rings, Pyre ash ============ */
+const HF_RING_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2 - 0.35, 0.3, 0));
+{
+  const ringTex = canvasTex(512, 8, (g) => { for (let x = 0; x < 512; x++) { const a = 0.25 + 0.5 * Math.abs(Math.sin(x * 0.07) * Math.sin(x * 0.013 + 1)); g.fillStyle = `rgba(210,235,255,${a})`; g.fillRect(x, 0, 1, 8); } });
+  const geo = new THREE.RingGeometry(FROSTP.R * 1.5, FROSTP.R * 2.7, 128, 1);
+  const pos = geo.attributes.position, uv = geo.attributes.uv, v = new V3();
+  for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); uv.setXY(i, (v.length() - FROSTP.R * 1.5) / (FROSTP.R * 1.2), 0.5); }
+  const ring = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  ring.position.copy(FROSTP.pos); ring.quaternion.copy(HF_RING_Q); scene.add(ring);
+  const smokeTex = canvasTex(128, 128, (g) => { const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(70,55,50,.85)'); gr.addColorStop(1, 'rgba(70,55,50,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); });
+  for (let i = 0; i < 40; i++) { const a = i / 40 * TAU, r = rand(1150, 1650); const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, transparent: true, depthWrite: false, opacity: rand(0.5, 0.85) })); s.scale.setScalar(rand(260, 520)); s.position.copy(PYREP.pos).add(new V3(Math.cos(a) * r, rand(-300, 300), Math.sin(a) * r)); scene.add(s); }
+}
+
+/* ============ racing league ============ */
+function trackPts(c, n, rx, rz, yAmp, seed) { const pts = []; for (let i = 0; i < n; i++) { const a = i / n * TAU, w = 1 + 0.22 * Math.sin(a * 3 + seed); pts.push(c.clone().add(new V3(Math.cos(a) * rx * w, Math.sin(a * 2 + seed) * yAmp, Math.sin(a) * rz * w))); } return pts; }
+function ringTrack() { const pts = []; for (let i = 0; i < 12; i++) { const a = i / 12 * TAU, r = FROSTP.R * (i % 2 ? 1.9 : 2.3); pts.push(new V3(Math.cos(a) * r, Math.sin(a) * r, (i % 2 ? 1 : -1) * 140).applyQuaternion(HF_RING_Q).add(FROSTP.pos)); } return pts; }
+const TRACKS = [
+  { id: 'kessel', name: 'Kessel Run', sys: 'ember', desc: 'Twelve gates threaded through the Kessel ore belt. Watch the rocks.', pts: trackPts(FIELD_C, 12, 640, 560, 120, 1) },
+  { id: 'wander', name: 'Wanderer Loop', sys: 'ember', desc: 'A big, fast loop around the derelict worldship Wanderer.', pts: trackPts(WANDER_POS, 12, 1350, 1300, 320, 2) },
+  { id: 'rings', name: 'Ringrunner', sys: 'frost', desc: 'Dive above and below the ice rings of Hoarfrost.', pts: ringTrack() },
+  { id: 'ash', name: 'Ashfall Dash', sys: 'cinder', desc: 'Find the gates inside the ash clouds around Pyre.', pts: trackPts(PYREP.pos, 12, 1400, 1350, 240, 3) },
+];
+TRACKS.forEach(t => { let L = 0; for (let i = 0; i < t.pts.length; i++) L += t.pts[i].distanceTo(t.pts[(i + 1) % t.pts.length]); t.len = L; t.gold = Math.round(L / 235); t.silver = Math.round(L / 195); t.bronze = Math.round(L / 160); });
+const MEDALS = [null, ['Gold', '#ffc23a'], ['Silver', '#d8dde8'], ['Bronze', '#d08a4a']];
+const RIVALS = [['Vixen Rao', 0xd8402a], ['Dax Mercer', 0xe0b020], ['Kiko Shard', 0x9a5ad9]];
+const RACE = { on: false, tr: null, phase: 'idle', gates: [], k: 1, t: 0, cd: 0, rivals: [], ghost: null, ghostData: null, rec: [], recT: 0, warned: false };
+const GATE_GEO = new THREE.TorusGeometry(34, 2.4, 8, 48);
+let GHOSTS = {}; try { GHOSTS = JSON.parse(localStorage.getItem('ember-reach-ghosts') || '{}'); } catch (e) { GHOSTS = {}; }
+function armRace(id) {
+  cancelRace();
+  const tr = TRACKS.find(t => t.id === id); if (!tr) return;
+  Object.assign(RACE, { on: true, tr, phase: 'arm', k: 1, t: 0, rivals: [], rec: [], recT: 0, warned: false });
+  tr.pts.forEach((p, i) => { const m = new THREE.Mesh(GATE_GEO, mGlow(i === 0 ? 0x7dffb0 : 0xff8a3d)); m.position.copy(p); m.lookAt(tr.pts[(i + 1) % tr.pts.length]); scene.add(m); RACE.gates.push(m); });
+  say(`Race ready: ${tr.name}. Fly to the green start gate in ${SYS[tr.sys].name}${tr.sys !== G.sys ? ' (warp with M)' : ''}.`, 'good');
+}
+function cancelRace(msg) {
+  RACE.gates.forEach(g => scene.remove(g)); RACE.gates = [];
+  RACE.rivals.forEach(r => scene.remove(r.obj)); RACE.rivals = [];
+  if (RACE.ghost) scene.remove(RACE.ghost); RACE.ghost = null;
+  $('#raceCount').hidden = true;
+  if (RACE.on && msg) say(msg, 'bad');
+  RACE.on = false; RACE.phase = 'idle';
+}
+function colorGates() { const n = RACE.tr.pts.length; RACE.gates.forEach((g, i) => { const target = RACE.k % n; g.material.color.setHex(i === target ? 0x7dffb0 : 0xff8a3d); g.visible = RACE.phase !== 'run' || i === target || i === (RACE.k + 1) % n || i === (RACE.k + 2) % n; }); }
+function pathAt(tr, d) {
+  const n = tr.pts.length; d = Math.min(d, tr.len - 0.01);
+  for (let i = 0; i < n; i++) { const a = tr.pts[i], b = tr.pts[(i + 1) % n], L = a.distanceTo(b); if (d <= L) return { p: a.clone().lerp(b, d / L), next: b }; d -= L; }
+  return { p: tr.pts[0].clone(), next: tr.pts[1] };
+}
+function playerProgress() { const tr = RACE.tr, n = tr.pts.length; let d = 0; for (let i = 0; i < RACE.k - 1; i++) d += tr.pts[i].distanceTo(tr.pts[(i + 1) % n]); const a = tr.pts[(RACE.k - 1) % n], b = tr.pts[RACE.k % n], L = a.distanceTo(b); return d + clamp(L - player.position.distanceTo(b), 0, L); }
+function startCountdown() {
+  const tr = RACE.tr;
+  RACE.phase = 'countdown'; RACE.cd = 3.5; colorGates();
+  const times = [tr.gold * rand(0.97, 1.0), (tr.gold + tr.silver) / 2 * rand(0.98, 1.02), tr.silver * rand(1.0, 1.05)];
+  RIVALS.forEach(([name, col], i) => { const obj = makeFighter({ hull: col, trim: 0x22232b, glass: 0xffd27a, glow: 0xffa040, sweep: -0.6 + i * 0.4 }); scene.add(obj); const off = new V3((i - 1) * 40, 18, 0); obj.position.copy(tr.pts[0]).add(off); orientTo(obj, tr.pts[1]); RACE.rivals.push({ obj, name, time: times[i], speed: tr.len / times[i], off, done: false }); });
+  const gd = GHOSTS[tr.id];
+  if (gd && gd.length > 14) {
+    RACE.ghost = makeFighter(STYLE_PLAYER); const gm = new THREE.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.32, depthWrite: false });
+    RACE.ghost.traverse(o => { if (o.isMesh) o.material = gm; if (o.isSprite) o.visible = false; }); scene.add(RACE.ghost); RACE.ghostData = gd;
+  }
+}
+function updateRace(dt) {
+  if (!RACE.on) return;
+  const tr = RACE.tr, n = tr.pts.length;
+  RACE.gates.forEach(g => { g.rotation.z += dt * 0.4; });
+  if (RACE.phase === 'arm') {
+    if (G.sys === tr.sys && G.state === 'fly' && player.position.distanceTo(tr.pts[0]) < 260 + P.r) {
+      if (P.r > 40) { if (!RACE.warned) { RACE.warned = true; say(`League rules: the ${SH().name} is too big to race. Switch to a fighter or frigate.`, 'bad'); } return; }
+      startCountdown();
+    }
+    return;
+  }
+  if (RACE.phase === 'countdown') {
+    RACE.cd -= dt; const c = Math.ceil(RACE.cd);
+    $('#raceCount').hidden = false; $('#raceCount').textContent = RACE.cd > 0.5 ? String(Math.max(1, c - 0)) : 'GO!';
+    if (RACE.cd <= 0) { RACE.phase = 'run'; RACE.t = 0; sfx('win'); setTimeout(() => { $('#raceCount').hidden = true; }, 600); colorGates(); }
+    return;
+  }
+  if (RACE.phase !== 'run') return;
+  RACE.t += dt;
+  RACE.recT -= dt; if (RACE.recT <= 0) { RACE.recT = 0.1; const p = player.position, q = player.quaternion; RACE.rec.push(+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1), +q.x.toFixed(3), +q.y.toFixed(3), +q.z.toFixed(3), +q.w.toFixed(3)); }
+  for (const r of RACE.rivals) {
+    const d = RACE.t * r.speed; if (d >= tr.len) { r.done = true; }
+    const at = pathAt(tr, d), wob = new V3(Math.sin(RACE.t * 0.7 + r.off.x) * 14, Math.cos(RACE.t * 0.5 + r.off.x) * 10, 0);
+    r.obj.position.copy(at.p).add(r.off.clone().multiplyScalar(0.4)).add(wob); turnToward(r.obj, at.next, dt * 3);
+    r.obj.userData.engines.forEach(s => s.scale.setScalar(4 + Math.random()));
+  }
+  if (RACE.ghost && RACE.ghostData) {
+    const gd = RACE.ghostData, f = RACE.t / 0.1, i = Math.floor(f), frames = gd.length / 7;
+    if (i < frames - 1) { const a = i * 7, b = a + 7, k = f - i; RACE.ghost.visible = true; RACE.ghost.position.set(gd[a] + (gd[b] - gd[a]) * k, gd[a + 1] + (gd[b + 1] - gd[a + 1]) * k, gd[a + 2] + (gd[b + 2] - gd[a + 2]) * k); RACE.ghost.quaternion.set(gd[a + 3], gd[a + 4], gd[a + 5], gd[a + 6]).normalize(); }
+    else RACE.ghost.visible = false;
+  }
+  if (player.position.distanceTo(tr.pts[RACE.k % n]) < 38 + P.r * 0.5) {
+    sfx('ring');
+    if (RACE.k >= n) { finishRace(); return; }
+    RACE.k++; colorGates();
+  }
+  if (RACE.t > tr.bronze * 3) cancelRace('Race timed out.');
+}
+function finishRace() {
+  const tr = RACE.tr, time = RACE.t, place = 1 + RACE.rivals.filter(r => r.time < time).length;
+  const medal = time <= tr.gold ? 1 : time <= tr.silver ? 2 : time <= tr.bronze ? 3 : 0;
+  const prevBest = G.raceBest[tr.id], best = !prevBest || time < prevBest;
+  if (best) { G.raceBest[tr.id] = +time.toFixed(2); GHOSTS[tr.id] = RACE.rec; try { localStorage.setItem('ember-reach-ghosts', JSON.stringify(GHOSTS)); } catch (e) {} }
+  const prevMedal = G.trophies[tr.id] || 0, dz = SYS[tr.sys].danger || 1;
+  let cr = medal ? [0, 3000, 1500, 700][medal] : 150; if (medal && prevMedal && prevMedal <= medal) cr = Math.round(cr * 0.2);
+  cr = Math.round(cr * dz) + (place === 1 ? 500 : 0);
+  if (medal && (!prevMedal || medal < prevMedal)) G.trophies[tr.id] = medal;
+  G.credits += cr; G.stats.races = (G.stats.races || 0) + 1;
+  const card = $('#raceResult'), md = MEDALS[medal];
+  card.style.setProperty('--rc', md ? md[1] : '#a8988f');
+  card.innerHTML = `<div class="cc-rar">${tr.name} · ${['', '1st', '2nd', '3rd', '4th'][place]} place</div><h3>${time.toFixed(2)} s${md ? ` · ${md[0]}` : ''}</h3><p>${best ? (prevBest ? `New best lap (was ${prevBest.toFixed(2)} s). Ghost saved.` : 'First finish! Ghost saved.') : `Best lap ${prevBest.toFixed(2)} s.`} Prize: ${cr.toLocaleString()} cr</p>`;
+  card.hidden = false; clearTimeout(finishRace.t); finishRace.t = setTimeout(() => card.hidden = true, 7000);
+  sfx(medal ? 'win' : 'ring'); save();
+  RACE.phase = 'done'; setTimeout(() => cancelRace(), 2500);
+}
+function raceCard() {
+  const tr = RACE.tr, n = tr.pts.length;
+  if (RACE.phase === 'arm') return `<div class="eyebrow">Race · ${SYS[tr.sys].name}</div><h3>${tr.name}</h3><p>Fly to the green start gate${tr.sys !== G.sys ? ` in ${SYS[tr.sys].name} (warp with M)` : ''}.</p>`;
+  if (RACE.phase === 'countdown') return `<div class="eyebrow">Race</div><h3>${tr.name}</h3><p>Get ready...</p>`;
+  const pp = playerProgress(), pos = 1 + RACE.rivals.filter(r => Math.min(RACE.t * r.speed, tr.len) > pp).length;
+  return `<div class="eyebrow">Race · position ${pos} of 4</div><h3>${tr.name}</h3><p><span class="timer">${RACE.t.toFixed(1)} s</span> · gate ${Math.min(RACE.k, n)} / ${n}<br>Gold ${tr.gold} s · Silver ${tr.silver} s · Bronze ${tr.bronze} s${G.raceBest[tr.id] ? ` · Best ${G.raceBest[tr.id].toFixed(1)} s` : ''}</p>`;
+}
+function raceMarkers() {
+  if (!RACE.on) return;
+  const tr = RACE.tr; if (tr.sys !== G.sys) return;
+  const idx = RACE.phase === 'arm' || RACE.phase === 'countdown' ? 0 : RACE.k % tr.pts.length, p = tr.pts[idx];
+  const el = marker('race-gate', 'target', RACE.phase === 'arm' ? `${tr.name} start` : `Gate ${Math.min(RACE.k, tr.pts.length)}`); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(p)); placeMarker(el, p);
+  RACE.rivals.forEach((r, i) => { const d = r.obj.position.distanceTo(player.position); if (d > 1500) return; const e2 = marker('rival-' + i, 'enemy', r.name); e2.style.color = '#ffc08a'; e2.querySelector('.dst').textContent = fmtD(d); placeMarker(e2, r.obj.position); });
+}
+function renderRaces() {
+  let h = `<p class="craft-note">The Reach Racing League. One lap, ${TRACKS[0].pts.length} gates, three rival pilots. Beat the medal times to win trophies for your Genesis Ark. Fighters and frigates only.</p>`;
+  if (RACE.on) h += `<div class="item"><div><h4>Racing: ${RACE.tr.name}</h4><p>${RACE.phase === 'arm' ? 'Head for the start gate.' : 'Race in progress.'}</p></div><div><button class="ghost" data-act="cancelrace">Cancel race</button></div></div>`;
+  for (const t of TRACKS) {
+    const best = G.raceBest[t.id], md = MEDALS[G.trophies[t.id] || 0], locked = t.sys === 'cinder' && !G.cinderLane;
+    h += `<div class="item"><div><h4>${t.name} <span class="tag delivery">${SYS[t.sys].name}</span>${md ? ` <span class="tag" style="background:${md[1]}33;color:${md[1]}">${md[0]}</span>` : ''}</h4><p>${t.desc}</p><p class="shipstats">${(t.len / 1000).toFixed(1)} km · Gold ${t.gold} s · Silver ${t.silver} s · Bronze ${t.bronze} s${best ? ` · Your best ${best.toFixed(2)} s${GHOSTS[t.id] ? ' (ghost saved)' : ''}` : ''}</p></div><div><button class="btn" data-act="race" data-k="${t.id}" ${RACE.on || locked ? 'disabled' : ''}>${locked ? 'Lane locked' : 'Race'}</button></div></div>`;
+  }
+  return h;
+}
+// trophy shelf on the Ark bridge
+const TS = { x: -48, z: -128, cups: [] };
+function buildTrophyShelf() {
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; };
+  const wood = smat(0x5a3a2a, 0.7);
+  add(new THREE.BoxGeometry(4, 6, 18), smat(0x2a2c34, 0.5, { metalness: 0.5 }), TS.x - 1, 3, TS.z);
+  for (const y of [1.6, 3.6, 5.6]) add(new THREE.BoxGeometry(4.4, 0.2, 18), wood, TS.x + 0.2, y, TS.z);
+  const sign = add(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: textTex('TROPHIES', '#5a3a10', '#ffd27a') }), TS.x + 2.3, 7.4, TS.z); sign.rotation.y = Math.PI / 2;
+  const L = new THREE.PointLight(0xffd27a, 0.9, 14); L.position.set(TS.x + 4, 6, TS.z); surf.add(L);
+  for (let z = -7.5; z <= 7.5; z += 3) S.colliders.push({ x: TS.x, z: TS.z + z, r: 2.6, top: 7 });
+}
+function makeCup(col) {
+  const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: col, metalness: 0.9, roughness: 0.2, emissive: col, emissiveIntensity: 0.15 });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.25, 0.7), smat(0x1a1a1e)); base.position.y = 0.12; g.add(base);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.5, 8), m); stem.position.y = 0.5; g.add(stem);
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.18, 0.6, 14, 1, true), new THREE.MeshStandardMaterial({ color: col, metalness: 0.9, roughness: 0.2, side: THREE.DoubleSide })); bowl.position.y = 1.05; g.add(bowl);
+  for (const s of [-1, 1]) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.04, 6, 12, Math.PI), m); h.position.set(s * 0.45, 1.05, 0); h.rotation.z = s * Math.PI / 2; g.add(h); }
+  return g;
+}
+function refreshTrophies() {
+  TS.cups.forEach(c => surf.remove(c)); TS.cups = [];
+  TRACKS.forEach((t, i) => { const md = G.trophies[t.id]; if (!md) return; const cup = makeCup([0, 0xffc23a, 0xd8dde8, 0xd08a4a][md]); cup.position.set(TS.x + 0.6, 3.7, TS.z - 6 + i * 4); cup.scale.setScalar(1.6); surf.add(cup); TS.cups.push(cup); });
+}
+const nearShelf = () => Math.hypot(S.pos.x - TS.x, S.pos.z - TS.z) < 9;
+function trophyPrompt() { if (!W.interior || !nearShelf()) return ''; const n = Object.keys(G.trophies).length; return n ? `Trophy shelf: ${n} of ${TRACKS.length} league trophies. Gold medals shine brightest.` : 'Trophy shelf: empty. Win medals in the Reach Racing League at Haven Ring.'; }
+
+/* ============ your own space stations ============ */
+const CORE_COST = 50000;
+const OMODS = {
+  hab: { name: 'Hab ring', cost: 30000, ring: true, desc: 'Homes for 2,000 people. Pays rent (+2 cr/s) and adds 40 recruits to your crew office.' },
+  trade: { name: 'Trade dock', cost: 20000, desc: 'A trader starts visiting. Every visit pays a 250 cr docking fee.' },
+  refinery: { name: 'Refinery', cost: 25000, desc: 'Turns stored ore into credits: 1 ore every 4 s, worth 45 cr each.' },
+  turret: { name: 'Defence turret', cost: 8000, desc: 'Shoots pirates near your station and helps fight off raids.' },
+  dock: { name: 'Ship dock', cost: 15000, desc: 'Your other ships park here, and your station starts selling Sunstone warp fuel.' },
+  solar: { name: 'Solar array', cost: 4000, desc: 'Cheap power. +0.5 cr/s.' },
+};
+const OSLOTS = {};
+for (let i = 0; i < 8; i++) { const a = i / 8 * TAU, d = new V3(Math.cos(a), 0, Math.sin(a)); OSLOTS['i' + i] = { pos: d.clone().multiplyScalar(80), dir: d, label: `Inner arm ${i + 1}` }; OSLOTS['o' + i] = { pos: d.clone().multiplyScalar(160), dir: d, needs: 'i' + i, label: `Outer arm ${i + 1}` }; }
+OSLOTS.top = { pos: new V3(0, 70, 0), dir: new V3(0, 1, 0), label: 'Top spire' }; OSLOTS.bot = { pos: new V3(0, -70, 0), dir: new V3(0, -1, 0), label: 'Keel' }; OSLOTS.ring = { ring: true, label: 'Hab ring' };
+const OWN = {};
+function makeCore() {
+  const g = new THREE.Group(), W2 = mStd(0xd8dde8, 0.5, 0.45), O = mStd(0xff8a3d, 0.35, 0.5), Dk = mStd(0x23242c, 0.55, 0.5);
+  g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(36, 1), W2));
+  const band = new THREE.Mesh(new THREE.TorusGeometry(37, 3, 8, 40), O); band.rotation.x = Math.PI / 2; g.add(band);
+  for (const y of [-1, 1]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(14, 22, 26, 10), Dk); c.position.y = y * 40; g.add(c); }
+  windows(g, 30, (w, k) => { const a = k / 30 * TAU; w.position.set(Math.cos(a) * 36.5, (k % 3 - 1) * 8, Math.sin(a) * 36.5); w.rotation.y = -a + Math.PI / 2; }, 0xffd8a0);
+  const b = glowSprite(0x7dffb0, 16); b.position.y = 58; g.add(b); b.userData.blink = 0; blinkers.push(b);
+  return g;
+}
+function makeOMod(type) {
+  const g = new THREE.Group(), W2 = mStd(0xd8dde8, 0.5, 0.45), O = mStd(0xff8a3d, 0.35, 0.5), Dk = mStd(0x23242c, 0.55, 0.5);
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
+  if (type === 'hab') {
+    const t = add(new THREE.TorusGeometry(120, 11, 10, 64), W2, 0, 0, 0); t.rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + TAU / 8, sp = add(new THREE.BoxGeometry(5, 5, 84), Dk, Math.cos(a) * 78, 0, Math.sin(a) * 78); sp.rotation.y = -a + Math.PI / 2; }
+    windows(g, 80, (w, k) => { const a = k / 80 * TAU; w.position.set(Math.cos(a) * 130.8, k % 2 ? 2 : -2, Math.sin(a) * 130.8); w.rotation.y = -a + Math.PI / 2; });
+    g.userData.spin = t;
+    return g;
+  }
+  add(new THREE.BoxGeometry(6, 6, 40), Dk, 0, 0, -20);
+  if (type === 'trade') { add(new THREE.BoxGeometry(30, 6, 46), W2, 0, 0, 14); add(new THREE.BoxGeometry(31, 1.5, 47), O, 0, 3.5, 14); for (const s of [-1, 1]) { add(new THREE.BoxGeometry(3, 3, 30), Dk, s * 18, 0, 46); const l = glowSprite(0x7dffb0, 6); l.position.set(s * 18, 0, 62); g.add(l); } }
+  else if (type === 'refinery') { for (const x of [-10, 10]) add(new THREE.CylinderGeometry(8, 8, 34, 12), W2, x, 0, 10).rotation.x = Math.PI / 2; add(new THREE.CylinderGeometry(6, 8, 14, 10), Dk, 0, 12, 10); const f = glowSprite(0xff7a20, 22); f.position.set(0, 20, 10); g.add(f); g.userData.glow = f; }
+  else if (type === 'turret') { add(new THREE.CylinderGeometry(7, 9, 6, 10), Dk, 0, 0, 4).rotation.x = Math.PI / 2; const head = new THREE.Group(); head.position.set(0, 0, 10); g.add(head); const dome = new THREE.Mesh(new THREE.SphereGeometry(5.5, 12, 8), O); head.add(dome); for (const x of [-1.6, 1.6]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 14, 6), Dk); b.rotation.x = Math.PI / 2; b.position.set(x, 0, -7); head.add(b); } g.userData.head = head; }
+  else if (type === 'dock') { for (const x of [-16, 16]) for (const y of [-10, 10]) add(new THREE.BoxGeometry(2, 2, 44), Dk, x, y, 18); add(new THREE.BoxGeometry(34, 22, 2), W2, 0, 0, 0); const ship = makeFighter(STYLE_PLAYER); ship.position.set(0, -2, 22); g.add(ship); g.userData.ship = ship; }
+  else if (type === 'solar') { for (const s of [-1, 1]) { add(new THREE.BoxGeometry(40, 0.6, 18), new THREE.MeshStandardMaterial({ color: 0x1a3a7a, metalness: 0.7, roughness: 0.25, emissive: 0x0a1a40, emissiveIntensity: 0.4 }), s * 24, 0, 8); } }
+  return g;
+}
+function spawnOwnStation(sys) {
+  const d = G.stations[sys]; if (!d || OWN[sys]) return;
+  const obj = new THREE.Group(); obj.add(makeCore()); obj.position.fromArray(d.p); scene.add(obj);
+  const st = { id: 'own-' + sys, sys, name: 'Your station', kind: 'Player outpost', pos: obj.position.clone(), dockR: 300, colR: 70, exit: new V3(0, 0, 1), orePrice: 30, view: 520, own: true, obj, blurb: 'Your own outpost. Snap new modules onto it from the Station tab, store ore for the refinery, and collect what it earns.' };
+  STATIONS.push(st); RECRUIT_CAP[st.id] = 30;
+  OWN[sys] = { st, obj, mods: {}, target: { obj, alive: true }, traders: [], cd: {} };
+  refreshOwnModules(sys);
+}
+function refreshOwnModules(sys) {
+  const o = OWN[sys], d = G.stations[sys];
+  for (const k in o.mods) o.obj.remove(o.mods[k]); o.mods = {};
+  for (const [slot, type] of Object.entries(d.mods)) {
+    const m = makeOMod(type), sl = OSLOTS[slot];
+    if (!sl.ring) { m.position.copy(sl.pos); m.quaternion.setFromUnitVectors(new V3(0, 0, 1), sl.dir); }
+    o.obj.add(m); o.mods[slot] = m;
+  }
+  RECRUIT_CAP[o.st.id] = 30 + 40 * countMods(sys, 'hab'); o.st.fuel = countMods(sys, 'dock') > 0;
+  syncOwnTraders(sys);
+}
+const countMods = (sys, t) => Object.values(G.stations[sys].mods).filter(x => x === t).length;
+function syncOwnTraders(sys) {
+  const o = OWN[sys], want = Math.min(3, countMods(sys, 'trade'));
+  while (o.traders.length > want) { const n = o.traders.pop(); scene.remove(n.obj); npcs.splice(npcs.indexOf(n), 1); }
+  while (o.traders.length < want) { const home = STATIONS.find(s => s.sys === sys && !s.own); addNPC('trader', sys, [o.st.pos.clone().add(new V3(rand(-200, 200), 60, 260)), home.pos.clone().add(new V3(rand(-200, 200), 0, 420))]); const n = npcs[npcs.length - 1]; n.own = sys; o.traders.push(n); }
+}
+function ownTradeVisit(sys) { const d = G.stations[sys]; if (!d) return; d.bank += 250; if (G.sys === sys && player.position.distanceTo(OWN[sys].st.pos) < 3000) say('A trader docked at your station. +250 cr to the station bank.'); }
+function freeSlot(type) {
+  const d = G.stations[G.docked.sys];
+  if (OMODS[type].ring) return d.mods.ring ? null : 'ring';
+  for (let i = 0; i < 8; i++) if (!d.mods['i' + i]) return 'i' + i;
+  for (let i = 0; i < 8; i++) if (!d.mods['o' + i]) return 'o' + i;
+  if (!d.mods.top) return 'top'; if (!d.mods.bot) return 'bot';
+  return null;
+}
+function stationIncome(sys) { const d = G.stations[sys]; return 2 * countMods(sys, 'hab') + 0.5 * countMods(sys, 'solar') + (d.ore > 0 ? countMods(sys, 'refinery') * 45 / 4 : 0); }
+function renderOwnStation(st) {
+  const sys = st.sys, d = G.stations[sys], dz = SYS[sys].danger || 1;
+  const slotDot = (k, x, y) => { const t = d.mods[k]; const c = t ? { hab: '#7dffb0', trade: '#6fd8ff', refinery: '#ff8a3d', turret: '#ff4d5e', dock: '#d8dde8', solar: '#6a8aff' }[t] : 'none'; const locked = OSLOTS[k].needs && !d.mods[OSLOTS[k].needs]; return `<circle cx="${x}" cy="${y}" r="9" fill="${c}" stroke="${t ? c : locked ? '#3a3540' : '#a8988f'}" stroke-dasharray="${t ? '0' : '3 3'}"/>`; };
+  let svg = `<svg class="slotmap" viewBox="-110 -110 220 220" aria-label="Station modules seen from above"><circle r="${d.mods.ring ? 64 : 0}" fill="none" stroke="#7dffb0" stroke-width="4" opacity=".6"/><circle r="22" fill="#ff8a3d" opacity=".8"/>`;
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; svg += `<line x1="${Math.cos(a) * 22}" y1="${Math.sin(a) * 22}" x2="${Math.cos(a) * 90}" y2="${Math.sin(a) * 90}" stroke="#3a3540"/>` + slotDot('i' + i, Math.cos(a) * 46, Math.sin(a) * 46) + slotDot('o' + i, Math.cos(a) * 88, Math.sin(a) * 88); }
+  svg += slotDot('top', -96, -96) + slotDot('bot', 96, 96) + '</svg>';
+  let h = `<div class="item"><div><h4>Your station in ${SYS[sys].name}</h4><p>Bank <b>${Math.floor(d.bank).toLocaleString()} cr</b> · earning about ${stationIncome(sys).toFixed(1)} cr/s · stored ore ${d.ore} · hull ${Math.round(d.hp)} of 1,000</p><div class="row-btns" style="margin-top:10px"><button class="btn" data-act="obank" ${d.bank >= 1 ? '' : 'disabled'}>Collect bank</button><button class="ghost" data-act="oore" ${G.ore && countMods(sys, 'refinery') ? '' : 'disabled'}>Deposit ${G.ore} ore</button><button class="ghost" data-act="ofix" ${d.hp < 1000 && G.credits >= 2 ? '' : 'disabled'}>Repair (${Math.ceil((1000 - d.hp) * 2)} cr)</button></div><p style="margin-top:8px">Pirates raid stations every so often. ${countMods(sys, 'turret')} turret${countMods(sys, 'turret') === 1 ? '' : 's'} guard this one${dz > 1 ? `, and raids here are ${dz > 2 ? 'very ' : ''}dangerous` : ''}.</p></div><div>${svg}</div></div>`;
+  for (const [k, m] of Object.entries(OMODS)) {
+    const slot = freeSlot(k);
+    h += `<div class="item"><div><h4>${m.name} <span class="tag delivery">${countMods(sys, k)} built</span></h4><p>${m.desc}</p></div><div><div class="reward">${m.cost.toLocaleString()} cr</div><button class="btn" data-act="oadd" data-k="${k}" ${slot && G.credits >= m.cost ? '' : 'disabled'}>${slot ? 'Snap on' : 'No free slot'}</button></div></div>`;
+  }
+  const built = Object.entries(d.mods);
+  if (built.length) h += `<div class="item"><div><h4>Installed modules</h4><div class="chips">${built.map(([s, t]) => `<span class="chip ok">${OMODS[t].name} · ${OSLOTS[s].label} <button class="xbtn" data-act="orem" data-k="${s}" aria-label="Remove">×</button></span>`).join('')}</div><p style="margin-top:6px">Removing a module refunds half its cost. Outer arms need their inner arm.</p></div><div></div></div>`;
+  return h;
+}
+function ownAct(act, b, st) {
+  if (act === 'buycore') { if (G.credits < CORE_COST) return; G.credits -= CORE_COST; G.coreKits++; say('Station core loaded into your hold. Undock, find a quiet spot and press B to deploy it.', 'good'); sfx('win'); save(); renderDock(); return; }
+  if (!st || !st.own) return;
+  const sys = st.sys, d = G.stations[sys];
+  if (act === 'oadd') { const k = b.dataset.k, slot = freeSlot(k); if (!slot || G.credits < OMODS[k].cost) return; G.credits -= OMODS[k].cost; d.mods[slot] = k; refreshOwnModules(sys); say(`${OMODS[k].name} snapped onto your station.`, 'good'); sfx('build'); save(); renderDock(); }
+  if (act === 'orem') { const s = b.dataset.k; if (/^i/.test(s) && d.mods['o' + s.slice(1)]) { say('Remove the outer module on that arm first.', 'bad'); return; } const t = d.mods[s]; delete d.mods[s]; G.credits += Math.round(OMODS[t].cost / 2); refreshOwnModules(sys); sfx('ui'); save(); renderDock(); }
+  if (act === 'obank') { const v = Math.floor(d.bank); G.credits += v; d.bank -= v; say(`Collected ${v.toLocaleString()} cr from your station.`, 'good'); sfx('pickup'); save(); renderDock(); }
+  if (act === 'oore') { d.ore += G.ore; say(`Deposited ${G.ore} ore at your refinery.`); G.ore = 0; sfx('ui'); save(); renderDock(); }
+  if (act === 'ofix') { const pts = Math.min(Math.ceil(1000 - d.hp), Math.floor(G.credits / 2)); G.credits -= pts * 2; d.hp += pts; sfx('ui'); save(); renderDock(); }
+  if (act === 'buycore') { if (G.credits < CORE_COST) return; G.credits -= CORE_COST; G.coreKits++; say('Station core loaded into your hold. Undock, find a quiet spot and press B to deploy it.', 'good'); sfx('win'); save(); renderDock(); }
+}
+function renderCoreShop(st) {
+  const mine = Object.keys(G.stations).map(s => SYS[s].name);
+  return `<div class="item"><div><h4>Station core kit</h4><p>Build your own space station. Buy a core, fly somewhere quiet (at least 2.5 km from other stations and well clear of planets) and press B to deploy it, one per system. Then dock and snap on modules. ${mine.length ? `Your stations: ${mine.join(', ')}.` : ''}${G.coreKits ? ` You carry ${G.coreKits} core${G.coreKits > 1 ? 's' : ''}.` : ''}</p></div><div><div class="reward">${CORE_COST.toLocaleString()} cr</div><button class="btn" data-act="buycore" ${G.credits >= CORE_COST ? '' : 'disabled'}>Buy core</button></div></div>`;
+}
+function deployCore() {
+  if (G.state !== 'fly') return;
+  if (!G.coreKits) { say('Buy a station core kit in the Ships tab at any station first.', 'bad'); return; }
+  if (G.stations[G.sys]) { say(`You already have a station in ${SYS[G.sys].name}.`, 'bad'); return; }
+  const at = player.position.clone().add(new V3(0, 0, -1).applyQuaternion(player.quaternion).multiplyScalar(250 + P.r));
+  if (STATIONS.some(s => s.sys === G.sys && s.pos.distanceTo(at) < 2500)) { say('Too close to another station. Fly at least 2.5 km away.', 'bad'); return; }
+  if (PLANETS.some(p => p.pos.distanceTo(at) < p.R + 1500) || (G.sys === 'ember' && at.distanceTo(WANDER_POS) < 2000)) { say('Too close to a planet or the Wanderer. Find open space.', 'bad'); return; }
+  G.coreKits--; G.stations[G.sys] = { p: at.toArray().map(v => +v.toFixed(1)), mods: {}, ore: 0, bank: 0, hp: 1000, raidT: rand(420, 720) };
+  spawnOwnStation(G.sys); sfx('win'); say('Station core deployed! Dock with E to start snapping on modules.', 'good'); save();
+}
+function ownPrompt() { return G.coreKits && !G.stations[G.sys] ? (isTouch ? 'You carry a station core. Tap CORE to deploy it here.' : 'You carry a station core. Press <kbd>B</kbd> to deploy it here.') : ''; }
+function ownStationHit(b) {
+  const o = OWN[G.sys]; if (!o) return false;
+  if (!segHit(b.prev, b.m.position, o.st.pos, 60)) return false;
+  const d = G.stations[G.sys]; d.hp -= b.dmg; spark(b.m.position, 0xff6040, 14);
+  if (d.hp <= 0) stationLost(G.sys);
+  return true;
+}
+function stationLost(sys) {
+  const d = G.stations[sys], built = Object.keys(d.mods).filter(s => !/^i/.test(s) || !d.mods['o' + s.slice(1)]);
+  const lost = built.length ? pick(built) : null, loot = Math.floor(d.bank * 0.5);
+  if (lost) { const t = d.mods[lost]; delete d.mods[lost]; if (OWN[sys]) refreshOwnModules(sys); say(`Raiders wrecked your ${OMODS[t].name} and stole ${loot.toLocaleString()} cr from the station bank!`, 'bad'); }
+  else say(`Raiders looted ${loot.toLocaleString()} cr from your station bank!`, 'bad');
+  d.bank -= loot; d.hp = 500;
+  if (OWN[sys]) { enemies.forEach(e => { if (e.tgt === OWN[sys].target) e.tgt = null; }); if (OWN[sys]) explode(OWN[sys].st.pos.clone().add(randDir().multiplyScalar(60)), 2, 0xffa050); }
+  save();
+}
+const _tq = new THREE.Object3D();
+function updateOwnStations(dt) {
+  for (const [sys, d] of Object.entries(G.stations)) {
+    d.bank += dt * (2 * countMods(sys, 'hab') + 0.5 * countMods(sys, 'solar'));
+    const refs = countMods(sys, 'refinery');
+    if (refs && d.ore > 0) { d.refT = (d.refT || 0) + dt * refs; while (d.refT >= 4 && d.ore > 0) { d.refT -= 4; d.ore--; d.bank += 45; } }
+    d.raidT -= dt;
+    if (d.raidT <= 0) {
+      d.raidT = rand(420, 720);
+      const dz = SYS[sys].danger || 1, tur = countMods(sys, 'turret');
+      if (G.sys === sys && G.state === 'fly' && OWN[sys]) {
+        const n = 2 + Math.round(dz) + (G.rep.pirates <= -40 ? 1 : 0);
+        for (let i = 0; i < n; i++) { const e = spawnPirate(OWN[sys].st.pos.clone().add(randDir().multiplyScalar(900)), { heavy: i === 0 && dz > 1 }); e.tgt = OWN[sys].target; }
+        showComms('Station alarm', `Your station in ${SYS[sys].name} is under attack by ${n} raiders! Turrets are firing. Get over there!`);
+      } else if (G.rep.pirates >= 25 && Math.random() < 0.5) {
+      } else {
+        const attack = rand(2, 6) * dz, defence = tur * 2;
+        if (defence >= attack) say(`Raiders hit your station in ${SYS[sys].name}, but the turrets drove them off.`, 'good');
+        else { d.hp = Math.max(1, d.hp - 300); const loot = Math.floor(d.bank * 0.3); d.bank -= loot; say(`Raiders hit your station in ${SYS[sys].name} and stole ${loot.toLocaleString()} cr. Build more turrets!`, 'bad'); }
+      }
+    }
+    const o = OWN[sys]; if (!o || sys !== G.sys) continue;
+    for (const [slot, m] of Object.entries(o.mods)) {
+      if (m.userData.spin) m.userData.spin.rotation.z += dt * 0.08;
+      if (m.userData.glow) m.userData.glow.scale.setScalar(d.ore > 0 ? 22 + Math.random() * 6 : 10);
+      if (!m.userData.head) continue;
+      const wp = m.userData.head.getWorldPosition(new V3());
+      let foe = null, bd = 900; for (const e of enemies) { const dd = e.obj.position.distanceTo(wp); if (dd < bd) { bd = dd; foe = e; } }
+      o.cd[slot] = (o.cd[slot] || 0) - dt;
+      if (foe && o.cd[slot] <= 0) { o.cd[slot] = 0.6; _tq.position.copy(wp); orientTo(_tq, foe.obj.position); fireBolt(wp, _tq.quaternion, new V3(), 'npc', 12, new V3(0, 0, -8)); }
+    }
+  }
+}
+function ownMarkers() {
+  if (derelict && G.sys === 'ember') { const el = marker('derelict', 'salvage', 'Derelict worldship'); el.querySelector('.dst').textContent = fmtD(Math.max(0, player.position.distanceTo(WANDER_POS) - 520)); placeMarker(el, WANDER_POS); }
+  const o = OWN[G.sys]; if (o) { const hp = G.stations[G.sys].hp; if (hp < 1000) { const el = marker('st-' + o.st.id, 'station', 'Your station'); el.querySelector('.hp i').style.width = (hp / 10) + '%'; } }
+}
+{ const _em2 = extraMarkers; extraMarkers = function () { _em2(); raceMarkers(); ownMarkers(); }; }
+G.raceBest = G.raceBest || {}; G.trophies = G.trophies || {}; G.stations = G.stations || {}; G.coreKits = G.coreKits || 0;
+Object.keys(G.stations).forEach(spawnOwnStation);
+spawnDerelict();
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
-  if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map') {
+  if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
     const off = tmp.set(0, 4.2 * (SH().camUp || 1), 15).multiplyScalar(SH().cam).applyQuaternion(player.quaternion);
     const boostPull = (keys.ShiftLeft || touchBtn.boost) && G.boost > 1 ? 4 : 0;
     off.multiplyScalar(1 + boostPull * 0.06);
@@ -4145,15 +4557,15 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander';
   const onSurf = renderScene !== scene;
   if (running) {
-    T += dt; advanceTod(dt); arkIncome(dt);
+    T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt);
     if (!onSurf) {
       if (G.state === 'fly') { updatePlayer(dt); updateMission(dt); updatePatrols(dt); }
       if (G.state === 'descent') updateDescent(dt);
       if (G.state === 'warp') updateWarp(dt);
-      updateBoss(dt); if (G.state === 'fly') updateWingmen(dt); updateWrecks(dt); updateNPCs(dt); updateEvents(dt);
+      updateBoss(dt); if (G.state === 'fly') updateWingmen(dt); updateWrecks(dt); updateNPCs(dt); updateEvents(dt); updateRace(dt);
       player.visible = G.state === 'fly' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map';
       updateEnemies(dt); updateBolts(dt); updateMissiles(dt); updatePickups(dt); updateFx(dt); updateWorld(dt);
     } else {
