@@ -410,6 +410,24 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 .gcell.syl b { color: #ff9ad8; font-family: var(--display); font-size: 14px; }
 .gcell span { font-size: 11px; color: var(--text); }
 #ngBtn { margin-top: -4px; }
+#wqHud { position: fixed; left: calc(16px + env(safe-area-inset-left, 0px)); top: calc(168px + env(safe-area-inset-top, 0px)); z-index: 5; max-width: min(340px, calc(100vw - 32px)); display: grid; gap: 3px; padding: 8px 12px; border-radius: 6px; background: rgba(14,16,34,.72); border: 1px solid rgba(159,255,232,.35); pointer-events: none; }
+#wqHud b { font-family: var(--display); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #9fffe8; }
+#wqHud span { font-size: 12px; color: #e8f0ff; line-height: 1.4; }
+#wqBtn { position: fixed; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 7; font: inherit; font-size: 13px; color: #e8fff8; background: rgba(20,40,60,.88); border: 1px solid rgba(159,255,232,.6); border-radius: 20px; padding: 8px 16px; cursor: pointer; white-space: nowrap; box-shadow: 0 0 16px rgba(159,255,232,.25); }
+#wqBtn kbd { font-family: var(--display); border: 1px solid rgba(255,255,255,.4); border-radius: 3px; padding: 0 5px; }
+#whaleName, #whaleSong { z-index: 23; }
+#whaleName .center-card, #whaleSong .center-card { max-width: 500px; }
+.wq-eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: #9fffe8; }
+#wnKind { color: var(--dim); font-size: 13px; }
+#wnInput { width: 100%; font: inherit; font-family: var(--display); font-size: 22px; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(159,255,232,.5); background: rgba(0,0,0,.35); color: #fff; text-align: center; }
+.wpads { display: grid; grid-template-columns: repeat(2, minmax(110px, 1fr)); gap: 12px; width: min(320px, 100%); margin: 6px auto; }
+.wpad { aspect-ratio: 1.4; border-radius: 18px; border: 2px solid rgba(255,255,255,.25); cursor: pointer; font-family: var(--display); font-size: 20px; color: rgba(255,255,255,.75); opacity: .55; transition: opacity .1s, transform .1s, box-shadow .1s; }
+.wpad[data-i="0"] { background: #1f8a7a; } .wpad[data-i="1"] { background: #b0407a; } .wpad[data-i="2"] { background: #b08a20; } .wpad[data-i="3"] { background: #6a4ab0; }
+.wpad.on { opacity: 1; transform: scale(1.05); box-shadow: 0 0 30px currentColor, 0 0 0 3px #fff inset; color: #fff; }
+#wsStatus { min-height: 40px; color: #e8f0ff; text-align: center; }
+#wsDots { display: flex; gap: 8px; justify-content: center; }
+#wsDots i { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.15); }
+#wsDots i.cur { background: #ffd060; } #wsDots i.done { background: #7dffb0; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -573,6 +591,10 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="raceCount" hidden></div>
 <div id="cityBubble" hidden></div>
 <div id="dvBadge" hidden></div>
+<div id="wqHud" hidden></div>
+<button id="wqBtn" hidden></button>
+<div class="overlay" id="whaleName" hidden><div class="center-card" style="display:grid;gap:10px;justify-items:center"><div class="wq-eyebrow">Scan complete</div><h2 style="margin:0">Name this whale</h2><p id="wnKind"></p><input id="wnInput" maxlength="18" autocomplete="off" aria-label="Whale name"><div class="row-btns"><button class="ghost" id="wnRandom">Random name</button><button class="ghost" id="wnCancel">Later</button><button class="btn" id="wnSave">Save name</button></div></div></div>
+<div class="overlay" id="whaleSong" hidden><div class="center-card" style="display:grid;gap:10px;justify-items:center"><div class="wq-eyebrow">Whale song</div><h2 style="margin:0">Sing with the herd</h2><div id="wsDots"></div><div class="wpads"><button class="wpad" data-i="0">1</button><button class="wpad" data-i="1">2</button><button class="wpad" data-i="2">3</button><button class="wpad" data-i="3">4</button></div><p id="wsStatus"></p><button class="ghost" id="wsClose">Stop singing</button></div></div>
 <div id="arenaHud" hidden><div class="ah-top"><span id="ahWave"></span><span id="ahScore"></span><span id="ahMul"></span></div><span id="ahNext"></span></div>
 <div id="arenaBanner" hidden></div>
 <div id="rivalComms" hidden><div id="rcAvatar"></div><b id="rcName"></b><span id="rcTag"></span><p id="rcText"></p></div>
@@ -1022,8 +1044,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -1252,7 +1274,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyG' && G.state === 'surface' && !e.repeat) petInteract();
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -6449,6 +6471,273 @@ let ngArm = false;
 $('#endingClose').insertAdjacentHTML('afterend', '<button class="ghost" id="ngBtn">Start New Game+</button>');
 $('#ngBtn').addEventListener('click', e => { if (!ngArm) { ngArm = true; e.target.textContent = 'Click again: start over with your gold ship, pets and statue'; setTimeout(() => { ngArm = false; e.target.textContent = 'Start New Game+'; }, 5000); return; } startNGPlus(); });
 
+/* ============ the whale migration: a Sylari friendship quest ============ */
+G.wq = G.wq || { stage: 0, names: [], rideLog: false, friend: null, festT: 0, songs: 0 };
+const WQ = { built: false, whales: [], a: 0, pos: new V3(), dir: new V3(1, 0, 0), wave: 0, waveT: 6, lines: [], rideT: 0, fw: null, fireT: 0, near: null };
+const LOOP_C = VEIL_C.clone().add(new V3(2600, 200, -2200)), LOOP_R = 900, NURSE = VEIL_C.clone().add(new V3(-5200, 500, -4600));
+const WHALE_KINDS = ['matriarch', 'adult', 'adult', 'calf', 'calf'], WHALE_LABEL = { matriarch: 'Matriarch', adult: 'Veil whale', calf: 'Whale calf' };
+const WHALE_SCALE = { matriarch: 1.25, adult: 1, calf: 0.45 };
+const WHALE_OFF = [[0, 0, 0], [-260, 40, 160], [260, -30, 180], [-90, -70, 300], [110, 60, 320]];
+const WHALE_NAMES = ['Luma', 'Bubbles', 'Captain Fin', 'Moonbelly', 'Nimbus', 'Pearl', 'Sprinkle', 'Big Blue', 'Tidesong', 'Glimmer', 'Wobble', 'Starfin', 'Hush', 'Coral', 'Biscuit', 'Doodle', 'Marshmallow', 'Comet'];
+function makeWhale(k) {
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const skin = new THREE.MeshStandardMaterial({ color: 0x2a3a7a, metalness: 0.2, roughness: 0.55, emissive: 0x0a1440, emissiveIntensity: 0.5 });
+  const belly = new THREE.MeshStandardMaterial({ color: 0xa8d8e8, roughness: 0.6, emissive: 0x2a5a6a, emissiveIntensity: 0.4 });
+  const glowM = mGlow(0x9fffe8), pinkM = mGlow(0xff9ad8);
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(30, 24, 16), skin); torso.scale.set(1, 0.85, 3.2); body.add(torso);
+  const under = new THREE.Mesh(new THREE.SphereGeometry(29, 20, 12, 0, TAU, Math.PI * 0.55, Math.PI * 0.45), belly); under.scale.set(1.02, 0.9, 3.15); body.add(under);
+  for (let i = 0; i < 9; i++) for (const s of [-1, 1]) { const z = -70 + i * 17, sp = glowSprite(i % 3 === 1 ? 0xff9ad8 : 0x9fffe8, 9); sp.position.set(s * 27 * Math.cos((z / 96) * 1.2), 8, z); body.add(sp); }
+  const stripe = new THREE.Mesh(new THREE.TorusGeometry(31, 1.1, 6, 40, Math.PI), glowM); stripe.rotation.z = Math.PI / 2; stripe.rotation.y = Math.PI / 2; stripe.scale.set(3.1, 0.85, 1); body.add(stripe);
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(3, 10, 8), pinkM); eye.position.set(s * 22, 4, -72); body.add(eye);
+    const fin = new THREE.Mesh(new THREE.SphereGeometry(16, 12, 8), skin); fin.scale.set(2.2, 0.15, 0.8); fin.position.set(s * 40, -12, -20); fin.rotation.z = s * -0.4; body.add(fin); g.userData['fin' + s] = fin;
+  }
+  const tail = new THREE.Group(); tail.position.z = 90; body.add(tail);
+  const stalk = new THREE.Mesh(new THREE.SphereGeometry(14, 12, 8), skin); stalk.scale.set(0.8, 0.7, 2.6); stalk.position.z = 22; tail.add(stalk);
+  for (const s of [-1, 1]) { const fl = new THREE.Mesh(new THREE.SphereGeometry(20, 12, 8), skin); fl.scale.set(1.8, 0.12, 0.9); fl.position.set(s * 26, 0, 56); fl.rotation.y = s * 0.5; tail.add(fl); const fg = glowSprite(0x9fffe8, 14); fg.position.set(s * 40, 0, 62); tail.add(fg); }
+  const aura = glowSprite(0x6fd8ff, 260); aura.material.opacity = 0.35; body.add(aura);
+  g.userData.tail = tail; g.userData.body = body; g.scale.setScalar(WHALE_SCALE[k] || 1);
+  return g;
+}
+function buildHerd() {
+  if (WQ.built || !veilOpen()) return; WQ.built = true;
+  WHALE_KINDS.forEach((k, i) => { const obj = makeWhale(k); obj.position.copy(LOOP_C).add(new V3(WHALE_OFF[i][0], WHALE_OFF[i][1], WHALE_OFF[i][2])); scene.add(obj); WQ.whales.push({ i, kind: k, obj, hp: 100, phase: rand(0, TAU), off: new V3(WHALE_OFF[i][0], WHALE_OFF[i][1], WHALE_OFF[i][2]) }); });
+  WQ.pos.copy(LOOP_C);
+  // the hidden nursery: a crystal nebula
+  const fogTex = canvasTex(128, 128, (c) => { const gr = c.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,180,230,.6)'); gr.addColorStop(1, 'rgba(255,180,230,0)'); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
+  for (let i = 0; i < 40; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: rand(0.25, 0.5), color: new THREE.Color(pick([0xffb8e0, 0x9fffe8, 0xc8b0ff])) })); s.scale.setScalar(rand(500, 1100)); s.position.copy(NURSE).add(randDir().multiplyScalar(rand(300, 1300))); scene.add(s); }
+  for (let i = 0; i < 26; i++) {
+    const col = pick([0xff9ad8, 0x9fffe8, 0xffd890, 0xc8b0ff]), c = new THREE.Mesh(new THREE.OctahedronGeometry(rand(20, 60), 0), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.7, flatShading: true, transparent: true, opacity: 0.85 }));
+    c.scale.y = rand(2.5, 5); const d = randDir(); c.position.copy(NURSE).addScaledVector(d, rand(700, 1300)); c.quaternion.setFromUnitVectors(UP, d); scene.add(c);
+  }
+  const heart = glowSprite(0xffd8f0, 900); heart.position.copy(NURSE); scene.add(heart);
+}
+function herdUpdate(dt) {
+  const st = G.wq.stage, speed = 55;
+  if (st >= 5) { WQ.a += dt * 40 / 500; WQ.pos.copy(NURSE).add(new V3(Math.cos(WQ.a) * 500, Math.sin(WQ.a * 2) * 60, Math.sin(WQ.a) * 500)); WQ.dir.set(-Math.sin(WQ.a), 0, Math.cos(WQ.a)).normalize(); }
+  else if (st === 4) {
+    const to = NURSE.clone().sub(WQ.pos), d = to.length(), near = player.position.distanceTo(WQ.pos) < 1800;
+    WQ.waiting = !near;
+    if (near && d > 1) { WQ.dir.lerp(to.normalize(), Math.min(1, dt)).normalize(); WQ.pos.addScaledVector(WQ.dir, Math.min(d, 75 * dt)); }
+    if (d < 250) { G.wq.stage = 5; G.credits += 2000; sfx('win'); showComms('Ooli of the Sylari', `${sylSay('{0}, {1}!')} You found it: the whale nursery! The matriarch wants to sing with you. Fly close to her and listen. +2,000 cr`); logAdd(['The hidden nursery', 'We followed the herd into a nebula made of crystal and pink fog. Inside: a nursery full of baby whales, glowing like nightlights. I have never seen anything so beautiful.']); save(); }
+  } else { WQ.a += dt * speed / LOOP_R; WQ.pos.copy(LOOP_C).add(new V3(Math.cos(WQ.a) * LOOP_R, Math.sin(WQ.a * 2) * 80, Math.sin(WQ.a) * LOOP_R)); WQ.dir.set(-Math.sin(WQ.a), Math.cos(WQ.a * 2) * 0.17, Math.cos(WQ.a)).normalize(); }
+  const q = new THREE.Quaternion(); { _m.lookAt(WQ.pos, WQ.pos.clone().add(WQ.dir), UP); q.setFromRotationMatrix(_m); }
+  for (const w of WQ.whales) {
+    const tgt = w.off.clone().applyQuaternion(q).add(WQ.pos); tgt.y += Math.sin(T * 0.5 + w.phase) * 15;
+    const prev = w.obj.position.clone(); w.obj.position.lerp(tgt, Math.min(1, dt * 0.8));
+    const mv = w.obj.position.clone().sub(prev); if (mv.lengthSq() > 0.0001) turnToward(w.obj, w.obj.position.clone().add(mv.normalize().multiplyScalar(10)).addScaledVector(WQ.dir, 4), dt * 0.8);
+    w.obj.userData.tail.rotation.x = Math.sin(T * 1.4 + w.phase) * 0.35; w.obj.userData.body.rotation.x = Math.sin(T * 1.4 + w.phase - 1) * 0.05;
+    if (st !== 3 && w.hp < 100) w.hp = Math.min(100, w.hp + dt * 5);
+    const lim = 45 * (WHALE_SCALE[w.kind]) * 2 + P.r * 0.8, d = player.position.distanceTo(w.obj.position);
+    if (d < lim) { const n = new V3().subVectors(player.position, w.obj.position).normalize(); player.position.copy(w.obj.position).addScaledVector(n, lim); const vn = P.vel.dot(n); if (vn < 0) P.vel.addScaledVector(n, -vn); }
+  }
+}
+const whaleName = w => G.wq.names[w.i] || null;
+function nearestWhale(r, ok) { let best = null, bd = r; for (const w of WQ.whales) { if (ok && !ok(w)) continue; const d = player.position.distanceTo(w.obj.position) - 60 * WHALE_SCALE[w.kind]; if (d < bd) { bd = d; best = w; } } return best; }
+function wqAction() {
+  if (G.state !== 'fly' || G.sys !== 'veil' || !WQ.built) return;
+  const w = WQ.near; if (!w) return;
+  if (G.wq.stage === 2 && !whaleName(w)) openNaming(w);
+  else if (G.wq.stage >= 5 && w.kind === 'matriarch') openSong();
+}
+addEventListener('keydown', e => { if (e.code === 'KeyN' && !e.repeat && !(e.target.matches && e.target.matches('input, textarea'))) wqAction(); });
+$('#wqBtn').addEventListener('click', wqAction);
+
+// naming
+let namingW = null;
+function openNaming(w) {
+  namingW = w; sfx('scan');
+  $('#wnKind').textContent = `${WHALE_LABEL[w.kind]} · length ${Math.round(190 * WHALE_SCALE[w.kind])} m · ${['calm', 'curious', 'playful', 'sleepy', 'bossy'][w.i]}`;
+  $('#wnInput').value = pick(WHALE_NAMES.filter(n => !G.wq.names.includes(n)));
+  $('#comms').hidden = true; setState('naming'); $('#whaleName').hidden = false; setTimeout(() => { $('#wnInput').focus(); $('#wnInput').select(); }, 50);
+}
+function saveName() {
+  const w = namingW; if (!w) return; const name = ($('#wnInput').value || '').trim().slice(0, 18) || pick(WHALE_NAMES);
+  G.wq.names[w.i] = name; namingW = null; $('#whaleName').hidden = true; setState('fly'); G.credits += 200; sfx('win');
+  const n = G.wq.names.filter(Boolean).length; say(`You named the ${WHALE_LABEL[w.kind].toLowerCase()} “${name}”! +200 cr (${n} of 5)`, 'good');
+  if (n >= 5 && G.wq.stage === 2) { G.wq.stage = 3; WQ.wave = 0; WQ.waveT = 8; showComms('Ooli of the Sylari', `${sylSay('{6}! {6}!')} Hunters are coming for the calves, ${G.wq.names[3]} and ${G.wq.names[4]}! They use harpoons. Shoot the hunters before they drag the little ones away!`); }
+  save();
+}
+function closeNaming() { namingW = null; $('#whaleName').hidden = true; if (G.state === 'naming') setState('fly'); }
+$('#wnSave').addEventListener('click', saveName); $('#wnCancel').addEventListener('click', closeNaming);
+$('#wnRandom').addEventListener('click', () => { $('#wnInput').value = pick(WHALE_NAMES.filter(n => !G.wq.names.includes(n))); sfx('ui'); });
+$('#wnInput').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') saveName(); if (e.key === 'Escape') closeNaming(); });
+
+// hunters
+const HUNTER_STYLE = { hull: 0x2a2226, trim: 0xc4271f, glass: 0xff6040, glow: 0xff4020, sweep: 0.2 };
+function spawnHunters(n) {
+  const calves = WQ.whales.filter(w => w.kind === 'calf'), from = randDir(); from.y *= 0.3; from.normalize();
+  for (let i = 0; i < n; i++) {
+    const c = calves[i % calves.length], e = spawnPirate(WQ.pos.clone().addScaledVector(from, 1600).add(randDir().multiplyScalar(150)), { heavy: i === 0 });
+    scene.remove(e.obj); const o = makeFighter(HUNTER_STYLE); const hp = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 8, 6), mStd(0x8a8f99)); hp.rotation.x = Math.PI / 2; hp.position.set(0, -1.4, -6); o.add(hp);
+    o.position.copy(e.obj.position); scene.add(o); e.obj = o;
+    Object.assign(e, { hunter: true, calf: c, tgt: { obj: c.obj, alive: true, r: 0 }, aggro: true, label: 'Whale hunter', bounty: Math.round(e.bounty * 1.5) });
+  }
+}
+function harpoonLine(i) {
+  if (!WQ.lines[i]) { const geo = new THREE.BufferGeometry().setFromPoints([new V3(), new V3()]); const l = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffd0a0, transparent: true, opacity: 0.8 })); scene.add(l); WQ.lines[i] = l; }
+  return WQ.lines[i];
+}
+function huntUpdate(dt) {
+  let li = 0;
+  const hunters = enemies.filter(e => e.hunter);
+  for (const e of hunters) {
+    const d = e.obj.position.distanceTo(e.calf.obj.position);
+    if (!e.aggroP && d < 320) {
+      e.calf.hp -= 7 * dt; const l = harpoonLine(li++); const pa = l.geometry.attributes.position; pa.setXYZ(0, e.obj.position.x, e.obj.position.y, e.obj.position.z); pa.setXYZ(1, e.calf.obj.position.x, e.calf.obj.position.y, e.calf.obj.position.z); pa.needsUpdate = true; l.geometry.computeBoundingSphere(); l.visible = true;
+      if (!e.calf.warned || T - e.calf.warned > 6) { e.calf.warned = T; say(`A hunter has harpooned ${whaleName(e.calf) || 'a calf'}! Shoot it!`, 'bad'); }
+    }
+  }
+  for (let i = li; i < WQ.lines.length; i++) WQ.lines[i].visible = false;
+  if (G.wq.stage !== 3) return;
+  const calves = WQ.whales.filter(w => w.kind === 'calf');
+  const hurt = calves.find(c => c.hp <= 0);
+  if (hurt) {
+    enemies.slice().forEach(e => { if (e.hunter) removeEnemy(e); }); calves.forEach(c => c.hp = 100); WQ.wave = 0; WQ.waveT = 12; sfx('fail');
+    showComms('Ooli of the Sylari', `${sylSay('{8}! {8}!')} ${whaleName(hurt) || 'The calf'} broke free, but the herd scattered in panic. The hunters will be back. Get ready and protect the calves again!`); return;
+  }
+  if (player.position.distanceTo(WQ.pos) > 3500) return;
+  if (!hunters.length) {
+    if (WQ.wave >= 3) { G.wq.stage = 4; G.credits += 3000; sfx('win'); showComms('Ooli of the Sylari', `${sylSay('{11}, {1}! {11}!')} The hunters ran away! The herd trusts you now. Follow them, they are going somewhere secret. +3,000 cr`); logAdd(['Whale guardian', `Hunters tried to harpoon ${G.wq.names[3]} and ${G.wq.names[4]}. My wingmen and I chased off three whole waves. The little ones bumped my ship afterwards. I think that was a thank you.`]); save(); return; }
+    WQ.waveT -= dt; if (WQ.waveT <= 0) { WQ.wave++; spawnHunters(2 + WQ.wave); WQ.waveT = 6; say(`Whale hunters incoming! Wave ${WQ.wave} of 3`, 'bad'); sfx('fail'); }
+  }
+}
+{ const _d4 = die; die = function () { if (G.wq.stage === 3) { WQ.wave = 0; WQ.waveT = 12; WQ.whales.forEach(w => w.hp = 100); } _d4(); }; }
+
+// whale song
+const WS = { seq: [], i: 0, input: false, round: 0, lens: [3, 4, 5], busy: false };
+const PAD_F = [220, 277, 330, 392];
+function whaleTone(i, dur = 0.6) {
+  if (!AC) return;
+  try { const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime, f = PAD_F[i]; o.type = 'sine'; o.frequency.setValueAtTime(f * 1.12, t); o.frequency.exponentialRampToValueAtTime(f * 0.86, t + dur); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(master || AC.destination); o.start(t); o.stop(t + dur + 0.05); } catch (e) {}
+}
+function padFlash(i, ms = 450) { const p = document.querySelector(`.wpad[data-i="${i}"]`); if (!p) return; p.classList.add('on'); setTimeout(() => p.classList.remove('on'), ms); whaleTone(i, ms / 1000 + 0.15); }
+function openSong() { $('#comms').hidden = true; setState('song'); $('#whaleSong').hidden = false; WS.round = 0; newRound(); }
+function newRound() {
+  WS.seq = Array.from({ length: WS.lens[WS.round] }, () => Math.random() * 4 | 0); playSeq();
+}
+function playSeq() {
+  WS.input = false; WS.i = 0; WS.busy = true;
+  $('#wsStatus').textContent = `${G.wq.names[0] || 'The matriarch'} sings... listen!`;
+  $('#wsDots').innerHTML = WS.lens.map((_, k) => `<i class="${k < WS.round ? 'done' : k === WS.round ? 'cur' : ''}"></i>`).join('');
+  WS.seq.forEach((n, k) => setTimeout(() => { if (G.state === 'song') padFlash(n, 500); }, 700 + k * 750));
+  setTimeout(() => { if (G.state !== 'song') return; WS.input = true; WS.busy = false; $('#wsStatus').textContent = 'Your turn! Sing it back (click the pads or press 1 2 3 4).'; }, 700 + WS.seq.length * 750);
+}
+function songPress(i) {
+  if (!WS.input) return; padFlash(i, 300);
+  if (i !== WS.seq[WS.i]) { WS.input = false; sfx('fail'); $('#wsStatus').textContent = 'The whale hums patiently. Listen again...'; setTimeout(() => { if (G.state === 'song') playSeq(); }, 1400); return; }
+  WS.i++;
+  if (WS.i >= WS.seq.length) {
+    WS.input = false; WS.round++;
+    if (WS.round >= WS.lens.length) { songWin(); return; }
+    $('#wsStatus').textContent = 'Beautiful! The whale sings a longer song...'; sfx('ring'); setTimeout(() => { if (G.state === 'song') newRound(); }, 1300);
+  }
+}
+function songWin() {
+  $('#wsDots').innerHTML = WS.lens.map(() => '<i class="done"></i>').join(''); sfx('win'); G.wq.songs++;
+  if (G.wq.stage === 5) {
+    const calf = G.wq.names[3] || 'The calf'; G.wq.friend = calf; G.wq.stage = 6;
+    $('#wsStatus').textContent = `The whole herd sings back! ${calf} swims up and nuzzles your ship. ${calf} wants to come with you!`;
+    showComms('Ooli of the Sylari', `${sylSay('{9}! {9}!')} The whales say you are family now. ${calf} will follow your ship wherever you fly. Come back to the Sylari Bloom. We are throwing a festival for you!`);
+    logAdd(['A whale of a friend', `I sang with the matriarch, ${G.wq.names[0]}. Then little ${calf} decided I am her new best friend. She follows my ship everywhere now. Sometimes she sings while I fly.`]);
+  } else { G.credits += 500; $('#wsStatus').textContent = 'The herd loves your singing! +500 cr'; }
+  save(); setTimeout(closeSong, 2600);
+}
+function closeSong() { $('#whaleSong').hidden = true; WS.input = false; if (G.state === 'song') setState('fly'); }
+document.querySelectorAll('.wpad').forEach(p => p.addEventListener('click', () => songPress(+p.dataset.i)));
+$('#wsClose').addEventListener('click', closeSong);
+addEventListener('keydown', e => { if (G.state === 'song') { const n = '1234'.indexOf(e.key); if (n >= 0) songPress(n); } });
+
+// the friend whale follows you
+function friendUpdate(dt) {
+  if (!G.wq.friend) { if (WQ.fw) WQ.fw.visible = false; return; }
+  if (!WQ.fw) { WQ.fw = makeWhale('calf'); WQ.fw.scale.setScalar(0.13); scene.add(WQ.fw); WQ.fw.position.copy(player.position); WQ.fwT = 30; }
+  const fw = WQ.fw, on = G.state === 'fly' || G.state === 'pause' || G.state === 'map' || G.state === 'photo' || G.state === 'warp';
+  fw.visible = on; if (!on) return;
+  const s = Math.max(42, P.r * 3.5), slot = new V3(-1.4 * s, 0.8 * s, 2.2 * s).applyQuaternion(player.quaternion).add(player.position);
+  slot.y += Math.sin(T * 0.8) * s * 0.08;
+  const d = fw.position.distanceTo(slot); if (d > 6000) fw.position.copy(slot);
+  const prev = fw.position.clone(); fw.position.lerp(slot, Math.min(1, dt * 1.6));
+  const mv = fw.position.clone().sub(prev); turnToward(fw, mv.lengthSq() > 0.01 ? fw.position.clone().add(mv) : fw.position.clone().add(new V3(0, 0, -1).applyQuaternion(player.quaternion)), dt * 2);
+  fw.userData.tail.rotation.x = Math.sin(T * 2.2) * 0.4;
+  if ((WQ.fwT -= dt) <= 0 && G.state === 'fly') { WQ.fwT = rand(40, 80); whaleTone(Math.random() * 4 | 0, 1.2); say(`${G.wq.friend} sings a happy little song.`); }
+}
+
+// the festival
+function startFestival() {
+  G.wq.stage = 7; G.wq.festT = 120; G.credits += 10000; sfx('win');
+  if (!G.arena.trails.includes('song')) G.arena.trails.push('song'); if (!G.paints.includes('whale')) G.paints.push('whale');
+  showComms('Ooli of the Sylari', `${sylSay('{0}, {1}! {11}! {7}, {7}, {7}!')} The whole Bloom is celebrating the whales, and you! Look outside when you undock: fireworks! Gifts for you: 10,000 credits, the Whale song trail and the Abyssal whale paint.`);
+  logAdd(['The Whale Festival', `The Sylari threw a festival for the herd and for me. Fireworks, singing, glowing fruit pies. ${G.wq.friend} did loops around the station. Best day in the whole Reach.`]);
+  save();
+}
+function fireworks(dt) {
+  if (G.sys !== 'veil') return;
+  const bloom = stationById('bloom'); if (!bloom) return;
+  const party = G.wq.festT > 0; if (party && G.state === 'fly') G.wq.festT -= dt;
+  if (G.wq.stage < 7 || player.position.distanceTo(bloom.pos) > 6000) return;
+  if ((WQ.fireT -= dt) > 0) return; WQ.fireT = party ? rand(0.25, 0.7) : rand(4, 9);
+  const at = bloom.pos.clone().add(new V3(rand(-500, 500), rand(150, 600), rand(-500, 500)));
+  explode(at, rand(1.6, 3), pick([0xff9ad8, 0x9fffe8, 0xffd060, 0xc8b0ff, 0xff6a6a, 0x7dffb0])); sfx('boom', 0.25);
+}
+TRAILS.song = { name: 'Whale song bubbles', c: [0x9fffe8, 0x6fd8ff, 0xff9ad8] };
+PAINTS.whale = { name: 'Abyssal whale', hull: 0x1a2a6a, trim: 0x9fffe8, emissive: 0x0a1a4a, arena: true };
+
+// tick, markers, HUD, Sylari tab
+function wqSpace(dt) {
+  friendUpdate(dt);
+  if (!WQ.built) return;
+  const vis = G.sys === 'veil' && G.wq.stage >= 1; WQ.whales.forEach(w => w.obj.visible = vis);
+  if (G.sys !== 'veil') { $('#wqBtn').hidden = true; return; }
+  fireworks(dt);
+  if (G.wq.stage < 1) return;
+  herdUpdate(dt); huntUpdate(dt);
+  const st = G.wq.stage;
+  if (st === 1 && player.position.distanceTo(WQ.pos) < 1500) { G.wq.stage = 2; sfx('ring'); showComms('Ooli of the Sylari', `${sylSay('{0}!')} There they are! Five whales: the matriarch, two grown-ups and two little calves. Fly close to each one and press N to scan it and give it a name.`); save(); }
+  WQ.near = G.state === 'fly' ? nearestWhale(320, st === 2 ? w => !whaleName(w) : st >= 5 ? w => w.kind === 'matriarch' : null) : null;
+  const can = WQ.near && ((st === 2 && !whaleName(WQ.near)) || (st >= 5 && WQ.near.kind === 'matriarch'));
+  const btn = $('#wqBtn'); btn.hidden = !can;
+  if (can) btn.innerHTML = st === 2 ? `🐋 ${isTouch ? 'Tap here' : 'Press <kbd>N</kbd>'} to scan and name this ${WHALE_LABEL[WQ.near.kind].toLowerCase()}` : `🎵 ${isTouch ? 'Tap here' : 'Press <kbd>N</kbd>'} to sing with ${whaleName(WQ.near) || 'the matriarch'}`;
+  const ride = G.state === 'fly' && P.vel.length() > 20 && nearestWhale(260);
+  if (ride) { WQ.rideT += dt; if (WQ.rideT > 8 && !G.wq.rideLog) { G.wq.rideLog = true; logAdd(['Swimming with giants', `I flew right alongside ${whaleName(ride) || 'a giant space whale'} for a while. Its eye was as big as my whole ship. It winked at me. I am almost sure it winked.`]); } }
+  WQ.riding = ride ? (whaleName(ride) || 'a whale') : null;
+}
+{ const _ub3 = updateBoss; updateBoss = function (dt) { _ub3(dt); wqSpace(dt); }; }
+function wqHudLine() {
+  const st = G.wq.stage, n = G.wq.names.filter(Boolean).length;
+  if (st === 6) return 'Return to the Sylari Bloom for the festival';
+  if (G.sys !== 'veil') return '';
+  const calves = WQ.whales.filter(w => w.kind === 'calf');
+  const base = ['', 'Find the whale herd (follow the marker)', `Scan and name the whales: ${n} of 5 (fly close, press N)`, `Protect the calves! Wave ${Math.max(1, WQ.wave)} of 3 · ${calves.map(c => `${whaleName(c) || 'calf'} ${Math.max(0, Math.ceil(c.hp))}%`).join(' · ')}`, WQ.waiting ? 'The herd is waiting for you. Stay close!' : 'Follow the herd to their secret nursery', 'At the nursery: fly to the matriarch and sing with her (N)'][st] || '';
+  return base + (WQ.riding && st < 6 ? ` · 🌊 Riding alongside ${WQ.riding}` : '');
+}
+{ const _uh = updateHUD; updateHUD = function (dt) { _uh(dt); const t = G.wq.stage >= 1 && G.wq.stage <= 6 ? wqHudLine() : ''; const el = $('#wqHud'); el.hidden = !t; if (t && el._t !== t) { el.innerHTML = `<b>🐋 The whale migration</b><span>${t}</span>`; el._t = t; } }; }
+{ const _ss2 = setState; setState = function (s) { _ss2(s); if (s !== 'fly') { $('#wqHud').hidden = true; $('#wqBtn').hidden = true; } }; }
+function wqMarkers() {
+  if (G.sys !== 'veil' || !WQ.built || G.wq.stage < 1) return;
+  const st = G.wq.stage;
+  if (st === 1 || (st === 4 && player.position.distanceTo(WQ.pos) > 2500)) { const el = marker('wq-herd', 'friendly', 'Whale herd'); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(WQ.pos)); placeMarker(el, WQ.pos); }
+  if (st >= 2) WQ.whales.forEach(w => { const d = player.position.distanceTo(w.obj.position); if (d > 4000) return; const el = marker('wq-w' + w.i, w.kind === 'calf' && st === 3 ? 'target' : 'friendly', `${whaleName(w) || 'Unknown ' + WHALE_LABEL[w.kind].toLowerCase()}${st === 3 && w.kind === 'calf' ? ` ${Math.max(0, Math.ceil(w.hp))}%` : ''}`); el.querySelector('.dst').textContent = fmtD(d); placeMarker(el, w.obj.position); });
+  if (st >= 4) { const el = marker('wq-nurse', 'friendly', 'Whale nursery'); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(NURSE)); placeMarker(el, NURSE); }
+}
+{ const _em10 = extraMarkers; extraMarkers = function () { _em10(); wqMarkers(); }; }
+{ const _rs = renderSylari; renderSylari = function () {
+  const st = G.wq.stage; let q = '';
+  if (G.syl.fluent) {
+    if (st === 0) q = `<div class="item syl-card"><div><h4>Ooli needs your help <span class="tag boss">Quest</span></h4><p>“${sylSay('{1}, {1}!')} A herd of giant glowing space whales is migrating through the Veil, and something is hunting them. Will you find the herd, learn their names, and keep the little calves safe?”</p></div><div><button class="btn" data-act="wqstart">Help the whales</button></div></div>`;
+    else if (st < 7) q = `<div class="item syl-card"><div><h4>The whale migration</h4><p>${st === 6 ? 'The herd is safe! Ooli is ready to start the festival.' : wqHudLine() || 'Fly out into the Lumen Veil to find the herd.'}</p>${G.wq.names.filter(Boolean).length ? `<p class="shipstats">Your whales: ${WHALE_KINDS.map((k, i) => G.wq.names[i] ? `${G.wq.names[i]} (${WHALE_LABEL[k]})` : null).filter(Boolean).join(' · ')}</p>` : ''}</div><div>${st === 6 ? '<button class="btn" data-act="wqfest">Start the festival!</button>' : ''}</div></div>`;
+    else q = `<div class="item syl-card"><div><h4>Friends of the whales</h4><p>The herd is safe in its nursery. ${G.wq.friend} follows your ship everywhere. Visit the nursery any time to sing with ${G.wq.names[0]} again (+500 cr per song).</p><p class="shipstats">Your whales: ${WHALE_KINDS.map((k, i) => `${G.wq.names[i]} (${WHALE_LABEL[k]})`).join(' · ')} · songs sung: ${G.wq.songs}</p></div><div></div></div>`;
+  }
+  return q + _rs();
+}; }
+{ const _ea3 = expAct; expAct = function (act, b) {
+  if (act === 'wqstart') { if (G.wq.stage === 0) { G.wq.stage = 1; buildHerd(); sfx('win'); say('Quest started: The whale migration. Undock and follow the Whale herd marker.', 'good'); save(); renderDock(); } return; }
+  if (act === 'wqfest') { if (G.wq.stage === 6) { startFestival(); renderDock(); } return; }
+  _ea3(act, b);
+}; }
+{ const _dk2 = dock; dock = function (st) { _dk2(st); if (st.id === 'bloom' && G.syl.fluent && G.wq.stage === 0 && !G.wq.asked) { G.wq.asked = true; setTimeout(() => showComms('Ooli of the Sylari', `${sylSay('{1}!')} Please come and see me in the Sylari tab. Something is wrong with the whales.`), 900); } }; }
+if (G.wq.stage >= 1) buildHerd();
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
   if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
@@ -6487,7 +6776,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song';
   const onSurf = renderScene !== scene;
   if (running) {
     T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt); expTick(dt); citySim(dt); dvTick(dt);
