@@ -428,6 +428,18 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 #wsDots { display: flex; gap: 8px; justify-content: center; }
 #wsDots i { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.15); }
 #wsDots i.cur { background: #ffd060; } #wsDots i.done { background: #7dffb0; }
+#seaDoor, #seaSecret { z-index: 23; }
+#seaDoor .center-card, #seaSecret .center-card { max-width: 560px; display: grid; gap: 10px; justify-items: center; text-align: center; }
+.sea-eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: #6fd8ff; }
+#sdClue { font-family: "Caveat", cursive; font-size: 30px; color: #ffd8f0; margin: 0; }
+#sdHelp { color: var(--dim); font-size: 13px; margin: 0; }
+#sdOpts { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; width: min(340px, 100%); }
+.sd-opt { display: grid; gap: 2px; font-family: var(--display); font-size: 18px; text-transform: none; letter-spacing: .04em; }
+.sd-opt small { font-family: var(--mono, inherit); font-size: 11px; opacity: .75; letter-spacing: 0; }
+#sdStatus { min-height: 22px; color: #e8f0ff; margin: 0; }
+#secretBody { display: grid; gap: 10px; text-align: left; }
+#secretBody p { margin: 0; line-height: 1.6; color: #e8f0ff; }
+.secret-friend { color: #9fffe8 !important; font-style: italic; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -592,6 +604,8 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="cityBubble" hidden></div>
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
+<div class="overlay" id="seaDoor" hidden><div class="center-card"><div class="sea-eyebrow">Sunken city</div><h2 id="sdTitle" style="margin:0"></h2><p id="sdClue"></p><p id="sdHelp"></p><div id="sdOpts"></div><p id="sdStatus"></p><button class="ghost" id="sdClose">Swim away</button></div></div>
+<div class="overlay" id="seaSecret" hidden><div class="center-card"><div class="sea-eyebrow">The memory crystal</div><h2 style="margin:0">Where the whales came from</h2><div id="secretBody"></div><button class="btn" id="secretClose">Close</button></div></div>
 <button id="wqBtn" hidden></button>
 <div class="overlay" id="whaleName" hidden><div class="center-card" style="display:grid;gap:10px;justify-items:center"><div class="wq-eyebrow">Scan complete</div><h2 style="margin:0">Name this whale</h2><p id="wnKind"></p><input id="wnInput" maxlength="18" autocomplete="off" aria-label="Whale name"><div class="row-btns"><button class="ghost" id="wnRandom">Random name</button><button class="ghost" id="wnCancel">Later</button><button class="btn" id="wnSave">Save name</button></div></div></div>
 <div class="overlay" id="whaleSong" hidden><div class="center-card" style="display:grid;gap:10px;justify-items:center"><div class="wq-eyebrow">Whale song</div><h2 style="margin:0">Sing with the herd</h2><div id="wsDots"></div><div class="wpads"><button class="wpad" data-i="0">1</button><button class="wpad" data-i="1">2</button><button class="wpad" data-i="2">3</button><button class="wpad" data-i="3">4</button></div><p id="wsStatus"></p><button class="ghost" id="wsClose">Stop singing</button></div></div>
@@ -1044,8 +1058,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -1269,12 +1283,12 @@ addEventListener('keydown', e => {
     const now = performance.now();
     if (lastTap.code === e.code && now - lastTap.t < 280) { startRoll(e.code === 'KeyA' ? 1 : -1); lastTap.t = 0; } else { lastTap.code = e.code; lastTap.t = now; }
   }
-  if (G.state === 'surface' && !e.repeat) { if (e.code === 'KeyE') harvest(); if (e.code === 'KeyF') board(); if (e.code === 'KeyC') scan(); if (e.code === 'KeyB') toggleBuild(); if (S.build) { if (e.code === 'KeyR') rotateBuild(); if (e.code === 'KeyX') removePiece(); const n = '1234567890-'.indexOf(e.key); if (n >= 0) selectPiece(Object.keys(PIECES)[n]); } }
+  if (G.state === 'surface' && !e.repeat) { if (e.code === 'KeyE') harvest(); if (e.code === 'KeyF') board(); if (e.code === 'KeyC') scan(); if (e.code === 'KeyB') toggleBuild(); if (S.build) { if (e.code === 'KeyR') rotateBuild(); if (e.code === 'KeyX') removePiece(); const n = '1234567890-='.indexOf(e.key); if (n >= 0) selectPiece(Object.keys(PIECES)[n]); } }
   if (e.code === 'KeyP' && !e.repeat) { if (G.state === 'fly' || G.state === 'surface') enterPhoto(); else if (G.state === 'photo') exitPhoto(); }
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyG' && G.state === 'surface' && !e.repeat) petInteract();
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -6738,6 +6752,467 @@ function wqMarkers() {
 { const _dk2 = dock; dock = function (st) { _dk2(st); if (st.id === 'bloom' && G.syl.fluent && G.wq.stage === 0 && !G.wq.asked) { G.wq.asked = true; setTimeout(() => showComms('Ooli of the Sylari', `${sylSay('{1}!')} Please come and see me in the Sylari tab. Something is wrong with the whales.`), 900); } }; }
 if (G.wq.stage >= 1) buildHerd();
 
+/* ============ the Verdance ocean: mini-sub, wrecks, the sunken city ============ */
+G.sea = G.sea || { chests: [false, false, false], clams: [false, false, false], pearls: 0, species: {}, oro: 0, doors: [false, false, false], secret: false, dives: 0, deepest: 0, seen: {} };
+ITEMS.pearl = { name: 'Glow-pearl', mat: null, color: 0xfff0c8, css: '#fff0c8' };
+ITEMS.chest = { name: 'Treasure chest', mat: null, color: 0xffc23a, css: '#ffc23a' };
+PIECES.subdock = { name: 'Sub dock', cost: { cr: 4000, prism: 3, resin: 2 } };
+PAINTS.pearl = { name: 'Ocean pearl', hull: 0xf0f4f8, trim: 0x2a8aa0, emissive: 0x0a2a3a, arena: true };
+RECIPES.subair = { name: 'Sub air tanks', max: () => (G.craft.subair || 0) >= 2, cost: () => !G.craft.subair ? { cryo: 3, resin: 3, cr: 1500 } : { comet: 2, prism: 3, cr: 3000 },
+  desc: () => `Your mini-sub holds about ${Math.round(100 / SUB_AIR[G.craft.subair || 0])} s of air${(G.craft.subair || 0) < 2 ? `. Next level: ${Math.round(100 / SUB_AIR[(G.craft.subair || 0) + 1])} s` : ''}. Refill at the surface or in bubble vents.`, apply() { G.craft.subair = (G.craft.subair || 0) + 1; } };
+RECIPES.subprop = { name: 'Sub turbo propeller', max: () => (G.craft.subprop || 0) >= 2, cost: () => !G.craft.subprop ? { prism: 3, sun: 1, cr: 2000 } : { obs: 3, void: 1, cr: 4000 },
+  desc: () => `Your mini-sub cruises at ${SUB_SPD[G.craft.subprop || 0]} m/s${(G.craft.subprop || 0) < 2 ? `. Next level: ${SUB_SPD[(G.craft.subprop || 0) + 1]} m/s` : ''}.`, apply() { G.craft.subprop = (G.craft.subprop || 0) + 1; } };
+const SUB_AIR = [1.1, 0.65, 0.4], SUB_SPD = [10, 14, 18];
+function makeSubDock() {
+  const g = new THREE.Group(), add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
+  add(new THREE.BoxGeometry(3.6, 0.3, 5), mStd(0x8a6a4a, 0.1, 0.8), 0, 0.5, 0);
+  for (const x of [-1.6, 1.6]) for (const z of [-2.2, 2.2]) add(new THREE.CylinderGeometry(0.15, 0.15, 1.4, 6), mStd(0x5a4a3a), x, -0.1, z);
+  const crane = add(new THREE.BoxGeometry(0.25, 3.4, 0.25), mStd(0xd7712c, 0.4, 0.5), -1.4, 2.2, -2); add(new THREE.BoxGeometry(2.2, 0.2, 0.2), mStd(0xd7712c, 0.4, 0.5), -0.4, 3.8, -2);
+  const sub = makeSub(); sub.scale.setScalar(0.7); sub.position.set(0.4, 2.3, -1.5); sub.rotation.y = Math.PI / 2; g.add(sub);
+  return g;
+}
+function makeSub() {
+  const g = new THREE.Group(), Y = mStd(0xf2c22a, 0.3, 0.45), D = mStd(0x2c2b33, 0.5, 0.5);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), Y); body.scale.set(1, 0.9, 1.7); g.add(body);
+  const win = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 12), new THREE.MeshStandardMaterial({ color: 0x7fd4ff, emissive: 0x1a5a80, emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.1 })); win.position.set(0, 0.25, -1.15); g.add(win);
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.6, 10), Y); tower.position.set(0, 0.95, 0.1); g.add(tower);
+  for (const s of [-1, 1]) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.5), Y); f.position.set(s * 1, -0.2, 0.9); g.add(f); const l = glowSprite(0xfff4c8, 1.4); l.position.set(s * 0.45, -0.35, -1.5); g.add(l); }
+  const prop = new THREE.Group(); prop.position.z = 1.8; for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.05), D); b.rotation.z = i / 3 * TAU; b.position.y = 0; prop.add(b); } g.add(prop);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.6, 0.5), Y); fin.position.set(0, 0.5, 1.5); g.add(fin);
+  g.userData.prop = prop;
+  return g;
+}
+{ const _mp2 = makePiece; makePiece = function (t) { return t === 'subdock' ? makeSubDock() : _mp2(t); }; }
+const nearDock = () => { if (W !== VERD_W) return null; for (const b of S.base) if (b.rec.t === 'subdock' && Math.hypot(b.obj.position.x - S.pos.x, b.obj.position.z - S.pos.z) < 4.5) return b; return null; };
+{ const _cp2 = cityPrompt; cityPrompt = function () { if (!S.build && !S.near && nearDock()) return `${isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'} to climb into your mini-sub and dive into the ocean`; return _cp2(); }; }
+
+// the ocean world
+const CZ = -650, CITY_Y = () => seaFloor(0, CZ);
+function seaFloor(x, z) {
+  const r = Math.hypot(x, z); let h = -10 - Math.max(0, r - 40) * 0.12;
+  const t = Math.max(0, -z - 250); h -= t * 0.35 * Math.exp(-(x * x) / (2 * 230 * 230));
+  h += (vnoise(x * 0.02 + 40, z * 0.02) - 0.5) * 14 + (vnoise(x * 0.07, z * 0.07 + 9) - 0.5) * 4;
+  if (Math.abs(x) < 40 && z < CZ + 110 && z > CZ - 110) h = Math.max(h, seaFloorFlat());
+  return Math.max(h, -280);
+}
+let _flat = null; function seaFloorFlat() { if (_flat == null) { const r = 650, t = 400; _flat = -10 - (r - 40) * 0.12 - t * 0.35 + 0; } return _flat; }
+const SEA_W = { id: 'sea', interior: true, brand: 'VERDANCE OCEAN · MINI-SUB', title: 'Verdance Ocean', scene: new THREE.Scene(), pad: { x: 0, z: 0 }, padH: 0, hgtFn: seaFloor, itemPlan: [], critterMinH: 99, bob: false, buildable: false,
+  pal: { dayTop: new THREE.Color(0x2a90a8), dayHor: new THREE.Color(0x2a90a8), setTop: new THREE.Color(0x2a90a8), setHor: new THREE.Color(0x2a90a8), nightTop: new THREE.Color(0x0a2a3a), nightHor: new THREE.Color(0x0a2a3a), water: new THREE.Color(0x2a90a8) },
+  nightMsg: 'Night falls above the waves. Down here, the glowing creatures come out.', hint: 'W/S swim · A/D sideways · Space up · Shift down · drag to look · H headlights · C scan creatures · E open, talk and surface',
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+WORLDS.sea = SEA_W;
+const SEA = { sub: null, spot: null, lamp: null, lights: false, air: 100, jelly: [], schools: [], rays: [], anglers: [], kelp: [], vents: [], wrecks: [], doors: [], oro: null, crystal: null, prev: new V3(), shafts: [], fogC: new THREE.Color(), warnT: -9 };
+const SPECIES = { moonjelly: { name: 'Moon jelly', fact: 'A soft pink jellyfish that glows brighter when it is happy.' }, lanternfish: { name: 'Lantern minnow', fact: 'Tiny fish that swim in glowing swirls to confuse hungry eels.' }, glowray: { name: 'Glow ray', fact: 'Flaps its huge wings like a slow bird. Its edges shine like neon.' }, deepjelly: { name: 'Abyss jelly', fact: 'Lives so deep that sunlight has never touched it. Glows teal.' }, angler: { name: 'Lamp-nose angler', fact: 'Grumpy looking, but it only eats tiny shrimp. Its lamp is very pretty.' } };
+const WRECKS = [{ name: 'The Rusty Kettle', x: -220, z: -180, rot: 0.6, loot: { cr: 2500, comet: 3 } }, { name: 'Merry Comet', x: 260, z: -300, rot: -1.1, loot: { cr: 4000, prism: 4, sun: 2 } }, { name: 'HMS Soggy Biscuit', x: -120, z: -470, rot: 2.2, loot: { cr: 6000, void: 2 } }];
+const CLAMS = [[150, 70], [-170, 40], [110, 160]];
+const VENTS = [[60, 30], [-200, -150], [240, -270], [-90, -430], [0, -560], [30, -330]];
+const SDOOR_Z = [CZ + 20, CZ - 15, CZ - 50], DOOR_WORDS = [{ w: 2, clue: '✦ A carving of a twinkling star' }, { w: 3, clue: '⌂ A carving of a little round house' }, { w: 1, clue: '🤝 A carving of two hands holding each other' }], CRYSTAL_WORD = { w: 7, clue: '🏮 A carving of a glowing lantern' };
+function buildSea() {
+  if (S.built) return; S.built = true;
+  surf.fog = new THREE.Fog(0x2a90a8, 4, 200); surf.background = new THREE.Color(0x2a90a8);
+  const sky = makeSkyDome(0x2a90a8, 0x2a90a8); sky.visible = false; surf.add(sky); S.sky = sky;
+  S.sun = new THREE.DirectionalLight(0xcff4ff, 0.8); S.sun.position.set(0.3, 1, 0.2); surf.add(S.sun); S.hemi = new THREE.HemisphereLight(0x9fe8ff, 0x0a2030, 0.8); surf.add(S.hemi); S.moonLight = new THREE.DirectionalLight(0x6fd8ff, 0); surf.add(S.moonLight);
+  // seabed
+  const N = 150, size = 1900, geo = new THREE.PlaneGeometry(size, size, N, N); geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, cols = [], c1 = new THREE.Color(0xd8c89a), c2 = new THREE.Color(0x3a4a5a), c3 = new THREE.Color(0x1a1a2a), cc = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i), y = seaFloor(x, z); pos.setY(i, y); const k = clamp(-y / 220, 0, 1); cc.copy(c1).lerp(c2, Math.min(1, k * 2)).lerp(c3, Math.max(0, k * 2 - 1)); cols.push(cc.r, cc.g, cc.b); }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); geo.computeVertexNormals();
+  surf.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true })));
+  const rockM = smat(0x4a5060, 0.9, { flatShading: true });
+  for (let i = 0; i < 120; i++) { const x = rand(-850, 850), z = rand(-850, 850); if (Math.abs(x) < 40 && z < CZ + 110 && z > CZ - 110) continue; const r = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(1.5, 6), 0), rockM); r.position.set(x, seaFloor(x, z), z); r.rotation.set(rand(0, 3), rand(0, 3), 0); surf.add(r); }
+  // water surface from below + light shafts
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, fog: false })); top.rotation.x = Math.PI / 2; top.position.y = 0; surf.add(top);
+  const shaftM = new THREE.MeshBasicMaterial({ color: 0xcff8ff, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  for (let i = 0; i < 40; i++) { const s = new THREE.Mesh(new THREE.CylinderGeometry(2, 9, 70, 8, 1, true), shaftM); s.position.set(rand(-260, 260), -35, rand(-260, 200)); s.rotation.z = 0.25; surf.add(s); SEA.shafts.push(s); }
+  // kelp forests
+  const kelpM = [0x3a7a3a, 0x5a8a2a, 0x2a6a4a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, side: THREE.DoubleSide, emissive: 0x0a2a10, emissiveIntensity: 0.3 }));
+  for (const [cx, cz] of [[150, 90], [-160, 50]]) for (let i = 0; i < 70; i++) {
+    const x = cx + rand(-70, 70), z = cz + rand(-60, 60), y = seaFloor(x, z), hgtK = rand(10, -y - 2), g = new THREE.Group();
+    for (const ry of [0, Math.PI / 2]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(1.4, hgtK, 1, 6), pick(kelpM)); p.position.y = hgtK / 2; p.rotation.y = ry; g.add(p); }
+    g.position.set(x, y, z); surf.add(g); SEA.kelp.push({ g, ph: rand(0, TAU) });
+  }
+  // clams with glow-pearls
+  CLAMS.forEach(([x, z], i) => {
+    const y = seaFloor(x, z), g = new THREE.Group(), shell = smat(0xc8a8d8, 0.6);
+    const lo = new THREE.Mesh(new THREE.SphereGeometry(2, 14, 8, 0, TAU, Math.PI / 2, Math.PI / 2), shell); g.add(lo);
+    const hi = new THREE.Mesh(new THREE.SphereGeometry(2, 14, 8, 0, TAU, 0, Math.PI / 2), shell); hi.position.z = 1.2; hi.rotation.x = -0.8; g.add(hi);
+    g.position.set(x, y + 0.4, z); surf.add(g);
+    if (!G.sea.clams[i]) { const p = new THREE.Group(); p.add(new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), new THREE.MeshStandardMaterial({ color: 0xfff6e0, emissive: 0xffe0a0, emissiveIntensity: 1, roughness: 0.1 }))); const gl = glowSprite(0xfff0c8, 3); p.add(gl); p.userData.glow = gl; p.userData.gs = 3; p.position.set(x, y + 1.2, z); surf.add(p); S.items.push({ type: 'pearl', obj: p, tagged: true, phase: 0, id: 'pearl' + i, clam: i }); }
+  });
+  // bubble vents
+  VENTS.forEach(([x, z]) => { const y = seaFloor(x, z), base = new THREE.Mesh(new THREE.ConeGeometry(2.5, 3, 8), rockM); base.position.set(x, y + 1, z); surf.add(base); const bubbles = []; for (let i = 0; i < 24; i++) { const b = glowSprite(0xe8fbff, rand(0.6, 1.4)); b.position.set(x + rand(-1.5, 1.5), y + rand(0, 60), z + rand(-1.5, 1.5)); surf.add(b); bubbles.push(b); } SEA.vents.push({ x, z, y, bubbles }); });
+  // shipwrecks
+  const wood = smat(0x5a3a22, 0.9), dark = smat(0x2a2018, 0.9);
+  WRECKS.forEach((w, i) => {
+    const y = seaFloor(w.x, w.z), g = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.CylinderGeometry(5, 3, 30, 10, 1, false, 0, Math.PI), wood); hull.rotation.set(Math.PI / 2, 0, Math.PI / 2); g.add(hull);
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(9, 0.4, 28), dark); deck.position.y = 0.2; g.add(deck);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 18, 6), wood); mast.position.set(0, 7, -3); mast.rotation.z = 0.7; g.add(mast);
+    for (let k = 0; k < 4; k++) { const cr = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.4), wood); cr.position.set(rand(-8, 8), -2, rand(-14, 14)); cr.rotation.y = rand(0, 3); g.add(cr); }
+    g.position.set(w.x, y + 2.5, w.z); g.rotation.y = w.rot; g.rotation.z = 0.15; surf.add(g);
+    S.colliders.push({ x: w.x, z: w.z, r: 6, top: y + 4 });
+    if (!G.sea.chests[i]) { const ch = new THREE.Group(); const box = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1, 1.1), smat(0x6a4a2a)); ch.add(box); const lid = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.4, 1.2), mStd(0xd9a520, 0.8, 0.3)); lid.position.y = 0.6; ch.add(lid); const gl = glowSprite(0xffc23a, 4); gl.position.y = 0.8; ch.add(gl); ch.userData.glow = gl; ch.userData.gs = 4; const off = new V3(0, 3.6, 4).applyAxisAngle(UP, w.rot); ch.position.set(w.x + off.x, y + off.y, w.z + off.z); surf.add(ch); S.items.push({ type: 'chest', obj: ch, tagged: true, phase: 0, id: 'chest' + i, wreck: i }); }
+    SEA.wrecks.push({ x: w.x, y, z: w.z });
+  });
+  // glowing creatures
+  const bellM = [0xff9ad8, 0x9fffe8].map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.9, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
+  for (let i = 0; i < 34; i++) {
+    const deep = i >= 20, x = deep ? rand(-200, 200) : rand(-300, 300), z = deep ? rand(CZ - 120, -300) : rand(-300, 200), fy = seaFloor(x, z), y = rand(fy + 6, Math.min(-4, fy + 60)), g = new THREE.Group(), m = bellM[deep ? 1 : 0];
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(1.2, 14, 8, 0, TAU, 0, Math.PI / 2), m); g.add(bell);
+    for (let k = 0; k < 5; k++) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, rand(2, 4), 3), m); const a = k / 5 * TAU; t.position.set(Math.cos(a) * 0.6, -1.5, Math.sin(a) * 0.6); g.add(t); }
+    g.add(glowSprite(deep ? 0x9fffe8 : 0xff9ad8, 6)); g.position.set(x, y, z); surf.add(g); SEA.jelly.push({ g, y, ph: rand(0, TAU), sp: deep ? 'deepjelly' : 'moonjelly' });
+  }
+  for (let i = 0; i < 6; i++) { const c = new V3(rand(-250, 250), 0, rand(-350, 150)); c.y = seaFloor(c.x, c.z) + rand(8, 25); const fish = []; for (let k = 0; k < 14; k++) { const f = glowSprite(pick([0x9fffe8, 0xffe08a]), 1.1); surf.add(f); fish.push({ f, o: randDir().multiplyScalar(rand(2, 7)), ph: rand(0, TAU) }); } SEA.schools.push({ c, fish, a: rand(0, TAU), r: rand(12, 30) }); }
+  for (let i = 0; i < 4; i++) { const g = new THREE.Group(), w = new THREE.Mesh(new THREE.OctahedronGeometry(3, 0), new THREE.MeshStandardMaterial({ color: 0x3a4a8a, emissive: 0x1a2a6a, emissiveIntensity: 0.6, flatShading: true })); w.scale.set(2, 0.15, 1.3); g.add(w); const e = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.08, 4, 4), mGlow(0x6fd8ff)); e.rotation.x = Math.PI / 2; e.rotation.z = Math.PI / 4; e.scale.set(1.9, 1.25, 1); g.add(e); surf.add(g); const c = new V3(rand(-200, 200), 0, rand(-300, 100)); c.y = seaFloor(c.x, c.z) + 15; SEA.rays.push({ g, c, a: rand(0, TAU), r: rand(25, 50) }); }
+  for (let i = 0; i < 6; i++) { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), smat(0x2a2030)); b.scale.z = 1.4; g.add(b); const lure = glowSprite(0x9fffe8, 2.2); lure.position.set(0, 1.2, -1.6); g.add(lure); const x = rand(-60, 60), z = CZ + rand(40, 140); g.position.set(x, seaFloor(x, z) + rand(4, 14), z); surf.add(g); SEA.anglers.push({ g, base: g.position.clone(), ph: rand(0, TAU) }); }
+  buildCity();
+  SEA.sub = makeSub(); surf.add(SEA.sub);
+  SEA.spot = new THREE.SpotLight(0xfff4d8, 0, 110, 0.55, 0.5, 1.2); surf.add(SEA.spot); surf.add(SEA.spot.target);
+  SEA.lamp = new THREE.PointLight(0xfff4d8, 0, 18); surf.add(SEA.lamp);
+  S.astro = makeAstronaut(); S.astro.g.visible = false; surf.add(S.astro.g); S.drone = makeDrone(); S.drone.visible = false; surf.add(S.drone);
+}
+SEA_W.build = buildSea;
+function buildCity() {
+  const cy = CITY_Y(), stone = new THREE.MeshStandardMaterial({ color: 0x5a6a7a, roughness: 0.6, metalness: 0.2, emissive: 0x0a1a2a, emissiveIntensity: 0.4 }), glowT = mGlow(0x9fffe8), glowP = mGlow(0xff9ad8);
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; };
+  add(new THREE.CylinderGeometry(60, 64, 2, 32), stone, 0, cy - 0.5, CZ + 50);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU, x = Math.cos(a) * 52, z = CZ + 50 + Math.sin(a) * 52; if (Math.sin(a) > 0.7) continue; add(new THREE.CylinderGeometry(1.6, 2.4, rand(26, 46), 6), stone, x, cy + 15, z); const t = add(new THREE.OctahedronGeometry(2.2, 0), i % 2 ? glowT : glowP, x, cy + 40, z); t.scale.y = 2; }
+  for (let i = 0; i < 5; i++) { const x = rand(-40, 40), z = CZ + 50 + rand(-30, 30); if (Math.abs(x) < 18) continue; const d = add(new THREE.SphereGeometry(rand(6, 10), 16, 10, 0, TAU, 0, Math.PI / 2), stone, x, cy, z); d.scale.y = 0.8; add(new THREE.TorusGeometry(d.geometry.parameters.radius * 1.01, 0.3, 6, 32), glowT, x, cy + 0.5, z).rotation.x = Math.PI / 2; }
+  // the temple: a long hall with three doors
+  const len = 115, zc = CZ - 36;
+  for (const s of [-1, 1]) add(new THREE.BoxGeometry(2, 20, len), stone, s * 14, cy + 10, zc);
+  add(new THREE.BoxGeometry(30, 2, len), stone, 0, cy + 20, zc); add(new THREE.BoxGeometry(30, 20, 2), stone, 0, cy + 10, CZ - 94);
+  for (let z = CZ + 15; z > CZ - 92; z -= 9) for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.3, 8, 0.6), glowT, s * 12.9, cy + 9, z);
+  [[CZ + 5, 0x9fffe8], [CZ - 30, 0xff9ad8], [CZ - 72, 0xffe0a0]].forEach(([z, c]) => { const L = new THREE.PointLight(c, 1.6, 50); L.position.set(0, cy + 14, z); surf.add(L); });
+  const facade = add(new THREE.BoxGeometry(34, 26, 3), stone, 0, cy + 13, CZ + 22); facade.visible = true;
+  SEA.facadeHole = add(new THREE.BoxGeometry(22, 17, 3.4), new THREE.MeshBasicMaterial({ color: 0x020408 }), 0, cy + 8.5, CZ + 22);
+  SDOOR_Z.forEach((z, i) => {
+    const d = add(new THREE.CylinderGeometry(10, 10, 1.6, 32), stone, 0, cy + 9, z); d.rotation.x = Math.PI / 2;
+    const tex = canvasTex(128, 128, (c) => { c.fillStyle = '#1a2a3a'; c.fillRect(0, 0, 128, 128); glyphDraw(c, 200 + DOOR_WORDS[i].w * 3, 16, 16, 96, '#ff9ad8'); });
+    const face = new THREE.Mesh(new THREE.CircleGeometry(6, 32), new THREE.MeshBasicMaterial({ map: tex })); face.position.set(0, cy + 9, z + 0.85); surf.add(face);
+    const ring = add(new THREE.TorusGeometry(10, 0.4, 6, 40), glowP, 0, cy + 9, z + 0.8);
+    SEA.doors.push({ d, face, ring, z, open: 0 });
+  });
+  // the hall of memory
+  const mural = canvasTex(1024, 512, (c, w, h) => {
+    const sky = c.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#120a2a'); sky.addColorStop(0.5, '#3a1a5a'); sky.addColorStop(0.55, '#1a6a8a'); sky.addColorStop(1, '#0a2a3a'); c.fillStyle = sky; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 160; i++) { c.fillStyle = `rgba(255,255,255,${Math.random() * 0.8})`; c.fillRect(Math.random() * w, Math.random() * h * 0.5, 2, 2); }
+    const whale = (x, y, s, a) => { c.save(); c.translate(x, y); c.rotate(a); c.scale(s, s); c.fillStyle = '#6fd8ff'; c.shadowColor = '#9fffe8'; c.shadowBlur = 20; c.beginPath(); c.ellipse(0, 0, 60, 20, 0, 0, TAU); c.fill(); c.beginPath(); c.moveTo(55, 0); c.lineTo(90, -18); c.lineTo(80, 0); c.lineTo(90, 18); c.closePath(); c.fill(); c.restore(); };
+    whale(220, 400, 1.2, -0.5); whale(420, 300, 1, -0.7); whale(620, 190, 0.8, -0.8); whale(800, 90, 0.6, -0.9);
+    c.strokeStyle = 'rgba(255,154,216,.8)'; c.lineWidth = 6; c.shadowColor = '#ff9ad8'; c.shadowBlur = 18; c.beginPath(); c.moveTo(120, 470); c.bezierCurveTo(400, 380, 700, 200, 960, 40); c.stroke();
+    c.shadowBlur = 0; c.fillStyle = '#ffe0a0'; for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(100 + i * 50, 470, 8, 0, TAU); c.fill(); }
+  });
+  const mu = add(new THREE.PlaneGeometry(24, 12), new THREE.MeshBasicMaterial({ map: mural }), 0, cy + 10, CZ - 92.9);
+  add(new THREE.CylinderGeometry(3, 4, 3, 8), stone, 0, cy + 1.5, CZ - 76);
+  SEA.crystal = add(new THREE.OctahedronGeometry(2.4, 0), new THREE.MeshStandardMaterial({ color: 0x9fffe8, emissive: 0x4fffe0, emissiveIntensity: 0.6, flatShading: true, transparent: true, opacity: 0.9 }), 0, cy + 6, CZ - 76); SEA.crystal.scale.y = 1.8;
+  SEA.crystalGlow = glowSprite(0x9fffe8, 10); SEA.crystalGlow.position.set(0, cy + 6, CZ - 76); surf.add(SEA.crystalGlow);
+  // Oro the deep guardian
+  const oro = { segs: [], head: new V3(0, cy + 30, CZ + 160), a: 0 }, bodyM = new THREE.MeshStandardMaterial({ color: 0x2a8a9a, roughness: 0.4, emissive: 0x0a3a4a, emissiveIntensity: 0.6 }), finM = new THREE.MeshStandardMaterial({ color: 0x9fffe8, emissive: 0x4fffe0, emissiveIntensity: 0.8, transparent: true, opacity: 0.75, side: THREE.DoubleSide });
+  for (let i = 0; i < 20; i++) { const r = i === 0 ? 4.5 : 4 * (1 - i / 26), g = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), bodyM); b.scale.z = 1.4; g.add(b); if (i % 2 === 0) { const f = new THREE.Mesh(new THREE.CircleGeometry(r * 1.2, 3, 0, Math.PI), finM); f.position.y = r * 0.8; f.rotation.y = Math.PI / 2; g.add(f); { const gs = glowSprite(0x9fffe8, r * 1.5); gs.position.set(0, r * 0.6, 0); g.add(gs); } }
+    if (i === 0) { for (const s of [-1, 1]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8), new THREE.MeshStandardMaterial({ color: 0xfff6e0, emissive: 0xffe0a0, emissiveIntensity: 0.8 })); eye.position.set(s * 2.6, 1.6, -3.2); g.add(eye); const pu = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), mStd(0x101018)); pu.position.set(s * 2.7, 1.7, -4.1); g.add(pu); const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.02, 7, 4), finM); wh.position.set(s * 3, -0.8, -4); wh.rotation.set(0.6, 0, s * 1.2); g.add(wh); } const smile = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.18, 6, 16, Math.PI), mStd(0x0a2a30)); smile.position.set(0, -1.4, -5.6); smile.rotation.z = Math.PI; g.add(smile); }
+    g.position.copy(oro.head).add(new V3(0, 0, i * 5)); surf.add(g); oro.segs.push(g); }
+  SEA.oro = oro;
+}
+// sub physics and camera
+const subFwd = new V3(), subRight = new V3();
+function seaLegal(p) {
+  if (p.y > -0.8 || Math.hypot(p.x, p.z) > 920) return false;
+  if (p.y < seaFloor(p.x, p.z) + 1.2) return false;
+  const cy = CITY_Y();
+  if (Math.abs(p.x) < 16 && p.z < CZ + 23.5 && p.z > CZ - 96 && p.y < cy + 22) {
+    const inC = Math.abs(p.x) < 12 && p.y > cy + 0.8 && p.y < cy + 18 && p.z < CZ + 23.5 && p.z > CZ - 92;
+    if (!inC) return false;
+    if (p.z < SDOOR_Z[0] + 1.5 && !G.sea.doors[0]) return false;
+    if (p.z < SDOOR_Z[1] + 1.5 && !G.sea.doors[1]) return false;
+    if (p.z < SDOOR_Z[2] + 1.5 && !G.sea.doors[2]) return false;
+    if (p.z > CZ + 20 && !G.sea.doors[0]) return false;
+  }
+  if (G.sea.oro < 2 && Math.abs(p.x) < 30 && p.z > CZ + 23 && p.z < CZ + 52 && p.y < cy + 30) return false;
+  for (const c of S.colliders) if (p.y < c.top && Math.hypot(p.x - c.x, p.z - c.z) < c.r + 1.2) return false;
+  return true;
+}
+function subUpdate(dt) {
+  let mx = 0, mz = 0, my = 0;
+  if (keys.KeyW || keys.ArrowUp) mz -= 1; if (keys.KeyS || keys.ArrowDown) mz += 1;
+  if (keys.KeyA || keys.ArrowLeft) mx -= 1; if (keys.KeyD || keys.ArrowRight) mx += 1;
+  if (isTouch && (stick.x || stick.y)) { mx = stick.x; mz = stick.y; }
+  if (keys.Space || touchBtn.jet) my += 1; if (keys.ShiftLeft || keys.ShiftRight) my -= 1;
+  const p = S.pitch - 0.3, cp = Math.cos(p);
+  subFwd.set(-Math.sin(S.yaw) * cp, -Math.sin(p), -Math.cos(S.yaw) * cp); subRight.set(Math.cos(S.yaw), 0, -Math.sin(S.yaw));
+  const want = new V3().addScaledVector(subFwd, -mz).addScaledVector(subRight, mx); want.y += my; if (want.lengthSq() > 1) want.normalize();
+  const spd = SUB_SPD[G.craft.subprop || 0];
+  S.vel.lerp(want.multiplyScalar(spd), Math.min(1, dt * 1.8));
+  // move one axis at a time so the sub slides along walls
+  for (const ax of ['x', 'y', 'z']) { const old = S.pos[ax]; S.pos[ax] += S.vel[ax] * dt; if (!seaLegal(S.pos)) { S.pos[ax] = old; S.vel[ax] *= -0.2; } }
+  if (!seaLegal(S.pos)) { const f = seaFloor(S.pos.x, S.pos.z) + 1.3; if (S.pos.y < f) S.pos.y = f; if (S.pos.y > -0.8) S.pos.y = -0.9; }
+  const sub = SEA.sub; sub.position.copy(S.pos);
+  const hv = Math.hypot(S.vel.x, S.vel.z); if (hv > 0.5) S.heading = lerpAngle(S.heading, Math.atan2(-S.vel.x, -S.vel.z), dt * 3); else if (mz) S.heading = lerpAngle(S.heading, S.yaw, dt * 2);
+  sub.rotation.set(clamp(S.vel.y * 0.05, -0.4, 0.4), S.heading, Math.sin(T * 1.3) * 0.04);
+  sub.userData.prop.rotation.z += dt * (4 + S.vel.length() * 2);
+  // lights
+  const depth = -S.pos.y, k = clamp(depth / 220, 0, 1);
+  const f = new V3(0, 0, -1).applyEuler(sub.rotation);
+  SEA.spot.position.copy(S.pos).addScaledVector(f, 1.6); SEA.spot.target.position.copy(S.pos).addScaledVector(f, 30); SEA.spot.intensity = SEA.lights ? 3.2 : 0; SEA.lamp.position.copy(S.pos).addScaledVector(f, 2.5); SEA.lamp.intensity = SEA.lights ? 1.2 : 0;
+  if (!SEA.lights && depth > 45 && !SEA.lightTip) { SEA.lightTip = true; say(`It is getting dark down here. Press ${isTouch ? 'the SCAN button twice' : 'H'} to turn on your headlights.`); }
+  // air
+  const surfaceNow = S.pos.y > -2.5;
+  let vent = null; for (const v of SEA.vents) if (Math.hypot(S.pos.x - v.x, S.pos.z - v.z) < 6 && S.pos.y < v.y + 62) { vent = v; break; }
+  if (surfaceNow) SEA.air = Math.min(100, SEA.air + 35 * dt); else if (vent) { SEA.air = Math.min(100, SEA.air + 22 * dt); if (Math.random() < dt * 4) sfx('pickup', 0.2); } else SEA.air = Math.max(0, SEA.air - SUB_AIR[G.craft.subair || 0] * dt);
+  if (SEA.air < 25 && !surfaceNow && !vent && T - SEA.warnT > 8) { SEA.warnT = T; say('Air is running low! Swim up to the surface or into a bubble vent.', 'bad'); sfx('fail'); }
+  if (SEA.air <= 0) { S.pos.set(0, -2, 10); S.vel.set(0, 0, 0); SEA.air = 100; say('Out of air! Your sub blew its emergency floats and popped back up by your dock. Nothing was lost.', 'bad'); sfx('fail'); }
+  G.sea.deepest = Math.max(G.sea.deepest, Math.round(depth));
+  if (depth > 150 && !G.sea.deepLog) { G.sea.deepLog = true; logAdd(['The deep dark', `My sub went down past 150 meters today. Without headlights it is black as space down there. But things glow. Lots of things glow.`]); }
+  S.near = null; let nd = 5;
+  for (const it of S.items) { const d = it.obj.position.distanceTo(S.pos); if (d < nd) { nd = d; S.near = it; } }
+  S.scanCd = Math.max(0, S.scanCd - dt);
+}
+function subCamera(dt) {
+  const tgt = tmp.copy(S.pos).add(new V3(0, 1, 0)), d = 9, cp = Math.cos(S.pitch);
+  if (keys.KeyQ) S.yaw += dt * 1.8; if (keys.KeyZ) S.yaw -= dt * 1.8;
+  const want = tmp2.set(tgt.x + Math.sin(S.yaw) * cp * d, tgt.y + Math.sin(S.pitch) * d, tgt.z + Math.cos(S.yaw) * cp * d);
+  want.y = Math.min(want.y, -0.4); const fl = seaFloor(want.x, want.z) + 1; if (want.y < fl) want.y = fl;
+  camera.position.lerp(want, 1 - Math.exp(-dt * 10)); camera.up.set(0, 1, 0); camera.lookAt(tgt);
+}
+{ const _us = updateSurface; updateSurface = function (dt) { if (W === SEA_W) { subUpdate(dt); return; } _us(dt); }; }
+{ const _usc = updateSurfCamera; updateSurfCamera = function (dt) { if (W === SEA_W) { subCamera(dt); return; } _usc(dt); }; }
+{ const _upt = updatePet; updatePet = function (dt) { if (W === SEA_W) { if (PET.obj) PET.obj.visible = false; return; } if (PET.obj) PET.obj.visible = true; _upt(dt); }; }
+SEA_W.update = function (dt) {
+  const depth = -S.pos.y, k = clamp(depth / 220, 0, 1);
+  SEA.fogC.setHex(0x2a90a8).lerp(new THREE.Color(0x01040a), Math.pow(k, 0.7));
+  surf.fog.color.copy(SEA.fogC); surf.background.copy(SEA.fogC);
+  surf.fog.far = (220 - k * 170) + (SEA.lights ? 35 : 0); surf.fog.near = 2;
+  S.hemi.intensity = 0.85 * (1 - k) + (SEA.lights ? 0.2 : 0.1); S.sun.intensity = 0.8 * Math.pow(1 - k, 2); S.moonLight.intensity = 0;
+  SEA.shafts.forEach((s, i) => { s.material.opacity = 0.06 * (1 - k); s.rotation.z = 0.25 + Math.sin(T * 0.3 + i) * 0.05; });
+  SEA.kelp.forEach(q => { q.g.rotation.z = Math.sin(T * 0.8 + q.ph) * 0.08; q.g.rotation.x = Math.cos(T * 0.6 + q.ph) * 0.06; });
+  SEA.jelly.forEach(j => { j.g.position.y = j.y + Math.sin(T * 0.6 + j.ph) * 3; j.g.scale.y = 1 + Math.sin(T * 2.2 + j.ph) * 0.12; });
+  SEA.schools.forEach(s => { s.a += dt * 0.25; const c = tmp.set(s.c.x + Math.cos(s.a) * s.r, s.c.y + Math.sin(s.a * 2) * 3, s.c.z + Math.sin(s.a) * s.r); s.fish.forEach(f => f.f.position.copy(c).add(tmp2.copy(f.o).applyAxisAngle(UP, T * 0.8 + f.ph))); });
+  SEA.rays.forEach(r => { r.a += dt * 0.12; r.g.position.set(r.c.x + Math.cos(r.a) * r.r, r.c.y + Math.sin(r.a * 3) * 2, r.c.z + Math.sin(r.a) * r.r); r.g.rotation.y = -r.a; r.g.children[0].scale.y = 0.15 + Math.sin(T * 2) * 0.05; r.g.rotation.z = Math.sin(T * 2) * 0.15; });
+  SEA.anglers.forEach(a => { a.g.position.x = a.base.x + Math.sin(T * 0.4 + a.ph) * 4; a.g.rotation.y = Math.cos(T * 0.4 + a.ph) > 0 ? Math.PI / 2 : -Math.PI / 2; });
+  SEA.vents.forEach(v => v.bubbles.forEach(b => { b.position.y += dt * 6; if (b.position.y > Math.min(-0.5, v.y + 62)) b.position.y = v.y + 1; }));
+  SEA.doors.forEach((d, i) => { if (G.sea.doors[i] && d.open < 1) { d.open = Math.min(1, d.open + dt * 0.5); } const y = CITY_Y() + 9 - d.open * 20; d.d.position.y = y; d.face.position.y = y; d.ring.position.y = y; });
+  SEA.facadeHole.material.color.setHex(G.sea.doors[0] ? 0x020408 : 0x020408);
+  if (SEA.crystal) { SEA.crystal.rotation.y += dt * 0.6; SEA.crystal.material.emissiveIntensity = G.sea.secret ? 1.6 : 0.6 + Math.sin(T * 2) * 0.2; SEA.crystalGlow.scale.setScalar(G.sea.secret ? 22 : 10 + Math.sin(T * 2) * 2); }
+  oroUpdate(dt);
+};
+function oroUpdate(dt) {
+  if (!SEA.oro) return;
+  const o = SEA.oro, cy = CITY_Y(), gate = new V3(0, cy + 12, CZ + 40), near = S.pos.distanceTo(gate) < 170;
+  let tgt;
+  if (G.sea.oro < 2 && near) { tgt = gate.clone().add(new V3(Math.sin(T * 0.5) * 8, Math.sin(T * 0.7) * 3, 6)); if (G.sea.oro === 0 && S.pos.distanceTo(o.head) < 70) { G.sea.oro = 1; sfx('ring'); showComms('Oro the Deep Guardian', `*a deep, friendly rumble* ${sylSay('{0}... {3}.')} (A giant sea serpent with kind eyes blocks the gate. It sniffs at your sub hopefully. It seems hungry for something that glows. Maybe the Glow-pearls in the giant clams of the kelp forests?)`); logAdd(['Oro', 'Deep down there is a city, and guarding it is a sea monster the size of a train. It has a smile. And whiskers. I named it Oro. I think it wants a snack.']); save(); } }
+  else { o.a += dt * 0.12; tgt = new V3(Math.cos(o.a) * 110, cy + 32 + Math.sin(o.a * 3) * 8, CZ + Math.sin(o.a) * 110); }
+  const to = tgt.sub(o.head), d = to.length(); if (d > 0.5) o.head.addScaledVector(to.normalize(), Math.min(d, (G.sea.oro < 2 && near ? 14 : 9) * dt));
+  o.segs[0].position.copy(o.head); if (d > 0.5) turnToward(o.segs[0], tgt.add(o.head), dt * 2);
+  for (let i = 1; i < o.segs.length; i++) { const a = o.segs[i - 1].position, b = o.segs[i].position, dir = b.clone().sub(a); const L = dir.length() || 1; b.copy(a).addScaledVector(dir.divideScalar(L), 4.6); b.y += Math.sin(T * 1.5 - i * 0.5) * 0.08; o.segs[i].lookAt(a); o.segs[i].rotateY(Math.PI); }
+}
+// interactions
+const SEA_DOOR = { open: false, kind: null, i: 0 };
+function seaPrompt() {
+  const key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>';
+  if (S.near) return S.near.type === 'pearl' ? `${key} to take the Glow-pearl from the giant clam` : `${key} to open the treasure chest of the ${WRECKS[S.near.wreck].name}`;
+  if (S.pos.y > -3 && Math.hypot(S.pos.x, S.pos.z) < 18) return `${key} to climb out at your sub dock`;
+  const o = SEA.oro; if (G.sea.oro === 1 && S.pos.distanceTo(o.head) < 40) return `${key} to say hello to Oro (${G.sea.pearls} of 3 Glow-pearls)`;
+  const cy = CITY_Y();
+  for (let i = 0; i < 3; i++) if (!G.sea.doors[i] && Math.abs(S.pos.z - (SDOOR_Z[i] + 5)) < 6 && Math.abs(S.pos.x) < 12 && S.pos.y < cy + 22) return `${key} to speak a Sylari word to the door`;
+  if (!G.sea.secret && G.sea.doors[2] && S.pos.distanceTo(SEA.crystal.position) < 9) return `${key} to wake the memory crystal`;
+  if (S.pos.y > -3) return 'You are at the surface. Air refilled! Your dock is at the marker.';
+  return '';
+}
+function seaInteract() {
+  if (S.near) {
+    const it = S.near; surf.remove(it.obj); S.items.splice(S.items.indexOf(it), 1); S.near = null;
+    if (it.type === 'pearl') { G.sea.clams[it.clam] = true; G.sea.pearls++; sfx('win'); say(`You found a Glow-pearl! (${G.sea.pearls} of 3)${G.sea.oro ? ' Oro will love it.' : ''}`, 'good'); }
+    else { const w = WRECKS[it.wreck]; G.sea.chests[it.wreck] = true; const got = Object.entries(w.loot).map(([k, n]) => { if (k === 'cr') G.credits += n; else G.mats[k] += n; return k === 'cr' ? `${n.toLocaleString()} cr` : `${n} ${MATS[k].name}`; }); sfx('win'); say(`Treasure from the ${w.name}: ${got.join(', ')}!`, 'good');
+      if (it.wreck === 2) setTimeout(() => showComms('Captain’s note in the chest', 'Soggy old paper, still readable: "We followed the glowing lights down the deep valley, south of here. There is a CITY down there, under the sea. And something big guards it. Bring something shiny." The trench marker has been added to your sub.'), 800);
+      if (G.sea.chests.filter(Boolean).length === 1) logAdd(['Sunken treasure', `I found the wreck of the ${w.name} and pried open its treasure chest. Gold! Real pirate gold, at the bottom of the sea.`]); }
+    save(); return;
+  }
+  if (S.pos.y > -3 && Math.hypot(S.pos.x, S.pos.z) < 18) { leaveSea(); return; }
+  const o = SEA.oro;
+  if (G.sea.oro === 1 && S.pos.distanceTo(o.head) < 40) {
+    if (G.sea.pearls >= 3) { G.sea.oro = 2; G.sea.pearls -= 3; sfx('win'); showComms('Oro the Deep Guardian', `*the happiest rumble you have ever heard* ${sylSay('{11}! {11}, {1}!')} Oro gobbles the three Glow-pearls, does a slow loop-the-loop and swims aside. The gate to the sunken city is open. The doors inside listen for Sylari words.`); logAdd(['Oro’s snack', 'I fed Oro three Glow-pearls. It did a loop-the-loop. Then it let me into the city. Best sea monster ever.']); }
+    else { sfx('ui'); say(`Oro sniffs your sub and looks a bit sad. It wants Glow-pearls: ${G.sea.pearls} of 3. Try the giant clams in the kelp forests.`); }
+    save(); return;
+  }
+  const cy = CITY_Y();
+  for (let i = 0; i < 3; i++) if (!G.sea.doors[i] && Math.abs(S.pos.z - (SDOOR_Z[i] + 5)) < 6 && Math.abs(S.pos.x) < 12 && S.pos.y < cy + 22) { openDoorUI('door', i); return; }
+  if (!G.sea.secret && G.sea.doors[2] && S.pos.distanceTo(SEA.crystal.position) < 9) { openDoorUI('crystal', 0); return; }
+}
+{ const _hv2 = harvest; harvest = function () {
+  if (G.state !== 'surface') return _hv2();
+  if (W === SEA_W) { seaInteract(); return; }
+  if (!S.build && !S.near && nearDock()) { enterSea(); return; }
+  _hv2();
+}; }
+{ const _sc = scan; scan = function () {
+  if (W !== SEA_W) return _sc();
+  if (S.scanCd > 0) return; S.scanCd = 4; sfx('scan');
+  const near = []; SEA.jelly.forEach(j => { if (j.g.position.distanceTo(S.pos) < 45) near.push(j.sp); }); SEA.schools.forEach(s => { if (s.fish[0].f.position.distanceTo(S.pos) < 45) near.push('lanternfish'); }); SEA.rays.forEach(r => { if (r.g.position.distanceTo(S.pos) < 55) near.push('glowray'); }); SEA.anglers.forEach(a => { if (a.g.position.distanceTo(S.pos) < 45) near.push('angler'); });
+  const fresh = [...new Set(near)].filter(k => !G.sea.species[k]);
+  if (!fresh.length) { say(near.length ? 'You already know these creatures. Look for new ones deeper down.' : 'Nothing glowing in range. Swim closer to a creature.'); return; }
+  fresh.forEach(k => { G.sea.species[k] = true; G.credits += 150; say(`New sea creature: ${SPECIES[k].name}! ${SPECIES[k].fact} +150 cr`, 'good'); });
+  if (Object.keys(G.sea.species).length === Object.keys(SPECIES).length) { G.credits += 2000; say('You catalogued every glowing creature in the ocean! +2,000 cr', 'good'); logAdd(['Ocean naturalist', 'Moon jellies, lantern minnows, glow rays, abyss jellies and a very grumpy-looking angler. I have scanned them all.']); }
+  save();
+}; }
+addEventListener('keydown', e => { if (e.code === 'KeyH' && G.state === 'surface' && W === SEA_W && !e.repeat) { SEA.lights = !SEA.lights; sfx('ui'); say(`Headlights ${SEA.lights ? 'on' : 'off'}.`); } });
+{ let lastScanTap = 0; const tb = document.getElementById('tScanB'); if (tb) tb.addEventListener('click', () => { if (W !== SEA_W) return; const now = performance.now(); if (now - lastScanTap < 400) { SEA.lights = !SEA.lights; say(`Headlights ${SEA.lights ? 'on' : 'off'}.`); } lastScanTap = now; }); }
+// door word puzzle
+function openDoorUI(kind, i) {
+  SEA_DOOR.kind = kind; SEA_DOOR.i = i; const dw = kind === 'door' ? DOOR_WORDS[i] : CRYSTAL_WORD;
+  const wrong = SYL.map((_, k) => k).filter(k => k !== dw.w).sort(() => Math.random() - 0.5).slice(0, 3), opts = [dw.w].concat(wrong).sort(() => Math.random() - 0.5);
+  $('#sdTitle').textContent = kind === 'door' ? `Sealed door ${i + 1} of 3` : 'The memory crystal';
+  $('#sdClue').textContent = dw.clue;
+  $('#sdHelp').textContent = G.syl.learned.length ? 'Say the Sylari word that matches the carving. Words you know show their meaning.' : 'The door wants a word in Sylari, the language of the Lumen Veil. You could guess, or learn Sylari from Ooli in New Game+.';
+  $('#sdOpts').innerHTML = opts.map(k => `<button class="btn sd-opt" data-w="${k}">${SYL[k].s}${sylKnown(k) ? `<small>${SYL[k].en}</small>` : ''}</button>`).join('');
+  $('#sdStatus').textContent = ''; $('#comms').hidden = true; setState('door'); $('#seaDoor').hidden = false; sfx('ui');
+}
+function closeDoorUI() { $('#seaDoor').hidden = true; if (G.state === 'door') setState('surface'); }
+$('#sdOpts').addEventListener('click', e => {
+  const b = e.target.closest('.sd-opt'); if (!b) return; const w = +b.dataset.w, dw = SEA_DOOR.kind === 'door' ? DOOR_WORDS[SEA_DOOR.i] : CRYSTAL_WORD;
+  if (w !== dw.w) { sfx('fail'); $('#sdStatus').textContent = `“${SYL[w].s}”... the carving stays dark. Try another word.`; b.disabled = true; return; }
+  sfx('win');
+  if (SEA_DOOR.kind === 'door') { G.sea.doors[SEA_DOOR.i] = true; $('#sdStatus').textContent = `“${SYL[w].s}”! The carving glows and the stone door rolls open.`; if (SEA_DOOR.i === 0) logAdd(['The sunken city', 'I spoke a Sylari word to a door at the bottom of the ocean, and it opened. The Sylari were here once. Or someone who spoke like them.']); }
+  else { $('#sdStatus').textContent = 'The crystal blazes with light...'; setTimeout(revealSecret, 900); }
+  save(); if (SEA_DOOR.kind === 'door') setTimeout(closeDoorUI, 1300);
+});
+$('#sdClose').addEventListener('click', closeDoorUI);
+function revealSecret() {
+  G.sea.secret = true; G.credits += 15000; if (!G.paints.includes('pearl')) G.paints.push('pearl');
+  const friend = G.wq && G.wq.friend;
+  $('#secretBody').innerHTML = `<p>The crystal shows a memory, like a dream you can see.</p>
+  <p>Long, long ago, before the stations and the pirates and the Reach, <b>the whales lived here</b>, in the warm oceans of Verdance. The Old Ones, who built the ruin in the Abyss, loved them and sang with them.</p>
+  <p>Then a great hunger came out of the dark. <b>The Devourer.</b> It wanted to swallow the whole ocean.</p>
+  <p>So the Old Ones poured <b>Void light</b> into the sea, and the whales learned to swim through the stars. They fled to a place of soft pink light, far away, where the Devourer could not follow: <b>the Lumen Veil</b>. The Old Ones stayed behind to put the Devourer to sleep, and built the Guardian to keep it that way.</p>
+  <p>The whales never came home. But every whale still remembers the sea. <b>That is why they sing.</b></p>
+  ${friend ? `<p class="secret-friend">Far away, ${friend} the whale suddenly sings louder than ever. Maybe ${friend} heard it too.</p>` : ''}
+  <div class="end-rewards"><span class="chip ok">+15,000 cr</span><span class="chip ok">Ocean pearl paint</span><span class="chip ok">The whales' secret</span></div>`;
+  $('#comms').hidden = true; $('#seaDoor').hidden = true; setState('door'); $('#seaSecret').hidden = false; sfx('ring');
+  logAdd(['Where the whales came from', 'The space whales were born in the oceans of Verdance. When the Devourer came, the Old Ones gave them Void light and the whales swam up into the stars. Every whale song is a song about the sea. I think I am going to cry a little.']);
+  save();
+}
+$('#secretClose').addEventListener('click', () => { $('#seaSecret').hidden = true; if (G.state === 'door') setState('surface'); if (G.syl.fluent && G.ngp && G.ngp.level) setTimeout(() => showComms('Ooli of the Sylari', `${sylSay('{0}, {1}...')} You found the old sea home of the whales? The whole Bloom is singing about it. ${sylSay('{11}, {1}. {11}.')}`), 1500); });
+// entering and leaving
+function enterSea() {
+  const b = nearDock(); if (!b) return; G.sea.dockAt = { x: b.obj.position.x, z: b.obj.position.z };
+  if (S.build) toggleBuild();
+  arkTransition(() => {
+    useWorld(SEA_W); W.build();
+    renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 64; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
+    S.pos.set(0, -3, 8); S.vel.set(0, 0, 0); S.heading = 0; S.yaw = 0; S.pitch = 0.25; SEA.air = 100; G.sea.dives++;
+    $('#heatRow').hidden = false; $('#heatRow span').textContent = 'Air'; $('#bFuel').closest('.bar').querySelector('span').textContent = 'Depth';
+    setState('surface'); subCamera(1);
+    say(G.sea.dives === 1 ? 'Splash! Your mini-sub slips under the waves. Watch your air, and press H for headlights when it gets dark.' : 'Diving into the Verdance ocean.', 'good');
+    if (G.sea.dives === 1) logAdd(['First dive', 'I built a little yellow submarine and drove it straight into the ocean. Fish everywhere. Kelp taller than houses. I can hear my own heartbeat.']);
+  }, 'Diving');
+  $('#entryTitle').textContent = 'Verdance Ocean';
+}
+function leaveSea() {
+  arkTransition(() => {
+    useWorld(VERD_W); renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 62; camera.updateProjectionMatrix();
+    const d = G.sea.dockAt || { x: PAD.x + 10, z: PAD.z + 10 }; S.pos.set(d.x + 3, Math.max(hgt(d.x + 3, d.z + 3), 0), d.z + 3); S.vel.set(0, 0, 0);
+    if (S.astro) S.astro.g.visible = true; S.heat = 100; $('#bFuel').closest('.bar').querySelector('span').textContent = 'Jetpack'; setState('surface'); updateSurfCamera(1);
+    say(`Back on dry land. Deepest dive so far: ${G.sea.deepest} m.`, 'good'); save();
+  }, 'Surfacing');
+  $('#entryTitle').textContent = 'Verdance';
+}
+{ const _ush = updateSurfHUD; updateSurfHUD = function () {
+  _ush(); if (W !== SEA_W) return;
+  setPrompt(seaPrompt());
+  $('#bHeat').style.width = SEA.air + '%'; $('#tHeat').textContent = Math.round(SEA.air);
+  $('#bFuel').style.width = clamp(-S.pos.y / 260 * 100, 0, 100) + '%'; $('#tFuel').textContent = Math.round(-S.pos.y) + ' m';
+  $('#sDisc').textContent = `${Object.keys(G.sea.species).length} of ${Object.keys(SPECIES).length} sea creatures scanned · ${G.sea.chests.filter(Boolean).length} of 3 treasures · headlights ${SEA.lights ? 'on' : 'off'}`;
+  $('#frostV').style.opacity = clamp((30 - SEA.air) / 30, 0, 0.8);
+}; }
+SEA_W.surfMarkers = function () {
+  const m = (id, cls, label, p) => { const el = marker(id, cls, label); el.querySelector('.dst').textContent = fmtD(S.pos.distanceTo(p)); placeMarker(el, p); };
+  m('sea-dock', 'station', 'Your dock (surface)', tmp.set(0, -1, 0));
+  SEA.vents.forEach((v, i) => { const p = new V3(v.x, v.y + 4, v.z); if (S.pos.distanceTo(p) < 140) m('sea-v' + i, 'friendly', 'Bubble vent (air)', p); });
+  WRECKS.forEach((w, i) => { const p = new V3(w.x, SEA.wrecks[i].y + 6, w.z), d = S.pos.distanceTo(p); if (d < 200) G.sea.seen['w' + i] = true; if (G.sea.seen['w' + i]) m('sea-w' + i, G.sea.chests[i] ? 'friendly' : 'target', w.name, p); });
+  if (G.sea.chests[2] || S.pos.z < -420) m('sea-city', 'target', G.sea.oro >= 2 ? 'Sunken city' : 'Strange glow in the deep', new V3(0, CITY_Y() + 20, CZ + 40));
+  if (G.sea.oro === 1) m('sea-oro', 'friendly', 'Oro', SEA.oro.head);
+};
+{ const _ss3 = setState; setState = function (s) { _ss3(s); if (s !== 'surface' || W !== SEA_W) { const hr = document.getElementById('heatRow'); if (hr && W !== SEA_W && !(W.cold || W.hot)) hr.hidden = true; } }; }
+
+/* ============ visual upgrade: teal nebula, cloudy planets, engine streaks, floating rocks ============ */
+// 1. teal nebula clouds over the Ember Reach sky and a brighter, whiter sun
+{
+  const cv = TEX_SKY.image, g = cv && cv.getContext ? cv.getContext('2d') : null;
+  if (g) {
+    const W2 = cv.width, H2 = cv.height; g.save(); g.fillStyle = 'rgba(6,40,52,0.55)'; g.fillRect(0, 0, W2, H2); g.globalCompositeOperation = 'lighter';
+    const blob = (x, y, r, col, a) => { for (const dx of [-W2, 0, W2]) { if (x + dx + r < 0 || x + dx - r > W2) continue; const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, r); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.beginPath(); g.arc(x + dx, y, r, 0, TAU); g.fill(); } };
+    for (let i = 0; i < 320; i++) { const t = Math.random(); blob(t * W2, H2 * (0.42 + Math.sin(t * TAU * 1.5) * 0.12) + (Math.random() - 0.5) * H2 * 0.3, rand(60, 300), pick(['40,200,190', '30,160,170', '70,230,210', '20,120,150']), rand(0.04, 0.09)); }
+    for (let i = 0; i < 5000; i++) { const bb = Math.pow(Math.random(), 3); g.fillStyle = `rgba(230,250,255,${0.15 + bb * 0.7})`; g.fillRect(Math.random() * W2, Math.random() * H2, bb > 0.85 ? 2.4 : 1.4, bb > 0.85 ? 2.4 : 1.4); }
+    for (let i = 0; i < 40; i++) blob(Math.random() * W2, Math.random() * H2, rand(150, 420), '20,110,120', rand(0.02, 0.04));
+    g.restore(); TEX_SKY.needsUpdate = true;
+  }
+  Object.assign(SYS.ember, { sunColor: 0xfff4e8, sunI: 2.0, sprite: 0xd8f4ff, sunScale: 9000, amb: 0x2a4450, hemi: [0x5fe0d8, 0x2a1a14], dust: 0xcff8f0 });
+  if (G.sys === 'ember') setSystem('ember');
+}
+// 2. swirling cloud layers and a big glowing edge on the planets
+function planetCloudTex(seed, col) {
+  return canvasTex(1024, 512, (g, W2, H2) => {
+    let s = seed; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    g.clearRect(0, 0, W2, H2);
+    for (let band = 0; band < 26; band++) {
+      const y = r() * H2, len = 200 + r() * 700, x0 = r() * W2, th = 6 + r() * 26;
+      for (let k = 0; k < 40; k++) { const x = x0 + (k / 40) * len, yy = y + Math.sin(k * 0.35 + band) * th * 1.4; for (const dx of [-W2, 0, W2]) { const gr = g.createRadialGradient(x + dx, yy, 0, x + dx, yy, th * 1.8); gr.addColorStop(0, `rgba(${col},${0.22 + r() * 0.2})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.beginPath(); g.arc(x + dx, yy, th * 1.8, 0, TAU); g.fill(); } }
+    }
+    for (let i = 0; i < 260; i++) { const x = r() * W2, y = r() * H2, rr = 4 + r() * 30; const gr = g.createRadialGradient(x, y, 0, x, y, rr); gr.addColorStop(0, `rgba(${col},${0.3 + r() * 0.3})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr, 0, TAU); g.fill(); }
+  });
+}
+const CLOUDS = [];
+function addClouds(pos, R, seed, col, halo, op = 1) {
+  const grp = scene.children.find(o => o.isGroup && o.position.distanceTo(pos) < 1 && o.children.length >= 2); if (!grp) return;
+  const tex = planetCloudTex(seed, col);
+  const m = new THREE.Mesh(new THREE.SphereGeometry(R * 1.018, 64, 48), new THREE.MeshStandardMaterial({ map: tex, alphaMap: tex, transparent: true, opacity: op, depthWrite: false, roughness: 1, metalness: 0 }));
+  m.rotation.z = rand(-0.3, 0.3); grp.add(m); CLOUDS.push({ m, sp: rand(0.004, 0.009) });
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(R * 1.13, 64, 48), new THREE.ShaderMaterial({
+    uniforms: { c: { value: new THREE.Color(halo) }, sun: { value: SUN_DIR } },
+    vertexShader: 'varying vec3 vN; varying vec3 vW; varying vec3 vC; void main(){ vC = (modelMatrix * vec4(0.0,0.0,0.0,1.0)).xyz; vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: 'uniform vec3 c; uniform vec3 sun; varying vec3 vN; varying vec3 vW; varying vec3 vC; void main(){ vec3 v = normalize(cameraPosition - vW); float k = clamp(-dot(v, vN), 0.0, 1.0); float rim = pow(k, 2.2) * 1.4; float lit = clamp(dot(normalize(vW - vC), sun) * 0.6 + 0.5, 0.15, 1.0); gl_FragColor = vec4(c * rim * lit * 0.28, 1.0); }',
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide }));
+  grp.add(glow);
+}
+addClouds(VERD.pos, VERD.R, 11, '255,255,255', 0x9ff4ff);
+addClouds(FROSTP.pos, FROSTP.R, 23, '240,250,255', 0xcff4ff);
+addClouds(new V3(-5200, -4200, -21000), 7000, 37, '255,236,220', 0xffb080, 0.45);
+addClouds(FROST_C.clone().add(new V3(-14000, 5000, -32000)), 9000, 41, '220,240,255', 0x8fd8ff);
+addClouds(PYREP.pos, PYREP.R, 53, '90,70,70', 0xff7a40);
+// 3. long blue engine streaks
+const STREAK_TEX = canvasTex(32, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.08, 'rgba(160,230,255,.9)'); gr.addColorStop(0.5, 'rgba(70,170,255,.35)'); gr.addColorStop(1, 'rgba(40,120,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); const sg = g.createLinearGradient(0, 0, w, 0); sg.addColorStop(0, 'rgba(0,0,0,1)'); sg.addColorStop(0.5, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,1)'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = sg; g.fillRect(0, 0, w, h); });
+const STREAK_GEO = (() => { const g = new THREE.PlaneGeometry(1, 1); g.translate(0, -0.5, 0); g.rotateX(-Math.PI / 2); return g; })();
+const STREAKS = { list: [], model: null, wp: new V3() };
+function makeStreak() {
+  const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ map: STREAK_TEX, color: 0x8fdcff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  const a = new THREE.Mesh(STREAK_GEO, mat), b = new THREE.Mesh(STREAK_GEO, mat); b.rotation.z = Math.PI / 2; g.add(a, b); g.userData.mat = mat; scene.add(g); return g;
+}
+function updateStreaks(dt) {
+  const eng = player.userData.engines || [];
+  if (STREAKS.model !== playerModel || STREAKS.list.length !== eng.length) { STREAKS.list.forEach(s => scene.remove(s)); STREAKS.list = eng.map(makeStreak); STREAKS.model = playerModel; }
+  const spd = P.vel.length(), on = (G.state === 'fly' || G.state === 'photo' || G.state === 'warp') && player.visible && spd > 25;
+  const len = (G.state === 'warp' ? 600 : clamp(spd * 0.28, 0, 160)) * Math.max(1, SH().r / 10), wid = Math.max(0.45, SH().r * 0.07);
+  const col = G.ship === 'aurum' ? 0xffd890 : 0x8fdcff;
+  STREAKS.list.forEach((s, i) => { s.visible = on; if (!on) return; eng[i].getWorldPosition(STREAKS.wp); s.position.copy(STREAKS.wp); s.quaternion.copy(player.quaternion); s.scale.set(wid, wid, len); s.userData.mat.color.setHex(col); s.userData.mat.opacity = clamp((spd - 25) / 120, 0.2, 1); });
+}
+// 4. floating rocks drifting past the ship
+const DEB_N = 240, DEB_R = 650;
+const debris = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.95, flatShading: true }), DEB_N);
+const DEB = Array.from({ length: DEB_N }, () => ({ p: randDir().multiplyScalar(rand(60, DEB_R)), s: Math.pow(Math.random(), 2.5) * 5 + 0.5, r: new THREE.Euler(rand(0, 3), rand(0, 3), 0), w: rand(-0.4, 0.4) }));
+debris.frustumCulled = false; scene.add(debris);
+const _dm = new THREE.Matrix4(), _dq = new THREE.Quaternion(), _ds = new V3(), _dp = new V3();
+let debInit = false;
+function updateDebris(dt) {
+  const c = camera.position;
+  if (!debInit) { debInit = true; DEB.forEach(d => d.p.add(c)); }
+  DEB.forEach((d, i) => {
+    _dp.subVectors(d.p, c); const L = _dp.length();
+    if (L > DEB_R) { d.p.copy(c).addScaledVector(_dp.normalize(), -DEB_R * 0.95).add(randDir().multiplyScalar(80)); }
+    d.r.x += d.w * dt; d.r.y += d.w * 0.7 * dt; _dq.setFromEuler(d.r); _ds.setScalar(d.s); _dm.compose(d.p, _dq, _ds); debris.setMatrixAt(i, _dm);
+  });
+  debris.instanceMatrix.needsUpdate = true;
+  debris.visible = G.sys !== 'veil';
+}
+{ const _ub4 = updateBoss; updateBoss = function (dt) { _ub4(dt); updateStreaks(dt); updateDebris(dt); CLOUDS.forEach(q => q.m.rotation.y += q.sp * dt); }; }
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
   if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
@@ -6776,7 +7251,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door';
   const onSurf = renderScene !== scene;
   if (running) {
     T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt); expTick(dt); citySim(dt); dvTick(dt);
