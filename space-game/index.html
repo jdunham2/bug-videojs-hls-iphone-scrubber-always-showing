@@ -483,6 +483,18 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 #smList li { font-size: 13px; color: #e8d8b8; padding: 4px 6px; border-radius: 4px; background: rgba(0,0,0,.2); }
 #smList li.ok { color: #9fe8b0; }
 #smStatus { color: #ffd890; font-size: 13px; margin: 0; }
+#zooPanel .panel { width: min(860px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(8px); margin-block: 24px; }
+#zooPanel header { display: flex; justify-content: space-between; align-items: start; padding: 18px 22px 12px; border-bottom: 1px solid var(--line); }
+#zooPanel header h2 { margin: 4px 0 0; font-family: var(--display); font-size: 26px; }
+#zooPanel header .eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: #7dffb0; }
+#zooBtn { margin-right: 8px; }
+.zoo-list { display: grid; gap: 6px; margin-top: 6px; }
+.zoo-a { display: grid; gap: 2px; padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,.04); font-size: 12px; }
+.zoo-a b { font-family: var(--display); font-size: 14px; }
+.zoo-a span { color: var(--dim); }
+.zc { font-style: normal; font-weight: 600; padding: 0 5px; border-radius: 3px; }
+.zc-golden { color: #1a1206; background: #ffc23a; } .zc-shadow { color: #e8e0ff; background: #2a2a3a; } .zc-crystal { color: #0a2a3a; background: #9ff4ff; }
+.zc-rainbow { color: #fff; background: linear-gradient(90deg, #ff5a5a, #ffc23a, #7dffb0, #6fd8ff, #b07aff); }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -606,6 +618,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
       <button class="tab" role="tab" data-tab="pets" aria-selected="false">Pets</button>
       <button class="tab" role="tab" data-tab="expeditions" aria-selected="false">Expeditions</button>
       <button class="tab" role="tab" data-tab="company" aria-selected="false">Company</button>
+      <button class="tab" role="tab" data-tab="zoo" aria-selected="false">Zoo</button>
       <button class="tab" role="tab" data-tab="ships" aria-selected="false">Ships</button>
       <button class="tab" role="tab" data-tab="crew" aria-selected="false">Crew</button>
       <button class="tab" role="tab" data-tab="crafting" aria-selected="false">Crafting</button>
@@ -648,6 +661,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="cityBubble" hidden></div>
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
+<div class="overlay" id="zooPanel" hidden><div class="panel"><header><div><div class="eyebrow">Starlight Zoo</div><h2 id="zpTitle"></h2></div><button class="ghost" id="zpClose">Close</button></header><div class="tabbody" id="zpBody"></div></div></div>
 <div class="overlay" id="starMap" hidden><div class="sm-card"><div class="eyebrow" style="color:#d9a520;font-size:10px;letter-spacing:.24em;text-transform:uppercase">Blackstar the Pirate King's</div><h2>Star map</h2><div id="smTiles"></div><p id="smStatus"></p><ol id="smList"></ol><div style="text-align:right"><button class="ghost" id="smClose">Close</button></div></div></div>
 <div id="mrHud" hidden><span id="mrGate"></span><span id="mrPos"></span><span id="mrTime"></span><span id="mrBest"></span></div>
 <div id="dgHud" hidden><b>MAGMA GOLEM</b><div class="dgb"><i id="dgFill"></i></div><span id="dgTxt"></span></div>
@@ -1110,8 +1124,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th, zoo: G.zoo })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; G.zoo = s.zoo || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -1340,7 +1354,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyG' && G.state === 'surface' && !e.repeat) petInteract();
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'starmap') closeStarMap(); else if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (G.state === 'zoopanel') closeZooPanel(); else if (G.state === 'starmap') closeStarMap(); else if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -8915,6 +8929,216 @@ PAINTS.blackstar = { name: 'Blackstar', hull: 0x141418, trim: 0xd9a520, emissive
 TROPHIES.crown = { name: 'Pirate King\'s crown', ok: () => G.th.stage === 'done', make: () => { const g = new THREE.Group(), m = mStd(0xffc23a, 0.95, 0.2); const band = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12, 1, true), m); band.position.y = 0.3; g.add(band); for (let i = 0; i < 5; i++) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 4), m); const a = i / 5 * TAU; sp.position.set(Math.cos(a) * 0.33, 0.55, Math.sin(a) * 0.33); g.add(sp); } const gem = glowSprite(0xff3a3a, 0.6); gem.position.y = 0.35; g.add(gem); return g; } };
 TROPHIES.starmap = { name: 'Framed star map', ok: () => thCount() >= 10, make: () => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.05), new THREE.MeshBasicMaterial({ map: TH_MAP })); m.position.y = 0.4; return m; } };
 
+/* ============ the Starlight Zoo ============ */
+G.zoo = G.zoo || { built: false, pens: [0, 1, 2, 3, 4, 5].map(() => ({ biome: null, decor: [], fedAt: 0, cleanAt: 0, breed: null })), animals: [], awards: {}, visitors: 0, payT: 0, nextId: 1 };
+const ZSP = {
+  hopper: { name: 'Dunehopper', biome: 'jungle', make: makeCritter, s: 1.1, cost: 800, from: 'Verdance (scan one with C)', ok: () => !!G.disc.hopper },
+  glimmer: { name: 'Glimmerwing', biome: 'jungle', make: makeGlimmerPet, s: 2.2, fly: true, cost: 900, from: 'Verdance at night (scan one)', ok: () => !!G.disc.glimmer },
+  snowpuff: { name: 'Snowpuff', biome: 'ice', make: makeSnowpuff, s: 1.1, cost: 900, from: 'Hoarfrost (scan one)', ok: () => !!G.disc.snowpuff },
+  emberback: { name: 'Emberback', biome: 'lava', make: makeEmberback, s: 1.3, cost: 1000, from: 'Pyre (scan one)', ok: () => !!G.disc.emberback },
+  crawler: { name: 'Ice crawler', biome: 'moon', make: makeCrawler, s: 0.55, cost: 1200, from: 'the moon Glint (defeat one at night)', ok: () => !!(G.moon && G.moon.kills) },
+  beetle: { name: 'Fire beetle', biome: 'lava', make: makeBeetle, s: 0.55, cost: 1200, from: 'the volcano dungeon on Pyre', ok: () => !!(G.dg && G.dg.visits) },
+  raptling: { name: 'Raptling', biome: 'jungle', make: () => makeDino('raptling'), s: 1, cost: 1500, from: 'prehistoric Verdance (scan one)', ok: () => !!(G.tm && G.tm.scanned.raptling) },
+  jelly: { name: 'Moon jelly', biome: 'ocean', make: () => { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0xff9ad8, emissive: 0xff9ad8, emissiveIntensity: 0.9, transparent: true, opacity: 0.75, side: THREE.DoubleSide }); g.add(new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8, 0, TAU, 0, Math.PI / 2), m)); for (let k = 0; k < 5; k++) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.4, 3), m); t.position.set(Math.cos(k) * 0.3, -0.7, Math.sin(k) * 0.3); g.add(t); } g.add(glowSprite(0xff9ad8, 2.4)); return g; }, s: 1, fly: true, cost: 1000, from: 'the Verdance ocean (scan one from your sub)', ok: () => !!(G.sea && G.sea.species.moonjelly) },
+  thunderhorn: { name: 'Baby Thunderhorn', biome: 'jungle', make: () => makeDino('thunderhorn'), s: 0.28, cost: 3000, from: 'prehistoric Verdance (scan one)', ok: () => !!(G.tm && G.tm.scanned.thunderhorn) },
+};
+const ZBIOMES = { jungle: { name: 'Jungle', col: 0x3a8a3a }, ice: { name: 'Ice field', col: 0xdfefff }, lava: { name: 'Lava rocks', col: 0x2a1a16 }, ocean: { name: 'Ocean tank', col: 0x2a7ab0 }, moon: { name: 'Moon dust', col: 0x8a8c94 } };
+const ZDECOR = { plants: 'Plants and trees', rocks: 'Rocks and caves', toys: 'Toys and treats' };
+const ZCOLORS = { normal: { name: 'Normal' }, golden: { name: 'Golden', hex: 0xffc23a, em: 0x5a3a00 }, shadow: { name: 'Shadow', hex: 0x2a2a3a, em: 0x1a0a2a }, crystal: { name: 'Crystal', hex: 0x9ff4ff, em: 0x2a6a8a }, rainbow: { name: 'Rainbow', hex: 0xffffff, em: 0x222222 } };
+const ZNAMES = ['Biscuit', 'Pip', 'Nova', 'Mochi', 'Ziggy', 'Pebble', 'Sprout', 'Bean', 'Luna', 'Waffles', 'Noodle', 'Puddle', 'Sparky', 'Fizz', 'Nugget', 'Dot', 'Bubbles', 'Tiny', 'Squeak', 'Taco'];
+const ZPEN = [[-34, -28], [0, -38], [34, -28], [-34, 26], [0, 36], [34, 26]], ZHALF = 8;
+const ZAWARDS = [
+  { id: 'first', name: 'First resident', desc: 'Adopt your first animal', cr: 500, ok: () => G.zoo.animals.length >= 1 },
+  { id: 'fivesp', name: 'Five species', desc: 'Keep five different species', cr: 2000, ok: () => new Set(G.zoo.animals.map(a => a.sp)).size >= 5 },
+  { id: 'baby', name: 'First baby', desc: 'Breed a baby animal', cr: 1000, ok: () => G.zoo.animals.some(a => a.bred) },
+  { id: 'rare', name: 'Rare color', desc: 'Breed a golden, shadow or crystal baby', cr: 1500, ok: () => G.zoo.animals.some(a => a.bred && a.col !== 'normal') },
+  { id: 'rainbow', name: 'Rainbow baby', desc: 'Breed a legendary rainbow baby', cr: 5000, ok: () => G.zoo.animals.some(a => a.col === 'rainbow') },
+  { id: 'twenty', name: 'Big zoo', desc: 'Keep 20 animals', cr: 3000, ok: () => G.zoo.animals.length >= 20 },
+  { id: 'stars5', name: 'Five-star zoo', desc: 'Reach a 5 star rating', cr: 5000, ok: () => zooStars() >= 5 },
+  { id: 'visitors', name: 'Crowd pleaser', desc: 'Welcome 1,000 visitors', cr: 2000, ok: () => G.zoo.visitors >= 1000 },
+];
+const zFed = pen => clamp(100 - (Date.now() - pen.fedAt) / 6000, 0, 100), zClean = pen => clamp(100 - (Date.now() - pen.cleanAt) / 9000, 0, 100);
+const zAdult = a => Date.now() - a.born > 180000;
+function zHappy(a) { const pen = G.zoo.pens[a.pen]; let h = 25; if (pen.biome === ZSP[a.sp].biome) h += 40; h += Math.min(3, pen.decor.length) * 10; h += zFed(pen) > 30 ? 15 : -20; h += zClean(pen) > 40 ? 10 : -15; if (G.zoo.animals.filter(q => q.pen === a.pen).length > 5) h -= 10; return clamp(h, 0, 100); }
+function zooStars() { const A = G.zoo.animals; if (!A.length) return 0; const avg = A.reduce((s, a) => s + zHappy(a), 0) / A.length, sp = new Set(A.map(a => a.sp)).size; return clamp(Math.round(avg / 22) + (sp >= 5 ? 1 : 0), 1, 5); }
+const zVisitorsPerMin = () => Math.round(G.zoo.animals.length * 2 * zooStars() * (1 + G.zoo.animals.filter(a => a.col !== 'normal').length * 0.1));
+function zBaby(a, b) {
+  const pool = [a.col, b.col], r = Math.random(); let col = pick(pool);
+  if (a.col !== 'normal' && b.col !== 'normal' && a.col !== b.col && r < 0.3) col = 'rainbow';
+  else if (r < 0.14) col = pick(['golden', 'shadow', 'crystal']);
+  else if (a.col === b.col && a.col !== 'normal') col = Math.random() < 0.6 ? a.col : 'normal';
+  return col;
+}
+function zAdd(sp, pen, col = 'normal', bred = false) { const a = { id: G.zoo.nextId++, sp, pen, col, born: bred ? Date.now() : Date.now() - 200000, name: (bred ? 'Little ' : '') + pick(ZNAMES), bred }; G.zoo.animals.push(a); return a; }
+let zT = 1;
+function zooTick(dt) {
+  if (!G.zoo.built) return; if ((zT -= dt) > 0) return; zT = 1; const now = Date.now();
+  G.zoo.pens.forEach((pen, i) => { const br = pen.breed; if (br && now >= br.until) { pen.breed = null; const a = G.zoo.animals.find(q => q.id === br.a), b = G.zoo.animals.find(q => q.id === br.b); if (a && b) { const col = zBaby(a, b), baby = zAdd(a.sp, i, col, true); sfx('win'); showComms('Starlight Zoo keeper', `A baby ${ZSP[a.sp].name} was born in habitat ${i + 1}! We named it ${baby.name}.${col !== 'normal' ? ` And look at that: it is ${ZCOLORS[col].name.toUpperCase()}! ${col === 'rainbow' ? 'A legendary rainbow baby! Visitors will go crazy!' : 'A rare color!'}` : ''}`); if (G.zoo.animals.filter(q => q.bred).length === 1) logAdd(['A baby at the zoo', `${a.name} and ${b.name} had a baby! Little ${ZSP[a.sp].name.toLowerCase()}, wobbly legs, very loud. I am a zoo grandparent now.`]); save(); } } });
+  G.zoo.payT += 1; if (G.zoo.payT >= 60) { G.zoo.payT = 0; const v = zVisitorsPerMin(); if (v > 0) { G.zoo.visitors += v; const cr = v * 3; G.credits += cr; if (G.state !== 'title') say(`Starlight Zoo: ${v} visitors bought tickets. +${cr.toLocaleString()} cr`, 'good'); } }
+  ZAWARDS.forEach(w => { if (!G.zoo.awards[w.id] && w.ok()) { G.zoo.awards[w.id] = true; G.credits += w.cr; sfx('win'); showComms('Reach Zoo Society', `Congratulations! Your zoo wins the "${w.name}" award: ${w.desc.toLowerCase()}. +${w.cr.toLocaleString()} cr`); logAdd([`Zoo award: ${w.name}`, `The Reach Zoo Society gave the Starlight Zoo an award: ${w.name}. They gave me a shiny plaque. I put it next to the penguins. We do not have penguins.`]); save(); } });
+}
+{ const _et2 = expTick; expTick = function (dt) { _et2(dt); zooTick(dt); }; }
+// the zoo station in space
+const ZOO_POS = new V3(-600, 700, -1900);
+function buildZooStation() {
+  const g = new THREE.Group(), M = mStd(0xd8dde8, 0.5, 0.4);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(110, 120, 16, 32), M); g.add(ring);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16, 0, TAU, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.35, metalness: 0.4, roughness: 0.1 })); dome.position.y = 8; g.add(dome);
+  const green = new THREE.Mesh(new THREE.CylinderGeometry(96, 96, 2, 32), new THREE.MeshStandardMaterial({ color: 0x3a8a3a, emissive: 0x1a4a1a, emissiveIntensity: 0.5 })); green.position.y = 9; g.add(green);
+  for (let i = 0; i < 14; i++) { const a = rand(0, TAU), r = rand(10, 80), t = new THREE.Mesh(new THREE.ConeGeometry(rand(5, 9), rand(16, 30), 7), mStd(0x2a7a3a, 0.1, 0.8)); t.position.set(Math.cos(a) * r, 22, Math.sin(a) * r); g.add(t); }
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(120, 22), new THREE.MeshBasicMaterial({ map: hvText('STARLIGHT ZOO', 512, 96, '#10141a', '#7dffb0'), transparent: true, side: THREE.DoubleSide })); sign.position.set(0, 120, 0); g.add(sign); g.userData.sign = sign;
+  for (let i = 0; i < 8; i++) blinker(g, new V3(Math.cos(i / 8 * TAU) * 118, 8, Math.sin(i / 8 * TAU) * 118), i % 2 ? 0x7dffb0 : 0xffc23a, 12, i);
+  return g;
+}
+function zooStation() {
+  if (stationById('zoo')) return;
+  STATIONS.push({ id: 'zoo', sys: 'ember', name: 'Starlight Zoo', kind: 'Your space zoo', build: buildZooStation, pos: ZOO_POS.clone(), dockR: 300, colR: 130, exit: new V3(0, 0, 1), orePrice: 20, view: 560,
+    blurb: 'Your very own space zoo: a glass dome full of creatures from every corner of the Reach. Visitors come from every station to see them.' });
+  const s = STATIONS[STATIONS.length - 1]; s.obj = s.build(); s.obj.position.copy(s.pos); scene.add(s.obj); s.obj.traverse(o => { if (o.isSprite && o.userData.blink !== undefined) blinkers.push(o); });
+  PROFILE.zoo = { food: 1.3, ice: 1.1, parts: 1.2, med: 1.3, fuel: 1.1, lux: 1.4 }; RECRUIT_CAP.zoo = 20;
+}
+if (G.zoo.built) zooStation();
+// the zoo dome interior
+const ZOO_W = { id: 'zoo', interior: true, brand: 'STARLIGHT ZOO · ON FOOT', title: 'Starlight Zoo', scene: new THREE.Scene(), pad: { x: 0, z: 0 }, padH: 0, hgtFn: () => 0, itemPlan: [], critterMinH: 99, bob: false, buildable: false,
+  pal: { dayTop: new THREE.Color(0x6ab0e8), dayHor: new THREE.Color(0xdff0ff), setTop: new THREE.Color(0x6a5a9a), setHor: new THREE.Color(0xffb88a), nightTop: new THREE.Color(0x0a1020), nightHor: new THREE.Color(0x1a2a40), water: new THREE.Color(0x3a9fd0) },
+  nightMsg: 'Night at the zoo. The glowing creatures light up their habitats.', hint: 'WASD walk · E at a habitat sign to design it, adopt, feed and breed · the kiosk shows awards',
+  bounds(p) { const inPen = ZPEN.some(([x, z]) => Math.abs(p.x - x) < ZHALF + 0.6 && Math.abs(p.z - z) < ZHALF + 0.6); if (Math.hypot(p.x, p.z) < 56 && !inPen) ZVL.copy(p); else { p.x = ZVL.x; p.z = ZVL.z; } },
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+WORLDS.zoo = ZOO_W;
+const ZVL = new V3(0, 0, 48);
+const ZV = { pens: [], animals: {}, walkers: [], kiosk: { x: 9, z: 44 } };
+function buildZooInterior() {
+  if (S.built) return; S.built = true;
+  surf.fog = new THREE.Fog(0xdff0ff, 80, 400);
+  const sky = makeSkyDome(0x6ab0e8, 0xdff0ff); sky.renderOrder = -10; surf.add(sky); S.sky = sky;
+  S.sun = new THREE.DirectionalLight(0xfff4e8, 0.9); S.sun.position.copy(SURF_SUN); surf.add(S.sun); S.hemi = new THREE.HemisphereLight(0xdfefff, 0x4a6a3a, 0.6); surf.add(S.hemi); S.moonLight = new THREE.DirectionalLight(0x8fa8ff, 0); S.moonLight.position.set(0.6, 0.8, -0.3); surf.add(S.moonLight);
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; };
+  const grass = add(new THREE.CircleGeometry(62, 48), new THREE.MeshStandardMaterial({ color: 0x5aa84a, roughness: 0.9 }), 0, 0, 0); grass.rotation.x = -Math.PI / 2;
+  const path = add(new THREE.RingGeometry(10, 18, 48), new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 0.9, side: THREE.DoubleSide }), 0, 0.02, 0); path.rotation.x = -Math.PI / 2;
+  const walk = add(new THREE.PlaneGeometry(8, 40), new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 0.9 }), 0, 0.02, 36); walk.rotation.x = -Math.PI / 2;
+  const glass = add(new THREE.SphereGeometry(64, 40, 20, 0, TAU, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.18, side: THREE.DoubleSide, metalness: 0.3, roughness: 0.1, depthWrite: false }));
+  for (let i = 0; i < 16; i++) { const a = i / 16 * TAU, b = add(new THREE.TorusGeometry(64, 0.3, 4, 32, Math.PI), mStd(0xd8dde8, 0.5, 0.4), 0, 0, 0); b.rotation.set(0, a, 0); }
+  add(new THREE.CylinderGeometry(4, 4.5, 1, 20), mStd(0xd8d0c0, 0.2, 0.6), 0, 0.5, 0); const fw = add(new THREE.ConeGeometry(0.8, 4, 12), new THREE.MeshStandardMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.6, emissive: 0x3a8ad0 }), 0, 2.6, 0); S.colliders.push({ x: 0, z: 0, r: 4.6, top: 1 });
+  const k = add(new THREE.BoxGeometry(2.4, 2.6, 1.2), mStd(0x3b66d9, 0.3, 0.5), ZV.kiosk.x, 1.3, ZV.kiosk.z); const ks = add(new THREE.PlaneGeometry(3, 0.8), new THREE.MeshBasicMaterial({ map: hvText('ZOO INFO', 256, 64, '#10141a', '#ffc23a'), transparent: true }), ZV.kiosk.x, 3.2, ZV.kiosk.z - 0.65); ks.rotation.y = Math.PI; S.colliders.push({ x: ZV.kiosk.x, z: ZV.kiosk.z, r: 1.6, top: 2.6 });
+  add(new THREE.PlaneGeometry(10, 1.6), new THREE.MeshBasicMaterial({ map: hvText('EXIT · TO YOUR SHIP', 512, 80, '#10141a', '#7dffb0'), transparent: true, side: THREE.DoubleSide }), 0, 5, 56);
+  ZPEN.forEach(([x, z], i) => {
+    const g = new THREE.Group(); g.position.set(x, 0, z); surf.add(g);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ZHALF * 2, ZHALF * 2), new THREE.MeshStandardMaterial({ color: 0x6a6a5a, roughness: 0.9 })); floor.rotation.x = -Math.PI / 2; floor.position.y = 0.05; g.add(floor);
+    const rail = mStd(0x8a6a4a, 0.1, 0.8); for (const [dx, dz, w, d] of [[0, -ZHALF, ZHALF * 2, 0.2], [0, ZHALF, ZHALF * 2, 0.2], [-ZHALF, 0, 0.2, ZHALF * 2], [ZHALF, 0, 0.2, ZHALF * 2]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.15, d), rail); r.position.set(dx, 1.1, dz); g.add(r); const r2 = r.clone(); r2.position.y = 0.5; g.add(r2); }
+    const toCenter = new V3(-x, 0, -z).normalize(), sx = x + toCenter.x * (ZHALF + 2), sz = z + toCenter.z * (ZHALF + 2);
+    const post = add(new THREE.BoxGeometry(0.2, 2.4, 0.2), mStd(0x5a4a3a), sx, 1.2, sz);
+    const sign = add(new THREE.PlaneGeometry(3.4, 1.4), new THREE.MeshBasicMaterial({ map: hvText(`HABITAT ${i + 1}`, 256, 104, '#14161e', '#ffd060'), transparent: true, side: THREE.DoubleSide }), sx, 2.8, sz); sign.lookAt(0, 2.8, 0);
+    const deco = new THREE.Group(); g.add(deco);
+    ZV.pens.push({ g, floor, deco, sx, sz, key: '' });
+  });
+  for (let i = 0; i < 14; i++) { const p = makePerson(pick([0x3b66d9, 0xd7712c, 0x4f9a3a, 0xb05ad9, 0xe8e2dc, 0xd9a520, 0x2aa8a0])); p.g.visible = false; surf.add(p.g); ZV.walkers.push(Object.assign(p, { a: rand(0, TAU), r: rand(11, 17), sp: rand(0.05, 0.1) * (Math.random() < 0.5 ? 1 : -1), t: 0, wait: 0 })); }
+  S.astro = makeAstronaut(); surf.add(S.astro.g); S.drone = makeDrone(); surf.add(S.drone);
+}
+ZOO_W.build = buildZooInterior;
+function zPenDecor(i) {
+  const pen = G.zoo.pens[i], v = ZV.pens[i], key = (pen.biome || '') + '|' + pen.decor.join(','); if (v.key === key) return; v.key = key;
+  while (v.deco.children.length) v.deco.remove(v.deco.children[0]);
+  v.floor.material.color.setHex(pen.biome ? ZBIOMES[pen.biome].col : 0x6a6a5a);
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); v.deco.add(m); return m; };
+  if (pen.biome === 'ocean') { add(new THREE.BoxGeometry(ZHALF * 2 - 0.4, 6, ZHALF * 2 - 0.4), new THREE.MeshStandardMaterial({ color: 0x3aa8e0, transparent: true, opacity: 0.35, roughness: 0.1, depthWrite: false }), 0, 3, 0); }
+  if (pen.biome === 'lava') { const l = add(new THREE.CircleGeometry(2.5, 16), new THREE.MeshStandardMaterial({ color: 0xff5a10, emissive: 0xff3a00, emissiveIntensity: 1.2 }), 3, 0.08, 3); l.rotation.x = -Math.PI / 2; }
+  if (pen.biome === 'ice') for (let k = 0; k < 4; k++) add(new THREE.ConeGeometry(0.6, rand(2, 4), 5), new THREE.MeshStandardMaterial({ color: 0xbfeaff, emissive: 0x1a4a7a, emissiveIntensity: 0.3, transparent: true, opacity: 0.85 }), rand(-6, 6), 1.2, rand(-6, 6));
+  if (pen.biome === 'moon') for (let k = 0; k < 3; k++) { const c = add(new THREE.TorusGeometry(rand(1, 2), 0.25, 6, 16), mStd(0x6a6c74), rand(-5, 5), 0.1, rand(-5, 5)); c.rotation.x = Math.PI / 2; }
+  if (pen.decor.includes('plants')) for (let k = 0; k < 4; k++) { const x = rand(-6, 6), z = rand(-6, 6); add(new THREE.CylinderGeometry(0.15, 0.2, 2, 6), mStd(0x5a3a22), x, 1, z); add(new THREE.IcosahedronGeometry(1.2, 0), new THREE.MeshStandardMaterial({ color: pen.biome === 'ice' ? 0xdfefff : 0x3a9a4a, flatShading: true }), x, 2.6, z); }
+  if (pen.decor.includes('rocks')) for (let k = 0; k < 3; k++) add(new THREE.DodecahedronGeometry(rand(0.8, 1.6), 0), smat(pen.biome === 'lava' ? 0x1a1210 : 0x8a8478, 0.9, { flatShading: true }), rand(-6, 6), 0.6, rand(-6, 6));
+  if (pen.decor.includes('toys')) { add(new THREE.SphereGeometry(0.5, 12, 8), mStd(0xff5a5a, 0.1, 0.5), rand(-4, 4), 0.5, rand(-4, 4)); add(new THREE.TorusGeometry(0.6, 0.15, 6, 16), mStd(0xffc23a, 0.1, 0.5), rand(-4, 4), 0.2, rand(-4, 4)).rotation.x = Math.PI / 2; }
+}
+function zColorize(obj, col) {
+  if (col === 'normal') return; const c = ZCOLORS[col];
+  obj.traverse(o => { if (o.isMesh && o.material && o.material.color) { o.material = o.material.clone(); if (col === 'crystal') { o.material.transparent = true; o.material.opacity = 0.8; } o.material.color.setHex(c.hex); if (o.material.emissive) { o.material.emissive.setHex(c.em); o.material.emissiveIntensity = 0.6; } } });
+}
+ZOO_W.update = function (dt) {
+  G.zoo.pens.forEach((_, i) => zPenDecor(i));
+  const seen = {};
+  G.zoo.animals.forEach(a => {
+    seen[a.id] = true; let v = ZV.animals[a.id]; const sp = ZSP[a.sp], [px, pz] = ZPEN[a.pen];
+    if (!v) { const o = sp.make(); zColorize(o, a.col); surf.add(o); v = ZV.animals[a.id] = { obj: o, goal: null, wait: rand(0, 3), t: rand(0, 6) }; o.position.set(px + rand(-5, 5), 0, pz + rand(-5, 5)); }
+    const o = v.obj, sc = sp.s * (zAdult(a) ? 1 : 0.55); o.scale.setScalar(sc); v.t += dt;
+    if (a.col === 'rainbow') o.traverse(m => { if (m.isMesh && m.material && m.material.color) m.material.color.setHSL((T * 0.3 + m.id * 0.1) % 1, 0.9, 0.6); });
+    if (v.wait > 0) v.wait -= dt; else { if (!v.goal) v.goal = new V3(px + rand(-ZHALF + 1.5, ZHALF - 1.5), 0, pz + rand(-ZHALF + 1.5, ZHALF - 1.5)); const dx = v.goal.x - o.position.x, dz = v.goal.z - o.position.z, d = Math.hypot(dx, dz); if (d < 0.4) { v.goal = null; v.wait = rand(1.5, 5); } else { const s = (zHappy(a) > 50 ? 1.6 : 0.8) * dt; o.position.x += dx / d * s; o.position.z += dz / d * s; o.rotation.y = Math.atan2(-dx, -dz); } }
+    o.position.y = sp.fly ? 2 + Math.sin(v.t * 1.5) * 0.6 : (v.goal ? Math.abs(Math.sin(v.t * 8)) * 0.15 : 0);
+    if (o.userData.legs) o.userData.legs.forEach((l, k) => l.rotation.x = v.goal ? Math.sin(v.t * 10 + k * 1.6) * 0.5 : 0);
+  });
+  for (const id in ZV.animals) if (!seen[id]) { surf.remove(ZV.animals[id].obj); delete ZV.animals[id]; }
+  const want = Math.min(ZV.walkers.length, Math.round(zVisitorsPerMin() / 8));
+  ZV.walkers.forEach((w, i) => { w.g.visible = i < want; if (!w.g.visible) return; w.a += w.sp * dt; w.g.position.set(Math.cos(w.a) * w.r, 0, Math.sin(w.a) * w.r); w.g.rotation.y = -w.a + (w.sp > 0 ? Math.PI : 0); w.t += dt * 7; const sw = Math.sin(w.t) * 0.5; w.legs[0].rotation.x = sw; w.legs[1].rotation.x = -sw; });
+};
+ZOO_W.surfMarkers = function () {
+  const m = (id, cls, label, x, z) => { const el = marker(id, cls, label); el.querySelector('.dst').textContent = fmtD(Math.hypot(S.pos.x - x, S.pos.z - z)); placeMarker(el, tmp.set(x, 4, z)); };
+  m('zoo-exit', 'station', 'Your ship', 0, 55); m('zoo-info', 'friendly', 'Zoo info', ZV.kiosk.x, ZV.kiosk.z);
+};
+// interacting inside the zoo
+function zSpot() {
+  if (S.pos.z > 52) return { t: 'exit' };
+  if (Math.hypot(S.pos.x - ZV.kiosk.x, S.pos.z - ZV.kiosk.z) < 3.6) return { t: 'kiosk' };
+  for (let i = 0; i < 6; i++) { const v = ZV.pens[i]; if (v && Math.hypot(S.pos.x - v.sx, S.pos.z - v.sz) < 3.6) return { t: 'pen', i }; }
+  return null;
+}
+function zooPrompt() { const s = zSpot(), key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'; if (!s) return ''; if (s.t === 'exit') return `${key} to go back to your ship`; if (s.t === 'kiosk') return `${key} to see your zoo rating and awards`; const pen = G.zoo.pens[s.i]; return `${key} to manage habitat ${s.i + 1} (${pen.biome ? ZBIOMES[pen.biome].name : 'empty'} · ${G.zoo.animals.filter(a => a.pen === s.i).length} animals)`; }
+const ZP = { mode: null, pen: 0 };
+function openZooPanel(mode, pen) { ZP.mode = mode; ZP.pen = pen || 0; $('#zpTitle').textContent = mode === 'pen' ? `Habitat ${ZP.pen + 1}` : 'Starlight Zoo'; $('#zpBody').innerHTML = mode === 'pen' ? renderPen() : renderZooInfo(); $('#comms').hidden = true; setState('zoopanel'); $('#zooPanel').hidden = false; sfx('ui'); }
+function closeZooPanel() { $('#zooPanel').hidden = true; ZP.mode = null; if (G.state === 'zoopanel') setState('surface'); }
+function zRefresh() { if (ZP.mode) $('#zpBody').innerHTML = ZP.mode === 'pen' ? renderPen() : renderZooInfo(); else if (G.state === 'docked') renderDock(); }
+$('#zpClose').addEventListener('click', closeZooPanel);
+const zBar = (v, col) => `<div class="exp-bar" style="width:120px;display:inline-block;vertical-align:middle"><i style="width:${v}%;${col ? `background:${col}` : ''}"></i></div>`;
+function renderPen() {
+  const i = ZP.pen, pen = G.zoo.pens[i], here = G.zoo.animals.filter(a => a.pen === i);
+  let h = `<div class="item"><div><h4>Habitat design</h4><p>Each species is happiest in its own biome. Decorations make every animal happier.</p><div class="row-btns" style="margin-top:8px">${Object.entries(ZBIOMES).map(([k, b]) => `<button class="${pen.biome === k ? 'btn' : 'ghost'}" data-z="biome" data-k="${k}"><span class="swatch" style="background:#${b.col.toString(16).padStart(6, '0')}"></span>${b.name}</button>`).join('')}</div><p class="shipstats" style="margin-top:6px">Changing the biome costs 1,000 cr.</p><div class="row-btns" style="margin-top:8px">${Object.entries(ZDECOR).map(([k, n]) => pen.decor.includes(k) ? `<span class="chip ok">${n}</span>` : `<button class="ghost" data-z="decor" data-k="${k}" ${G.credits >= 500 ? '' : 'disabled'}>Add ${n.toLowerCase()} · 500 cr</button>`).join('')}</div></div></div>`;
+  h += `<div class="item"><div><h4>Care</h4><p>Food ${zBar(zFed(pen))} ${Math.round(zFed(pen))}% · Clean ${zBar(zClean(pen), '#6fd8ff')} ${Math.round(zClean(pen))}%</p></div><div><button class="btn" data-z="feed" ${G.credits >= 60 ? '' : 'disabled'}>Feed · 60 cr</button><button class="ghost" data-z="clean" style="margin-top:6px" ${G.credits >= 40 ? '' : 'disabled'}>Clean · 40 cr</button></div></div>`;
+  if (here.length) h += `<div class="item"><div><h4>Residents (${here.length} of 6)</h4><div class="zoo-list">${here.map(a => `<div class="zoo-a"><b>${a.name}</b> <span>${ZCOLORS[a.col].name !== 'Normal' ? `<i class="zc zc-${a.col}">${ZCOLORS[a.col].name}</i> ` : ''}${ZSP[a.sp].name}${zAdult(a) ? '' : ' · baby'}</span><span>Happy ${zBar(zHappy(a), zHappy(a) > 60 ? '' : zHappy(a) > 35 ? '#ffc23a' : '#ff5a5a')} · likes ${ZBIOMES[ZSP[a.sp].biome].name}</span></div>`).join('')}</div></div></div>`;
+  const pairs = {}; here.filter(a => zAdult(a) && zHappy(a) >= 60).forEach(a => (pairs[a.sp] = pairs[a.sp] || []).push(a));
+  const can = Object.entries(pairs).filter(([, l]) => l.length >= 2);
+  h += `<div class="item"><div><h4>Breeding</h4>${pen.breed ? `<p>A baby is on the way! ${fmtLeft(pen.breed.until - Date.now())} to go.</p>` : can.length ? `<p>Happy grown-up pairs can have babies. Babies can be born in rare colors: golden, shadow, crystal... and very rarely RAINBOW, when two different rare colors have a baby.</p>` : '<p>You need two happy grown-ups (60%+) of the same species in this habitat.</p>'}</div><div>${!pen.breed && here.length < 6 ? can.map(([sp]) => `<button class="btn" data-z="breed" data-k="${sp}">Breed ${ZSP[sp].name}s</button>`).join('') : ''}</div></div>`;
+  h += `<h4 class="craft-sub">Adopt animals</h4>`;
+  Object.entries(ZSP).forEach(([k, s]) => { const ok = s.ok(); h += `<div class="item"><div><h4>${s.name} <span class="tag delivery">likes ${ZBIOMES[s.biome].name}</span></h4><p>${ok ? 'You discovered this species. Adopt one for this habitat.' : `Not discovered yet. Find it in ${s.from}.`}</p></div><div>${ok ? `<div class="reward">${s.cost.toLocaleString()} cr</div><button class="btn" data-z="adopt" data-k="${k}" ${G.credits >= s.cost && here.length < 6 ? '' : 'disabled'}>Adopt</button>` : '<div class="reward" style="font-size:12px">Locked</div>'}</div></div>`; });
+  return h;
+}
+function renderZooInfo() {
+  const st = zooStars(), sp = new Set(G.zoo.animals.map(a => a.sp)).size;
+  let h = `<div class="item co-card"><div><h4>Starlight Zoo <span class="stars">${stars(st)}</span></h4><p>${G.zoo.animals.length} animals · ${sp} species · ${G.zoo.animals.filter(a => a.col !== 'normal').length} rare colors · about ${zVisitorsPerMin()} visitors a minute (${(zVisitorsPerMin() * 3).toLocaleString()} cr) · ${G.zoo.visitors.toLocaleString()} visitors so far</p><p class="shipstats">Happy animals, more species and rare colors bring more visitors.</p></div></div>`;
+  h += `<div class="item"><div><h4>Zoo awards</h4><div class="chips">${ZAWARDS.map(w => `<span class="chip ${G.zoo.awards[w.id] ? 'ok' : 'miss'}">${w.name}<i>${G.zoo.awards[w.id] ? 'won' : w.desc}</i></span>`).join('')}</div></div></div>`;
+  if (G.zoo.animals.length) h += `<div class="item"><div><h4>All residents</h4><div class="chips">${G.zoo.animals.map(a => `<span class="chip">${a.name} · ${ZCOLORS[a.col].name !== 'Normal' ? ZCOLORS[a.col].name + ' ' : ''}${ZSP[a.sp].name}${zAdult(a) ? '' : ' (baby)'} · habitat ${a.pen + 1}</span>`).join('')}</div></div></div>`;
+  return h;
+}
+function zooAct(z, k) {
+  const i = ZP.pen, pen = G.zoo.pens[i];
+  if (z === 'biome') { if (pen.biome === k || G.credits < 1000) return; G.credits -= 1000; pen.biome = k; sfx('pickup'); say(`Habitat ${i + 1} is now a ${ZBIOMES[k].name.toLowerCase()}!`, 'good'); }
+  if (z === 'decor') { if (pen.decor.includes(k) || G.credits < 500) return; G.credits -= 500; pen.decor.push(k); sfx('pickup'); }
+  if (z === 'feed') { if (G.credits < 60) return; G.credits -= 60; pen.fedAt = Date.now(); sfx('pickup'); say('Munch munch! Everyone in this habitat is full.', 'good'); }
+  if (z === 'clean') { if (G.credits < 40) return; G.credits -= 40; pen.cleanAt = Date.now(); sfx('ui'); say('Sparkling clean!', 'good'); }
+  if (z === 'adopt') { const s = ZSP[k]; if (!s.ok() || G.credits < s.cost || G.zoo.animals.filter(a => a.pen === i).length >= 6) return; G.credits -= s.cost; const a = zAdd(k, i); if (!pen.fedAt) { pen.fedAt = Date.now(); pen.cleanAt = Date.now(); } sfx('win'); say(`${a.name} the ${s.name} moved into habitat ${i + 1}!`, 'good'); if (G.zoo.animals.length === 1) logAdd(['The first resident', `${a.name} the ${s.name.toLowerCase()} is the first animal at the Starlight Zoo. It sniffed everything, then fell asleep in the food bowl.`]); }
+  if (z === 'breed') { if (pen.breed) return; const l = G.zoo.animals.filter(a => a.pen === i && a.sp === k && zAdult(a) && zHappy(a) >= 60); if (l.length < 2) return; pen.breed = { a: l[0].id, b: l[1].id, until: Date.now() + 90000 }; sfx('ring'); say(`${l[0].name} and ${l[1].name} are getting cozy... a baby will arrive in about 90 seconds!`, 'good'); }
+  save(); zRefresh();
+}
+$('#zpBody').addEventListener('click', e => { const b = e.target.closest('[data-z]'); if (!b || b.disabled) return; zooAct(b.dataset.z, b.dataset.k); });
+function zooInteract() { const s = zSpot(); if (!s) return; if (s.t === 'exit') { leaveZoo(); return; } if (s.t === 'kiosk') { openZooPanel('info'); return; } openZooPanel('pen', s.i); }
+{ const _hv8 = harvest; harvest = function () { if (G.state === 'surface' && W === ZOO_W) { zooInteract(); return; } _hv8(); }; }
+{ const _ush7 = updateSurfHUD; updateSurfHUD = function () { _ush7(); if (W === ZOO_W) { setPrompt(zooPrompt()); $('#sDisc').textContent = `Zoo rating ${stars(zooStars())} · ${G.zoo.animals.length} animals · ${zVisitorsPerMin()} visitors a minute`; } }; }
+function enterZoo() {
+  if (!G.docked || G.docked.id !== 'zoo') return;
+  arkTransition(() => {
+    G.docked = null; useWorld(ZOO_W); W.build(); renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 62; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
+    S.pos.set(0, 0, 48); ZVL.copy(S.pos); S.vel.set(0, 0, 0); S.heading = 0; S.yaw = 0; S.pitch = 0.3; S.fuel = fuelMax(); S.heat = 100; S.astro.g.visible = true; setState('surface'); updateSurfCamera(1);
+    say('Welcome to the Starlight Zoo! Walk up to a habitat sign to design it and adopt animals.', 'good');
+  }, 'Walking into the zoo');
+  $('#entryTitle').textContent = 'Starlight Zoo';
+}
+function leaveZoo() { arkTransition(() => { renderScene = scene; applyBloom(false); camera.near = shipNear(); camera.fov = 68; camera.updateProjectionMatrix(); dock(stationById('zoo')); }, 'Back to your ship'); $('#entryTitle').textContent = 'Starlight Zoo'; }
+$('#undockBtn').insertAdjacentHTML('beforebegin', '<button class="ghost" id="zooBtn" hidden>Walk into the zoo</button>');
+$('#zooBtn').addEventListener('click', enterZoo);
+{ const _rd3 = renderDock; renderDock = function () {
+  _rd3(); const st = G.docked; $('#zooBtn').hidden = !st || st.id !== 'zoo';
+  if (st && dockTab === 'zoo') $('#tabBody').innerHTML = G.zoo.built ? renderZooInfo() + (st.id === 'zoo' ? '<p class="craft-note">Click "Walk into the zoo" to design habitats, feed, adopt and breed.</p>' : '<p class="craft-note">Fly to the Starlight Zoo (near Haven Ring) and walk inside to manage your animals.</p>') : `<div class="item co-card"><div><h4>Build a space zoo</h4><p>A glass dome station near Haven Ring with six habitats for creatures from all over the Reach. Visitors pay to see them, and happy animals can have babies, sometimes in rare colors.</p></div><div><div class="reward">25,000 cr</div><button class="btn" data-act="zoobuild" ${G.credits >= 25000 ? '' : 'disabled'}>Build the zoo</button></div></div>`;
+}; }
+{ const _dk3 = dock; dock = function (st) { _dk3(st); if (st.id === 'zoo') { dockTab = 'zoo'; renderDock(); } }; }
+{ const _ea7 = expAct; expAct = function (act, b) { if (act === 'zoobuild') { if (G.zoo.built || G.credits < 25000) return; G.credits -= 25000; G.zoo.built = true; zooStation(); sfx('win'); showComms('Starlight Zoo builders', 'Your zoo station is finished! Look for the glass dome just past Haven Ring. Dock there and walk inside to set up the first habitat.'); logAdd(['The Starlight Zoo', 'I built a zoo. In space. It is a big glass dome full of grass. Now I need animals. And maybe a gift shop.']); save(); renderDock(); return; } _ea7(act, b); }; }
+TROPHIES.zoo = { name: 'Zoo award plaque', ok: () => Object.keys(G.zoo.awards).length >= 3, make: () => { const g = new THREE.Group(); const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.06), mStd(0x7dffb0, 0.5, 0.4)); p.position.y = 0.35; g.add(p); const h = makeCritter(); h.scale.setScalar(0.12); h.position.set(0, 0.6, 0.05); g.add(h); return g; } };
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
   if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
@@ -8953,7 +9177,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel' && G.state !== 'starmap';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel' && G.state !== 'starmap' && G.state !== 'zoopanel';
   const onSurf = renderScene !== scene;
   if (running) {
     T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt); expTick(dt); citySim(dt); dvTick(dt);
