@@ -463,6 +463,16 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 #mechHud .mt.heat i { background: #ff8a5a; }
 #mechBtns { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(222px + env(safe-area-inset-bottom, 0px)); z-index: 7; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; width: 220px; }
 #mechBtns button { padding: 8px 6px; font-size: 11px; touch-action: none; }
+#mrHud { position: fixed; left: 50%; bottom: calc(196px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6; display: flex; gap: 18px; align-items: baseline; padding: 8px 18px; border-radius: 8px; background: rgba(14,16,26,.8); border: 1px solid rgba(255,194,58,.5); pointer-events: none; font-family: var(--display); }
+#mrGate { color: #39ff9a; letter-spacing: .16em; font-size: 13px; }
+#mrPos { color: #ffc23a; font-size: 28px; font-weight: 600; }
+#mrTime { color: #fff3e6; font-size: 18px; }
+#mrBest { color: var(--dim); font-size: 11px; }
+#dgHud { position: fixed; left: 50%; bottom: calc(196px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6; width: min(460px, calc(100vw - 32px)); display: grid; gap: 4px; text-align: center; pointer-events: none; }
+#dgHud b { font-family: var(--display); letter-spacing: .3em; font-size: 13px; color: #ffb070; text-shadow: 0 0 10px #ff5a10; }
+#dgHud .dgb { height: 9px; border-radius: 5px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,120,40,.5); overflow: hidden; }
+#dgFill { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff3a00, #ffc040); }
+#dgTxt { font-size: 12px; color: #ffe0c0; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -628,6 +638,8 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="cityBubble" hidden></div>
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
+<div id="mrHud" hidden><span id="mrGate"></span><span id="mrPos"></span><span id="mrTime"></span><span id="mrBest"></span></div>
+<div id="dgHud" hidden><b>MAGMA GOLEM</b><div class="dgb"><i id="dgFill"></i></div><span id="dgTxt"></span></div>
 <div id="mbBar" hidden><div id="mbPieces"></div><div id="mbInfo"></div></div>
 <div id="mbHud" hidden></div>
 <div id="mechHud" hidden><b>TITAN MECH</b><span>Armor <em id="mhArmorT"></em></span><div class="mt"><i id="mhArmor"></i></div><span>Laser heat</span><div class="mt heat"><i id="mhHeat"></i></div></div>
@@ -1087,8 +1099,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -7960,7 +7972,7 @@ function mechUpdate(dt) {
   MECH.beam.visible = firing;
   if (firing) {
     const from = new V3(); ud.tip.getWorldPosition(from); const f = fwdOf(S.heading); let len2 = 60, hitC = null, hitB = null;
-    for (const c of MB.crawlers) { const v = c.obj.position.clone().add(new V3(0, 0.8, 0)).sub(from), along = v.dot(f); if (along < 0 || along > len2) continue; const side = v.clone().addScaledVector(f, -along); side.y *= 0.3; if (side.length() < 2.2) { len2 = along; hitC = c; } }
+    for (const c of MB.crawlers) { const v = c.obj.position.clone().add(new V3(0, 0.8, 0)).sub(from), along = v.dot(f); if (along < 0 || along > len2) continue; const side = v.clone().addScaledVector(f, -along); side.y *= 0.3; if (side.length() < (c.r || 2.2)) { len2 = along; hitC = c; } }
     for (const b of w.boulders) { const v = b.obj.position.clone().sub(from), along = v.dot(f); if (along < 0 || along > len2) continue; const side = v.clone().addScaledVector(f, -along); side.y *= 0.3; if (side.length() < b.s + 0.5) { len2 = along; hitB = b; hitC = null; } }
     const to = from.clone().addScaledVector(f, len2); to.y = Math.max(to.y - len2 * 0.04, hgt(to.x, to.z) + 0.6);
     const d = to.clone().sub(from); MECH.beam.position.copy(from).addScaledVector(d, 0.5); MECH.beam.quaternion.setFromUnitVectors(UP, d.clone().normalize()); MECH.beam.scale.set(1 + Math.random() * 0.5, d.length(), 1 + Math.random() * 0.5);
@@ -7980,7 +7992,7 @@ function mechPunch() {
   if (MECH.punchT > 0) return; MECH.punchT = 0.35; sfx('whoosh', 0.5);
   setTimeout(() => {
     if (!S.mech) return; const w = curMW(), hp = S.pos.clone().addScaledVector(fwdOf(S.heading), 3.8).add(new V3(0, 2, 0)); let hit = false;
-    MB.crawlers.slice().forEach(c => { if (c.obj.position.distanceTo(hp) < 5) { damageCrawler(c, 70); hit = true; } });
+    MB.crawlers.slice().forEach(c => { if (c.obj.position.distanceTo(hp) < (c.r ? c.r + 3.5 : 5)) { damageCrawler(c, 70); hit = true; } });
     w.boulders.slice().forEach(b => { if (Math.hypot(b.obj.position.x - hp.x, b.obj.position.z - hp.z) < b.s + 2.5) { hitBoulder(w, b); hit = true; } });
     S.items.slice().forEach(it => { if (it.obj.position.distanceTo(hp) < 5 && ITEMS[it.type] && ITEMS[it.type].mat) { G.mats[ITEMS[it.type].mat] += 2; surf.remove(it.obj); S.items.splice(S.items.indexOf(it), 1); say(`Smash! +2 ${MATS[ITEMS[it.type].mat].name}`, 'good'); hit = true; } });
     if (hit) { shake = Math.min(1, shake + 0.4); sfx('thud', 0.8); }
@@ -8054,6 +8066,317 @@ Object.entries(MECH_UPG).forEach(([id, u]) => { RECIPES[id] = { name: u.name, ma
   return h;
 }; }
 { const _ea5 = expAct; expAct = function (act, b) { if (act === 'mechpaint') { if (G.paints.includes(b.dataset.k)) { G.mech.paint = b.dataset.k; mechPaintAll(); sfx('ui'); say(`Mech painted ${PAINTS[b.dataset.k].name}!`, 'good'); save(); renderDock(); } return; } _ea5(act, b); }; }
+
+/* ============ the mech racing league ============ */
+G.mrace = G.mrace || { best: {}, wins: {}, champ: false, races: 0 };
+G.dg = G.dg || { vault: false, golem: 0, visits: 0 };
+const MR_CUPS = { verdance: 'Verdance Mud Cup', rime: 'Hoarfrost Ice Cup', pyre: 'Pyre Lava Cup', moon: 'Glint Moon Cup' };
+const MR_RIVALS = [{ n: 'Clank', col: 0xc4271f, trim: 0x2a2522, base: 6.9 }, { n: 'Bolt-9', col: 0xd9a520, trim: 0x2a2a40, base: 7.4 }, { n: 'Big Bertha', col: 0x6a3aaa, trim: 0xffc23a, base: 7.8 }];
+const MRACE = { on: false, w: null, next: 1, t: 0, count: 0, ai: [], done: false, place: 0, finished: [] };
+function mrTrackSetup() {
+  const w = curMW(); if (!w || w.track || !MECH_WORLDS().includes(W)) return;
+  const rMin = W === MOON_W ? 115 : 70, rMax = W === MOON_W ? 150 : 125, cps = [];
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * TAU + 0.3; let best = null;
+    for (let k = 0; k < 12; k++) { const r = rMin + (rMax - rMin) * (k / 11), x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r; if (hgt(x, z) > 0.6 && !S.colliders.some(c => Math.hypot(c.x - x, c.z - z) < c.r + 5)) { best = new V3(x, hgt(x, z), z); break; } }
+    cps.push(best || new V3(PAD.x + Math.cos(a) * rMin, Math.max(0.5, hgt(PAD.x + Math.cos(a) * rMin, PAD.z + Math.sin(a) * rMin)), PAD.z + Math.sin(a) * rMin));
+  }
+  const arches = cps.map((p, i) => {
+    const g = new THREE.Group(), next = cps[(i + 1) % 8], dir = new V3().subVectors(next, p).setY(0).normalize(), side = new V3(-dir.z, 0, dir.x);
+    for (const s of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.8, 8, 0.8), mStd(0x2a2c34, 0.6, 0.4)); post.position.copy(side).multiplyScalar(s * 6).setY(4); g.add(post); }
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(13, 0.8, 0.8), new THREE.MeshStandardMaterial({ color: i === 0 ? 0xffffff : 0xffc23a, emissive: i === 0 ? 0xffffff : 0xffc23a, emissiveIntensity: 0.6 })); bar.position.y = 8.2; bar.rotation.y = Math.atan2(-side.z, side.x); g.add(bar);
+    if (i === 0) { const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.6), new THREE.MeshBasicMaterial({ map: hvText('MECH RACE · START', 512, 80, '#14161e', '#ffc23a'), transparent: true, side: THREE.DoubleSide })); sign.position.y = 10; sign.rotation.y = bar.rotation.y; g.add(sign); }
+    g.position.copy(p); surf.add(g); return { g, bar };
+  });
+  const obs = [];
+  for (let i = 0; i < 8; i++) {
+    const a = cps[i], b = cps[(i + 1) % 8], mid = a.clone().lerp(b, 0.5), dir = new V3().subVectors(b, a).setY(0), len = dir.length(); dir.normalize(); const side = new V3(-dir.z, 0, dir.x); mid.y = Math.max(hgt(mid.x, mid.z), 0);
+    const type = ['pad', 'wall', 'crate', 'pad', 'crate', 'wall', 'pad', 'none'][i];
+    if (type === 'pad') { const m = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.3, 24), new THREE.MeshStandardMaterial({ color: 0x39ff9a, emissive: 0x1aaa5a, emissiveIntensity: 0.9 })); m.position.copy(mid).add(new V3(0, 0.2, 0)); surf.add(m); obs.push({ type, pos: mid, obj: m, seg: i, s: 0.5 }); }
+    if (type === 'wall') { const m = new THREE.Mesh(new THREE.BoxGeometry(12, 5, 1.2), new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.9, emissive: 0x2a1a0a, emissiveIntensity: 0.3 })); m.position.copy(mid).add(new V3(0, 2.5, 0)); m.rotation.y = Math.atan2(-side.z, side.x); surf.add(m); const cols = [-4.5, -1.5, 1.5, 4.5].map(o => ({ x: mid.x + side.x * o, z: mid.z + side.z * o, r: 1.6, top: mid.y + 5 })); obs.push({ type, pos: mid, obj: m, cols, up: false, seg: i, s: 0.5 }); }
+    if (type === 'crate') { const m = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 2.6), mStd(0xd7712c, 0.4, 0.5)); surf.add(m); obs.push({ type, pos: mid, obj: m, side, seg: i, ph: rand(0, TAU) }); }
+  }
+  w.track = { cps, arches, obs };
+}
+function mrWalls(up) { const tr = curMW().track; tr.obs.filter(o => o.type === 'wall').forEach(o => { if (up && !o.up) { o.up = true; o.obj.visible = true; o.cols.forEach(c => S.colliders.push(c)); } if (!up && o.up) { o.up = false; o.obj.visible = false; o.cols.forEach(c => { const i = S.colliders.indexOf(c); if (i >= 0) S.colliders.splice(i, 1); }); } }); }
+function breakWall(o) { if (!o.up) return; o.up = false; o.obj.visible = false; o.cols.forEach(c => { const i = S.colliders.indexOf(c); if (i >= 0) S.colliders.splice(i, 1); }); for (let k = 0; k < 5; k++) hitFlash(o.pos.clone().add(new V3(rand(-5, 5), rand(1, 4), rand(-1, 1))), 0xffd0a0, 4); sfx('boom', 0.6); shake = Math.min(1, shake + 0.5); }
+const nearStart = () => { const w = curMW(); return w && w.track && S.mech && !MRACE.on && Math.hypot(S.pos.x - w.track.cps[0].x, S.pos.z - w.track.cps[0].z) < 10; };
+function mrSegLens(cps) { const L = []; for (let i = 0; i < 8; i++) L.push(cps[i].distanceTo(cps[(i + 1) % 8])); return L; }
+function mrStart() {
+  if (MB.active) { say('Defend your base first!', 'bad'); return; }
+  const w = curMW(), tr = w.track; mrWalls(true);
+  MRACE.ai.forEach(a => surf.remove(a.obj));
+  MRACE.ai = MR_RIVALS.map((r, i) => { const m = makeMech(); m.userData.mats.H.color.setHex(r.col); m.userData.mats.T.color.setHex(r.trim); m.scale.setScalar(0.95); surf.add(m); return { r, obj: m, s: -(i + 1) * 3, stall: 0, hop: 0, done: false, t: 0, off: (i - 1) * 3.5 }; });
+  Object.assign(MRACE, { on: true, w, next: 1, t: 0, count: 3.5, done: false, place: 0, finished: [], L: mrSegLens(tr.cps) });
+  MRACE.total = MRACE.L.reduce((a, b) => a + b, 0);
+  const p0 = tr.cps[0], d0 = new V3().subVectors(tr.cps[1], p0).setY(0).normalize();
+  S.pos.copy(p0).addScaledVector(d0, -4); S.vel.set(0, 0, 0); S.heading = Math.atan2(-d0.x, -d0.z); S.yaw = S.heading;
+  sfx('ring'); say(`Mech race on ${W.title.replace('Explore ', '')}! Pass all 8 gates. Green pads launch you, brown walls need a punch, dodge the sliding crates.`, 'good');
+}
+function mrPos(k) { const tr = MRACE.w.track; let s = ((k % MRACE.total) + MRACE.total) % MRACE.total; for (let i = 0; i < 8; i++) { if (s <= MRACE.L[i]) { const a = tr.cps[i], b = tr.cps[(i + 1) % 8]; return { p: a.clone().lerp(b, s / MRACE.L[i]), seg: i, f: s / MRACE.L[i], dir: new V3().subVectors(b, a).setY(0).normalize() }; } s -= MRACE.L[i]; } return { p: tr.cps[0].clone(), seg: 0, f: 0, dir: new V3(1, 0, 0) }; }
+function mrPlayerProg() { const tr = MRACE.w.track, i = (MRACE.next + 7) % 8, a = tr.cps[i], b = tr.cps[MRACE.next % 8], segIdx = MRACE.next - 1; const f = clamp(1 - Math.hypot(S.pos.x - b.x, S.pos.z - b.z) / MRACE.L[i], 0, 1); return MRACE.L.slice(0, segIdx).reduce((a2, c) => a2 + c, 0) + f * MRACE.L[i]; }
+function mrUpdate(dt) {
+  const w = curMW(); if (!w || !w.track) return; const tr = w.track;
+  tr.obs.forEach(o => { if (o.type === 'crate') { o.obj.position.copy(o.pos).addScaledVector(o.side, Math.sin(T * 1.4 + o.ph) * 6.5); o.obj.position.y = Math.max(hgt(o.obj.position.x, o.obj.position.z), 0) + 1.3; o.obj.rotation.y += dt; } if (o.type === 'pad') o.obj.material.emissiveIntensity = 0.6 + Math.sin(T * 6) * 0.3; });
+  tr.arches.forEach((a, i) => { const on = MRACE.on && MRACE.w === w && i === MRACE.next % 8; a.bar.material.emissiveIntensity = on ? 1.4 + Math.sin(T * 8) * 0.4 : 0.4; a.bar.material.color.setHex(on ? 0x39ff9a : i === 0 ? 0xffffff : 0xffc23a); a.bar.material.emissive.setHex(on ? 0x39ff9a : i === 0 ? 0xffffff : 0xffc23a); });
+  if (!MRACE.on || MRACE.w !== w || G.state !== 'surface') { $('#mrHud').hidden = true; return; }
+  if (!S.mech) { mrEnd(false, 'You climbed out of your mech. Race cancelled.'); return; }
+  if (MRACE.count > 0) { const before = Math.ceil(MRACE.count); MRACE.count -= dt; const after = Math.ceil(MRACE.count); if (after !== before || !MRACE.shown) { MRACE.shown = true; showBanner(after > 0 ? String(after) : 'GO!'); sfx(after > 0 ? 'ui' : 'win'); } S.vel.x = S.vel.z = 0; if (MRACE.count > 0) { const p0 = tr.cps[0], d0 = new V3().subVectors(tr.cps[1], p0).setY(0).normalize(); S.pos.x = p0.x - d0.x * 4; S.pos.z = p0.z - d0.z * 4; } }
+  else MRACE.t += dt;
+  // player obstacles
+  for (const o of tr.obs) {
+    const d = Math.hypot(S.pos.x - o.obj.position.x, S.pos.z - o.obj.position.z);
+    if (o.type === 'pad' && d < 3.4 && S.grounded) { S.vel.y = W === MOON_W ? 16 : 24; const f = fwdOf(S.heading); S.vel.x += f.x * 6; S.vel.z += f.z * 6; sfx('whoosh'); hitFlash(o.obj.position.clone().add(new V3(0, 1, 0)), 0x39ff9a, 6); }
+    if (o.type === 'crate' && d < 3.2 && S.pos.y < o.obj.position.y + 1.5 && T - (o.hitT || 0) > 1) { o.hitT = T; const push = new V3(S.pos.x - o.obj.position.x, 0, S.pos.z - o.obj.position.z).normalize().multiplyScalar(14); S.vel.x = push.x; S.vel.z = push.z; S.vel.y = 6; sfx('thud', 0.8); shake = Math.min(1, shake + 0.4); say('BONK! A crate knocked you sideways.', 'bad'); }
+  }
+  // gates
+  const g = tr.cps[MRACE.next % 8];
+  if (MRACE.count <= 0 && Math.hypot(S.pos.x - g.x, S.pos.z - g.z) < 8) { if (MRACE.next === 8) { mrFinishPlayer(); } else { MRACE.next++; sfx('pickup'); } }
+  // rivals
+  const pp = mrPlayerProg();
+  MRACE.ai.forEach(a => {
+    if (a.done) return; if (MRACE.count > 0) { const q = mrPos(a.s); a.obj.position.copy(q.p).addScaledVector(new V3(-q.dir.z, 0, q.dir.x), a.off); a.obj.position.y = Math.max(hgt(a.obj.position.x, a.obj.position.z), 0); a.obj.rotation.y = Math.atan2(-q.dir.x, -q.dir.z); return; }
+    let v = a.r.base * (W === MOON_W ? 1.05 : 1); const gap = a.s - pp; if (gap > 25) v *= 0.82; else if (gap < -40) v *= 1.18;
+    if (a.stall > 0) { a.stall -= dt; v = 0; a.obj.userData.armL.rotation.x = -Math.sin(a.stall * 12) * 1.4; }
+    const q0 = mrPos(a.s); a.s += v * dt; const q = mrPos(a.s);
+    for (const o of tr.obs) { if (o.seg !== q.seg) continue; if (o.type === 'wall' && o.up && q0.f < 0.47 && q.f >= 0.47) { a.s -= v * dt; a.stall = 0.9; setTimeout(() => breakWall(o), 700); } if (o.type === 'pad' && q0.f < 0.5 && q.f >= 0.5) a.hop = 1.4; }
+    if (a.hop > 0) a.hop -= dt;
+    a.obj.position.copy(q.p).addScaledVector(new V3(-q.dir.z, 0, q.dir.x), a.off); a.obj.position.y = Math.max(hgt(a.obj.position.x, a.obj.position.z), 0) + (a.hop > 0 ? Math.sin((1.4 - a.hop) / 1.4 * Math.PI) * 9 : 0); a.obj.rotation.y = Math.atan2(-q.dir.x, -q.dir.z);
+    a.t += dt * v; const sw = Math.sin(a.t * 0.9) * 0.45, ud = a.obj.userData; ud.legs[0].hip.rotation.x = sw; ud.legs[1].hip.rotation.x = -sw;
+    if (a.s >= MRACE.total) { a.done = true; MRACE.finished.push(a.r.n); }
+  });
+  const ahead = MRACE.ai.filter(a => a.done || a.s > pp).length;
+  $('#mrHud').hidden = false; $('#mrGate').textContent = `GATE ${Math.min(8, MRACE.next)}/8`; $('#mrPos').textContent = `${ahead + 1}${['st', 'nd', 'rd', 'th'][ahead]}`; $('#mrTime').textContent = MRACE.t.toFixed(1) + 's';
+  $('#mrBest').textContent = G.mrace.best[W.id] ? `Best ${G.mrace.best[W.id].toFixed(1)}s` : 'No best time yet';
+}
+function mrFinishPlayer() {
+  const place = MRACE.finished.length + 1, cup = MR_CUPS[W.id], t = MRACE.t; MRACE.on = false; G.mrace.races++;
+  const pay = [3000, 1500, 800, 300][place - 1]; G.credits += pay;
+  if (!G.mrace.best[W.id] || t < G.mrace.best[W.id]) G.mrace.best[W.id] = t;
+  let extra = '';
+  if (place === 1 && !G.mrace.wins[W.id]) { G.mrace.wins[W.id] = true; extra = ` You won the ${cup}!`; logAdd([`The ${cup}`, `I won the ${cup} in my mech, ${t.toFixed(1)} seconds. Clank, Bolt-9 and Big Bertha are demanding a rematch.`]); }
+  if (Object.keys(MR_CUPS).every(k => G.mrace.wins[k]) && !G.mrace.champ) { G.mrace.champ = true; G.credits += 10000; extra += ' That is all four cups: you are the Mech League Champion! +10,000 cr'; logAdd(['Mech League Champion', 'All four mech cups are mine. Mud, ice, lava and moon dust. My mech needs a bath.']); }
+  sfx(place === 1 ? 'win' : 'ui'); showBanner(place === 1 ? '1ST PLACE!' : `${place}${['', 'ND', 'RD', 'TH'][place - 1]} PLACE`);
+  showComms('Mech League announcer', `${['WHAT A WIN', 'So close', 'A podium finish', 'Better luck next time'][place - 1]}! You finished ${place}${['st', 'nd', 'rd', 'th'][place - 1]} in ${t.toFixed(1)} seconds. +${pay.toLocaleString()} cr.${extra}`);
+  setTimeout(() => { MRACE.ai.forEach(a => surf.remove(a.obj)); MRACE.ai = []; }, 4000); $('#mrHud').hidden = true; save();
+}
+function mrEnd(ok, msg) { MRACE.on = false; MRACE.ai.forEach(a => surf.remove(a.obj)); MRACE.ai = []; $('#mrHud').hidden = true; if (msg) say(msg, 'bad'); }
+TROPHIES.mechcup = { name: 'Mech racing cup', ok: () => Object.keys(G.mrace.wins).length > 0, make: () => { const g = new THREE.Group(), m = mStd(0xc0c8d8, 0.9, 0.25); const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.15, 0.5, 6, 1, true), m); cup.position.y = 0.5; g.add(cup); const st = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), mStd(0xd7712c)); st.position.y = 0.15; g.add(st); return g; } };
+TROPHIES.golem = { name: 'Magma heart', ok: () => (G.dg.golem || 0) > 0, make: () => { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.DodecahedronGeometry(0.35, 0), new THREE.MeshStandardMaterial({ color: 0x3a1a10, emissive: 0xff5a20, emissiveIntensity: 1.2, flatShading: true }))); g.add(glowSprite(0xff6a20, 1.2)); g.position.y = 0.4; return g; } };
+
+/* ============ the volcano dungeon under Pyre ============ */
+PAINTS.magma = { name: 'Magma core', hull: 0x2a1410, trim: 0xff6a20, emissive: 0x5a1a00, arena: true };
+function dgDoorSetup() {
+  if (W !== PYRE_W) return; const w = curMW(); if (!w || w.door) return;
+  let pos = null; for (let k = 0; k < 60 && !pos; k++) { const a = -0.8 + k * 0.21, r = 55 + (k % 5) * 8, x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r; if (hgt(x, z) > 2 && !S.colliders.some(c => Math.hypot(c.x - x, c.z - z) < c.r + 8)) pos = new V3(x, hgt(x, z), z); }
+  if (!pos) pos = new V3(PAD.x + 50, Math.max(hgt(PAD.x + 50, PAD.z - 40), 1), PAD.z - 40);
+  const g = new THREE.Group(), rock = smat(0x2a1c18, 0.9, { flatShading: true });
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(22, 26, 9, 1, true), rock); cone.position.y = 10; g.add(cone);
+  const mouth = new THREE.Mesh(new THREE.CircleGeometry(6, 20, 0, Math.PI), new THREE.MeshBasicMaterial({ color: 0xff5a10, side: THREE.DoubleSide })); mouth.position.set(0, 0.1, -17); g.add(mouth);
+  for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.DodecahedronGeometry(4, 0), rock); p.position.set(s * 8, 3, -16); g.add(p); }
+  const gl = glowSprite(0xff6a20, 40); gl.position.set(0, 4, -16); g.add(gl); const top = glowSprite(0xff4a10, 30); top.position.y = 24; g.add(top);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.5), new THREE.MeshBasicMaterial({ map: hvText('VOLCANO · MECHS ONLY', 512, 80, '#1a0e0a', '#ff8a3a'), transparent: true, side: THREE.DoubleSide })); sign.position.set(0, 9, -17.5); g.add(sign);
+  const dir = new V3(PAD.x - pos.x, 0, PAD.z - pos.z).normalize(); g.position.copy(pos); g.rotation.y = Math.atan2(-dir.x, -dir.z) + Math.PI; surf.add(g);
+  const mouthW = new V3(0, 0, -17).applyAxisAngle(UP, g.rotation.y).add(pos); w.door = mouthW; S.colliders.push({ x: pos.x, z: pos.z, r: 14, top: pos.y + 20 });
+}
+{ const _msw = mechSetupWorld; mechSetupWorld = function () { _msw(); mrTrackSetup(); dgDoorSetup(); }; }
+const nearDoor = () => { const w = curMW(); return W === PYRE_W && w && w.door && Math.hypot(S.pos.x - w.door.x, S.pos.z - w.door.z) < 9 ? w : null; };
+// dungeon world
+const DG_RECTS = [[-13, 13, -230, 4], [-30, 30, -292, -229]];
+const dgIn = p => DG_RECTS.some(r => p.x > r[0] && p.x < r[1] && p.z > r[2] && p.z < r[3]);
+const DGL = new V3();
+const DG = { built: false, beetles: [], vents: [], bridge: [], pillars: [], chests: [], room: {}, golem: null, balls: [], ring: null, door: null, lava: [], embers: [] };
+const BR_Z0 = -122, BR_N = 9, BR_L = 6;
+function dgHgt(x, z) {
+  if (z < BR_Z0 && z > BR_Z0 - BR_N * BR_L - 2) { if (Math.abs(x) < 3.3) { const i = Math.floor((BR_Z0 - z) / BR_L), b = DG.bridge[i]; if (!b || !b.down) return 0; } return -8; }
+  return 0;
+}
+const DG_W = { id: 'dungeon', interior: true, brand: 'PYRE · VOLCANO DUNGEON', title: 'Volcano dungeon', scene: new THREE.Scene(), pad: { x: 0, z: 0 }, padH: 0, hgtFn: dgHgt, itemPlan: [], critterMinH: 99, bob: false, buildable: false,
+  pal: { dayTop: new THREE.Color(0x2a0a04), dayHor: new THREE.Color(0x5a1a08), setTop: new THREE.Color(0x2a0a04), setHor: new THREE.Color(0x5a1a08), nightTop: new THREE.Color(0x2a0a04), nightHor: new THREE.Color(0x5a1a08), water: new THREE.Color(0xff5a10) },
+  nightMsg: '', hint: 'Mech: WASD stomp · E punch · hold V laser · Space jets · find the treasure vault and the magma golem at the bottom',
+  bounds(p) { if (!DG.door.open && p.z < -213.5 && p.z > -230) { p.z = -213.5; S.vel.z = Math.max(0, S.vel.z); } if (dgIn(p)) DGL.copy(p); else { p.x = DGL.x; p.z = DGL.z; } },
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+WORLDS.dungeon = DG_W;
+function buildDungeon() {
+  if (S.built) return; S.built = true;
+  surf.fog = new THREE.Fog(0x2a0a04, 30, 160); surf.background = new THREE.Color(0x120402);
+  const sky = makeSkyDome(0x120402, 0x2a0a04); sky.visible = false; surf.add(sky); S.sky = sky;
+  S.sun = new THREE.DirectionalLight(0xff8a50, 0.3); S.sun.position.set(0.2, 1, 0.3); surf.add(S.sun); S.hemi = new THREE.HemisphereLight(0xff9a60, 0x3a1008, 0.6); surf.add(S.hemi); S.moonLight = new THREE.DirectionalLight(0xff6a20, 0); surf.add(S.moonLight);
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; };
+  const crack = canvasTex(256, 256, (c) => { c.fillStyle = '#2a1e1c'; c.fillRect(0, 0, 256, 256); c.strokeStyle = 'rgba(255,100,30,.55)'; c.lineWidth = 3; c.shadowColor = '#ff5a10'; c.shadowBlur = 8; for (let i = 0; i < 9; i++) { c.beginPath(); let x = Math.random() * 256, y = Math.random() * 256; c.moveTo(x, y); for (let k = 0; k < 5; k++) { x += rand(-40, 40); y += rand(-40, 40); c.lineTo(x, y); } c.stroke(); } }); crack.wrapS = crack.wrapT = THREE.RepeatWrapping; crack.repeat.set(6, 30);
+  const floorM = new THREE.MeshStandardMaterial({ map: crack, roughness: 0.9, emissive: 0x1a0602 });
+  const f1 = add(new THREE.PlaneGeometry(26, 122), floorM, 0, 0, -59); f1.rotation.x = -Math.PI / 2;
+  const f2 = add(new THREE.PlaneGeometry(26, 48), floorM, 0, 0, -205); f2.rotation.x = -Math.PI / 2;
+  const f3 = add(new THREE.PlaneGeometry(60, 64), floorM, 0, 0, -260); f3.rotation.x = -Math.PI / 2;
+  const lavaM = new THREE.MeshStandardMaterial({ color: 0xff5a10, emissive: 0xff3a00, emissiveIntensity: 1.2, roughness: 0.4 });
+  const lava = add(new THREE.PlaneGeometry(26, BR_N * BR_L + 4), lavaM, 0, -1.2, BR_Z0 - BR_N * BR_L / 2); lava.rotation.x = -Math.PI / 2; DG.lava.push(lava);
+  for (const s of [-1, 1]) { const r = add(new THREE.PlaneGeometry(2.5, 230), lavaM, s * 11.5, 0.05, -112); r.rotation.x = -Math.PI / 2; }
+  const rock = smat(0x2a1c18, 0.9, { flatShading: true });
+  for (const s of [-1, 1]) { add(new THREE.BoxGeometry(2, 22, 234), rock, s * 14, 11, -113); add(new THREE.BoxGeometry(2, 22, 64), rock, s * 31, 11, -261); }
+  add(new THREE.BoxGeometry(64, 2, 64), rock, 0, 22, -261); add(new THREE.BoxGeometry(28, 2, 234), rock, 0, 22, -113); add(new THREE.BoxGeometry(64, 22, 2), rock, 0, 11, -293); add(new THREE.BoxGeometry(28, 22, 2), rock, 0, 11, 4);
+  for (const s of [-1, 1]) add(new THREE.BoxGeometry(17, 22, 2), rock, s * 22, 11, -229.5);
+  [[0, -10], [0, -50], [0, -95], [0, -150], [0, -200], [-15, -255], [15, -255]].forEach(([x, z]) => { const L = new THREE.PointLight(0xff6a20, 1.3, 55); L.position.set(x, 12, z); surf.add(L); });
+  for (let i = 0; i < 40; i++) { const e = glowSprite(0xff8a3a, rand(0.3, 0.8)); e.position.set(rand(-12, 12), rand(0, 20), rand(-280, 0)); surf.add(e); DG.embers.push(e); }
+  // room 2: heat vents
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { const x = -7 + c * 7, z = -78 - r * 10; const base = add(new THREE.CylinderGeometry(1.8, 2.2, 0.5, 10), smat(0x1a1210), x, 0.25, z); const glow = add(new THREE.CircleGeometry(1.5, 16), new THREE.MeshBasicMaterial({ color: 0xff3a00, transparent: true, opacity: 0.2 }), x, 0.52, z); glow.rotation.x = -Math.PI / 2; const flame = add(new THREE.ConeGeometry(1.8, 10, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), x, 5, z); flame.rotation.x = Math.PI; flame.visible = false; DG.vents.push({ x, z, glow, flame, ph: (r * 3 + c) * 0.37 }); }
+  // room 3: the collapsing bridge
+  for (let i = 0; i < BR_N; i++) { const m = add(new THREE.BoxGeometry(6.6, 1, BR_L - 0.3), smat(0x4a3a30, 0.8, { flatShading: true }), 0, -0.5, BR_Z0 - i * BR_L - BR_L / 2); DG.bridge.push({ m, t: 0, down: false, back: 0 }); }
+  // room 4: the treasure vault
+  DG.door = { m: add(new THREE.BoxGeometry(26, 20, 2), new THREE.MeshStandardMaterial({ color: 0x3a2a20, emissive: 0xff5a10, emissiveIntensity: 0.15 }), 0, 10, -215), open: G.dg.vault };
+  if (G.dg.vault) DG.door.m.position.y = -12;
+  // the golem arena ring
+  DG.ring = add(new THREE.TorusGeometry(1, 0.4, 6, 48), new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }), 0, 0.4, -260); DG.ring.rotation.x = Math.PI / 2; DG.ring.visible = false;
+  S.astro = makeAstronaut(); S.astro.g.visible = false; surf.add(S.astro.g); S.drone = makeDrone(); S.drone.visible = false; surf.add(S.drone);
+}
+DG_W.build = buildDungeon;
+function makeBeetle() {
+  const g = new THREE.Group(), shell = new THREE.MeshStandardMaterial({ color: 0x5a1a0a, emissive: 0xff4a10, emissiveIntensity: 0.5, roughness: 0.4, flatShading: true }), dark = mStd(0x1a0a06, 0.4, 0.6);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8), shell); body.scale.set(1, 0.6, 1.4); body.position.y = 0.9; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), dark); head.position.set(0, 0.8, -1.4); g.add(head);
+  for (const s of [-1, 1]) { const horn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.8, 5), dark); horn.position.set(s * 0.3, 1, -1.9); horn.rotation.x = -1.2; g.add(horn); const e = glowSprite(0xffd040, 0.5); e.position.set(s * 0.25, 0.95, -1.85); g.add(e); }
+  const legs = []; for (let i = 0; i < 6; i++) { const s = i % 2 ? 1 : -1, piv = new THREE.Group(); piv.position.set(s * 0.8, 0.8, -0.6 + Math.floor(i / 2) * 0.6); const l = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.04, 1.2, 4), dark); l.position.set(s * 0.4, -0.35, 0); l.rotation.z = s * 0.9; piv.add(l); g.add(piv); legs.push(piv); }
+  const gl = glowSprite(0xff5a10, 2.5); gl.position.y = 1.2; g.add(gl); g.userData.legs = legs; return g;
+}
+function dgSpawnBeetles(n, z0, z1, x0 = -10, x1 = 10) { for (let i = 0; i < n; i++) { const o = makeBeetle(); o.position.set(rand(x0, x1), 0, rand(z0, z1)); surf.add(o); MB.crawlers.push({ obj: o, hp: 50, max: 50, cd: rand(0, 1), t: rand(0, 6), beetle: true }); } }
+function makeGolem() {
+  const g = new THREE.Group(), rock = new THREE.MeshStandardMaterial({ color: 0x2a1a14, roughness: 0.9, flatShading: true, emissive: 0x3a0a00, emissiveIntensity: 0.6 }), lava = new THREE.MeshStandardMaterial({ color: 0xff6a20, emissive: 0xff4a00, emissiveIntensity: 1.4 });
+  const add = (geo, mat, x, y, z, p = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); p.add(m); return m; };
+  const legs = [-1, 1].map(s => { const l = new THREE.Group(); l.position.set(s * 3, 7, 0); g.add(l); add(new THREE.DodecahedronGeometry(2.6, 0), rock, 0, -3.5, 0, l); add(new THREE.DodecahedronGeometry(2.2, 0), rock, 0, -6, 0, l); return l; });
+  const body = new THREE.Group(); body.position.y = 12; g.add(body);
+  const torso = add(new THREE.DodecahedronGeometry(5.5, 1), rock, 0, 0, 0, body); torso.scale.set(1.2, 1, 0.9);
+  const core = add(new THREE.SphereGeometry(2.2, 16, 12), lava, 0, 0.5, -4.4, body);
+  const head = add(new THREE.DodecahedronGeometry(2.4, 0), rock, 0, 6, -0.5, body); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.5, 8, 6), lava, s * 0.9, 6.3, -2.6, body);
+  const arms = [-1, 1].map(s => { const a = new THREE.Group(); a.position.set(s * 7, 2.5, 0); body.add(a); add(new THREE.DodecahedronGeometry(2.2, 0), rock, 0, -3, 0, a); add(new THREE.DodecahedronGeometry(2.8, 0), rock, 0, -7, 0, a); add(new THREE.SphereGeometry(1, 8, 6), lava, 0, -7, -2, a); return a; });
+  const L = new THREE.PointLight(0xff5a10, 2, 40); L.position.set(0, 12, -6); g.add(L);
+  g.userData = { legs, body, core, arms }; return g;
+}
+function dgSpawnGolem() {
+  if (DG.golem) return; const o = makeGolem(); o.position.set(0, 0, -268); surf.add(o);
+  const max = 2500 + ((G.ngp && G.ngp.level) || 0) * 800;
+  DG.golem = { obj: o, hp: max, max, cd: 0, t: 0, golem: true, r: 6, slamT: 6, fireT: 3.5, exposeT: 0, wind: 0, summoned: 0 }; MB.crawlers.push(DG.golem);
+  showComms('Something enormous', '*GRRRROOOOM* A giant made of rock and lava rises from the magma lake. The MAGMA GOLEM! Its armor is tough. When it slams the ground, its glowing core is exposed. Jump over the shockwaves with Space!');
+}
+{ const _dc2 = damageCrawler; damageCrawler = function (c, n) { if (c.golem) n *= c.exposeT > 0 ? 1.6 : 0.35; _dc2(c, n); if (c.golem && c.hp <= 0) golemDown(c); }; }
+function golemDown(c) {
+  const p = c.obj.position.clone(); for (let k = 0; k < 10; k++) setTimeout(() => hitFlash(p.clone().add(new V3(rand(-6, 6), rand(2, 18), rand(-6, 6))), 0xff8a3a, 12), k * 150);
+  DG.golem = null; DG.balls.forEach(b => surf.remove(b.obj)); DG.balls = []; DG.ring.visible = false; shake = 1; sfx('boom', 1.4);
+  const first = !G.dg.golem; G.dg.golem = (G.dg.golem || 0) + 1;
+  if (first) { G.credits += 20000; G.mats.obs += 10; G.mats.void += 3; if (!G.paints.includes('magma')) G.paints.push('magma'); showComms('The volcano goes quiet', 'The Magma Golem crumbles into a pile of glowing rocks! You found its Magma heart. +20,000 cr, +10 Obsidian, +3 Void glass and the Magma core paint for your ship and mech.'); logAdd(['The Magma Golem', 'Deep under Pyre, a giant made of lava tried to squash my mech. I jumped its shockwaves and lasered its glowing core until it fell apart. My mech smells like toast.']); }
+  else { G.credits += 3000; showComms('The volcano goes quiet', 'The Magma Golem falls again! +3,000 cr. It will reform from the lava next time you visit.'); }
+  save();
+}
+function dgReset() {
+  MB.crawlers.forEach(c => surf.remove(c.obj)); MB.crawlers = []; DG.golem = null; DG.room = {}; DG.balls.forEach(b => surf.remove(b.obj)); DG.balls = [];
+  DG.bridge.forEach(b => { b.t = 0; b.down = false; b.m.position.y = -0.5; b.m.visible = true; });
+  const w = MECH.w.dungeon; if (w) { w.boulders.forEach(b => surf.remove(b.obj)); w.boulders = []; DG.chests.forEach(c => surf.remove(c.obj)); DG.chests = []; }
+  if (!G.dg.vault) [[-7, -200], [0, -205], [7, -200]].forEach(([x, z]) => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(1.6, 0), new THREE.MeshStandardMaterial({ color: 0xff8a3a, emissive: 0xff5a10, emissiveIntensity: 0.9, flatShading: true })); m.scale.y = 2.2; m.position.set(x, 3.5, z); surf.add(m); const col = { x, z, r: 1.6, top: 7 }; S.colliders.push(col); w.boulders.push({ obj: m, hp: 3, s: 1.6, col, gem: 'obs', pillar: true }); });
+  if (!G.dg.chests) [[-8, -222], [0, -224], [8, -222]].forEach(([x, z], i) => { const ch = new THREE.Group(); const box = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.6, 1.6), smat(0x6a4a2a)); box.position.y = 0.8; ch.add(box); const lid = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.5, 1.7), mStd(0xd9a520, 0.8, 0.3)); lid.position.y = 1.8; ch.add(lid); const gl = glowSprite(0xffc23a, 4); gl.position.y = 2.2; ch.add(gl); ch.position.set(x, 0, z); surf.add(ch); DG.chests.push({ obj: ch, i }); });
+}
+{ const _hb = hitBoulder; hitBoulder = function (w, b) { if (!b.pillar) return _hb(w, b); b.hp--; hitFlash(b.obj.position.clone(), 0xffa040, 5); sfx('boom', 0.5); if (b.hp <= 0) { surf.remove(b.obj); const i = S.colliders.indexOf(b.col); if (i >= 0) S.colliders.splice(i, 1); w.boulders.splice(w.boulders.indexOf(b), 1); const left = w.boulders.filter(q => q.pillar).length; say(left ? `Crystal pillar shattered! ${left} to go.` : 'All three pillars are down! The vault door grinds open...', 'good'); if (!left) { G.dg.vault = true; DG.door.open = true; save(); } } }; }
+{ const _mp3 = mechPunch; mechPunch = function () { _mp3(); setTimeout(() => {
+  if (!S.mech) return; const hp = S.pos.clone().addScaledVector(fwdOf(S.heading), 3.8);
+  if (W === DG_W) { const c = DG.chests.find(q => Math.hypot(q.obj.position.x - hp.x, q.obj.position.z - hp.z) < 4); if (c) { surf.remove(c.obj); DG.chests.splice(DG.chests.indexOf(c), 1); const loot = [{ cr: 5000, obs: 4 }, { cr: 3000, sun: 4, prism: 4 }, { cr: 8000, void: 2 }][c.i]; Object.entries(loot).forEach(([k, n]) => { if (k === 'cr') G.credits += n; else G.mats[k] += n; }); say(`Treasure! ${Object.entries(loot).map(([k, n]) => k === 'cr' ? `${n.toLocaleString()} cr` : `${n} ${MATS[k].name}`).join(', ')}`, 'good'); sfx('win'); if (!DG.chests.length) { G.dg.chests = true; logAdd(['The treasure vault', 'Behind three crystal pillars under the volcano there was a vault full of gold. Somebody hid it there a long time ago. Finders keepers.']); } save(); } }
+  const w = curMW(); if (w && w.track) w.track.obs.forEach(o => { if (o.type === 'wall' && o.up && Math.hypot(o.obj.position.x - hp.x, o.obj.position.z - hp.z) < 6.5) breakWall(o); });
+}, 150); }; }
+function enterDungeon() {
+  const pw = curMW(); if (!pw || !S.mech) return;
+  arkTransition(() => {
+    pw.mech.visible = false; DG.returnTo = pw.door.clone();
+    useWorld(DG_W); W.build(); renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 66; camera.updateProjectionMatrix();
+    let w = MECH.w.dungeon; if (!w) { w = MECH.w.dungeon = { boulders: [], crates: [], drop: new V3(0, -999, 0), park: new V3(), parkH: 0 }; }
+    if (!w.mech) { w.mech = makeMech(); surf.add(w.mech); } w.mech.visible = true;
+    dgReset(); S.pos.set(0, 0, -4); DGL.copy(S.pos); S.vel.set(0, 0, 0); S.heading = 0; S.yaw = 0; S.pitch = 0.3; S.mech = true; G.dg.visits++;
+    setState('surface'); updateSurfCamera(1);
+    say('You stomp into the volcano. It is very, very hot. Good thing your mech has air conditioning.', 'good');
+    if (G.dg.visits === 1) logAdd(['Into the volcano', 'There is a cave under the biggest volcano on Pyre. Only a mech can survive the heat. So naturally I went in.']);
+  }, 'Entering the volcano');
+  $('#entryTitle').textContent = 'Volcano dungeon';
+}
+function leaveDungeon(fail) {
+  arkTransition(() => {
+    MB.crawlers.forEach(c => surf.remove(c.obj)); MB.crawlers = []; DG.golem = null; $('#dgHud').hidden = true;
+    const dw = MECH.w.dungeon; if (dw && dw.mech) dw.mech.visible = false;
+    useWorld(PYRE_W); renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 62; camera.updateProjectionMatrix();
+    const pw = curMW(), back = DG.returnTo || pw.door; S.pos.set(back.x, Math.max(hgt(back.x, back.z), 0), back.z).add(new V3(PAD.x - back.x, 0, PAD.z - back.z).normalize().multiplyScalar(6)); S.pos.y = Math.max(hgt(S.pos.x, S.pos.z), 0); S.vel.set(0, 0, 0);
+    pw.mech.visible = true; pw.mech.position.copy(S.pos);
+    if (fail) { S.mech = true; exitMech(true); } else S.mech = true;
+    setState('surface'); updateSurfCamera(1); save();
+  }, fail ? 'Emergency escape' : 'Leaving the volcano');
+  $('#entryTitle').textContent = 'Pyre';
+}
+{ const _mu = mechUpdate; mechUpdate = function (dt) {
+  if (W === DG_W && MECH.hp <= 0 && !DG.failing) { DG.failing = true; MECH.hp = 1; say('Your mech is collapsing! Emergency escape pod launching...', 'bad'); sfx('fail'); setTimeout(() => { DG.failing = false; leaveDungeon(true); }, 600); return; }
+  _mu(dt); if (W === DG_W) { W.bounds(S.pos); const w = curMW(); if (w && w.mech) w.mech.position.copy(S.pos); }
+  mrUpdate(dt);
+}; }
+DG_W.update = function (dt) {
+  DG.embers.forEach(e => { e.position.y += dt * 1.5; if (e.position.y > 21) e.position.y = 0; });
+  DG.lava.forEach(l => l.material.emissiveIntensity = 1.1 + Math.sin(T * 2) * 0.2);
+  if (DG.door.open && DG.door.m.position.y > -12) DG.door.m.position.y -= dt * 5;
+  if (G.state !== 'surface' || !S.mech) return;
+  const z = S.pos.z;
+  if (z < -22 && !DG.room.r1) { DG.room.r1 = true; dgSpawnBeetles(8, -60, -35); say('Room of Fire Beetles! Punch them or laser them before they nibble your mech.', 'bad'); }
+  if (z < -72 && !DG.room.r2) { DG.room.r2 = true; say('The Vent Gallery: the floor vents glow before they blast fire. Time your steps!', 'bad'); }
+  if (z < -118 && !DG.room.r3) { DG.room.r3 = true; say('A crumbling bridge over a lava lake. Do not stop: the stones fall soon after you step on them!', 'bad'); }
+  if (z < -184 && !DG.room.r4) { DG.room.r4 = true; say(G.dg.vault ? 'The vault is open.' : 'The treasure vault! Smash the three crystal pillars to open the door.', 'good'); }
+  if (z < -233 && !DG.room.r5) { DG.room.r5 = true; dgSpawnGolem(); }
+  // vents
+  DG.vents.forEach(v => { const cyc = (T * 0.25 + v.ph) % 1, warn = cyc > 0.55 && cyc < 0.75, fire = cyc >= 0.75; v.glow.material.opacity = fire ? 0.9 : warn ? 0.35 + (cyc - 0.55) * 3 : 0.15; v.flame.visible = fire; v.flame.scale.set(1, 0.8 + Math.random() * 0.3, 1);
+    if (fire && Math.hypot(S.pos.x - v.x, S.pos.z - v.z) < 2.6 && S.pos.y < 6) { MECH.hp -= 30 * dt; if (T - (DG.ventT || 0) > 1.5) { DG.ventT = T; say('OUCH! Fire vent!', 'bad'); sfx('thud'); } } });
+  // bridge
+  DG.bridge.forEach((b, i) => { const zc = BR_Z0 - i * BR_L - BR_L / 2; if (!b.down && b.t === 0 && Math.abs(S.pos.z - zc) < BR_L / 2 && Math.abs(S.pos.x) < 3.3 && S.pos.y < 1) { b.t = 0.75; sfx('thud', 0.4); } if (b.t > 0) { b.t -= dt; b.m.position.x = Math.sin(T * 40) * 0.1; if (b.t <= 0) { b.down = true; b.back = 6; } } if (b.down) { b.m.position.y -= dt * 8; if ((b.back -= dt) <= 0) { b.down = false; b.t = 0; b.m.position.set(0, -0.5, zc); } } });
+  if (dgHgt(S.pos.x, S.pos.z) < -1 && S.pos.y < -0.8) { MECH.hp -= 60; hitFlash(S.pos.clone(), 0xff5a10, 8); sfx('fail'); say('SPLASH! Your mech fell in the lava! Back to the start of the bridge.', 'bad'); S.pos.set(0, 0.5, BR_Z0 + 4); S.vel.set(0, 0, 0); DGL.copy(S.pos); }
+  // beetles
+  MB.crawlers.forEach(c => { if (!c.beetle) return; const p = c.obj.position, dx = S.pos.x - p.x, dz = S.pos.z - p.z, d = Math.hypot(dx, dz); c.t += dt; c.cd -= dt;
+    if (d > 3) { p.x += dx / d * 4.6 * dt; p.z += dz / d * 4.6 * dt; } else if (c.cd <= 0) { c.cd = 1; MECH.hp -= 9; hitFlash(S.pos.clone().add(new V3(0, 2, 0)), 0xff8a5a, 2); }
+    if (!dgIn(p) || dgHgt(p.x, p.z) < -1) { p.x -= dx / (d || 1) * 4.6 * dt; p.z -= dz / (d || 1) * 4.6 * dt; }
+    c.obj.rotation.y = Math.atan2(-dx, -dz); p.y = 0; c.obj.userData.legs.forEach((l, i) => l.rotation.x = Math.sin(c.t * 14 + i * 1.6) * 0.5); });
+  // the golem
+  const g = DG.golem;
+  if (g) {
+    const o = g.obj, ud = o.userData, dx = S.pos.x - o.position.x, dz = S.pos.z - o.position.z, d = Math.hypot(dx, dz); g.t += dt;
+    if (g.wind <= 0 && d > 10) { o.position.x += dx / d * 2.4 * dt; o.position.z += dz / d * 2.4 * dt; ud.legs[0].rotation.x = Math.sin(g.t * 2) * 0.4; ud.legs[1].rotation.x = -Math.sin(g.t * 2) * 0.4; if (Math.abs(Math.sin(g.t * 2)) > 0.98 && T - (g.stepT || 0) > 0.4) { g.stepT = T; shake = Math.min(1, shake + 0.25); sfx('thud', 0.6); } }
+    o.rotation.y = lerpAngle(o.rotation.y, Math.atan2(-dx, -dz), dt * 1.5);
+    if (d < 7) { S.pos.x = o.position.x + dx / d * 7; S.pos.z = o.position.z + dz / d * 7; }
+    if (g.exposeT > 0) g.exposeT -= dt; ud.core.material.emissiveIntensity = g.exposeT > 0 ? 3 + Math.sin(T * 20) : 1; ud.core.scale.setScalar(g.exposeT > 0 ? 1.4 : 1);
+    g.slamT -= dt;
+    if (g.slamT <= 0 && g.wind <= 0) { g.wind = 1.2; say('The golem raises its fists...', 'bad'); }
+    if (g.wind > 0) { g.wind -= dt; ud.arms.forEach(a => a.rotation.x = -2.6 * (1 - Math.max(0, g.wind) / 1.2)); if (g.wind <= 0) { ud.arms.forEach(a => a.rotation.x = 0.3); g.slamT = 7; g.exposeT = 3.5; g.ringR = 2; DG.ring.position.set(o.position.x, 0.4, o.position.z); DG.ring.visible = true; DG.ringHit = false; shake = 1; sfx('boom', 1.2); say('SLAM! Jump the shockwave, then hit the glowing core!', 'bad'); } }
+    if (DG.ring.visible) { g.ringR += 16 * dt; DG.ring.scale.setScalar(g.ringR); DG.ring.material.opacity = Math.max(0, 0.9 - g.ringR / 40); const rd = Math.hypot(S.pos.x - DG.ring.position.x, S.pos.z - DG.ring.position.z); if (!DG.ringHit && Math.abs(rd - g.ringR) < 1.6 && S.pos.y - dgHgt(S.pos.x, S.pos.z) < 1.2) { DG.ringHit = true; MECH.hp -= 70; hitFlash(S.pos.clone().add(new V3(0, 2, 0)), 0xffa040, 6); say('The shockwave hit you! Press Space to jump over the next one.', 'bad'); } if (g.ringR > 36) DG.ring.visible = false; }
+    g.fireT -= dt; if (g.fireT <= 0 && g.wind <= 0) { g.fireT = 3.2; const from = o.position.clone().add(new V3(0, 16, 0)), to = S.pos.clone(); const b = glowSprite(0xff6a20, 4); b.position.copy(from); surf.add(b); DG.balls.push({ obj: b, from, to, t: 0 }); sfx('whoosh', 0.6); }
+    DG.balls.slice().forEach(b => { b.t += dt / 1.3; const k = Math.min(1, b.t); b.obj.position.lerpVectors(b.from, b.to, k); b.obj.position.y += Math.sin(k * Math.PI) * 10; if (k >= 1) { surf.remove(b.obj); DG.balls.splice(DG.balls.indexOf(b), 1); hitFlash(b.to.clone().add(new V3(0, 1, 0)), 0xff6a20, 9); sfx('boom', 0.6); if (Math.hypot(S.pos.x - b.to.x, S.pos.z - b.to.z) < 4.5) { MECH.hp -= 30; say('A fireball hit your mech! Keep moving!', 'bad'); } } });
+    if (g.hp < g.max * 0.5 && g.summoned < 1) { g.summoned = 1; dgSpawnBeetles(4, -280, -240, -20, 20); say('The golem calls fire beetles out of the lava!', 'bad'); }
+    if (g.hp < g.max * 0.25 && g.summoned < 2) { g.summoned = 2; dgSpawnBeetles(5, -280, -240, -20, 20); }
+    $('#dgHud').hidden = false; $('#dgFill').style.width = (g.hp / g.max * 100) + '%'; $('#dgTxt').textContent = g.exposeT > 0 ? 'CORE EXPOSED! Hit it now!' : `${Math.ceil(g.hp / g.max * 100)}%`;
+  } else $('#dgHud').hidden = true;
+};
+DG_W.surfMarkers = function () {
+  const m = (id, cls, label, p) => { const el = marker(id, cls, label); el.querySelector('.dst').textContent = fmtD(S.pos.distanceTo(p)); placeMarker(el, p); };
+  m('dg-exit', 'station', 'Way out', new V3(0, 6, 2));
+  if (!G.dg.vault) curMW() && curMW().boulders.forEach((b, i) => { if (b.pillar) m('dg-p' + i, 'target', 'Crystal pillar', b.obj.position); });
+  DG.chests.forEach((c, i) => { if (DG.door.open) m('dg-c' + i, 'target', 'Treasure chest', c.obj.position.clone().add(new V3(0, 3, 0))); });
+  if (DG.golem) m('dg-g', 'enemy', 'Magma golem', DG.golem.obj.position.clone().add(new V3(0, 24, 0)));
+  MB.crawlers.forEach((c, i) => { if (c.beetle && i < 10 && S.pos.distanceTo(c.obj.position) < 60) { const el = marker('dg-b' + i, 'enemy', 'Fire beetle'); el.querySelector('.dst').textContent = fmtD(S.pos.distanceTo(c.obj.position)); el.querySelector('.hp i').style.width = (c.hp / c.max * 100) + '%'; placeMarker(el, c.obj.position.clone().add(new V3(0, 3, 0))); } });
+};
+{ const _upt2 = updatePet; updatePet = function (dt) { if (W === DG_W) { if (PET.obj) PET.obj.visible = false; return; } _upt2(dt); }; }
+{ const _hv5 = harvest; harvest = function () {
+  if (G.state === 'surface' && S.mech) {
+    if (nearStart()) { mrStart(); return; }
+    if (nearDoor()) { enterDungeon(); return; }
+    if (W === DG_W && S.pos.z > -3) { leaveDungeon(false); return; }
+  }
+  _hv5();
+}; }
+{ const _ush4 = updateSurfHUD; updateSurfHUD = function () {
+  _ush4();
+  if (S.mech && !MRACE.on && nearStart()) setPrompt(`Press <kbd>E</kbd> to start the mech race (${MR_CUPS[W.id]}${G.mrace.wins[W.id] ? ' · won' : ''})`);
+  else if (S.mech && nearDoor()) setPrompt('Press <kbd>E</kbd> to stomp into the volcano dungeon');
+  else if (!S.mech && nearDoor()) setPrompt('Too hot inside! Climb into your mech to enter the volcano.');
+  else if (W === DG_W && S.pos.z > -3) setPrompt('Press <kbd>E</kbd> to leave the volcano');
+  else if (!S.mech) { const w = curMW(); if (w && w.track && Math.hypot(S.pos.x - w.track.cps[0].x, S.pos.z - w.track.cps[0].z) < 10) setPrompt('Mech races only! Climb into your mech to race.'); }
+}; }
+{ const _bd2 = board; board = function () { if (MRACE.on) mrEnd(false); _bd2(); }; }
+{ const _xm = exitMech; exitMech = function (eject) { if (W === DG_W) { say('Way too hot to climb out in here! Walk back to the exit first.', 'bad'); return; } if (MRACE.on) mrEnd(false); _xm(eject); }; }
 
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
