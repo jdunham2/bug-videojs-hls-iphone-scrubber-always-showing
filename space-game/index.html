@@ -450,6 +450,19 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 .co-row label { display: grid; gap: 3px; }
 .co-row select, .coname { font: inherit; font-size: 13px; color: var(--text); background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; max-width: 100%; }
 .coname { margin-top: 8px; width: min(320px, 100%); font-family: var(--display); font-size: 16px; }
+#mbBar { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 7; width: min(640px, calc(100vw - 32px)); display: grid; gap: 6px; padding: 10px; border-radius: 8px; background: rgba(14,16,26,.88); border: 1px solid var(--line); }
+#mbPieces { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+#mbInfo { font-size: 11px; color: var(--dim); text-align: center; }
+#mbHud { position: fixed; left: 50%; bottom: calc(196px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6; display: grid; justify-items: center; gap: 2px; pointer-events: none; text-shadow: 0 1px 4px #000; }
+#mbHud b { font-family: var(--display); letter-spacing: .2em; font-size: 13px; color: #9fe8ff; }
+#mbHud span { font-size: 12px; color: #e8f0ff; }
+#mechHud { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); z-index: 6; width: 220px; display: grid; gap: 4px; padding: 10px 12px; border-radius: 6px; background: rgba(14,16,26,.8); border: 1px solid var(--line); pointer-events: none; font-size: 11px; }
+#mechHud b { font-family: var(--display); letter-spacing: .18em; color: var(--ember); }
+#mechHud .mt { height: 7px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; }
+#mechHud .mt i { display: block; height: 100%; width: 100%; background: var(--good); }
+#mechHud .mt.heat i { background: #ff8a5a; }
+#mechBtns { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(222px + env(safe-area-inset-bottom, 0px)); z-index: 7; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; width: 220px; }
+#mechBtns button { padding: 8px 6px; font-size: 11px; touch-action: none; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -615,6 +628,10 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="cityBubble" hidden></div>
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
+<div id="mbBar" hidden><div id="mbPieces"></div><div id="mbInfo"></div></div>
+<div id="mbHud" hidden></div>
+<div id="mechHud" hidden><b>TITAN MECH</b><span>Armor <em id="mhArmorT"></em></span><div class="mt"><i id="mhArmor"></i></div><span>Laser heat</span><div class="mt heat"><i id="mhHeat"></i></div></div>
+<div id="mechBtns" hidden><button class="btn" data-m="punch">Punch (E)</button><button class="btn" data-m="grab">Grab (G)</button><button class="btn" data-m="laser">Laser (hold V)</button><button class="ghost" data-m="exit">Climb out (X)</button></div>
 <div class="overlay" id="hPanel" hidden><div class="panel"><header><div><div class="eyebrow" id="hpEyebrow"></div><h2 id="hpTitle"></h2></div><button class="ghost" id="hpClose">Close</button></header><div class="tabbody" id="hpBody"></div></div></div>
 <div class="overlay" id="seaDoor" hidden><div class="center-card"><div class="sea-eyebrow">Sunken city</div><h2 id="sdTitle" style="margin:0"></h2><p id="sdClue"></p><p id="sdHelp"></p><div id="sdOpts"></div><p id="sdStatus"></p><button class="ghost" id="sdClose">Swim away</button></div></div>
 <div class="overlay" id="seaSecret" hidden><div class="center-card"><div class="sea-eyebrow">The memory crystal</div><h2 style="margin:0">Where the whales came from</h2><div id="secretBody"></div><button class="btn" id="secretClose">Close</button></div></div>
@@ -1070,8 +1087,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -7658,6 +7675,385 @@ function coFleet(dt) {
 }
 { const _ub5 = updateBoss; updateBoss = function (dt) { _ub5(dt); coFleet(dt); }; }
 { const _em11 = extraMarkers; extraMarkers = function () { _em11(); if (!G.co) return; G.co.ships.forEach(s => { const o = COF.objs[s.id]; if (!o || !o.visible) return; const d = player.position.distanceTo(o.position); if (d > 8000) return; const cap = G.co.caps.find(c => c.id === s.cap); const el = marker('co-' + s.id, 'friendly', `${s.name}${cap ? ' · ' + cap.name.split(' ')[0] : ''}`); el.querySelector('.dst').textContent = fmtD(d); placeMarker(el, o.position); }); }; }
+
+/* ============ Glint, the moon of Hoarfrost: a base to defend ============ */
+G.moon = G.moon || { pieces: [], core: 400, nights: 0, tonight: false, kills: 0 };
+G.mech = G.mech || { owned: false, paint: 'blue', armor: 0, laser: 0, jets: 0 };
+const MOONP = { name: 'Glint', sys: 'frost', world: 'moon', pos: FROSTP.pos.clone().add(new V3(1700, 650, 1000)), R: 320 };
+MOONP.landR = MOONP.R + 420;
+makePlanet(MOONP.R, MOONP.pos, planetTex('#6a6c74', '170,172,182', '40,42,50'), 0x9fb8ff);
+PLANETS.push(MOONP);
+let _cr = 917; const crr = () => (_cr = (_cr * 16807) % 2147483647) / 2147483647;
+const CRATERS = []; while (CRATERS.length < 46) { const a = crr() * TAU, d = 110 + crr() * 650, c = { x: Math.cos(a) * d, z: Math.sin(a) * d - 10, r: 12 + Math.pow(crr(), 2) * 70, dep: 0 }; c.dep = c.r * (0.12 + crr() * 0.1); CRATERS.push(c); }
+function moonRaw(x, z) {
+  let h = 20 + (fbm(x * 0.008, z * 0.008) - 0.5) * 16 + (fbm(x * 0.05, z * 0.05) - 0.5) * 2;
+  for (const c of CRATERS) { const dx = x - c.x, dz = z - c.z; if (Math.abs(dx) > c.r * 1.3 || Math.abs(dz) > c.r * 1.3) continue; const d = Math.hypot(dx, dz) / c.r; if (d < 1) h += -c.dep * (1 - d * d) + c.dep * 0.35 * d * d * d * d; else if (d < 1.3) h += c.dep * 0.35 * (1.3 - d) / 0.3; }
+  return h;
+}
+function moonHgt(x, z) { const fb = Math.hypot(x, z + 12), k = smooth(70, 110, fb); return 20 + (moonRaw(x, z) - 20) * k; }
+const CORE = { x: 0, z: -30 };
+const MOON_W = { id: 'moon', brand: 'GLINT · MOON OF HOARFROST', title: 'Moon base Glint', scene: new THREE.Scene(), pad: { x: 0, z: 0 }, padH: 20, hgtFn: moonHgt,
+  itemPlan: [['cryo', 10, 0], ['prism', 6, 0], ['sun', 3, 0]], critterMinH: 99, bob: false, buildable: false,
+  pal: { dayTop: new THREE.Color(0x05060c), dayHor: new THREE.Color(0x2a2e3e), setTop: new THREE.Color(0x05060c), setHor: new THREE.Color(0x3a2e4e), nightTop: new THREE.Color(0x010204), nightHor: new THREE.Color(0x0a0c18), water: new THREE.Color(0x222222) },
+  nightMsg: 'Night on Glint. Listen... something is scratching at the ice. The crawlers are coming!', hint: 'WASD walk (low gravity!) · Space jetpack · B build defenses · V blaster · E use · ring the alarm at the core to start a defense',
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+WORLDS.moon = MOON_W;
+const MB = { on: false, sel: 'wall', rot: 0, ghost: null, objs: [], crawlers: [], active: false, wave: 0, waveT: 0, coreObj: null, coreGlow: null, hitT: -9, shotCd: 0, beams: [] };
+const MPIECES = { wall: { name: 'Ice wall', cost: { cr: 300, cryo: 1 }, hp: 220, r: 1.3 }, turret: { name: 'Laser turret', cost: { cr: 2500, prism: 2 }, hp: 160, r: 1.4 }, shield: { name: 'Shield generator', cost: { cr: 4000, cryo: 3, sun: 1 }, hp: 140, r: 1.4, bubble: 16 } };
+function buildMoon() {
+  if (S.built) return; S.built = true;
+  SHIP_REST.set(PAD.x, PAD_H + 2.5, PAD.z); SHIP_START.set(PAD.x + 240, PAD_H + 160, PAD.z - 140);
+  surf.fog = new THREE.Fog(0x0a0c18, 300, 1500);
+  const sky = makeSkyDome(0x05060c, 0x2a2e3e); sky.renderOrder = -10; surf.add(sky); S.sky = sky;
+  const sg = new THREE.BufferGeometry(), sp = []; for (let i = 0; i < 2500; i++) { const d = randDir(); if (d.y < 0.02) d.y = Math.abs(d.y) + 0.02; d.normalize().multiplyScalar(2400); sp.push(d.x, d.y, d.z); } sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  const stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, fog: false, depthWrite: false })); stars.renderOrder = -9; surf.add(stars); MB.stars = stars;
+  const pTex = canvasTex(512, 256, (g, W2, H2) => { for (let y = 0; y < H2; y++) { const n = Math.sin(y * 0.07) * 0.5 + Math.sin(y * 0.021 + 2) * 0.5; g.fillStyle = `rgb(${180 + n * 30},${215 + n * 20},${245})`; g.fillRect(0, y, W2, 1); } for (let i = 0; i < 300; i++) { g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.ellipse(Math.random() * W2, Math.random() * H2, rand(10, 60), rand(3, 10), 0, 0, TAU); g.fill(); } });
+  const hoar = new THREE.Mesh(new THREE.SphereGeometry(700, 48, 32), new THREE.MeshBasicMaterial({ map: pTex, fog: false, depthWrite: false })); hoar.position.set(-1600, 900, -1900); hoar.renderOrder = -8; surf.add(hoar);
+  const halo = glowSprite(0x9fe0ff, 2200); halo.material.opacity = 0.35; halo.position.copy(hoar.position); halo.renderOrder = -9; surf.add(halo);
+  S.sun = new THREE.DirectionalLight(0xffffff, 1.1); S.sun.position.copy(SURF_SUN); surf.add(S.sun);
+  S.hemi = new THREE.HemisphereLight(0xb8c8ff, 0x303038, 0.4); surf.add(S.hemi);
+  S.moonLight = new THREE.DirectionalLight(0x9fd0ff, 0); S.moonLight.position.set(-0.6, 0.6, -0.5); surf.add(S.moonLight);
+  const SIZE = 1700, SEG = 170, tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); tg.rotateX(-Math.PI / 2);
+  const tp = tg.attributes.position; for (let i = 0; i < tp.count; i++) tp.setY(i, moonHgt(tp.getX(i), tp.getZ(i))); tg.computeVertexNormals();
+  const nrm = tg.attributes.normal, cols = new Float32Array(tp.count * 3);
+  for (let i = 0; i < tp.count; i++) { const y = tp.getY(i), n = fbm(tp.getX(i) * 0.06, tp.getZ(i) * 0.06); colr.setRGB(0.6, 0.61, 0.66).multiplyScalar(0.75 + n * 0.35).lerp(tmpC.setRGB(0.3, 0.31, 0.36), smooth(18, 6, y)).lerp(tmpC.setRGB(0.42, 0.43, 0.48), smooth(0.9, 0.7, nrm.getY(i))); cols[i * 3] = colr.r; cols[i * 3 + 1] = colr.g; cols[i * 3 + 2] = colr.b; }
+  tg.setAttribute('color', new THREE.BufferAttribute(cols, 3)); surf.add(new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true })));
+  const rockM = smat(0x5a5c64, 0.9, { flatShading: true });
+  for (let i = 0; i < 70; i++) { const a = rand(0, TAU), r = rand(120, 700), x = Math.cos(a) * r, z = Math.sin(a) * r, s = rand(1, 5); const m = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockM); m.position.set(x, moonHgt(x, z) + s * 0.3, z); m.rotation.set(rand(0, 3), rand(0, 3), 0); surf.add(m); if (s > 2.5) S.colliders.push({ x, z, r: s * 0.9, top: moonHgt(x, z) + s }); }
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({ color: 0x222222 })); water.visible = false; water.position.y = -500; surf.add(water); S.water = water;
+  // landing pad, shuttle and base core
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(12, 13, 0.6, 32), smat(0x4a4c55, 0.6, { metalness: 0.4 })); pad.position.set(PAD.x, PAD_H + 0.05, PAD.z); surf.add(pad);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(10.5, 0.15, 6, 48), mGlow(0x6fd8ff)); ring.rotation.x = Math.PI / 2; ring.position.set(PAD.x, PAD_H + 0.4, PAD.z); surf.add(ring);
+  S.ship = new THREE.Group(); const sm = makeFighter(STYLE_PLAYER); S.ship.add(sm); S.shipModel = sm; S.ship.userData.engines = sm.userData.engines;
+  for (const [x, z] of [[0, -3], [2.4, 2.4], [-2.4, 2.4]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 2, 6), mStd(0x2a2b33)); leg.position.set(x, -1.4, z); S.ship.add(leg); }
+  S.ship.position.copy(SHIP_REST); S.ship.rotation.y = SHIP_YAW; surf.add(S.ship); S.colliders.push({ x: PAD.x, z: PAD.z, r: 5, top: PAD_H + 3.5 });
+  const cy = moonHgt(CORE.x, CORE.z), core = new THREE.Group();
+  core.add(new THREE.Mesh(new THREE.CylinderGeometry(3.4, 4, 2, 12), mStd(0x3a3c48, 0.6, 0.4)));
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2, 7, 10), mStd(0x8a8f9a, 0.5, 0.4)); tower.position.y = 4.5; core.add(tower);
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(1.6, 18, 12), new THREE.MeshStandardMaterial({ color: 0x7fe0ff, emissive: 0x3ab8ff, emissiveIntensity: 1.3 })); orb.position.y = 9; core.add(orb);
+  const gl = glowSprite(0x6fd8ff, 14); gl.position.y = 9; core.add(gl); const L = new THREE.PointLight(0x6fd8ff, 1.2, 40); L.position.y = 9; core.add(L);
+  core.position.set(CORE.x, cy, CORE.z); surf.add(core); MB.coreObj = core; MB.coreOrb = orb; MB.coreGlow = gl; S.colliders.push({ x: CORE.x, z: CORE.z, r: 4.2, top: cy + 10 });
+  S.astro = makeAstronaut(); surf.add(S.astro.g); S.drone = makeDrone(); surf.add(S.drone);
+  G.moon.pieces.forEach(spawnMPiece);
+  applyPaint();
+}
+MOON_W.build = buildMoon;
+function makeMPiece(t) {
+  const g = new THREE.Group(), metal = mStd(0x8a9aaa, 0.6, 0.35), dark = mStd(0x2a2c34, 0.5, 0.5), glow = mGlow(0x6fd8ff);
+  if (t === 'wall') { const b = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.2, 0.9), new THREE.MeshStandardMaterial({ color: 0xbfe8ff, roughness: 0.2, metalness: 0.3, transparent: true, opacity: 0.9, emissive: 0x1a4a7a, emissiveIntensity: 0.3 })); b.position.y = 1.6; g.add(b); const s = new THREE.Mesh(new THREE.BoxGeometry(4.25, 0.15, 0.95), glow); s.position.y = 3.1; g.add(s); }
+  if (t === 'turret') { const b = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.4, 1.6, 10), dark); b.position.y = 0.8; g.add(b); const head = new THREE.Group(); head.position.y = 2.1; const dome = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), metal); head.add(dome); for (const s of [-0.35, 0.35]) { const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.8, 6), dark); bar.rotation.x = Math.PI / 2; bar.position.set(s, 0, -1); head.add(bar); } const e = glowSprite(0xff5a5a, 1); e.position.set(0, 0.2, -0.85); head.add(e); g.add(head); g.userData.head = head; }
+  if (t === 'shield') { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 3.2, 8), metal); b.position.y = 1.6; g.add(b); const orb = new THREE.Mesh(new THREE.SphereGeometry(0.7, 14, 10), new THREE.MeshStandardMaterial({ color: 0x9fffe8, emissive: 0x4fffe0, emissiveIntensity: 1.2 })); orb.position.y = 3.6; g.add(orb); const dome = new THREE.Mesh(new THREE.SphereGeometry(MPIECES.shield.bubble, 32, 16, 0, TAU, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); g.add(dome); g.userData.dome = dome; }
+  return g;
+}
+function spawnMPiece(rec) {
+  const obj = makeMPiece(rec.t); obj.position.set(rec.x, moonHgt(rec.x, rec.z), rec.z); obj.rotation.y = rec.rot || 0; surf.add(obj);
+  const cols = [];
+  if (rec.t === 'wall') { const ax = new V3(1, 0, 0).applyAxisAngle(UP, rec.rot || 0); for (const s of [-1, 1]) cols.push({ x: rec.x + ax.x * s * 1.1, z: rec.z + ax.z * s * 1.1, r: 1.2, top: obj.position.y + 3.2 }); }
+  else cols.push({ x: rec.x, z: rec.z, r: 1.3, top: obj.position.y + 3 });
+  cols.forEach(c => S.colliders.push(c));
+  const o = { rec, obj, cols, sh: rec.t === 'shield' ? 200 : 0, shT: 0, cd: 0, beam: null }; MB.objs.push(o); return o;
+}
+function removeMPiece(o) { surf.remove(o.obj); o.cols.forEach(c => { const i = S.colliders.indexOf(c); if (i >= 0) S.colliders.splice(i, 1); }); MB.objs.splice(MB.objs.indexOf(o), 1); G.moon.pieces.splice(G.moon.pieces.indexOf(o.rec), 1); if (o.beam) surf.remove(o.beam); }
+// building
+const fwdOf = h => new V3(-Math.sin(h), 0, -Math.cos(h));
+function mbGhostSpot() { const p = S.pos.clone().addScaledVector(fwdOf(S.heading), 7); p.x = Math.round(p.x / 2) * 2; p.z = Math.round(p.z / 2) * 2; return p; }
+function mbPlan() {
+  const p = mbGhostSpot(), d = MPIECES[MB.sel]; let bad = '';
+  if (Math.hypot(p.x - CORE.x, p.z - CORE.z) > 85) bad = 'Too far from the base core';
+  else if (Math.hypot(p.x - CORE.x, p.z - CORE.z) < 5.5 || Math.hypot(p.x - PAD.x, p.z - PAD.z) < 13) bad = 'Too close to the core or the landing pad';
+  else if (MB.objs.some(o => Math.hypot(o.rec.x - p.x, o.rec.z - p.z) < (MB.sel === 'wall' && o.rec.t === 'wall' ? 1.6 : 2.8))) bad = 'Something is already there';
+  else if (!canAfford(d.cost)) bad = `Not enough materials (${costText(d.cost)})`;
+  return { p, bad };
+}
+function mbToggle() {
+  MB.on = !MB.on; if (MB.ghost) { surf.remove(MB.ghost); MB.ghost = null; }
+  if (MB.on) mbSetGhost(); $('#mbBar').hidden = !MB.on; mbBar(); sfx('ui');
+}
+function mbSetGhost() { if (MB.ghost) surf.remove(MB.ghost); MB.ghost = makeMPiece(MB.sel); MB.ghost.traverse(o => { if (o.isMesh) { o.material = GHOST_OK; } }); surf.add(MB.ghost); }
+function mbBar() { $('#mbPieces').innerHTML = Object.entries(MPIECES).map(([k, p], i) => `<button class="bbp" data-mk="${k}" aria-pressed="${MB.sel === k}"><span><kbd>${i + 1}</kbd>${p.name}</span><small>${costText(p.cost)}</small></button>`).join(''); $('#mbInfo').textContent = `${MB.objs.filter(o => o.rec.t === 'wall').length} walls · ${MB.objs.filter(o => o.rec.t === 'turret').length} turrets · ${MB.objs.filter(o => o.rec.t === 'shield').length} shields · E place · R rotate · X remove · B close`; }
+$('#mbPieces').addEventListener('click', e => { const b = e.target.closest('[data-mk]'); if (!b) return; MB.sel = b.dataset.mk; mbSetGhost(); mbBar(); sfx('ui'); });
+function mbPlace() {
+  const { p, bad } = mbPlan(); if (bad) { say(bad, 'bad'); sfx('fail'); return; }
+  payCost(MPIECES[MB.sel].cost); const rec = { t: MB.sel, x: p.x, z: p.z, rot: MB.rot, hp: MPIECES[MB.sel].hp }; G.moon.pieces.push(rec); spawnMPiece(rec); sfx('pickup');
+  if (G.moon.pieces.length === 1) logAdd(['Moon base Glint', 'I put up the first ice wall around my base on Glint, the little moon of Hoarfrost. The locals say the ice crawlers come out at night. The locals are robots, but still.']);
+  save(); mbBar();
+}
+function mbRemove() { const p = mbGhostSpot(); let best = null, bd = 3; for (const o of MB.objs) { const d = Math.hypot(o.rec.x - p.x, o.rec.z - p.z); if (d < bd) { bd = d; best = o; } } if (!best) return; const c = MPIECES[best.rec.t].cost; if (c.cr) G.credits += Math.round(c.cr / 2); removeMPiece(best); sfx('ui'); say(`${MPIECES[best.rec.t].name} removed. Half the credits refunded.`); save(); mbBar(); }
+// ice crawlers
+function makeCrawler() {
+  const g = new THREE.Group(), ice = new THREE.MeshStandardMaterial({ color: 0xd8f0ff, roughness: 0.3, metalness: 0.2, emissive: 0x1a4a7a, emissiveIntensity: 0.4, flatShading: true }), dark = mStd(0x2a3a5a, 0.4, 0.6);
+  for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.75 - i * 0.12, 10, 8), i ? dark : ice); b.scale.y = 0.6; b.position.set(0, 0.7, i * 0.9); g.add(b); const sp = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.8, 5), ice); sp.position.set(0, 1.25, i * 0.9); sp.rotation.x = -0.3; g.add(sp); }
+  const legs = []; for (let i = 0; i < 6; i++) { const s = i % 2 ? 1 : -1, l = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.03, 1.3, 4), dark); const piv = new THREE.Group(); piv.position.set(s * 0.5, 0.7, Math.floor(i / 2) * 0.8); l.position.set(s * 0.45, -0.35, 0); l.rotation.z = s * 0.9; piv.add(l); g.add(piv); legs.push(piv); }
+  for (const s of [-0.25, 0.25]) { const e = glowSprite(0x6fffff, 0.6); e.position.set(s, 0.85, -0.7); g.add(e); }
+  g.userData.legs = legs; g.scale.setScalar(1.3); return g;
+}
+function spawnCrawlerWave() {
+  MB.wave++; const n = 4 + MB.wave * 3 + Math.min(6, G.moon.nights) + ((G.ngp && G.ngp.level) || 0) * 2, hp = 40 + G.moon.nights * 6 + MB.wave * 8;
+  const base = rand(0, TAU);
+  for (let i = 0; i < n; i++) { const a = base + rand(-1.1, 1.1) + (i % 3 === 0 ? Math.PI : 0), r = rand(95, 120), x = CORE.x + Math.cos(a) * r, z = CORE.z + Math.sin(a) * r, o = makeCrawler(); o.position.set(x, moonHgt(x, z), z); surf.add(o); MB.crawlers.push({ obj: o, hp, max: hp, cd: rand(0, 1), t: rand(0, 6), spd: rand(3, 4.2) }); }
+  say(`Wave ${MB.wave} of 3: ${n} ice crawlers are scuttling toward your base!`, 'bad'); sfx('fail');
+}
+function startDefense(drill) {
+  if (MB.active) return; MB.active = true; MB.wave = 0; MB.waveT = 3; MB.drill = !!drill;
+  showComms('Base computer', drill ? 'ALARM TEST... wait, that is not a test. Crawlers detected! Three waves incoming. Man the defenses!' : 'Night has fallen on Glint. Seismic sensors are going crazy. Ice crawlers! Three waves incoming. Protect the core!');
+}
+function endDefense(ok) {
+  MB.active = false; MB.crawlers.forEach(c => surf.remove(c.obj)); MB.crawlers = []; G.moon.tonight = true;
+  if (ok) { G.moon.nights++; const cr = 2000 + G.moon.nights * 400; G.credits += cr; G.mats.cryo += 3; sfx('win'); showComms('Base computer', `All three waves defeated! The core is safe. Reward: ${cr.toLocaleString()} cr and 3 Cryo crystals. Nights survived: ${G.moon.nights}.`); if (G.moon.nights === 1) logAdd(['The first night', 'The ice crawlers came at night, just like they said. Hundreds of little legs. My turrets went pew pew pew. The core survived. I did not sleep at all.']); }
+  else { const lost = Math.min(G.mats.cryo, 3); G.mats.cryo -= lost; G.moon.core = 150; sfx('fail'); showComms('Base computer', `The core is overrun! The crawlers stole ${lost} Cryo crystals and scuttled away. Emergency repairs are running. Build more walls, turrets and shields!`); }
+  save();
+}
+function hitFlash(pos, col = 0x9fe8ff, size = 3) { const f = glowSprite(col, size); f.position.copy(pos); surf.add(f); S.pulses.push({ obj: f, t: 0, life: 0.4, kind: 'flash' }); }
+function damageCrawler(c, n) {
+  c.hp -= n; hitFlash(c.obj.position.clone().add(new V3(0, 1, 0)), 0xbff4ff, 2);
+  if (c.hp <= 0 && MB.crawlers.includes(c)) { hitFlash(c.obj.position.clone().add(new V3(0, 1, 0)), 0x6fffff, 6); surf.remove(c.obj); MB.crawlers.splice(MB.crawlers.indexOf(c), 1); G.credits += 40; G.moon.kills++; sfx('boom', 0.4); }
+}
+function shieldAt(x, z) { return MB.objs.find(o => o.rec.t === 'shield' && o.sh > 0 && Math.hypot(o.rec.x - x, o.rec.z - z) < MPIECES.shield.bubble); }
+function crawlerUpdate(c, dt) {
+  const o = c.obj, p = o.position; c.cd -= dt; c.t += dt;
+  // shields push crawlers out and soak up the hits
+  for (const s of MB.objs) { if (s.rec.t !== 'shield' || s.sh <= 0) continue; const dx = p.x - s.rec.x, dz = p.z - s.rec.z, d = Math.hypot(dx, dz), R = MPIECES.shield.bubble; if (d < R && Math.hypot(CORE.x - s.rec.x, CORE.z - s.rec.z) < R + 30) { p.x = s.rec.x + dx / (d || 1) * (R + 0.2); p.z = s.rec.z + dz / (d || 1) * (R + 0.2); if (c.cd <= 0) { c.cd = 1; s.sh -= 10; s.shT = 3; hitFlash(p.clone().add(new V3(0, 1.5, 0)), 0x6fd8ff, 2.5); } return; } }
+  let target = null, td = 1e9;
+  for (const m of MB.objs) { const d = Math.hypot(m.rec.x - p.x, m.rec.z - p.z); if (d < MPIECES[m.rec.t].r + 1.8 && d < td) { td = d; target = m; } }
+  const toCore = Math.hypot(CORE.x - p.x, CORE.z - p.z);
+  const pl = S.mech ? 3.2 : 2.2, dp = Math.hypot(S.pos.x - p.x, S.pos.z - p.z);
+  if (dp < pl && G.state === 'surface') { if (c.cd <= 0) { c.cd = 1; if (S.mech) { MECH.hp -= 12; hitFlash(S.pos.clone().add(new V3(0, 3, 0)), 0xff8a5a, 3); } else { const push = new V3(S.pos.x - p.x, 0, S.pos.z - p.z).normalize().multiplyScalar(9); S.vel.x += push.x; S.vel.z += push.z; S.vel.y += 4; if (T - MB.hitT > 3) { MB.hitT = T; say('A crawler bit your boot! Get in your mech or let the turrets handle it.', 'bad'); } } } }
+  else if (target) { if (c.cd <= 0) { c.cd = 1; target.rec.hp -= 12; hitFlash(target.obj.position.clone().add(new V3(0, 2, 0)), 0xffffff, 2); sfx('thud', 0.3); if (target.rec.hp <= 0) { hitFlash(target.obj.position.clone().add(new V3(0, 2, 0)), 0xff8a5a, 7); say(`The crawlers smashed a ${MPIECES[target.rec.t].name.toLowerCase()}!`, 'bad'); removeMPiece(target); save(); } } }
+  else if (toCore < 5) { if (c.cd <= 0) { c.cd = 1; G.moon.core -= 15; hitFlash(new V3(CORE.x, p.y + 3, CORE.z), 0xff6a5a, 4); sfx('thud', 0.5); } }
+  else { const step = c.spd * dt, dx = (CORE.x - p.x) / toCore, dz = (CORE.z - p.z) / toCore; p.x += dx * step + Math.sin(c.t * 2) * 0.02; p.z += dz * step; o.rotation.y = Math.atan2(-dx, -dz); }
+  p.y = moonHgt(p.x, p.z) + Math.abs(Math.sin(c.t * 10)) * 0.08;
+  o.userData.legs.forEach((l, i) => l.rotation.x = Math.sin(c.t * 12 + i * 1.6) * 0.5);
+}
+function turretUpdate(m, dt) {
+  m.cd -= dt; let best = null, bd = 46;
+  for (const c of MB.crawlers) { const d = c.obj.position.distanceTo(m.obj.position); if (d < bd) { bd = d; best = c; } }
+  const head = m.obj.userData.head; if (!best) { head.rotation.y += dt * 0.5; if (m.beam) m.beam.visible = false; return; }
+  const want = Math.atan2(-(best.obj.position.x - m.rec.x), -(best.obj.position.z - m.rec.z)) - (m.rec.rot || 0); head.rotation.y = lerpAngle(head.rotation.y, want, dt * 8);
+  if (!m.beam) { const geo = new THREE.BufferGeometry().setFromPoints([new V3(), new V3()]); m.beam = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff6a6a })); surf.add(m.beam); }
+  m.beam.visible = m.cd > 0.6;
+  if (m.cd <= 0) { m.cd = 0.8; damageCrawler(best, 16); sfx('laser', 0.2); const a = m.obj.position.clone().add(new V3(0, 2.1, 0)), b = best.obj.position.clone().add(new V3(0, 1, 0)), pa = m.beam.geometry.attributes.position; pa.setXYZ(0, a.x, a.y, a.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true; m.beam.geometry.computeBoundingSphere(); }
+}
+function mbBeam(from, to, col) {
+  const geo = new THREE.BufferGeometry().setFromPoints([from, to]), l = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: col })); surf.add(l); setTimeout(() => surf.remove(l), 90);
+}
+MOON_W.update = function (dt) {
+  if (MB.stars) MB.stars.position.copy(camera.position);
+  if (MB.ghost) { const { p, bad } = mbPlan(); MB.ghost.position.set(p.x, moonHgt(p.x, p.z), p.z); MB.ghost.rotation.y = MB.rot; const ok = !bad; if (MB.ghost.userData.ok !== ok) { MB.ghost.traverse(o => { if (o.isMesh) o.material = ok ? GHOST_OK : GHOST_BAD; }); MB.ghost.userData.ok = ok; } }
+  MB.coreOrb.material.emissiveIntensity = 1 + Math.sin(T * 3) * 0.3; MB.coreGlow.scale.setScalar(10 + (G.moon.core / 400) * 6);
+  MB.objs.forEach(m => { if (m.rec.t === 'shield') { if (m.shT > 0) m.shT -= dt; else m.sh = Math.min(200, m.sh + dt * 5); m.obj.userData.dome.visible = m.sh > 0; m.obj.userData.dome.material.opacity = 0.05 + (m.sh / 200) * 0.12 + (m.shT > 2.6 ? 0.2 : 0); } if (m.rec.t === 'turret') turretUpdate(m, dt); });
+  if (G.state !== 'surface') return;
+  const night = S.night > 0.5;
+  if (!night && S.night < 0.3 && G.moon.tonight && !MB.active) { G.moon.tonight = false; G.moon.core = 400; }
+  if (night && !G.moon.tonight && !MB.active) startDefense(false);
+  if (MB.active) {
+    MB.crawlers.slice().forEach(c => crawlerUpdate(c, dt));
+    if (G.moon.core <= 0) { G.moon.core = 0; endDefense(false); return; }
+    if (!MB.crawlers.length) { MB.waveT -= dt; if (MB.waveT <= 0) { if (MB.wave >= 3) endDefense(true); else { if (MB.wave > 0) { G.credits += 500; say(`Wave ${MB.wave} cleared! +500 cr. Next wave soon...`, 'good'); } spawnCrawlerWave(); MB.waveT = 8; } } }
+  }
+};
+MOON_W.surfMarkers = function () {
+  const m = (id, cls, label, p) => { const el = marker(id, cls, label); el.querySelector('.dst').textContent = fmtD(S.pos.distanceTo(p)); placeMarker(el, p); };
+  m('mb-core', 'station', `Base core ${Math.ceil(G.moon.core / 4)}%`, new V3(CORE.x, moonHgt(CORE.x, CORE.z) + 12, CORE.z));
+  MB.crawlers.forEach((c, i) => { if (i < 12 && S.pos.distanceTo(c.obj.position) < 140) { const el = marker('mb-c' + i, 'enemy', 'Ice crawler'); el.querySelector('.dst').textContent = fmtD(S.pos.distanceTo(c.obj.position)); el.querySelector('.hp i').style.width = (c.hp / c.max * 100) + '%'; placeMarker(el, c.obj.position.clone().add(new V3(0, 2.5, 0))); } });
+};
+function moonPrompt() {
+  const key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>';
+  if (MB.on) { const { bad } = mbPlan(); return bad ? `<span style="color:var(--bad)">${bad}</span>` : `${key} to build: ${MPIECES[MB.sel].name}`; }
+  if (Math.hypot(S.pos.x - CORE.x, S.pos.z - CORE.z) < 7 && !MB.active) return `${key} to ring the alarm and start a defense now · press <kbd>B</kbd> to build defenses`;
+  return '';
+}
+// on-foot blaster
+function footBlast() {
+  if (MB.shotCd > 0) return; MB.shotCd = 0.35; const f = fwdOf(S.heading), from = S.pos.clone().add(new V3(0, 1.3, 0));
+  let hit = null, hd = 35; for (const c of MB.crawlers) { const v = c.obj.position.clone().add(new V3(0, 0.8, 0)).sub(from), along = v.dot(f); if (along < 0 || along > hd) continue; if (v.clone().addScaledVector(f, -along).length() < 1.6) { hd = along; hit = c; } }
+  mbBeam(from, from.clone().addScaledVector(f, hd), 0x7dffb0); sfx('laser', 0.3); if (hit) damageCrawler(hit, 10);
+}
+
+/* ============ the mech suit ============ */
+const MECH_WORLDS = () => [VERD_W, RIME_W, PYRE_W, MOON_W];
+const MECH = { w: {}, hp: 300, heat: 0, over: false, punchT: 0, laserOn: false, beam: null, carry: null, repairT: 0, stepT: 0 };
+const mechMaxHp = () => [300, 500, 800, 1200][G.mech.armor || 0], mechDps = () => [30, 50, 80, 120][G.mech.laser || 0], mechJet = () => [16, 26, 36, 46][G.mech.jets || 0];
+function makeMech() {
+  const g = new THREE.Group(), pt = PAINTS[G.mech.paint] || PAINTS.blue, H = mStd(pt.hull, 0.5, 0.45), T = mStd(pt.trim, 0.4, 0.5), D = mStd(0x2a2c34, 0.6, 0.5);
+  const add = (geo, mat, x, y, z, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+  const legs = [-1, 1].map(s => { const hip = new THREE.Group(); hip.position.set(s * 1.1, 3.2, 0); g.add(hip); add(new THREE.BoxGeometry(0.9, 1.8, 1), H, 0, -0.9, 0, hip); const knee = new THREE.Group(); knee.position.y = -1.8; hip.add(knee); add(new THREE.BoxGeometry(0.8, 1.6, 0.9), D, 0, -0.8, 0, knee); add(new THREE.BoxGeometry(1.1, 0.4, 1.6), T, 0, -1.55, -0.2, knee); return { hip, knee }; });
+  add(new THREE.BoxGeometry(2.8, 0.7, 1.4), D, 0, 3.4, 0);
+  const torso = new THREE.Group(); torso.position.y = 4.6; g.add(torso);
+  add(new THREE.BoxGeometry(3, 2.2, 2), H, 0, 0, 0, torso); add(new THREE.BoxGeometry(3.1, 0.25, 2.05), T, 0, 0.6, 0, torso);
+  const glass = add(new THREE.BoxGeometry(1.4, 0.8, 0.1), new THREE.MeshStandardMaterial({ color: 0x7fd4ff, emissive: 0x1a5a80, emissiveIntensity: 0.8, metalness: 0.4, roughness: 0.1 }), 0, 0.3, -1.03, torso);
+  add(new THREE.BoxGeometry(1, 0.6, 1), D, 0, 1.4, 0.1, torso); const visor = add(new THREE.BoxGeometry(0.8, 0.15, 0.1), mGlow(0x6fd8ff), 0, 1.45, -0.42, torso);
+  for (const s of [-1, 1]) add(new THREE.BoxGeometry(1, 0.9, 1.4), T, s * 1.9, 0.6, 0, torso);
+  const armL = new THREE.Group(); armL.position.set(-1.9, 0.2, 0); torso.add(armL); add(new THREE.BoxGeometry(0.7, 1.8, 0.8), H, 0, -0.9, 0, armL); const fist = add(new THREE.BoxGeometry(0.95, 0.9, 0.95), D, 0, -2.1, 0, armL);
+  const armR = new THREE.Group(); armR.position.set(1.9, 0.2, 0); torso.add(armR); add(new THREE.BoxGeometry(0.7, 1.4, 0.8), H, 0, -0.7, 0, armR); const gun = add(new THREE.CylinderGeometry(0.28, 0.36, 2.2, 10), D, 0, -1.6, -0.6, armR); gun.rotation.x = Math.PI / 2 - 0.2; const tip = glowSprite(0xff4a4a, 1.2); tip.position.set(0, -1.8, -1.7); armR.add(tip);
+  for (const s of [-0.6, 0.6]) { const j = add(new THREE.CylinderGeometry(0.3, 0.4, 1, 8), D, s, -0.2, 1.2, torso); const fl = glowSprite(0x6fd8ff, 0.1); fl.position.set(s, -0.9, 1.2); torso.add(fl); g.userData['jet' + (s > 0 ? 'R' : 'L')] = fl; }
+  g.userData = Object.assign(g.userData, { legs, torso, armL, armR, tip, mats: { H, T } });
+  return g;
+}
+function mechPaintAll() { Object.values(MECH.w).forEach(w => { if (!w.mech) return; const pt = PAINTS[G.mech.paint] || PAINTS.blue; w.mech.userData.mats.H.color.setHex(pt.hull); w.mech.userData.mats.T.color.setHex(pt.trim); w.mech.userData.mats.H.emissive.setHex(pt.emissive || 0); }); }
+function mechSetupWorld() {
+  if (!MECH_WORLDS().includes(W)) return;
+  let w = MECH.w[W.id];
+  if (!w) {
+    w = MECH.w[W.id] = { boulders: [], crates: [], drop: new V3(PAD.x + 26, 0, PAD.z + 22) };
+    const rockM = smat(W === RIME_W ? 0x9fb8d0 : W === PYRE_W ? 0x3a2a26 : W === MOON_W ? 0x6a6c74 : 0x7a6a5a, 0.9, { flatShading: true }), gem = W === RIME_W ? 'cryo' : W === PYRE_W ? 'obs' : 'prism';
+    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + 0.5, r = rand(28, 55), x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r, s = rand(2.2, 3.4); if (hgt(x, z) < 0.5) continue; const b = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockM); b.position.set(x, hgt(x, z) + s * 0.5, z); b.rotation.set(rand(0, 3), rand(0, 3), 0); surf.add(b); const col = { x, z, r: s * 0.9, top: b.position.y + s }; S.colliders.push(col); w.boulders.push({ obj: b, hp: 4, s, col, gem }); }
+    w.drop.y = Math.max(hgt(w.drop.x, w.drop.z), 0);
+    const dp = new THREE.Mesh(new THREE.RingGeometry(4.5, 5.5, 32), new THREE.MeshBasicMaterial({ color: 0xffc23a, transparent: true, opacity: 0.7, side: THREE.DoubleSide })); dp.rotation.x = -Math.PI / 2; dp.position.copy(w.drop).add(new V3(0, 0.3, 0)); surf.add(dp);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(5, 1), new THREE.MeshBasicMaterial({ map: hvText('CARGO DROP', 256, 52, '#1a1e2a', '#ffc23a'), transparent: true, side: THREE.DoubleSide })); sign.position.copy(w.drop).add(new V3(0, 4, 0)); surf.add(sign);
+    for (let i = 0; i < 3; i++) spawnCrate(w);
+    const park = new V3(PAD.x - 12, 0, PAD.z + 8); park.y = Math.max(hgt(park.x, park.z), 0); w.park = park; w.parkH = -0.6;
+  }
+  if (G.mech.owned && !w.mech) { w.mech = makeMech(); w.mech.position.copy(w.park); w.mech.rotation.y = w.parkH; surf.add(w.mech); }
+}
+function spawnCrate(w) {
+  for (let k = 0; k < 30; k++) { const a = rand(0, TAU), r = rand(35, 70), x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r; if (hgt(x, z) < 0.5 || Math.hypot(x - w.drop.x, z - w.drop.z) < 25) continue;
+    const c = new THREE.Group(), box = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.2, 2.2), mStd(0xd7712c, 0.4, 0.5)); c.add(box); for (const s of [-1, 1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.3, 2.25), mStd(0x2a2c34)); st.position.y = s * 0.8; c.add(st); } const gl = glowSprite(0xffc23a, 2); gl.position.y = 1.6; c.add(gl);
+    c.position.set(x, hgt(x, z) + 1.1, z); surf.add(c); w.crates.push({ obj: c }); return; }
+}
+{ const _ssi3 = spawnStoryItems; spawnStoryItems = function () { _ssi3(); mechSetupWorld(); }; }
+const curMW = () => MECH.w[W.id];
+function nearMech() { const w = curMW(); return w && w.mech && !S.mech && MECH_WORLDS().includes(W) && Math.hypot(S.pos.x - w.mech.position.x, S.pos.z - w.mech.position.z) < 6 ? w : null; }
+function enterMech() {
+  const w = nearMech(); if (!w) return; if (MECH.repairT > T) { say(`Your mech is still repairing: ${Math.ceil(MECH.repairT - T)} s.`, 'bad'); return; }
+  S.mech = true; MECH.hp = Math.min(MECH.hp || mechMaxHp(), mechMaxHp()); if (MECH.hp <= 0) MECH.hp = mechMaxHp(); S.pos.copy(w.mech.position); S.heading = w.mech.rotation.y; S.vel.set(0, 0, 0); S.astro.g.visible = false; S.drone.visible = false; if (MB.on) mbToggle();
+  sfx('win'); say('You climb into the mech. E punch · G grab crates · V laser · Space jump jets · X climb out.', 'good');
+  if (!G.mech.log) { G.mech.log = true; logAdd(['Giant robot time', 'I have a mech. It is twelve meters tall. It has a laser arm. I punched a boulder and it exploded. Best. Day. Ever.']); }
+  $('#mechHud').hidden = false; $('#mechBtns').hidden = false;
+}
+function exitMech(eject) {
+  if (!S.mech) return; const w = curMW(); S.mech = false; MECH.laserOn = false; if (MECH.beam) MECH.beam.visible = false;
+  if (MECH.carry) { dropCrate(); }
+  w.mech.position.copy(S.pos); w.mech.rotation.y = S.heading; w.park.copy(S.pos); w.parkH = S.heading;
+  S.pos.addScaledVector(new V3(Math.cos(S.heading), 0, -Math.sin(S.heading)), 4); S.pos.y = hgt(S.pos.x, S.pos.z) + 0.5; S.astro.g.visible = true; S.drone.visible = true;
+  if (eject) { MECH.repairT = T + 45; MECH.hp = mechMaxHp(); say('Your mech is too damaged! You eject and it starts repairing itself (45 s).', 'bad'); sfx('fail'); } else sfx('ui');
+  $('#mechHud').hidden = true; $('#mechBtns').hidden = true;
+}
+function mechUpdate(dt) {
+  const w = curMW(), m = w.mech, ud = m.userData;
+  let mx = 0, mz = 0;
+  if (keys.KeyW || keys.ArrowUp) mz -= 1; if (keys.KeyS || keys.ArrowDown) mz += 1; if (keys.KeyA || keys.ArrowLeft) mx -= 1; if (keys.KeyD || keys.ArrowRight) mx += 1;
+  if (isTouch && (stick.x || stick.y)) { mx = stick.x; mz = stick.y; }
+  const sY = Math.sin(S.yaw), cY = Math.cos(S.yaw), mvv = new V3(mx * cY + mz * sY, 0, -mx * sY + mz * cY), len = Math.min(1, mvv.length()); if (len > 0.01) mvv.normalize();
+  const spd = (keys.ShiftLeft || keys.ShiftRight ? 10 : 6.5) * len * (MECH.carry ? 0.75 : 1);
+  S.vel.x += (mvv.x * spd - S.vel.x) * Math.min(1, dt * 4); S.vel.z += (mvv.z * spd - S.vel.z) * Math.min(1, dt * 4);
+  if (len > 0.05) S.heading = lerpAngle(S.heading, Math.atan2(-mvv.x, -mvv.z), dt * 4);
+  const jet = (keys.Space || touchBtn.jet) && S.fuel > 0; if (jet) { S.vel.y += mechJet() * 1.6 * dt; S.vel.y = Math.min(S.vel.y, mechJet() * 0.45); S.fuel = Math.max(0, S.fuel - 30 * dt); }
+  S.vel.y -= (W === MOON_W ? 6 : 16) * dt; S.pos.addScaledVector(S.vel, dt);
+  const gh = groundAt(S.pos.x, S.pos.z), floor = gh < -1.4 ? -1.4 : gh, wasAir = !S.grounded;
+  if (S.pos.y <= floor) { if (wasAir && S.vel.y < -8) { shake = Math.min(1, shake + 0.6); sfx('boom', 0.5); hitFlash(S.pos.clone(), 0xffe0c0, 6); } S.pos.y = floor; if (S.vel.y < 0) S.vel.y = 0; S.grounded = true; } else S.grounded = S.pos.y - floor < 0.05;
+  if (S.grounded && !jet) S.fuel = Math.min(fuelMax(), S.fuel + 25 * dt);
+  for (const c of S.colliders) { if (S.pos.y > c.top) continue; const dx = S.pos.x - c.x, dz = S.pos.z - c.z, d = Math.hypot(dx, dz), r = c.r + 1.6; if (d < r && d > 1e-4) { S.pos.x = c.x + dx / d * r; S.pos.z = c.z + dz / d * r; } }
+  const bx = S.pos.x - PAD.x, bz = S.pos.z - PAD.z, bd = Math.hypot(bx, bz); if (bd > 520) { S.pos.x = PAD.x + bx / bd * 520; S.pos.z = PAD.z + bz / bd * 520; }
+  m.position.copy(S.pos); m.rotation.y = S.heading;
+  const moving = S.grounded && len > 0.1; MECH.stepT += dt * (moving ? spd * 0.9 : 0); const sw = moving ? Math.sin(MECH.stepT) * 0.45 : 0;
+  ud.legs[0].hip.rotation.x = sw; ud.legs[1].hip.rotation.x = -sw; ud.legs[0].knee.rotation.x = Math.max(0, -sw) * 0.8; ud.legs[1].knee.rotation.x = Math.max(0, sw) * 0.8;
+  if (moving && Math.abs(Math.sin(MECH.stepT)) > 0.98 && T - (MECH.lastStep || 0) > 0.25) { MECH.lastStep = T; shake = Math.min(1, shake + 0.12); sfx('thud', 0.35); }
+  ud.torso.position.y = 4.6 + (moving ? Math.abs(Math.cos(MECH.stepT)) * 0.12 : 0);
+  if (MECH.punchT > 0) { MECH.punchT -= dt; ud.armL.rotation.x = -Math.sin((1 - MECH.punchT / 0.35) * Math.PI) * 1.6; } else ud.armL.rotation.x = MECH.carry ? -1.2 : sw * 0.5;
+  ud.armR.rotation.x = MECH.laserOn ? -1.3 : MECH.carry ? -1.2 : -sw * 0.5;
+  ['jetL', 'jetR'].forEach(k => { if (ud[k]) ud[k].scale.setScalar(jet ? rand(1.4, 2.2) : 0.01); });
+  // laser arm
+  const firing = (keys.KeyV || MECH.btnLaser) && !MECH.over && G.state === 'surface';
+  MECH.laserOn = firing; if (firing) { MECH.heat = Math.min(100, MECH.heat + 28 * dt); if (MECH.heat >= 100) { MECH.over = true; say('Laser overheated! Let it cool down.', 'bad'); } } else MECH.heat = Math.max(0, MECH.heat - 35 * dt); if (MECH.over && MECH.heat < 35) MECH.over = false;
+  if (!MECH.beam) { MECH.beam = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xff5a4a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })); }
+  if (MECH.beam.parent !== surf) surf.add(MECH.beam);
+  MECH.beam.visible = firing;
+  if (firing) {
+    const from = new V3(); ud.tip.getWorldPosition(from); const f = fwdOf(S.heading); let len2 = 60, hitC = null, hitB = null;
+    for (const c of MB.crawlers) { const v = c.obj.position.clone().add(new V3(0, 0.8, 0)).sub(from), along = v.dot(f); if (along < 0 || along > len2) continue; const side = v.clone().addScaledVector(f, -along); side.y *= 0.3; if (side.length() < 2.2) { len2 = along; hitC = c; } }
+    for (const b of w.boulders) { const v = b.obj.position.clone().sub(from), along = v.dot(f); if (along < 0 || along > len2) continue; const side = v.clone().addScaledVector(f, -along); side.y *= 0.3; if (side.length() < b.s + 0.5) { len2 = along; hitB = b; hitC = null; } }
+    const to = from.clone().addScaledVector(f, len2); to.y = Math.max(to.y - len2 * 0.04, hgt(to.x, to.z) + 0.6);
+    const d = to.clone().sub(from); MECH.beam.position.copy(from).addScaledVector(d, 0.5); MECH.beam.quaternion.setFromUnitVectors(UP, d.clone().normalize()); MECH.beam.scale.set(1 + Math.random() * 0.5, d.length(), 1 + Math.random() * 0.5);
+    if (hitC) damageCrawler(hitC, mechDps() * dt); if (hitB) { hitB.heat = (hitB.heat || 0) + dt; if (hitB.heat > 1.2) { hitB.heat = 0; hitBoulder(w, hitB); } }
+    if (Math.random() < dt * 20) hitFlash(to, 0xff8a5a, 1.5);
+    if (Math.random() < dt * 8) sfx('laser', 0.15);
+  }
+  if (MECH.carry) { MECH.carry.obj.position.copy(S.pos).add(new V3(0, 7.4, 0)).addScaledVector(fwdOf(S.heading), 1.2); MECH.carry.obj.rotation.y = S.heading; }
+  if (MECH.hp <= 0) exitMech(true);
+  S.heat = Math.min(100, S.heat + 20 * dt); S.near = null; S.scanCd = Math.max(0, S.scanCd - dt);
+}
+function hitBoulder(w, b) {
+  b.hp--; hitFlash(b.obj.position.clone().add(new V3(0, b.s * 0.5, 0)), 0xffe0c0, 4); sfx('boom', 0.4); shake = Math.min(1, shake + 0.3);
+  if (b.hp <= 0) { surf.remove(b.obj); const i = S.colliders.indexOf(b.col); if (i >= 0) S.colliders.splice(i, 1); w.boulders.splice(w.boulders.indexOf(b), 1); G.mats[b.gem] += 3; G.credits += 100; say(`Boulder smashed! +3 ${MATS[b.gem].name}, +100 cr`, 'good'); save(); }
+}
+function mechPunch() {
+  if (MECH.punchT > 0) return; MECH.punchT = 0.35; sfx('whoosh', 0.5);
+  setTimeout(() => {
+    if (!S.mech) return; const w = curMW(), hp = S.pos.clone().addScaledVector(fwdOf(S.heading), 3.8).add(new V3(0, 2, 0)); let hit = false;
+    MB.crawlers.slice().forEach(c => { if (c.obj.position.distanceTo(hp) < 5) { damageCrawler(c, 70); hit = true; } });
+    w.boulders.slice().forEach(b => { if (Math.hypot(b.obj.position.x - hp.x, b.obj.position.z - hp.z) < b.s + 2.5) { hitBoulder(w, b); hit = true; } });
+    S.items.slice().forEach(it => { if (it.obj.position.distanceTo(hp) < 5 && ITEMS[it.type] && ITEMS[it.type].mat) { G.mats[ITEMS[it.type].mat] += 2; surf.remove(it.obj); S.items.splice(S.items.indexOf(it), 1); say(`Smash! +2 ${MATS[ITEMS[it.type].mat].name}`, 'good'); hit = true; } });
+    if (hit) { shake = Math.min(1, shake + 0.4); sfx('thud', 0.8); }
+  }, 140);
+}
+function mechGrab() {
+  const w = curMW(); if (MECH.carry) { dropCrate(); return; }
+  const c = w.crates.find(q => Math.hypot(q.obj.position.x - S.pos.x, q.obj.position.z - S.pos.z) < 6);
+  if (!c) { say('No crate close enough. Walk up to an orange cargo crate.'); return; } MECH.carry = c; sfx('pickup'); say('Crate lifted! Carry it to the CARGO DROP ring.');
+}
+function dropCrate() {
+  const w = curMW(), c = MECH.carry; MECH.carry = null; if (!c) return;
+  const p = S.pos.clone().addScaledVector(fwdOf(S.heading), 3.5); c.obj.position.set(p.x, hgt(p.x, p.z) + 1.1, p.z);
+  if (Math.hypot(p.x - w.drop.x, p.z - w.drop.z) < 6.5) { surf.remove(c.obj); w.crates.splice(w.crates.indexOf(c), 1); G.credits += 350; G.mech.crates = (G.mech.crates || 0) + 1; sfx('win'); say(`Crate delivered! +350 cr (${G.mech.crates} delivered)`, 'good'); setTimeout(() => { if (curMW() === w) spawnCrate(w); }, 1500); save(); }
+  else sfx('thud');
+}
+// controls and hooks
+{ const _us2 = updateSurface; updateSurface = function (dt) { if (MB.shotCd > 0) MB.shotCd -= dt; if (S.mech && curMW() && curMW().mech) { mechUpdate(dt); return; } _us2(dt); if (W === MOON_W) S.vel.y += 10 * dt; }; }
+{ const _usc2 = updateSurfCamera; updateSurfCamera = function (dt) {
+  if (!S.mech) return _usc2(dt);
+  const tgt = tmp.copy(S.pos).add(new V3(0, 5.5, 0)), d = 16, cp = Math.cos(S.pitch);
+  if (keys.KeyQ) S.yaw += dt * 1.8; if (keys.KeyZ) S.yaw -= dt * 1.8;
+  const want = tmp2.set(tgt.x + Math.sin(S.yaw) * cp * d, tgt.y + Math.sin(S.pitch) * d, tgt.z + Math.cos(S.yaw) * cp * d); const gh = Math.max(hgt(want.x, want.z), 0); if (want.y < gh + 1) want.y = gh + 1;
+  camera.position.lerp(want, 1 - Math.exp(-dt * 10)); camera.up.set(0, 1, 0); camera.lookAt(tgt);
+}; }
+{ const _hv4 = harvest; harvest = function () {
+  if (G.state === 'surface') {
+    if (S.mech) { mechPunch(); return; }
+    if (W === MOON_W && MB.on) { mbPlace(); return; }
+    if (!S.near && nearMech()) { enterMech(); return; }
+    if (W === MOON_W && !S.near && Math.hypot(S.pos.x - CORE.x, S.pos.z - CORE.z) < 7 && !MB.active) { startDefense(true); return; }
+  }
+  _hv4();
+}; }
+{ const _pi = petInteract; petInteract = function () { if (S.mech) { mechGrab(); return; } _pi(); }; }
+{ const _tb = toggleBuild; toggleBuild = function () { if (W === MOON_W && G.state === 'surface') { if (!S.mech) mbToggle(); return; } _tb(); }; }
+{ const _bd = board; board = function () { if (S.mech) return; if (MB.on) mbToggle(); if (W === MOON_W && MB.active) { MB.active = false; MB.crawlers.forEach(c => surf.remove(c.obj)); MB.crawlers = []; } _bd(); }; }
+addEventListener('keydown', e => {
+  if (G.state !== 'surface' || e.repeat || (e.target.matches && e.target.matches('input, textarea'))) return;
+  if (e.code === 'KeyX') { if (S.mech) exitMech(false); else if (MB.on) mbRemove(); }
+  if (e.code === 'KeyV' && !S.mech && W === MOON_W) footBlast();
+  if (MB.on && W === MOON_W) { if (e.code === 'KeyR') { MB.rot = (MB.rot + Math.PI / 2) % TAU; sfx('ui'); } const n = '123'.indexOf(e.key); if (n >= 0) { MB.sel = Object.keys(MPIECES)[n]; mbSetGhost(); mbBar(); sfx('ui'); } }
+});
+document.querySelectorAll('#mechBtns [data-m]').forEach(b => {
+  const m = b.dataset.m;
+  if (m === 'laser') { const on = v => e => { e.preventDefault(); MECH.btnLaser = v; }; b.addEventListener('pointerdown', on(true)); b.addEventListener('pointerup', on(false)); b.addEventListener('pointerleave', on(false)); }
+  else b.addEventListener('click', () => { if (!S.mech) return; if (m === 'punch') mechPunch(); if (m === 'grab') mechGrab(); if (m === 'exit') exitMech(false); });
+});
+{ const _ush3 = updateSurfHUD; updateSurfHUD = function () {
+  _ush3();
+  const key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>';
+  if (S.mech) { const w = curMW(), c = !MECH.carry && w.crates.find(q => Math.hypot(q.obj.position.x - S.pos.x, q.obj.position.z - S.pos.z) < 6); setPrompt(MECH.carry ? (Math.hypot(S.pos.x - w.drop.x, S.pos.z - w.drop.z) < 9 ? 'Press <kbd>G</kbd> to drop the crate on the CARGO DROP ring' : 'Carry the crate to the CARGO DROP ring (G to drop)') : c ? 'Press <kbd>G</kbd> to lift the cargo crate' : 'E punch · G grab · hold V laser · Space jets · X climb out');
+    $('#mhArmor').style.width = (MECH.hp / mechMaxHp() * 100) + '%'; $('#mhArmorT').textContent = `${Math.ceil(MECH.hp)}/${mechMaxHp()}`; $('#mhHeat').style.width = MECH.heat + '%'; $('#mhHeat').style.background = MECH.over ? 'var(--bad)' : ''; }
+  else if (W === MOON_W) { const pr = moonPrompt(); if (pr) setPrompt(pr); }
+  if (!S.mech && nearMech() && !S.near && !MB.on) setPrompt(MECH.repairT > T ? `Your mech is repairing: ${Math.ceil(MECH.repairT - T)} s` : `${key} to climb into your mech`);
+  const mh = $('#mbHud'); if (W === MOON_W && G.state === 'surface') { mh.hidden = false; mh.innerHTML = MB.active ? `<b>NIGHT DEFENSE · WAVE ${Math.max(1, MB.wave)} OF 3</b><span>${MB.crawlers.length} crawlers · core ${Math.ceil(G.moon.core / 4)}% · ${MB.objs.filter(o => o.rec.t === 'shield' && o.sh > 0).length} shields up</span>` : `<b>MOON BASE GLINT</b><span>Core ${Math.ceil(G.moon.core / 4)}% · ${MB.objs.length} defenses · ${G.moon.nights} nights survived · crawlers attack at night</span>`; } else mh.hidden = true;
+}; }
+{ const _ss4 = setState; setState = function (s) { _ss4(s); if (s !== 'surface') { $('#mbHud').hidden = true; if (s !== 'pause' && s !== 'photo') { $('#mechHud').hidden = true; $('#mechBtns').hidden = true; } } else if (S.mech) { $('#mechHud').hidden = false; $('#mechBtns').hidden = false; } }; }
+// crafting: build, upgrade and paint the mech
+RECIPES.mech = { name: 'Titan mech suit', max: () => G.mech.owned, cost: () => ({ cr: 15000, cryo: 6, obs: 4, prism: 4 }), desc: () => G.mech.owned ? 'Parked by your landing pad on Verdance, Hoarfrost, Pyre and Glint.' : 'A twelve-meter walking robot with a punching fist, a laser arm and jump jets. It waits by your landing pad on Verdance, Hoarfrost, Pyre and the moon Glint. Walk up to it and press E.', apply() { G.mech.owned = true; MECH.hp = mechMaxHp(); if (MECH_WORLDS().includes(W) && G.state === 'surface') mechSetupWorld(); } };
+const MECH_UPG = {
+  mecharmor: { name: 'Mech armor plating', k: 'armor', cost: lv => ({ cr: 4000 * (lv + 1), cryo: 3 + lv, obs: 1 + lv }), desc: () => `Armor ${mechMaxHp()} → ${[300, 500, 800, 1200][(G.mech.armor || 0) + 1] || 'max'}.` },
+  mechlaser: { name: 'Mech laser focus', k: 'laser', cost: lv => ({ cr: 5000 * (lv + 1), prism: 3 + lv, sun: lv }), desc: () => `Laser damage ${mechDps()}/s → ${[30, 50, 80, 120][(G.mech.laser || 0) + 1] || 'max'}/s.` },
+  mechjets: { name: 'Mech jump jets', k: 'jets', cost: lv => ({ cr: 3000 * (lv + 1), resin: 4 + lv }), desc: () => `Bigger jumps. Level ${G.mech.jets || 0} of 3.` },
+};
+Object.entries(MECH_UPG).forEach(([id, u]) => { RECIPES[id] = { name: u.name, max: () => (G.mech[u.k] || 0) >= 3, cost: () => u.cost(G.mech[u.k] || 0), desc: u.desc, apply() { G.mech[u.k] = (G.mech[u.k] || 0) + 1; if (u.k === 'armor') MECH.hp = mechMaxHp(); } }; });
+{ const _rc = renderCrafting; renderCrafting = function () {
+  const hidden = {}; if (!G.mech.owned) Object.keys(MECH_UPG).forEach(k => { hidden[k] = RECIPES[k]; delete RECIPES[k]; });
+  let h = _rc(); Object.assign(RECIPES, hidden);
+  if (G.mech.owned) h += `<h4 class="craft-sub">Mech paint</h4><div class="item"><div><p>Pick a color for your mech from your paint locker.</p><div class="row-btns" style="margin-top:8px">${G.paints.map(k => PAINTS[k] ? `<button class="${G.mech.paint === k ? 'btn' : 'ghost'}" data-act="mechpaint" data-k="${k}"><span class="swatch" style="background:#${PAINTS[k].hull.toString(16).padStart(6, '0')}"></span>${PAINTS[k].name}</button>` : '').join('')}</div></div></div>`;
+  return h;
+}; }
+{ const _ea5 = expAct; expAct = function (act, b) { if (act === 'mechpaint') { if (G.paints.includes(b.dataset.k)) { G.mech.paint = b.dataset.k; mechPaintAll(); sfx('ui'); say(`Mech painted ${PAINTS[b.dataset.k].name}!`, 'good'); save(); renderDock(); } return; } _ea5(act, b); }; }
 
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
