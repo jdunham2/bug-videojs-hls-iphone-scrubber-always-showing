@@ -10978,7 +10978,7 @@ const COOP = { role: null, pilotPeer: null, pilot: null, crew: null, crewPeer: n
 const COOP_SYS = { engine: { name: 'Engine', fx: 'The ship is slow' }, shield: { name: 'Shield generator', fx: 'Shields will not recharge' }, weapons: { name: 'Weapons', fx: 'The main guns fire slowly' }, hull: { name: 'Hull', fx: 'Air is leaking, the hull is slowly getting worse' } };
 const NET = { ns: null, user: null, me: null, names: {}, asked: {}, friends: new Map(), others: [], sendT: 0, chatN: 0, chatM: 0, kl: [], hit: { o: null, d: {} }, hitBy: {}, bounty: {}, applied: {}, rewarded: new Set(), frb: [], radarT: 0, nick: '' };
 try { NET.nick = (localStorage.getItem('er-nick') || '').slice(0, 16); } catch (e) {}
-try { if (window.claude && window.claude.use) { window.claude.use('room').then(ns => { NET.ns = ns; if (!$('#coop').hidden) renderCoop(); }).catch(() => {}); window.claude.use('user').then(u => { NET.user = u; }).catch(() => {}); } } catch (e) {}
+try { if (window.claude && window.claude.use) { window.claude.use('room').then(ns => { NET.ns = ns; if (ns) { try { ns.onPeers(() => {}); ns.onConnection(c => { NET.conn = c; }); } catch (e) {} } if (!$('#coop').hidden) renderCoop(); }).catch(() => {}); window.claude.use('user').then(u => { NET.user = u; }).catch(() => {}); } } catch (e) {}
 const rd1 = v => Math.round(v * 10) / 10, rd3 = v => Math.round(v * 1000) / 1000;
 const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const QCHAT = ['Hi! 👋', 'Follow me!', 'Help! Pirates!', 'Nice shot!', 'Meet me at Haven Ring', 'Let\'s go to Verdance', 'Want to join my ship?', 'Wait for me!', 'Thanks!', 'GG! 🎉'];
@@ -10995,7 +10995,7 @@ function renderCoop() {
   else {
     const fr = NET.others; h = `<p>🌐 You are online! Everyone who has Ember Reach open with you shares the same galaxy. You see each other's ships with names over them, on the radar and on the galaxy map (M).</p>
       <p class="shipstats">Your name over your ship: <input id="coopNick" maxlength="16" placeholder="Your name" aria-label="Your name" autocomplete="off"> <button class="ghost" id="coopNickSave">Save</button></p>
-      <h4 style="margin:12px 0 6px">Friends online</h4>`;
+      <h4 style="margin:12px 0 6px">Friends online</h4><p class="shipstats">Connection: ${NET.conn === false ? 'connecting...' : 'connected'} · ${Math.max(1, NET.all || 1)} game${(NET.all || 1) === 1 ? '' : 's'} open in this world (including yours)</p>`;
     h += fr.length ? fr.map(f => { const p = f.presence, same = G.docked && p.st === 'docked' && p.dock === G.docked.id && COOP.role !== 'crew'; return `<div class="fb-offer"><div><b>${escH(netName(f))}</b> <span class="shipstats">${escH(netWhere(p))}${p.crewOf && p.crewOf === NET.me ? ' · aboard your ship!' : ''}</span></div><div>${same ? `<button class="btn" data-join="${escH(f.peer)}">Join their ship</button>` : ''}</div></div>`; }).join('') : '<p class="shipstats">Nobody else is here yet. When your friend opens the game, they appear here.</p>';
     if (COOP.role === 'crew') h += `<div class="row-btns" style="margin-top:10px"><button class="btn" id="coopReturn">Go back to my own ship</button></div>`;
     h += `<p class="shipstats" style="margin-top:12px">Press <kbd>U</kbd> for quick chat. Shoot pirates together: if you both hit one, you both get the reward. Dock at the same station as your friend to join their ship as crew.</p>`;
@@ -11020,7 +11020,7 @@ function netTick(dt) {
   if (!NET.ns) return;
   let all = []; try { all = NET.ns.peers(); } catch (e) {}
   const meP = all.find(q => q.isMe && q.sameTab); if (meP) NET.me = meP.peer;
-  NET.others = all.filter(q => !q.isMe && q.presence && q.presence.v === 2);
+  NET.others = all.filter(q => !(q.isMe && q.sameTab) && q.kind !== 'agent' && q.presence && q.presence.v === 2); NET.all = all.length;
   if ((NET.sendT -= dt) <= 0) { NET.sendT = 1 / 15; try { NET.ns.presence(netSnap()); } catch (e) {} }
   const seen = new Set();
   for (const f of NET.others) {
