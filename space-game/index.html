@@ -440,6 +440,16 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 #secretBody { display: grid; gap: 10px; text-align: left; }
 #secretBody p { margin: 0; line-height: 1.6; color: #e8f0ff; }
 .secret-friend { color: #9fffe8 !important; font-style: italic; }
+#hPanel .panel { width: min(860px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(8px); margin-block: 24px; }
+#hPanel header { display: flex; justify-content: space-between; align-items: start; padding: 18px 22px 12px; border-bottom: 1px solid var(--line); }
+#hPanel header h2 { margin: 4px 0 0; font-family: var(--display); font-size: 26px; }
+#hPanel header .eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--ember); }
+#walkBtn { margin-right: 8px; }
+.co-card { border-color: rgba(125,255,176,.45) !important; background: rgba(20,60,50,.2); }
+.co-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; font-size: 12px; color: var(--dim); }
+.co-row label { display: grid; gap: 3px; }
+.co-row select, .coname { font: inherit; font-size: 13px; color: var(--text); background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; max-width: 100%; }
+.coname { margin-top: 8px; width: min(320px, 100%); font-family: var(--display); font-size: 16px; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -562,6 +572,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
       <button class="tab" role="tab" data-tab="sylari" aria-selected="false" hidden>Sylari</button>
       <button class="tab" role="tab" data-tab="pets" aria-selected="false">Pets</button>
       <button class="tab" role="tab" data-tab="expeditions" aria-selected="false">Expeditions</button>
+      <button class="tab" role="tab" data-tab="company" aria-selected="false">Company</button>
       <button class="tab" role="tab" data-tab="ships" aria-selected="false">Ships</button>
       <button class="tab" role="tab" data-tab="crew" aria-selected="false">Crew</button>
       <button class="tab" role="tab" data-tab="crafting" aria-selected="false">Crafting</button>
@@ -604,6 +615,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="cityBubble" hidden></div>
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
+<div class="overlay" id="hPanel" hidden><div class="panel"><header><div><div class="eyebrow" id="hpEyebrow"></div><h2 id="hpTitle"></h2></div><button class="ghost" id="hpClose">Close</button></header><div class="tabbody" id="hpBody"></div></div></div>
 <div class="overlay" id="seaDoor" hidden><div class="center-card"><div class="sea-eyebrow">Sunken city</div><h2 id="sdTitle" style="margin:0"></h2><p id="sdClue"></p><p id="sdHelp"></p><div id="sdOpts"></div><p id="sdStatus"></p><button class="ghost" id="sdClose">Swim away</button></div></div>
 <div class="overlay" id="seaSecret" hidden><div class="center-card"><div class="sea-eyebrow">The memory crystal</div><h2 style="margin:0">Where the whales came from</h2><div id="secretBody"></div><button class="btn" id="secretClose">Close</button></div></div>
 <button id="wqBtn" hidden></button>
@@ -1058,8 +1070,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -1288,7 +1300,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyG' && G.state === 'surface' && !e.repeat) petInteract();
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -7213,6 +7225,440 @@ function updateDebris(dt) {
 }
 { const _ub4 = updateBoss; updateBoss = function (dt) { _ub4(dt); updateStreaks(dt); updateDebris(dt); CLOUDS.forEach(q => q.m.rotation.y += q.sp * dt); }; }
 
+/* ============ inside Haven Ring: a walkable station city ============ */
+G.quarters = G.quarters || { slots: [null, null, null, null, null, null, null, null], wall: 0, decor: [] };
+G.co = G.co || null;
+PAINTS.havenTeal = { name: 'Haven teal', hull: 0x1aa8a0, trim: 0xf0e8d8, cost: { cr: 3000 } };
+PAINTS.starlight = { name: 'Starlight chrome', hull: 0xc8d8f0, trim: 0x2a2a40, emissive: 0x1a2040, cost: { cr: 6000 } };
+const HV_RECTS = [[-15, 15, -70, 70], [-22, 22, 69, 110], [-40, 40, -130, -69], [15.5, 34, 22, 42], [13, 17, 29, 35], [15.5, 34, -38, -18], [13, 17, -31, -25], [-17, -13, -3, 3]];
+const hvIn = p => HV_RECTS.some(r => p.x > r[0] && p.x < r[1] && p.z > r[2] && p.z < r[3]);
+const HVL = new V3(0, 0, 0);
+const HAVEN_W = { id: 'haven', interior: true, brand: 'HAVEN RING · ON FOOT', title: 'Haven Ring', scene: new THREE.Scene(), pad: { x: 0, z: 0 }, padH: 0, hgtFn: () => 0, itemPlan: [], critterMinH: 99, bob: false, buildable: false,
+  pal: { dayTop: new THREE.Color(0x2a3040), dayHor: new THREE.Color(0x3a4050), setTop: new THREE.Color(0x2a3040), setHor: new THREE.Color(0x3a4050), nightTop: new THREE.Color(0x1a1e2a), nightHor: new THREE.Color(0x2a2e3a), water: new THREE.Color(0x3a9fd0) },
+  nightMsg: 'Night shift on Haven Ring. The cantina gets louder.', hint: 'WASD walk · Shift run · drag to look · E talk, shop, sit in ships and place trophies',
+  bounds(p) { if (hvIn(p)) HVL.copy(p); else { p.x = HVL.x; p.z = HVL.z; } if (p.y > 9) { p.y = 9; S.vel.y = Math.min(0, S.vel.y); } },
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+WORLDS.haven = HAVEN_W;
+const HV = { walkers: [], npcs: [], shops: [], slots: [], trophyObjs: [], decorObjs: [], hangar: [], hangarKey: '', screens: [], dance: [], band: [], talk: null, holo: null, holoDots: [], wallMat: null, coSign: null };
+function hvText(text, w, h, bg, fg, font) {
+  return canvasTex(w, h, (c) => { c.fillStyle = bg; c.fillRect(0, 0, w, h); c.fillStyle = fg; c.shadowColor = fg; c.shadowBlur = h * 0.15; c.font = font || `600 ${Math.round(h * 0.5)}px "Chakra Petch", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, w / 2, h / 2); });
+}
+const HV_SHOPS = [
+  { id: 'supply', name: 'SUNSTONE & SUPPLY', x: -13, z: -45, col: '#ffc23a', keeper: 'Old Tam', items: [{ k: 'sun', label: 'Sunstone', cr: 180 }, { k: 'prism', label: 'Prism shard', cr: 75 }, { k: 'cryo', label: 'Cryo crystal', cr: 95 }, { k: 'resin', label: 'Ember resin', cr: 55 }] },
+  { id: 'paint', name: 'PAINT SHACK', x: -13, z: -15, col: '#ff6fb0', keeper: 'Dazzle', items: [{ paint: 'havenTeal', label: 'Haven teal paint', cr: 3000 }, { paint: 'starlight', label: 'Starlight chrome paint', cr: 6000 }] },
+  { id: 'snack', name: 'ROCKET SNACKS', x: -13, z: 15, col: '#7dffb0', keeper: 'Chef Bao', items: [{ snack: 'noodles', label: 'Nebula noodles (repairs your hull)', cr: 60 }, { snack: 'soda', label: 'Comet soda (fills your boost)', cr: 25 }, { snack: 'pie', label: 'Glowberry pie (just tasty)', cr: 40 }] },
+  { id: 'souv', name: 'SOUVENIRS', x: -13, z: 45, col: '#6fd8ff', keeper: 'Mimi', items: [{ decor: 'lamp', label: 'Lava lamp', cr: 800 }, { decor: 'plant', label: 'Space plant', cr: 600 }, { decor: 'neon', label: 'Neon rocket sign', cr: 1500 }, { decor: 'tank', label: 'Fish tank', cr: 2500 }, { decor: 'disco', label: 'Disco ball', cr: 2000 }] },
+  { id: 'pets', name: 'PET TREATS', x: 13, z: 55, col: '#ffd890', keeper: 'Noodle', items: [{ treat: 1, label: 'Crunchy star treat (+XP for your pet)', cr: 100 }] },
+];
+const CANTINA_NPCS = [
+  { name: 'Gus', role: 'Bartender', x: 0, z: 104, shirt: 0x8a5a3a, lines: () => [hvHint(), 'What can I get you? Comet soda? Nebula juice? We have everything except water. Water is expensive.', 'The band plays every night. Every. Single. Night.'] },
+  { name: 'Marla', role: 'Old pilot', x: -16, z: 88, shirt: 0x6a8a5a, lines: () => ['I flew the Kessel run in nine minutes. Backwards.', 'Do a barrel roll! Double-tap A or D. Trust me, kid.', G.dv && G.dv.down ? 'You beat the Devourer? Kid, they are going to write songs about you.' : 'Back in my day, the scariest thing out there was pirates. Now? I hear things in the Abyss.'] },
+  { name: 'B33P', role: 'Robot DJ', x: 14, z: 98, shirt: 0x8a8f99, robot: true, lines: () => ['BEEP BOOP. TRY THE JUKEBOX. THREE SONGS LOADED. ALL OF THEM ARE BANGERS.', 'DANCE MODE: ENGAGED. YOUR DANCING: 4 OUT OF 10. IMPROVING.', 'I AM NOT A DJ. I AM AN ARTIST.'] },
+  { name: 'Pip Sparks', role: 'Arena rival', x: -8, z: 80, shirt: 0x39d0ff, lines: () => [G.arena && G.arena.best > 4000 ? 'You beat my arena score?! I am upgrading my vacuum ship tonight. You will see!' : 'Bet you can not beat my arena score! The Crucible is in Ember Reach, if you dare.', 'I put a fourth engine on my ship. It is mostly for the noise.'] },
+  { name: 'Commander Vale', role: 'Reach Patrol', x: 18, z: 80, shirt: 0x3b66d9, lines: () => ['Off duty. Do not tell anyone I am here. I am eating a pie.', 'Patrol always needs pilots. Check the bounty boards at Bastion Spire.'] },
+  { name: 'The Hooded Stranger', role: '???', x: -19, z: 106, shirt: 0x2a1a3a, lines: () => [hvSecret()] },
+];
+function hvHint() {
+  if (!G.story || G.story < 5) return 'Commander Vale has story missions, you know. Look for her contracts.';
+  if (!G.guardianDown) return 'People say there is an ancient ruin past the black hole. Puzzles. Treasure. A giant eye thing. Fun!';
+  if (!G.ships.includes('ark')) return 'You seen the Genesis Ark in the Rimeholt yards? A whole moon with engines. Costs a million.';
+  if (!G.co) return 'You should start a trading company! Freighters make money while you nap. Check the Company tab.';
+  if (!G.sea || !G.sea.dives) return 'Verdance has an ocean, you know. Build a Sub dock at your base and dive in.';
+  return 'Business is good. Thanks to you, mostly. Here, this soda is on the house.';
+}
+function hvSecret() {
+  if (G.alien && G.alien.tabs && G.alien.tabs.filter(Boolean).length < 8) return '...The glowing tablets. Look near your landing pads, where the light beams touch the sky...';
+  if (G.sea && !G.sea.secret) return '...Deep under the waves of Verdance, something remembers the whales... Oro is hungry...';
+  if (!(G.ngp && G.ngp.level)) return '...When the Worm is gone, start again. A pink light waits beyond Ember Reach...';
+  return '...You have found every secret I know. For now.';
+}
+function hvPerson(shirt, robot) {
+  const p = makePerson(shirt);
+  if (robot) { const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.38), mStd(0x8a8f99, 0.8, 0.3)); head.position.y = 1.62; p.g.add(head); const eye = glowSprite(0x6fd8ff, 0.5); eye.position.set(0, 1.64, -0.22); p.g.add(eye); }
+  return p;
+}
+function buildHavenInterior() {
+  if (S.built) return; S.built = true;
+  surf.fog = new THREE.Fog(0x1a1e2a, 40, 200); surf.background = new THREE.Color(0x10121a);
+  const sky = makeSkyDome(0x10121a, 0x10121a); sky.visible = false; surf.add(sky); S.sky = sky;
+  S.sun = new THREE.DirectionalLight(0xfff4e8, 0.5); S.sun.position.set(0.2, 1, 0.3); surf.add(S.sun); S.hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a3440, 0.9); surf.add(S.hemi); S.moonLight = new THREE.DirectionalLight(0x6fd8ff, 0); surf.add(S.moonLight);
+  const add = (geo, mat, x, y, z, ry) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (ry) m.rotation.y = ry; surf.add(m); return m; };
+  const tile = canvasTex(256, 256, (c) => { c.fillStyle = '#4a4e5a'; c.fillRect(0, 0, 256, 256); c.strokeStyle = '#3a3e48'; c.lineWidth = 6; c.strokeRect(3, 3, 250, 250); c.fillStyle = 'rgba(111,216,255,.12)'; c.fillRect(120, 0, 16, 256); }); tile.wrapS = tile.wrapT = THREE.RepeatWrapping; tile.repeat.set(20, 60);
+  const floor = add(new THREE.PlaneGeometry(100, 260), new THREE.MeshStandardMaterial({ map: tile, roughness: 0.6, metalness: 0.3 }), 0, 0, -10); floor.rotation.x = -Math.PI / 2;
+  const wallM = mStd(0x8a8f9a, 0.4, 0.5), darkM = mStd(0x2a2c34, 0.5, 0.5), glowB = mGlow(0x6fd8ff);
+  const wall = (x, z, w, d, h = 12, m = wallM) => add(new THREE.BoxGeometry(w, h, d), m, x, h / 2, z);
+  // promenade walls with gaps for shops and doors, and a ceiling with light strips
+  wall(-16, -36, 1, 68); wall(-16, 37, 1, 66); wall(16, -54, 1, 32); wall(16, -6, 1, 36); wall(16, 52, 1, 34);
+  add(new THREE.BoxGeometry(32, 0.6, 140), darkM, 0, 12.3, 0);
+  for (let z = -66; z <= 66; z += 12) add(new THREE.BoxGeometry(20, 0.15, 1.2), glowB, 0, 12, z);
+  for (const s of [-1, 1]) for (let z = -66; z <= 66; z += 6) add(new THREE.BoxGeometry(0.2, 0.2, 4), mGlow(0xffc070), s * 15.4, 0.2, z);
+  // a big window looking out at space over the door to your ship
+  const win = add(new THREE.PlaneGeometry(10, 6), new THREE.MeshBasicMaterial({ map: TEX_SKY }), -15.4, 6, 0, Math.PI / 2);
+  const gate = add(new THREE.BoxGeometry(0.4, 4.5, 4), mStd(0xd7712c, 0.4, 0.5), -15.4, 2.25, 0); const gs = add(new THREE.PlaneGeometry(4, 0.8), new THREE.MeshBasicMaterial({ map: hvText('TO YOUR SHIP', 256, 52, '#1a1e2a', '#7dffb0'), transparent: true }), -15.2, 5, 0, Math.PI / 2);
+  // fountain and planters in the middle
+  add(new THREE.CylinderGeometry(4, 4.4, 0.8, 24), wallM, 0, 0.4, 0); const water = add(new THREE.CylinderGeometry(3.6, 3.6, 0.2, 24), new THREE.MeshStandardMaterial({ color: 0x3aa8d0, emissive: 0x1a5a80, emissiveIntensity: 0.6, roughness: 0.1 }), 0, 0.85, 0); HV.fountain = add(new THREE.ConeGeometry(0.6, 3, 12), new THREE.MeshStandardMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.55, emissive: 0x3a8ad0 }), 0, 2.2, 0);
+  S.colliders.push({ x: 0, z: 0, r: 4.4, top: 1 });
+  for (const [x, z] of [[-8, -30], [8, -30], [-8, 30], [8, 30]]) { add(new THREE.BoxGeometry(2, 1, 2), darkM, x, 0.5, z); const t = add(new THREE.ConeGeometry(1.2, 3.2, 6), mStd(0x3a8a4a, 0.1, 0.8), x, 2.6, z); S.colliders.push({ x, z, r: 1.4, top: 4 }); }
+  // shops
+  HV_SHOPS.forEach(sh => {
+    const s = Math.sign(sh.x), bx = sh.x + s * 4;
+    wall(bx + s * 2.5, sh.z, 1, 12, 12, darkM); wall(bx, sh.z - 6, 6, 1, 12, darkM); wall(bx, sh.z + 6, 6, 1, 12, darkM);
+    add(new THREE.BoxGeometry(1.2, 1.2, 8), mStd(0xd8d0c0, 0.2, 0.6), sh.x + s * 0.6, 0.6, sh.z);
+    S.colliders.push({ x: sh.x + s * 0.6, z: sh.z - 2.5, r: 1.6, top: 1.3 }, { x: sh.x + s * 0.6, z: sh.z + 2.5, r: 1.6, top: 1.3 }, { x: sh.x + s * 0.6, z: sh.z, r: 1.6, top: 1.3 });
+    const sign = add(new THREE.PlaneGeometry(8, 1.4), new THREE.MeshBasicMaterial({ map: hvText(sh.name, 512, 90, '#14161e', sh.col), transparent: true }), sh.x + s * -0.4, 6.5, sh.z, s > 0 ? -Math.PI / 2 : Math.PI / 2);
+    const L = new THREE.PointLight(new THREE.Color(sh.col), 0.8, 14); L.position.set(sh.x + s * 2, 5, sh.z); surf.add(L);
+    const k = hvPerson(new THREE.Color(sh.col).getHex()); k.g.position.set(sh.x + s * 2.6, 0, sh.z); k.g.rotation.y = s > 0 ? Math.PI / 2 : -Math.PI / 2; surf.add(k.g);
+    HV.shops.push(Object.assign({ keeperObj: k }, sh));
+  });
+  // door signs
+  add(new THREE.PlaneGeometry(6, 1.1), new THREE.MeshBasicMaterial({ map: hvText("CAPTAIN'S QUARTERS", 512, 90, '#14161e', '#ffd890'), transparent: true }), 15.4, 6.5, 32, -Math.PI / 2);
+  HV.coSign = add(new THREE.PlaneGeometry(6, 1.1), new THREE.MeshBasicMaterial({ map: hvText('COMPANY OFFICE', 512, 90, '#14161e', '#7dffb0'), transparent: true }), 15.4, 6.5, -28, -Math.PI / 2);
+  add(new THREE.PlaneGeometry(12, 1.8), new THREE.MeshBasicMaterial({ map: hvText('THE BLACK HOLE CANTINA', 768, 110, '#120a1e', '#ff6fb0'), transparent: true }), 0, 9, 69.4, Math.PI);
+  add(new THREE.PlaneGeometry(12, 1.8), new THREE.MeshBasicMaterial({ map: hvText('HANGAR BAY', 768, 110, '#10141a', '#6fd8ff'), transparent: true }), 0, 9, -69.4);
+  // the cantina
+  wall(-22.5, 89.5, 1, 41, 12, darkM); wall(22.5, 89.5, 1, 41, 12, darkM); wall(0, 110.5, 46, 1, 12, darkM); wall(-18.5, 69.5, 7, 1, 12, darkM); wall(18.5, 69.5, 7, 1, 12, darkM);
+  add(new THREE.BoxGeometry(46, 0.6, 42), darkM, 0, 12.3, 89.5);
+  add(new THREE.BoxGeometry(14, 1.2, 1.4), mStd(0x5a3a2a, 0.2, 0.6), 0, 0.6, 101); S.colliders.push({ x: -4, z: 101, r: 2.2, top: 1.3 }, { x: 0, z: 101, r: 2.2, top: 1.3 }, { x: 4, z: 101, r: 2.2, top: 1.3 });
+  for (let i = 0; i < 4; i++) add(new THREE.BoxGeometry(14, 0.1, 0.1), mGlow([0xff6fb0, 0x6fd8ff, 0xffc23a, 0x7dffb0][i]), 0, 3 + i * 0.6, 109.8);
+  [[-12, 78], [12, 76], [-12, 96], [8, 88], [-4, 84]].forEach(([x, z]) => { add(new THREE.CylinderGeometry(1.4, 1.4, 0.15, 16), darkM, x, 1.1, z); add(new THREE.CylinderGeometry(0.15, 0.15, 1.1, 6), darkM, x, 0.55, z); S.colliders.push({ x, z, r: 1.5, top: 1.2 }); const c = glowSprite(0xffc070, 1.2); c.position.set(x, 1.4, z); surf.add(c); });
+  add(new THREE.BoxGeometry(12, 0.8, 6), darkM, 16, 0.4, 104); S.colliders.push({ x: 13, z: 104, r: 3, top: 0.8 }, { x: 19, z: 104, r: 3, top: 0.8 });
+  for (let i = 0; i < 3; i++) { const m = hvPerson([0xff6fb0, 0xffc23a, 0x7dffb0][i]); m.g.position.set(12 + i * 3.5, 0.8, 105); m.g.rotation.y = Math.PI; surf.add(m.g); const ins = new THREE.Mesh(i === 1 ? new THREE.CylinderGeometry(0.4, 0.4, 0.5, 10) : new THREE.BoxGeometry(0.2, 0.9, 0.4), mStd([0xd9a520, 0xc4271f, 0x3b66d9][i], 0.6, 0.3)); ins.position.set(0, 1, -0.4); m.g.add(ins); HV.band.push(m); }
+  for (let i = -2; i <= 2; i++) for (let j = 0; j < 3; j++) { const t = add(new THREE.BoxGeometry(2.6, 0.1, 2.6), new THREE.MeshStandardMaterial({ color: 0x222, emissive: 0xff6fb0, emissiveIntensity: 0.2 }), i * 2.8, 0.06, 82 + j * 2.8); HV.dance.push(t); }
+  HV.juke = add(new THREE.BoxGeometry(1.6, 2.6, 1), new THREE.MeshStandardMaterial({ color: 0x8a2a5a, emissive: 0xff3fb4, emissiveIntensity: 0.6 }), 21, 1.3, 84); S.colliders.push({ x: 21, z: 84, r: 1.2, top: 2.6 });
+  [[-14, 0xff6fb0], [14, 0x6fd8ff]].forEach(([x, c]) => { const L = new THREE.PointLight(c, 1.4, 40); L.position.set(x, 8, 90); surf.add(L); });
+  CANTINA_NPCS.forEach(n => { const p = hvPerson(n.shirt, n.robot); p.g.position.set(n.x, 0, n.z); p.g.rotation.y = Math.PI; surf.add(p.g); HV.npcs.push(Object.assign({ obj: p, role: n.role }, n)); });
+  // the hangar
+  wall(-40.5, -99.5, 1, 61, 16, darkM); wall(40.5, -99.5, 1, 61, 16, darkM); wall(0, -130.5, 82, 1, 16, darkM); wall(-27.5, -69.5, 25, 1, 16, darkM); wall(27.5, -69.5, 25, 1, 16, darkM);
+  add(new THREE.BoxGeometry(82, 0.6, 62), darkM, 0, 16.3, -99.5);
+  for (let i = 0; i < 6; i++) { const x = -30 + (i % 3) * 30, z = i < 3 ? -88 : -115; const pad = add(new THREE.CylinderGeometry(8, 8, 0.2, 32), mStd(0x3a3e48, 0.5, 0.5), x, 0.1, z); add(new THREE.TorusGeometry(8, 0.15, 6, 48), mGlow(0xffc23a), x, 0.25, z).rotation.x = Math.PI / 2; }
+  const hL = new THREE.PointLight(0xdfe8ff, 1.2, 90); hL.position.set(0, 14, -100); surf.add(hL);
+  // captain's quarters
+  wall(34.5, 32, 1, 21, 12, darkM); wall(25, 42.5, 20, 1, 12, darkM); wall(25, 21.5, 20, 1, 12, darkM); add(new THREE.BoxGeometry(20, 0.6, 22), darkM, 25, 12.3, 32);
+  HV.wallMat = new THREE.MeshStandardMaterial({ color: 0x3a4a6a, roughness: 0.8 }); add(new THREE.BoxGeometry(0.2, 11.8, 20.8), HV.wallMat, 34, 6, 32);
+  add(new THREE.PlaneGeometry(8, 5), new THREE.MeshBasicMaterial({ map: TEX_SKY }), 33.85, 6, 32, -Math.PI / 2);
+  add(new THREE.BoxGeometry(3, 0.8, 5), mStd(0x3b66d9, 0.1, 0.8), 30, 0.4, 25); S.colliders.push({ x: 30, z: 25, r: 2.4, top: 0.9 });
+  add(new THREE.CylinderGeometry(3, 3, 0.05, 24), new THREE.MeshStandardMaterial({ color: 0x8a3a3a, roughness: 1 }), 24, 0.03, 32);
+  const slotPos = [[18, 41.2], [22, 41.2], [26, 41.2], [30, 41.2], [18, 22.8], [22, 22.8], [26, 22.8], [33, 38]];
+  slotPos.forEach(([x, z], i) => { add(new THREE.CylinderGeometry(0.7, 0.8, 1.6, 10), mStd(0xd8d0c0, 0.2, 0.5), x, 0.8, z); const gl = glowSprite(0xffd890, 2); gl.position.set(x, 2.4, z); surf.add(gl); S.colliders.push({ x, z, r: 0.9, top: 1.6 }); HV.slots.push({ x, z, gl, obj: null, key: '' }); });
+  HV.wallPanel = add(new THREE.BoxGeometry(0.2, 1, 1), mGlow(0xffd890), 33.8, 1.6, 24);
+  const qL = new THREE.PointLight(0xffe0b0, 1, 30); qL.position.set(25, 9, 32); surf.add(qL);
+  // company office
+  wall(34.5, -28, 1, 21, 12, darkM); wall(25, -38.5, 20, 1, 12, darkM); wall(25, -17.5, 20, 1, 12, darkM); add(new THREE.BoxGeometry(20, 0.6, 22), darkM, 25, 12.3, -28);
+  add(new THREE.CylinderGeometry(4, 4.2, 1, 32), mStd(0x2a2c34, 0.6, 0.4), 25, 0.5, -28); S.colliders.push({ x: 25, z: -28, r: 4.4, top: 1.1 });
+  HV.holo = add(new THREE.CylinderGeometry(3.6, 3.6, 0.05, 48), new THREE.MeshBasicMaterial({ color: 0x2aa8a0, transparent: true, opacity: 0.35 }), 25, 1.2, -28);
+  for (let i = 0; i < 10; i++) { const d = glowSprite(0x7dffb0, 0.6); d.visible = false; surf.add(d); HV.holoDots.push(d); }
+  for (let i = 0; i < 5; i++) { const sc = add(new THREE.PlaneGeometry(3, 1.8), new THREE.MeshBasicMaterial({ color: 0x2aa8a0, transparent: true, opacity: 0.8 }), 33.85, 3 + (i % 2) * 2.4, -35 + i * 3.4, -Math.PI / 2); HV.screens.push(sc); }
+  const oL = new THREE.PointLight(0x7dffb0, 0.9, 30); oL.position.set(25, 8, -28); surf.add(oL);
+  // walkers
+  for (let i = 0; i < 12; i++) { const p = hvPerson(pick([0x3b66d9, 0xd7712c, 0x4f9a3a, 0xb05ad9, 0xe8e2dc, 0xd9a520, 0x2aa8a0])); p.g.position.set(rand(-10, 10), 0, rand(-60, 60)); surf.add(p.g); HV.walkers.push(Object.assign(p, { goal: null, wait: rand(0, 3), t: 0 })); }
+  S.astro = makeAstronaut(); surf.add(S.astro.g); S.drone = makeDrone(); surf.add(S.drone);
+}
+HAVEN_W.build = buildHavenInterior;
+// trophies for the quarters
+const TROPHIES = {
+  leviathan: { name: 'Leviathan model', ok: () => (G.stats.bosses || 0) >= 1, make: () => { const g = makeFighter({ hull: 0x3a3d48, trim: 0x8a2a20, glass: 0xff6040, glow: 0xff5a3a }); g.scale.setScalar(0.12); return g; } },
+  guardian: { name: 'Guardian eye', ok: () => !!G.guardianDown, make: () => { const g = makeEye(); g.scale.setScalar(0.09); return g; } },
+  devourer: { name: 'Devourer tooth', ok: () => !!(G.dv && G.dv.down) || !!(G.ngp && G.ngp.level), make: () => new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.1, 5), new THREE.MeshStandardMaterial({ color: 0x4a2058, emissive: 0xb07aff, emissiveIntensity: 0.6, flatShading: true })) },
+  racecup: { name: 'Racing cup', ok: () => Object.keys(G.trophies || {}).length > 0, make: () => { const g = new THREE.Group(), m = mStd(0xffc23a, 0.9, 0.25); const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.15, 0.5, 14, 1, true), m); cup.position.y = 0.5; g.add(cup); const st = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.2, 0.3, 8), m); st.position.y = 0.15; g.add(st); return g; } },
+  arena: { name: 'Arena medal', ok: () => !!G.arena && G.arena.best >= 8000, make: () => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.06, 20), mStd(0xffc23a, 0.9, 0.25)); m.rotation.x = Math.PI / 2; m.position.y = 0.4; return m; } },
+  whale: { name: 'Whale figurine', ok: () => !!(G.wq && G.wq.friend), make: () => { const g = makeWhale('adult'); g.scale.setScalar(0.004); return g; } },
+  lantern: { name: 'Sylari lantern', ok: () => !!(G.syl && G.syl.fluent), make: () => { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({ color: 0xff9ad8, emissive: 0xff9ad8, emissiveIntensity: 1 }))); g.add(glowSprite(0xff9ad8, 1.4)); g.position.y = 0.4; return g; } },
+  pearl: { name: 'Memory crystal shard', ok: () => !!(G.sea && G.sea.secret), make: () => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({ color: 0x9fffe8, emissive: 0x4fffe0, emissiveIntensity: 0.9, flatShading: true })); m.scale.y = 1.8; m.position.y = 0.5; return m; } },
+  fish: { name: 'Prize fish', ok: () => Object.keys(G.fishBest || {}).length >= 3, make: () => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), mStd(0x3aa8d0, 0.3, 0.4)); m.scale.set(0.6, 0.8, 1.8); m.position.y = 0.4; return m; } },
+  pet: { name: 'Pet photo', ok: () => (G.pets || []).length > 0, make: () => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.06), mStd(0xd9a520, 0.6, 0.4)); m.position.y = 0.3; return m; } },
+  statue: { name: 'Mini golden statue', ok: () => !!(G.dv && G.dv.down) || !!(G.ngp && G.ngp.level), make: () => { const a = makeAstronaut(); const gold = mStd(0xffc23a, 0.95, 0.22); a.g.traverse(o => { if (o.isMesh) o.material = gold; }); a.flames.forEach(f => f.visible = false); a.g.scale.setScalar(0.45); return a.g; } },
+  colony: { name: 'Colony model', ok: () => !!(G.city && G.city.best >= 25), make: () => { const g = new THREE.Group(); for (let i = 0; i < 4; i++) { const h = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2 + i * 0.1, 0.2), mStd(pick([0xe8dcc8, 0xc8e0e8, 0xf0d0c0]))); h.position.set((i % 2) * 0.3 - 0.15, 0.15 + i * 0.05, Math.floor(i / 2) * 0.3 - 0.15); g.add(h); } return g; } },
+  company: { name: 'Business award', ok: () => !!(G.co && G.co.level >= 3), make: () => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.35, 0), mStd(0x7dffb0, 0.6, 0.3)); m.position.y = 0.4; return m; } },
+};
+const trophyUnlocked = () => Object.keys(TROPHIES).filter(k => TROPHIES[k].ok());
+const DECOR = { lamp: { x: 18, z: 26 }, plant: { x: 33, z: 41 }, neon: { x: 33.8, z: 28 }, tank: { x: 20, z: 32 }, disco: { x: 25, z: 32 } };
+function makeDecor(k) {
+  const g = new THREE.Group();
+  if (k === 'lamp') { g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 1.2, 10), new THREE.MeshStandardMaterial({ color: 0xff6a3a, emissive: 0xff4a20, emissiveIntensity: 0.8, transparent: true, opacity: 0.8 }))); g.children[0].position.y = 0.6; const L = new THREE.PointLight(0xff6a3a, 0.6, 8); L.position.y = 1; g.add(L); }
+  if (k === 'plant') { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.3, 0.6, 10), mStd(0xd7712c)); p.position.y = 0.3; g.add(p); for (let i = 0; i < 6; i++) { const l = new THREE.Mesh(new THREE.ConeGeometry(0.15, 1.2, 4), new THREE.MeshStandardMaterial({ color: 0x5fe0a0, emissive: 0x1a6a4a, emissiveIntensity: 0.5 })); l.position.set(Math.cos(i) * 0.2, 1, Math.sin(i) * 0.2); l.rotation.set(Math.sin(i) * 0.4, 0, Math.cos(i) * 0.4); g.add(l); } }
+  if (k === 'neon') { const s = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: hvText('🚀 ROCKET', 256, 128, '#10121a', '#ff6fb0'), transparent: true })); s.rotation.y = -Math.PI / 2; s.position.y = 5; g.add(s); }
+  if (k === 'tank') { const t = new THREE.Mesh(new THREE.BoxGeometry(2, 1.2, 0.8), new THREE.MeshStandardMaterial({ color: 0x3aa8d0, transparent: true, opacity: 0.45, emissive: 0x1a5a80, emissiveIntensity: 0.5 })); t.position.y = 1.4; g.add(t); const st = new THREE.Mesh(new THREE.BoxGeometry(2, 0.8, 0.8), mStd(0x2a2c34)); st.position.y = 0.4; g.add(st); for (let i = 0; i < 3; i++) { const f = glowSprite(pick([0xffc23a, 0xff6fb0, 0x7dffb0]), 0.4); f.position.set(rand(-0.7, 0.7), 1.4, 0); g.add(f); } g.userData.fish = g.children.slice(2); }
+  if (k === 'disco') { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 1), mStd(0xe8eef4, 1, 0.1)); b.position.y = 10.5; g.add(b); g.userData.spin = b; const L = new THREE.PointLight(0xff6fb0, 0.8, 18); L.position.y = 9; g.add(L); g.userData.light = L; }
+  return g;
+}
+function refreshQuarters() {
+  HV.slots.forEach((s, i) => { const k = G.quarters.slots[i] || ''; if (s.key === k) return; if (s.obj) surf.remove(s.obj); s.obj = null; s.key = k; if (k && TROPHIES[k]) { s.obj = TROPHIES[k].make(); s.obj.position.set(s.x, 1.6, s.z); surf.add(s.obj); } s.gl.visible = !k; });
+  G.quarters.decor.forEach(k => { if (HV.decorObjs.some(d => d.k === k)) return; const o = makeDecor(k), p = DECOR[k]; o.position.set(p.x, 0, p.z); surf.add(o); HV.decorObjs.push({ k, o }); if (k === 'tank' || k === 'lamp') S.colliders.push({ x: p.x, z: p.z, r: 1.1, top: 2 }); });
+  HV.wallMat.color.setHex([0x3a4a6a, 0x6a3a4a, 0x3a6a4a, 0x5a4a2a, 0x2a2a3a][G.quarters.wall % 5]);
+}
+function refreshHangar() {
+  const owned = G.ships.filter(k => SHIPS[k]), key = owned.join(',') + '|' + G.ship;
+  if (HV.hangarKey === key) return; HV.hangarKey = key;
+  HV.hangar.forEach(h => { surf.remove(h.obj); surf.remove(h.sign); }); HV.hangar = [];
+  owned.slice(0, 6).forEach((k, i) => {
+    const x = -30 + (i % 3) * 30, z = i < 3 ? -88 : -115, m = SHIPS[k].make();
+    const box = new THREE.Box3().setFromObject(m), sz = box.getSize(new V3()), sc = Math.min(1.6, 13 / Math.max(sz.x, sz.y, sz.z));
+    m.scale.multiplyScalar(sc); m.position.set(x, 3.5, z); m.rotation.y = Math.PI * 0.8; surf.add(m);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.4), new THREE.MeshBasicMaterial({ map: hvText(`${SHIPS[k].name.toUpperCase()}${G.ship === k ? ' · ACTIVE' : ''}`, 512, 72, '#10141a', G.ship === k ? '#7dffb0' : '#6fd8ff'), transparent: true })); sign.position.set(x, 10.5, z); surf.add(sign);
+    HV.hangar.push({ k, obj: m, sign, x, z });
+  });
+}
+// walking in and out
+function enterHaven() {
+  const st = G.docked; if (!st || st.id !== 'haven') return;
+  arkTransition(() => {
+    G.docked = null; useWorld(HAVEN_W); W.build(); refreshQuarters(); refreshHangar();
+    renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 62; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
+    S.pos.set(-11, 0, 0); HVL.copy(S.pos); S.vel.set(0, 0, 0); S.heading = -Math.PI / 2; S.yaw = -Math.PI / 2 - 0.3; S.pitch = 0.25; S.fuel = fuelMax(); S.heat = 100;
+    S.astro.g.visible = true; setState('surface'); updateSurfCamera(1);
+    say('Welcome to the Haven Ring promenade! Shops on the left, the cantina at the far end, the hangar behind you.', 'good');
+    if (!G.quarters.visited) { G.quarters.visited = true; logAdd(['A walk around Haven', 'For the first time I got out of my ship and walked around Haven Ring. It is like a city in a donut. There is a cantina with a robot DJ.']); }
+  }, 'Walking aboard');
+  $('#entryTitle').textContent = 'Haven Ring';
+}
+function leaveHaven() {
+  arkTransition(() => { renderScene = scene; applyBloom(false); camera.near = shipNear(); camera.fov = 68; camera.updateProjectionMatrix(); $('#cityBubble').hidden = true; dock(stationById('haven')); }, 'Back to your ship');
+  $('#entryTitle').textContent = 'Haven Ring';
+}
+$('#undockBtn').insertAdjacentHTML('beforebegin', '<button class="ghost" id="walkBtn" hidden>Walk around the station</button>');
+$('#walkBtn').addEventListener('click', enterHaven);
+// talking, shopping, trophies
+const hvNear = (x, z, r) => Math.hypot(S.pos.x - x, S.pos.z - z) < r;
+function hvSpot() {
+  if (hvNear(-14, 0, 3)) return { t: 'exit' };
+  for (const sh of HV.shops) if (hvNear(sh.x, sh.z, 3.2)) return { t: 'shop', sh };
+  for (const n of HV.npcs) if (hvNear(n.x, n.z, n.name === "Gus" ? 7 : 3.2)) return { t: "npc", n };
+  if (hvNear(21, 84, 2.8)) return { t: 'juke' };
+  for (const h of HV.hangar) if (hvNear(h.x, h.z, 9.5)) return { t: 'ship', h };
+  for (let i = 0; i < HV.slots.length; i++) if (hvNear(HV.slots[i].x, HV.slots[i].z, 2.9)) return { t: 'slot', i };
+  if (hvNear(33.8, 24, 2.2)) return { t: 'wall' };
+  if (hvNear(25, -28, 6)) return { t: 'office' };
+  return null;
+}
+function havenPrompt() {
+  const s = hvSpot(), key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'; if (!s) return '';
+  if (s.t === 'exit') return `${key} to go back to your ship`;
+  if (s.t === 'shop') return `${key} to shop at ${s.sh.name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}`;
+  if (s.t === 'npc') return `${key} to talk to ${s.n.name} (${s.n.role})`;
+  if (s.t === 'juke') return `${key} to change the song on the jukebox (now: ${SONGS[MUSIC.song].name})`;
+  if (s.t === 'ship') return s.h.k === G.ship ? `Your ${SHIPS[s.h.k].name} is ready to launch.` : `${key} to make the ${SHIPS[s.h.k].name} your active ship`;
+  if (s.t === 'slot') { const k = G.quarters.slots[s.i]; return `${key} to ${k ? `swap the ${TROPHIES[k].name}` : 'place a trophy'} (${trophyUnlocked().length} of ${Object.keys(TROPHIES).length} trophies earned)`; }
+  if (s.t === 'wall') return `${key} to change your wall color`;
+  if (s.t === 'office') return `${key} to open your trading company`;
+  return '';
+}
+function havenInteract() {
+  const s = hvSpot(); if (!s) return;
+  if (s.t === 'exit') { leaveHaven(); return; }
+  if (s.t === 'shop') { openShop(s.sh); return; }
+  if (s.t === 'npc') { HV.talk = { n: s.n, text: pick(s.n.lines()), t: 6 }; sfx('ui'); return; }
+  if (s.t === 'juke') { MUSIC.song = (MUSIC.song + 1) % SONGS.length; sfx('ui'); say(`Now playing: ${SONGS[MUSIC.song].name}`); return; }
+  if (s.t === 'ship') { const k = s.h.k; if (k === G.ship) return; if (G.crew < SHIPS[k].crew) { say(`The ${SHIPS[k].name} needs ${SHIPS[k].crew.toLocaleString()} crew.`, 'bad'); return; } switchShip(k); sfx('win'); say(`The ${SHIPS[k].name} is now your active ship.`, 'good'); refreshHangar(); save(); return; }
+  if (s.t === 'slot') {
+    const all = trophyUnlocked(); if (!all.length) { say('You have no trophies yet. Beat bosses, win races, find secrets and they will show up here!'); return; }
+    const used = G.quarters.slots.filter((k, j) => k && j !== s.i), opts = [null].concat(all.filter(k => !used.includes(k))), cur = G.quarters.slots[s.i], nx = opts[(opts.indexOf(cur) + 1) % opts.length];
+    G.quarters.slots[s.i] = nx; refreshQuarters(); sfx('pickup'); say(nx ? `Placed: ${TROPHIES[nx].name}` : 'Pedestal cleared.'); save(); return;
+  }
+  if (s.t === 'wall') { G.quarters.wall++; refreshQuarters(); sfx('ui'); save(); return; }
+  if (s.t === 'office') { openHPanel('company'); return; }
+}
+let shopNow = null;
+function openShop(sh) { shopNow = sh; openHPanel('shop'); }
+function renderShop() {
+  const sh = shopNow; let h = `<p class="craft-note">${sh.keeper}: “${pick(['Welcome, welcome!', 'Best prices on the Ring!', 'Oh! A famous captain!', 'Take your time, look around.'])}”</p>`;
+  sh.items.forEach((it, i) => {
+    let owned = false; if (it.paint) owned = G.paints.includes(it.paint); if (it.decor) owned = G.quarters.decor.includes(it.decor);
+    h += `<div class="item"><div><h4>${it.label}</h4><p>${it.k ? `You have ${G.mats[it.k]}.` : it.paint ? (owned ? 'In your paint locker (Crafting tab).' : 'An exclusive Haven paint job.') : it.decor ? (owned ? 'Already in your quarters.' : 'Shows up in your captain’s quarters.') : it.treat ? (activePet() ? `For ${activePet().name}.` : 'You need a pet following you.') : ''}</p></div><div><div class="reward">${it.cr.toLocaleString()} cr</div><button class="btn" data-act="hvbuy" data-i="${i}" ${owned || G.credits < it.cr || (it.treat && !activePet()) ? 'disabled' : ''}>${owned ? 'Owned' : 'Buy'}</button></div></div>`;
+  });
+  return h;
+}
+function shopBuy(i) {
+  const it = shopNow.items[i]; if (!it || G.credits < it.cr) return;
+  if (it.paint && G.paints.includes(it.paint)) return; if (it.decor && G.quarters.decor.includes(it.decor)) return;
+  G.credits -= it.cr; sfx('pickup');
+  if (it.k) { G.mats[it.k]++; say(`+1 ${MATS[it.k].name}`); }
+  if (it.paint) { G.paints.push(it.paint); G.paint = it.paint; applyPaint(); say(`${PAINTS[it.paint].name} applied to your ship!`, 'good'); }
+  if (it.decor) { G.quarters.decor.push(it.decor); refreshQuarters(); say(`${it.label} delivered to your quarters!`, 'good'); }
+  if (it.snack === 'noodles') { G.hull = SH().hull; say('Slurp! Chef Bao’s nebula noodles. Your crew fixed the hull while you ate.', 'good'); }
+  if (it.snack === 'soda') { G.boost = 100; say('Fizz! Boost tank full. You burp a little star.', 'good'); }
+  if (it.snack === 'pie') say('Glowberry pie! Your tongue is glowing now. Worth it.', 'good');
+  if (it.treat && activePet()) { petXP(activePet(), 3); say(`${activePet().name} loves the crunchy star treat!`, 'good'); }
+  save(); $('#hpBody').innerHTML = renderShop();
+}
+// overlay panel for shops and the company office
+let hpMode = null;
+function openHPanel(mode) { hpMode = mode; $('#hpTitle').textContent = mode === 'shop' ? shopNow.name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : (G.co ? G.co.name : 'Start a trading company'); $('#hpEyebrow').textContent = mode === 'shop' ? `Haven Ring · ${shopNow.keeper}'s shop` : 'Haven Ring · company office'; $('#hpBody').innerHTML = mode === 'shop' ? renderShop() : renderCompany(); setState('hpanel'); $('#hPanel').hidden = false; sfx('ui'); }
+function closeHPanel() { $('#hPanel').hidden = true; hpMode = null; if (G.state === 'hpanel') setState('surface'); }
+$('#hpClose').addEventListener('click', closeHPanel);
+$('#hpBody').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; if (b.dataset.act === 'hvbuy') shopBuy(+b.dataset.i); else expAct(b.dataset.act, b); });
+$('#hpBody').addEventListener('change', e => coChange(e));
+$('#hpBody').addEventListener('keydown', e => e.stopPropagation());
+// cantina music: a tiny synth band
+const SONGS = [{ name: 'Nebula Swing', bpm: 118, root: 0, bass: [0, 0, 7, 7, 5, 5, 7, 3], lead: [12, -1, 15, 14, 12, -1, 10, 12, 15, -1, 17, 15, 12, -1, 10, 7] }, { name: 'Asteroid Funk', bpm: 104, root: 2, bass: [0, -1, 0, 10, -1, 7, 5, 3], lead: [7, 10, -1, 12, 10, 7, -1, 5, 7, -1, 3, 5, 7, 10, 12, -1] }, { name: 'Warp Waltz', bpm: 96, root: 5, bass: [0, 7, 7, 5, 12, 12, 3, 10], lead: [12, 14, 15, -1, 14, 12, 10, -1, 12, -1, 7, 10, 12, 14, 12, -1] }];
+const MUSIC = { song: 0, next: 0, step: 0, gain: null, beat: 0 };
+function hvNote(f, t, d, type, v) { const o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g); g.connect(MUSIC.gain); o.start(t); o.stop(t + d + 0.05); }
+function musicTick() {
+  if (!AC) return;
+  if (!MUSIC.gain) { MUSIC.gain = AC.createGain(); MUSIC.gain.gain.value = 0; MUSIC.gain.connect(master || AC.destination); }
+  const inside = W === HAVEN_W && renderScene === surf && (G.state === 'surface' || G.state === 'hpanel');
+  const vol = inside ? (S.pos.z > 66 ? clamp(1 - Math.hypot(S.pos.x - 15, S.pos.z - 104) / 60, 0.35, 1) * 0.16 : 0.025) : 0;
+  MUSIC.gain.gain.setTargetAtTime(vol, AC.currentTime, 0.4);
+  if (vol < 0.001) { MUSIC.next = 0; return; }
+  const sg = SONGS[MUSIC.song], st = 60 / sg.bpm / 2, f = n => 110 * Math.pow(2, (n + sg.root) / 12);
+  if (MUSIC.next < AC.currentTime) MUSIC.next = AC.currentTime + 0.05;
+  while (MUSIC.next < AC.currentTime + 0.25) {
+    const s = MUSIC.step++, t = MUSIC.next;
+    if (s % 2 === 0) { const b = sg.bass[(s / 2) % sg.bass.length]; if (b >= 0) hvNote(f(b) / 2, t, st * 1.6, 'triangle', 0.5); }
+    const l = sg.lead[s % sg.lead.length]; if (l >= 0) hvNote(f(l) * 2, t, st * 0.9, 'square', 0.08);
+    if (s % 8 === 0) [0, 4, 7].forEach(c => hvNote(f(c + 12), t, st * 3, 'sine', 0.12));
+    hvNote(6000, t, 0.03, 'square', s % 2 ? 0.015 : 0.03);
+    if (s % 2 === 0) setTimeout(() => { MUSIC.beat++; }, Math.max(0, (t - AC.currentTime) * 1000));
+    MUSIC.next += st;
+  }
+}
+HAVEN_W.update = function (dt) {
+  musicTick();
+  HV.fountain.scale.y = 1 + Math.sin(T * 3) * 0.15;
+  const spots = [[-10, -50], [10, -50], [-10, -20], [10, -20], [-10, 20], [10, 20], [-10, 50], [10, 50], [0, -60], [0, 60], [-6, 10], [6, -10]];
+  for (const w of HV.walkers) {
+    let moving = false;
+    if (w.wait > 0) w.wait -= dt; else { if (!w.goal) { const p = pick(spots); w.goal = new V3(p[0] + rand(-2, 2), 0, p[1] + rand(-3, 3)); } const dx = w.goal.x - w.g.position.x, dz = w.goal.z - w.g.position.z, d = Math.hypot(dx, dz); if (d < 0.6) { w.goal = null; w.wait = rand(2, 6); } else { w.g.position.x += dx / d * 1.4 * dt; w.g.position.z += dz / d * 1.4 * dt; w.g.rotation.y = Math.atan2(-dx, -dz); moving = true; } }
+    w.t += dt * (moving ? 7 : 0); const sw = moving ? Math.sin(w.t) * 0.5 : 0; w.legs[0].rotation.x = sw; w.legs[1].rotation.x = -sw; w.arms[0].rotation.x = -sw; w.arms[1].rotation.x = sw;
+  }
+  const b = MUSIC.beat;
+  HV.band.forEach((m, i) => { m.g.position.y = 0.8 + Math.abs(Math.sin(T * 6 + i)) * 0.15; m.arms[0].rotation.x = Math.sin(T * 8 + i) * 0.8; m.arms[1].rotation.x = -Math.sin(T * 8 + i) * 0.8; });
+  HV.dance.forEach((t, i) => { t.material.emissiveIntensity = (i + b) % 3 === 0 ? 1.2 : 0.15; t.material.emissive.setHex([0xff6fb0, 0x6fd8ff, 0xffc23a][(i + b) % 3]); });
+  HV.juke.material.emissiveIntensity = 0.5 + (b % 2) * 0.4;
+  HV.npcs.forEach(n => { const d = Math.hypot(S.pos.x - n.x, S.pos.z - n.z); if (d < 6) n.obj.g.rotation.y = lerpAngle(n.obj.g.rotation.y, Math.atan2(-(S.pos.x - n.x), -(S.pos.z - n.z)), dt * 4); });
+  HV.decorObjs.forEach(d => { if (d.o.userData.spin) { d.o.userData.spin.rotation.y += dt; d.o.userData.light.color.setHSL((T * 0.2) % 1, 1, 0.6); } if (d.o.userData.fish) d.o.userData.fish.forEach((f, i) => { f.position.x = Math.sin(T * 0.7 + i * 2) * 0.7; }); });
+  HV.slots.forEach(s => { if (s.obj) s.obj.rotation.y += dt * 0.5; });
+  // the company holo map
+  const fleet = G.co ? G.co.ships.filter(s => s.state === 'run') : [];
+  HV.holoDots.forEach((d, i) => { const s = fleet[i]; d.visible = !!s; if (s) { const k = clamp((Date.now() - s.t0) / s.dur, 0, 1), a = i * 1.7 + k * Math.PI; d.position.set(25 + Math.cos(a) * 2.6 * (0.4 + k * 0.6), 1.5, -28 + Math.sin(a) * 2.6 * (0.4 + k * 0.6)); } });
+  HV.holo.material.opacity = G.co ? 0.3 + Math.sin(T * 2) * 0.08 : 0.08;
+  HV.screens.forEach((sc, i) => { sc.visible = !!G.co && i < (G.co ? G.co.level : 0); sc.material.color.setHSL(0.45 + Math.sin(T + i) * 0.05, 0.6, 0.3 + (b + i) % 4 * 0.05); });
+  const tk = HV.talk, bub = $('#cityBubble');
+  if (tk && Math.hypot(S.pos.x - tk.n.x, S.pos.z - tk.n.z) > 12) tk.t = 0;
+  if (tk && tk.t > 0 && G.state === 'surface') { tk.t -= dt; const pp = tmp.copy(tk.n.obj.g.position).add(new V3(0, 2.4, 0)).project(camera); if (pp.z < 1) { bub.hidden = false; bub.innerHTML = `<b>${tk.n.name}</b><span>${tk.n.role}</span><p>${tk.text}</p>`; bub.style.left = ((pp.x * 0.5 + 0.5) * innerWidth) + 'px'; bub.style.top = ((-pp.y * 0.5 + 0.5) * innerHeight) + 'px'; } else bub.hidden = true; } else if (W === HAVEN_W) bub.hidden = true;
+};
+HAVEN_W.surfMarkers = function () {
+  const m = (id, cls, label, x, z, y = 5) => { const el = marker(id, cls, label); el.querySelector('.dst').textContent = fmtD(Math.hypot(S.pos.x - x, S.pos.z - z)); placeMarker(el, tmp.set(x, y, z)); };
+  m('hv-ship', 'station', 'Your ship', -15, 0); m('hv-cant', 'friendly', 'Cantina', 0, 75, 8); m('hv-hang', 'friendly', 'Hangar', 0, -75, 8); m('hv-q', 'friendly', 'Quarters', 16, 32); m('hv-co', 'friendly', 'Company office', 16, -28);
+};
+{ const _hv3 = harvest; harvest = function () { if (G.state === 'surface' && W === HAVEN_W) { havenInteract(); return; } _hv3(); }; }
+{ const _ush2 = updateSurfHUD; updateSurfHUD = function () { _ush2(); if (W === HAVEN_W) setPrompt(havenPrompt()); }; }
+{ const _rd2 = renderDock; renderDock = function () { _rd2(); const st = G.docked; $('#walkBtn').hidden = !st || st.id !== 'haven'; if (st && dockTab === 'company') $('#tabBody').innerHTML = renderCompany(); }; }
+
+/* ============ the trading company ============ */
+const FT = { mule: { name: 'Mule', cargo: 40, speed: 1, cost: 8000, lvl: 1, scale: 1 }, hauler: { name: 'Star Hauler', cargo: 100, speed: 0.9, cost: 25000, lvl: 2, scale: 1.6 }, mega: { name: 'Megafreighter', cargo: 260, speed: 0.75, cost: 80000, lvl: 4, scale: 2.6 } };
+const HQ = [null, { name: 'Garage office', ships: 2, cost: 0 }, { name: 'Small office', ships: 4, cost: 10000 }, { name: 'Trade hall', ships: 6, cost: 30000 }, { name: 'Tower office', ships: 8, cost: 75000 }, { name: 'Skyscraper HQ', ships: 10, cost: 150000 }];
+const TRAITS = { speedy: { name: 'Speedy', desc: 'trips 25% faster' }, haggler: { name: 'Haggler', desc: '+20% profit' }, brave: { name: 'Brave', desc: 'pirates rarely win' }, lucky: { name: 'Lucky', desc: 'finds bonus loot' }, steady: { name: 'Steady', desc: '+1 skill' } };
+const CAP_QUOTES = ['Never met a cargo I could not carry.', 'I sing to my engines. They like it.', 'Pirates? I eat pirates for breakfast. Not really. I eat toast.', 'Fastest freighter pilot east of Haven!', 'I once delivered a whole hippo. Do not ask.', 'Safety first. Snacks second. Cargo third.', 'My ship has a name. It is Gerald.'];
+const CO_RIVALS = [{ n: 'Solar Freight Co.', v: 60000, r: 30 }, { n: 'Kessel Mining Group', v: 120000, r: 55 }, { n: 'Halcyon Shipping', v: 250000, r: 90 }, { n: 'Reach Megacorp', v: 600000, r: 160 }];
+function coCandidate() {
+  const skill = 1 + (Math.random() * 4 | 0) + (Math.random() < 0.15 ? 1 : 0), trait = pick(Object.keys(TRAITS));
+  return { id: Date.now() + Math.floor(Math.random() * 1e6), name: `${pick(FIRST)} ${pick(LAST)}`, skill: Math.min(5, skill + (trait === 'steady' ? 1 : 0)), trait, quote: pick(CAP_QUOTES), trips: 0 };
+}
+const capFee = c => 500 * c.skill, capWage = c => 40 * c.skill;
+function coStations() { return STATIONS.filter(s => !s.own && PROFILE[s.id] && unlockedSys().includes(s.sys)); }
+function coBest(a, b) {
+  let best = { k: 'food', m: -Infinity };
+  for (const k in GOODS) { const m = goodPrice(b, k, false) - goodPrice(a, k, true); if (m > best.m) best = { k, m }; }
+  return best;
+}
+function coEstimate(s) {
+  const a = stationById(s.from), b = stationById(s.to); if (!a || !b || a === b) return null;
+  const cap = G.co.caps.find(c => c.id === s.cap), bt = coBest(a, b), bk = coBest(b, a), ft = FT[s.type];
+  const mul = (1 + 0.05 * G.co.level) * (cap && cap.trait === 'haggler' ? 1.2 : 1);
+  const profit = Math.round((Math.max(0, bt.m) + Math.max(0, bk.m)) * ft.cargo * mul * 0.12 - (cap ? capWage(cap) : 0));
+  const cross = a.sys !== b.sys, dist = cross ? 9000 : a.pos.distanceTo(b.pos);
+  const dur = Math.max(75, dist / (55 * ft.speed) + (cross ? 90 : 0)) * (cap && cap.trait === 'speedy' ? 0.75 : 1) * (1 - 0.04 * (cap ? cap.skill : 0));
+  return { good: bt.k, back: bk.k, profit, dur: Math.round(dur), cross };
+}
+function coStart(s) { const e = coEstimate(s); if (!e || !s.cap) return false; s.state = 'run'; s.t0 = Date.now(); s.dur = e.dur * 1000; s.leg = 0; s.good = e.good; return true; }
+function coArrive(s, quiet) {
+  const e = coEstimate(s), cap = G.co.caps.find(c => c.id === s.cap); if (!e || !cap) { s.state = 'idle'; return; }
+  let profit = Math.round(e.profit / 2); const dest = stationById(s.to).name;
+  const dz = Math.max(SYS[stationById(s.from).sys].danger || 1, SYS[stationById(s.to).sys].danger || 1), risk = 0.08 * dz * (cap.trait === 'brave' ? 0.3 : 1) * (1 - cap.skill * 0.08);
+  let msg = '';
+  if (Math.random() < risk) { profit = Math.round(profit * 0.4); msg = `Pirates raided ${cap.name}'s ${FT[s.type].name}! Most of the cargo was lost.`; }
+  else if (cap.trait === 'lucky' && Math.random() < 0.15) { const k = pick(['prism', 'sun', 'comet']); G.mats[k] += 2; msg = `${cap.name} found 2 ${MATS[k].name} floating in space!`; }
+  G.credits += profit; G.co.earned += Math.max(0, profit); G.co.trips++; cap.trips++; if (cap.skill < 5 && cap.trips % 8 === 0) { cap.skill++; msg = (msg ? msg + ' ' : '') + `${cap.name} got better at the job (skill ${cap.skill})!`; }
+  const tmpF = s.from; s.from = s.to; s.to = tmpF; s.t0 = Date.now(); s.dur = (coEstimate(s) || e).dur * 1000;
+  if (!quiet && (T - (G.co.msgT || -99) > 20 || msg)) { G.co.msgT = T; say(msg || `${cap.name} delivered ${GOODS[e.good].name.toLowerCase()} to ${dest}: +${profit.toLocaleString()} cr`, msg.startsWith('Pirates') ? 'bad' : 'good'); }
+  if (G.co.trips === 1) logAdd(['First delivery', `${cap.name} flew the first trip for ${G.co.name} and came back with real money. I am a business owner now. Do I need a tie?`]);
+}
+function coValue() { if (!G.co) return 0; return G.co.earned + G.co.ships.reduce((a, s) => a + FT[s.type].cost, 0) + HQ.slice(1, G.co.level + 1).reduce((a, h) => a + h.cost, 0); }
+let coT = 0, coFirst = true;
+function coTick(dt) {
+  if (!G.co) return;
+  if ((coT -= dt) > 0) return; coT = 1;
+  const now = Date.now();
+  for (const s of G.co.ships) { if (s.state !== 'run') continue; let n = 0; while (now >= s.t0 + s.dur && n < (coFirst ? 3 : 1)) { coArrive(s, coFirst); n++; } if (now >= s.t0 + s.dur) s.t0 = now; }
+  coFirst = false;
+  if (!G.co.hires || now > (G.co.hireT || 0)) { G.co.hires = [coCandidate(), coCandidate(), coCandidate()]; G.co.hireT = now + 300000; }
+  G.co.rv = G.co.rv || CO_RIVALS.map(r => r.v); CO_RIVALS.forEach((r, i) => { G.co.rv[i] += r.r * (0.6 + Math.random() * 0.8); });
+}
+{ const _et = expTick; expTick = function (dt) { _et(dt); coTick(dt); }; }
+function renderCompany() {
+  if (!G.co) return `<div class="item co-card"><div><h4>Start your own trading company</h4><p>Hire AI freighter captains, give them trade routes between stations and watch your fleet fly around the Reach. They earn money even while you are off adventuring. Registering costs 5,000 cr.</p><input class="coname" maxlength="28" value="Ember Star Trading" aria-label="Company name"></div><div><button class="btn" data-act="cofound" ${G.credits >= 5000 ? '' : 'disabled'}>Found company</button></div></div>`;
+  const co = G.co, hq = HQ[co.level], nx = HQ[co.level + 1], idle = co.caps.filter(c => !co.ships.some(s => s.cap === c.id)), sts = coStations(), now = Date.now();
+  let h = `<div class="item co-card"><div><h4>${co.name} <span class="tag race">${hq.name}</span></h4><p>${co.ships.length} of ${hq.ships} freighters · ${co.caps.length} captains · ${co.trips} trips · earned ${co.earned.toLocaleString()} cr · company value ${coValue().toLocaleString()} cr</p><p class="shipstats">Each HQ level adds freighter slots and +5% profit on every trip. Visit your office inside Haven Ring to see the fleet map.</p></div><div>${nx ? `<div class="reward">${nx.cost.toLocaleString()} cr</div><button class="btn" data-act="coupg" ${G.credits >= nx.cost ? '' : 'disabled'}>Upgrade to ${nx.name}</button>` : '<div class="reward">Top level!</div>'}</div></div>`;
+  h += '<h4 class="craft-sub">Your fleet</h4>';
+  if (!co.ships.length) h += '<p style="color:var(--dim)">No freighters yet. Buy one below, hire a captain, then pick a route.</p>';
+  co.ships.forEach(s => {
+    const e = coEstimate(s), k = s.state === 'run' ? clamp((now - s.t0) / s.dur, 0, 1) : 0, cap = co.caps.find(c => c.id === s.cap);
+    const sel = (end, v) => `<select class="coroute" data-id="${s.id}" data-end="${end}" ${s.state === 'run' ? 'disabled' : ''}>${sts.map(st => `<option value="${st.id}" ${st.id === v ? 'selected' : ''}>${st.name} (${SYS[st.sys].name})</option>`).join('')}</select>`;
+    h += `<div class="item"><div><h4>${s.name} <span class="tag delivery">${FT[s.type].name} · ${FT[s.type].cargo} cargo</span></h4>
+      <div class="co-row"><label>Captain <select class="cocap" data-id="${s.id}" ${s.state === 'run' ? 'disabled' : ''}><option value="">(none)</option>${co.caps.filter(c => c.id === s.cap || idle.includes(c)).map(c => `<option value="${c.id}" ${c.id === s.cap ? 'selected' : ''}>${c.name} · ★${c.skill} ${TRAITS[c.trait].name}</option>`).join('')}</select></label></div>
+      <div class="co-row"><label>From ${sel('from', s.from)}</label><label>To ${sel('to', s.to)}</label></div>
+      <p class="shipstats">${e ? `Carries ${GOODS[e.good].name.toLowerCase()} there and ${GOODS[e.back].name.toLowerCase()} back · about ${e.profit.toLocaleString()} cr per round trip · ${Math.round(e.dur)} s each way${e.cross ? ' (warp jump)' : ''}` : 'Pick two different stations.'}</p>
+      ${s.state === 'run' ? `<div class="exp-run"><span>${cap ? cap.name : ''} is flying to ${stationById(s.to).name} · ${fmtLeft(s.t0 + s.dur - now)}</span><div class="exp-bar"><i style="width:${k * 100}%"></i></div></div>` : ''}</div>
+      <div>${s.state === 'run' ? `<button class="ghost" data-act="costop" data-id="${s.id}">Stop route</button>` : `<button class="btn" data-act="costart" data-id="${s.id}" ${e && s.cap ? '' : 'disabled'}>Start route</button>`}</div></div>`;
+  });
+  h += '<h4 class="craft-sub">Buy freighters</h4>';
+  for (const [k, f] of Object.entries(FT)) { const lock = co.level < f.lvl, full = co.ships.length >= hq.ships; h += `<div class="item"><div><h4>${f.name}</h4><p>${f.cargo} cargo · speed ×${f.speed}${lock ? ` · needs ${HQ[f.lvl].name}` : ''}</p></div><div><div class="reward">${f.cost.toLocaleString()} cr</div><button class="btn" data-act="cobuy" data-k="${k}" ${lock || full || G.credits < f.cost ? 'disabled' : ''}>${full ? 'No free slot' : 'Buy'}</button></div></div>`; }
+  h += `<h4 class="craft-sub">Captains for hire <span style="color:var(--dim);font-size:11px">new faces in ${fmtLeft((co.hireT || now) - now)}</span></h4>`;
+  (co.hires || []).forEach(c => { h += `<div class="item"><div><h4>${c.name} <span class="stars">${stars(c.skill)}</span> <span class="tag race">${TRAITS[c.trait].name}</span></h4><p>“${c.quote}” · ${TRAITS[c.trait].desc} · wage ${capWage(c)} cr per trip</p></div><div><div class="reward">${capFee(c).toLocaleString()} cr</div><button class="btn" data-act="cohire" data-id="${c.id}" ${G.credits >= capFee(c) ? '' : 'disabled'}>Hire</button></div></div>`; });
+  if (co.caps.length) h += `<div class="item"><div><h4>Your captains</h4><div class="chips">${co.caps.map(c => `<span class="chip">${c.name} · ★${c.skill} ${TRAITS[c.trait].name} · ${c.trips} trips</span>`).join('')}</div></div></div>`;
+  const board = CO_RIVALS.map((r, i) => ({ n: r.n, v: Math.round((co.rv || [])[i] || r.v) })).concat([{ n: co.name, v: coValue(), me: true }]).sort((a, b) => b.v - a.v);
+  h += `<div class="item"><div><h4>Richest companies in the Reach</h4><ol class="lboard">${board.map((x, i) => `<li class="${x.me ? 'me' : ''}"><span>#${i + 1}</span><b>${x.n}</b><em></em><i>${x.v.toLocaleString()}</i></li>`).join('')}</ol></div></div>`;
+  return h;
+}
+function coRefresh() { if (hpMode === 'company') { $('#hpTitle').textContent = G.co ? G.co.name : 'Start a trading company'; $('#hpBody').innerHTML = renderCompany(); } else if (G.state === 'docked') renderDock(); }
+function coChange(e) {
+  const t = e.target; if (!G.co) return;
+  if (t.matches('.coroute')) { const s = G.co.ships.find(q => q.id === +t.dataset.id); if (s) { s[t.dataset.end] = t.value; save(); coRefresh(); } }
+  if (t.matches('.cocap')) { const s = G.co.ships.find(q => q.id === +t.dataset.id); if (s) { s.cap = t.value ? +t.value : null; save(); coRefresh(); } }
+}
+$('#tabBody').addEventListener('change', coChange);
+$('#tabBody').addEventListener('keydown', e => { if (e.target.matches('.coname')) e.stopPropagation(); });
+{ const _ea4 = expAct; expAct = function (act, b) {
+  if (act === 'cofound') { if (G.co || G.credits < 5000) return; const inp = document.querySelector('.coname'), name = (inp && inp.value.trim().slice(0, 28)) || 'Ember Star Trading'; G.credits -= 5000; G.co = { name, level: 1, earned: 0, trips: 0, ships: [], caps: [], hires: null, hireT: 0 }; coTick(2); sfx('win'); say(`${name} is open for business! Buy a freighter and hire a captain.`, 'good'); logAdd(['A company of my own', `Today I founded ${name}. One desk, one chair, zero freighters. Everyone starts somewhere.`]); save(); coRefresh(); return; }
+  if (act === 'coupg') { const nx = HQ[G.co.level + 1]; if (!nx || G.credits < nx.cost) return; G.credits -= nx.cost; G.co.level++; sfx('win'); say(`${G.co.name} moved into a ${nx.name}!`, 'good'); if (G.co.level === 5) logAdd(['Skyscraper', `${G.co.name} has a skyscraper HQ now. My office has a slide.`]); save(); coRefresh(); return; }
+  if (act === 'cobuy') { const f = FT[b.dataset.k]; if (!f || G.co.level < f.lvl || G.co.ships.length >= HQ[G.co.level].ships || G.credits < f.cost) return; G.credits -= f.cost; const sts = coStations(); G.co.ships.push({ id: Date.now(), type: b.dataset.k, name: `${pick(['Lucky', 'Swift', 'Big', 'Brave', 'Jolly', 'Cosmic', 'Rusty', 'Golden'])} ${pick(['Duck', 'Mule', 'Comet', 'Turtle', 'Bean', 'Otter', 'Kettle', 'Star'])}`, cap: null, from: sts[0].id, to: (sts[1] || sts[0]).id, state: 'idle' }); sfx('win'); save(); coRefresh(); return; }
+  if (act === 'cohire') { const c = (G.co.hires || []).find(q => q.id === +b.dataset.id); if (!c || G.credits < capFee(c)) return; G.credits -= capFee(c); G.co.caps.push(c); G.co.hires = G.co.hires.filter(q => q !== c); const free = G.co.ships.find(s => !s.cap); if (free) free.cap = c.id; sfx('win'); say(`${c.name} joined ${G.co.name}: “${c.quote}”`, 'good'); save(); coRefresh(); return; }
+  if (act === 'costart') { const s = G.co.ships.find(q => q.id === +b.dataset.id); if (s && coStart(s)) { sfx('ui'); say(`${s.name} is on its way!`, 'good'); save(); coRefresh(); } return; }
+  if (act === 'costop') { const s = G.co.ships.find(q => q.id === +b.dataset.id); if (s) { s.state = 'idle'; save(); coRefresh(); } return; }
+  _ea4(act, b);
+}; }
+// the fleet flying around the map
+const COF = { objs: {}, wp: new V3() };
+function coShipPos(s) {
+  const a = stationById(s.from), b = stationById(s.to); if (!a || !b) return null;
+  const k = clamp((Date.now() - s.t0) / s.dur, 0, 1), off = st => st.pos.clone().addScaledVector(st.exit, st.colR + 260).add(new V3(0, 60, 0));
+  if (a.sys === b.sys) { if (G.sys !== a.sys) return null; const p = off(a).lerp(off(b), k); p.y += Math.sin(k * Math.PI) * 300; return { p, to: off(b) }; }
+  if (k < 0.45) { if (G.sys !== a.sys) return null; const e = SYS[a.sys].arrive.clone().add(new V3(400, 200, 600)); return { p: off(a).lerp(e, k / 0.45), to: e }; }
+  if (k > 0.55) { if (G.sys !== b.sys) return null; const e = SYS[b.sys].arrive.clone().add(new V3(400, 200, 600)); return { p: e.clone().lerp(off(b), (k - 0.55) / 0.45), to: off(b) }; }
+  return null;
+}
+function coFleet(dt) {
+  const ships = G.co ? G.co.ships : [], seen = {};
+  for (const s of ships) {
+    if (s.state !== 'run') continue; const at = coShipPos(s); if (!at) continue; seen[s.id] = true;
+    let o = COF.objs[s.id]; if (!o) { o = makeHauler(); o.userData.mats.H.color.setHex(0x2aa8a0); o.userData.mats.T.color.setHex(0xffc23a); o.scale.setScalar(FT[s.type].scale); scene.add(o); COF.objs[s.id] = o; }
+    o.visible = true; o.position.copy(at.p); orientTo(o, at.to); if (o.userData.engines) o.userData.engines.forEach(e => e.scale.setScalar(8 + Math.random() * 3));
+  }
+  for (const id in COF.objs) if (!seen[id]) COF.objs[id].visible = false;
+}
+{ const _ub5 = updateBoss; updateBoss = function (dt) { _ub5(dt); coFleet(dt); }; }
+{ const _em11 = extraMarkers; extraMarkers = function () { _em11(); if (!G.co) return; G.co.ships.forEach(s => { const o = COF.objs[s.id]; if (!o || !o.visible) return; const d = player.position.distanceTo(o.position); if (d > 8000) return; const cap = G.co.caps.find(c => c.id === s.cap); const el = marker('co-' + s.id, 'friendly', `${s.name}${cap ? ' · ' + cap.name.split(' ')[0] : ''}`); el.querySelector('.dst').textContent = fmtD(d); placeMarker(el, o.position); }); }; }
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
   if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
@@ -7251,7 +7697,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel';
   const onSurf = renderScene !== scene;
   if (running) {
     T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt); expTick(dt); citySim(dt); dvTick(dt);
