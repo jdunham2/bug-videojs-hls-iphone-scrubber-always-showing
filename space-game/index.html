@@ -557,6 +557,16 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 @keyframes pdIn { from { opacity: 0; transform: translateY(10px); } }
 #pdConfetti i { position: absolute; top: -20px; width: 9px; height: 14px; border-radius: 2px; animation: pdFall linear infinite; }
 @keyframes pdFall { to { transform: translateY(110vh) rotate(720deg); } }
+#hbHud { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 12px; background: rgba(10,12,24,.75); border: 1px solid rgba(255,208,96,.45); border-radius: 6px; padding: 6px 14px; color: #e8eef4; pointer-events: none; max-width: calc(100vw - 32px); }
+.hb-pos { font-family: var(--display); font-size: 34px; font-weight: 700; color: #ffd060; }
+.hb-info { font-size: 12px; line-height: 1.6; }
+#hbTrick { position: fixed; top: 30%; left: 50%; transform: translateX(-50%); z-index: 6; font-family: var(--display); font-size: clamp(22px, 4vw, 40px); font-weight: 700; color: #ffd060; text-shadow: 0 0 18px rgba(255,160,40,.8), 0 3px 6px #000; pointer-events: none; animation: hbPop 1.3s both; text-align: center; }
+@keyframes hbPop { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -20px); } }
+#hbCount { position: fixed; top: 38%; left: 50%; transform: translateX(-50%); z-index: 6; font-family: var(--display); font-size: clamp(60px, 12vw, 120px); font-weight: 700; color: #fff; text-shadow: 0 0 30px #6fd8ff, 0 4px 10px #000; pointer-events: none; }
+#hbRes .panel { width: min(620px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(8px); margin-block: 24px; }
+#hbRes header { padding: 18px 22px 12px; border-bottom: 1px solid var(--line); } #hbRes header h2 { margin: 4px 0 0; font-family: var(--display); font-size: 24px; }
+#hbRes header .eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: #ffd060; }
+.hb-table { display: grid; gap: 3px; } .hb-table div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 8px; border-radius: 4px; background: rgba(255,255,255,.04); font-size: 13px; } .hb-table div.me { background: rgba(255,208,96,.14); color: #ffd060; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -685,6 +695,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
       <button class="tab" role="tab" data-tab="robot" aria-selected="false">Robot</button>
       <button class="tab" role="tab" data-tab="fortress" aria-selected="false">Fortress</button>
       <button class="tab" role="tab" data-tab="fleet" aria-selected="false">Fleet</button>
+      <button class="tab" role="tab" data-tab="hoverbike" aria-selected="false">Hoverbike</button>
       <button class="tab" role="tab" data-tab="ships" aria-selected="false">Ships</button>
       <button class="tab" role="tab" data-tab="crew" aria-selected="false">Crew</button>
       <button class="tab" role="tab" data-tab="crafting" aria-selected="false">Crafting</button>
@@ -728,6 +739,8 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
 <div id="fbHud" hidden></div>
+<div id="hbHud" hidden><div class="hb-pos" id="hbPos">1st</div><div class="hb-info" id="hbInfo"></div></div><div id="hbTrick" hidden></div><div id="hbCount" hidden></div>
+<div class="overlay" id="hbRes" hidden><div class="panel"><header><div class="eyebrow" id="hbResEye">Grand Prix</div><h2 id="hbResTitle"></h2></header><div class="tabbody" id="hbResBody"></div><div style="padding:0 22px 18px;text-align:right"><button class="btn" id="hbResOk">Continue</button></div></div></div>
 <div id="tac" hidden><canvas id="tacCv" aria-label="Tactical map of Starhold and the battle"></canvas><div class="tac-side"><div style="font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#7dffb0">Tactical map</div><h3>Starhold fleet</h3><div id="tacStatus"></div><p class="tac-help">Orders for the selected ships:</p><div class="tac-orders"><button class="btn" data-tac="follow">Follow me</button><button class="btn" data-tac="defend">Defend</button><button class="btn" data-tac="attack">Attack</button></div><div class="row-btns"><button class="ghost" id="tacAll">Select all</button></div><div id="tacList"></div><p class="tac-help">Click ships on the map or in the list to select them. Click a red pirate to send the selected ships after it. Shift-click to pick more than one.</p><button class="ghost" id="tacClose">Back to my ship (O)</button></div></div>
 <div id="parade" hidden><div class="pd-banner"><div class="eyebrow">Ember Reach celebrates</div><h1>VICTORY PARADE</h1><div id="pdNames"></div></div><div id="pdConfetti"></div></div>
 <div class="overlay" id="robPuz" hidden><div class="panel"><header><div><div class="eyebrow" id="rpEyebrow"></div><h2 id="rpTitle"></h2></div><button class="ghost" id="rpClose">Close</button></header><div class="tabbody" id="rpBody"></div></div></div>
@@ -1195,8 +1208,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th, zoo: G.zoo, tf: G.tf, rb: G.rb, fb: G.fb, nw: G.nw })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; G.zoo = s.zoo || null; G.tf = s.tf || null; G.rb = s.rb || null; G.fb = s.fb || null; G.nw = s.nw || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th, zoo: G.zoo, tf: G.tf, rb: G.rb, fb: G.fb, nw: G.nw, hb: G.hb })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; G.zoo = s.zoo || null; G.tf = s.tf || null; G.rb = s.rb || null; G.fb = s.fb || null; G.nw = s.nw || null; G.hb = s.hb || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -1425,7 +1438,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyG' && G.state === 'surface' && !e.repeat) petInteract();
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'tactical') closeTac(); else if (G.state === 'robopuz') closeRobPuz(); else if (G.state === 'zoopanel') closeZooPanel(); else if (G.state === 'starmap') closeStarMap(); else if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (G.state === 'hbres') { $('#hbRes').hidden = true; setState('surface'); } else if (G.state === 'tactical') closeTac(); else if (G.state === 'robopuz') closeRobPuz(); else if (G.state === 'zoopanel') closeZooPanel(); else if (G.state === 'starmap') closeStarMap(); else if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -10024,9 +10037,9 @@ const SPORE_W = nwWorld({ id: 'spore', brand: 'SPOREHOLM · SURFACE', title: 'Ex
     const CAPC = [0xff6fd8, 0x6fd8ff, 0xffd060, 0x9a6aff, 0x7dffb0];
     for (let i = 0; i < 70; i++) { const a = rand(0, TAU), r = rand(40, 480), x = Math.cos(a) * r, z = Math.sin(a) * r, y = sporeHgt(x, z); if (y < 0.5) continue; const H = rand(10, 36), R = H * rand(0.35, 0.6), c = pick(CAPC);
       const st = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.14, R * 0.2, H, 10), smat(0xece0d0, 0.8)); st.position.set(x, y + H / 2, z); surf.add(st);
-      const capM = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.15, roughness: 0.5 }); const cap = new THREE.Mesh(new THREE.SphereGeometry(R, 20, 10, 0, TAU, 0, Math.PI / 2), capM); cap.scale.y = 0.55; cap.position.set(x, y + H - R * 0.1, z); surf.add(cap);
-      for (let k = 0; k < 6; k++) { const a2 = rand(0, TAU), rr = rand(0.2, 0.8) * R, sp = new THREE.Mesh(new THREE.SphereGeometry(R * 0.08, 6, 4), mGlow(0xffffff)); sp.position.set(x + Math.cos(a2) * rr, y + H - R * 0.1 + Math.sqrt(Math.max(0, 1 - (rr / R) ** 2)) * R * 0.55, z + Math.sin(a2) * rr); surf.add(sp); }
-      S.colliders.push({ x, z, r: R * 0.2 + 0.3, top: y + H }); v.caps.push(capM); }
+      const spots = [], capM = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.15, roughness: 0.5 }); const cap = new THREE.Mesh(new THREE.SphereGeometry(R, 20, 10, 0, TAU, 0, Math.PI / 2), capM); cap.scale.y = 0.55; cap.position.set(x, y + H - R * 0.1, z); surf.add(cap);
+      for (let k = 0; k < 6; k++) { const a2 = rand(0, TAU), rr = rand(0.2, 0.8) * R, sp = new THREE.Mesh(new THREE.SphereGeometry(R * 0.08, 6, 4), mGlow(0xffffff)); sp.position.set(x + Math.cos(a2) * rr, y + H - R * 0.1 + Math.sqrt(Math.max(0, 1 - (rr / R) ** 2)) * R * 0.55, z + Math.sin(a2) * rr); surf.add(sp); spots.push(sp); }
+      S.colliders.push({ x, z, r: R * 0.2 + 0.3, top: y + H, objs: [st, cap, ...spots] }); v.caps.push(capM); }
     for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + 0.3, r = 45 + (i % 3) * 28, x = Math.cos(a) * r, z = Math.sin(a) * r, y = sporeHgt(x, z); const cap = new THREE.Mesh(new THREE.SphereGeometry(3, 18, 8, 0, TAU, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xff7ac8, emissive: 0xff4fa0, emissiveIntensity: 0.4, roughness: 0.4 })); cap.scale.y = 0.4; cap.position.set(x, y + 0.2, z); surf.add(cap); v.bounce.push({ x, z, y, cap, sq: 0 }); }
     v.motes = []; for (let i = 0; i < 50; i++) { const s = glowSprite(pick([0x7dffb0, 0xff9ad8, 0x9fe8ff]), rand(0.6, 1.4)); s.position.set(rand(-200, 200), rand(2, 25), rand(-200, 200)); surf.add(s); v.motes.push({ s, ph: rand(0, TAU) }); }
   },
@@ -10049,7 +10062,7 @@ const GLASS_W = nwWorld({ id: 'glass', brand: 'GLASSWIND · SURFACE', title: 'Ex
   treasure: { name: 'Ancient glass shell', col: 0x9fe8ff, at: [[-160, 60], [210, 150], [-90, -260], [280, -190], [-300, 230]], make: () => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1, 10), new THREE.MeshStandardMaterial({ color: 0xcff4ff, emissive: 0x4ab8e8, emissiveIntensity: 0.6, transparent: true, opacity: 0.85, roughness: 0.1 })); m.rotation.z = Math.PI / 2; return m; } },
   decor(v) {
     const crM = (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.25, transparent: true, opacity: 0.8, roughness: 0.1, metalness: 0.2, flatShading: true });
-    for (let i = 0; i < 45; i++) { const a = rand(0, TAU), r = rand(50, 480), x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.hypot(x - GV.x, z - GV.z) < 50) continue; const y = glassHgt(x, z), m = crM(pick([0x9fe8ff, 0xff9ad8, 0xc8a0ff, 0xffe08a])); for (let k = 0; k < 4; k++) { const h = rand(6, 26), c = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), m); c.scale.set(h * 0.14, h * 0.5, h * 0.14); c.position.set(x + rand(-3, 3), y + h * 0.3, z + rand(-3, 3)); c.rotation.set(rand(-0.3, 0.3), rand(0, 3), rand(-0.3, 0.3)); surf.add(c); } S.colliders.push({ x, z, r: 3, top: y + 12 }); }
+    for (let i = 0; i < 45; i++) { const a = rand(0, TAU), r = rand(50, 480), x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.hypot(x - GV.x, z - GV.z) < 50) continue; const y = glassHgt(x, z), m = crM(pick([0x9fe8ff, 0xff9ad8, 0xc8a0ff, 0xffe08a])), cs = []; for (let k = 0; k < 4; k++) { const h = rand(6, 26), c = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), m); c.scale.set(h * 0.14, h * 0.5, h * 0.14); c.position.set(x + rand(-3, 3), y + h * 0.3, z + rand(-3, 3)); c.rotation.set(rand(-0.3, 0.3), rand(0, 3), rand(-0.3, 0.3)); surf.add(c); cs.push(c); } S.colliders.push({ x, z, r: 3, top: y + 12, objs: cs }); }
     // the bones of a giant sand-whale
     const bone = smat(0xf0e6d0, 0.7); for (let i = 0; i < 9; i++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(9 - Math.abs(i - 4) * 1.2, 0.7, 6, 16, Math.PI), bone); rib.position.set(-70 + i * 6, glassHgt(-70 + i * 6, 60), 60); rib.rotation.y = Math.PI / 2; surf.add(rib); } const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 54, 8), bone); spine.rotation.z = Math.PI / 2; spine.position.set(-46, glassHgt(-46, 60) + 9, 60); surf.add(spine); const skull = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 8), bone); skull.scale.set(1.6, 0.8, 1); skull.position.set(-80, glassHgt(-80, 60) + 3, 60); surf.add(skull);
     // the singing vault
@@ -10088,7 +10101,7 @@ const NIMBUS_W = nwWorld({ id: 'nimbus', brand: 'NIMBUS · SKY ISLANDS', title: 
     const cloud = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x8a9ab8, emissiveIntensity: 0.35, roughness: 1, transparent: true, opacity: 0.94 })); cloud.rotation.x = -Math.PI / 2; cloud.position.y = 6; surf.add(cloud); v.cloud = cloud;
     v.puffs = []; for (let i = 0; i < 70; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff, map: TEX_GLOW, transparent: true, opacity: 0.7, depthWrite: false, fog: true })); s.scale.set(rand(40, 110), rand(16, 30), 1); s.position.set(rand(-700, 700), rand(4, 14), rand(-700, 700)); surf.add(s); v.puffs.push(s); }
     const trunk = smat(0x7a5a3a), leafC = [0x5fc060, 0x8ad86a, 0xffa0c8];
-    for (const [ix, iz, r, h] of NIM_ISL) for (let k = 0; k < Math.floor(r / 9); k++) { const a = rand(0, TAU), rr = rand(0.25, 0.7) * r, x = ix + Math.cos(a) * rr, z = iz + Math.sin(a) * rr; if (Math.hypot(x, z) < 22) continue; const y = nimHgt(x, z); if (y < 10) continue; const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 4, 6), trunk); t.position.set(x, y + 2, z); surf.add(t); const l = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(2, 3.4), 0), smat(pick(leafC), 0.8, { flatShading: true })); l.position.set(x, y + 5, z); surf.add(l); S.colliders.push({ x, z, r: 0.7, top: y + 7 }); }
+    for (const [ix, iz, r, h] of NIM_ISL) for (let k = 0; k < Math.floor(r / 9); k++) { const a = rand(0, TAU), rr = rand(0.25, 0.7) * r, x = ix + Math.cos(a) * rr, z = iz + Math.sin(a) * rr; if (Math.hypot(x, z) < 22) continue; const y = nimHgt(x, z); if (y < 10) continue; const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 4, 6), trunk); t.position.set(x, y + 2, z); surf.add(t); const l = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(2, 3.4), 0), smat(pick(leafC), 0.8, { flatShading: true })); l.position.set(x, y + 5, z); surf.add(l); S.colliders.push({ x, z, r: 0.7, top: y + 7, objs: [t, l] }); }
     for (const [ix, iz, r, h] of NIM_ISL) { for (let k = 0; k < 4; k++) { const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(1.5, 4), 0), smat(0x8a7a6a, 0.9, { flatShading: true })); rk.position.set(ix + rand(-r, r), h - rand(15, 40), iz + rand(-r, r)); surf.add(rk); } }
     v.drafts = []; for (let i = 1; i < NIM_ISL.length; i++) { const A = NIM_ISL[0], B = NIM_ISL[i]; if (NIM_BRIDGE.some(([a, b]) => b === i)) continue; let near = A, nd = Infinity; for (let j = 0; j < i; j++) { const C = NIM_ISL[j], d = Math.hypot(C[0] - B[0], C[1] - B[1]); if (d < nd) { nd = d; near = C; } } const dx = B[0] - near[0], dz = B[1] - near[1], d = Math.hypot(dx, dz), mid = (near[2] + (d - near[2] - B[2]) / 2) / d, x = near[0] + dx * mid, z = near[1] + dz * mid;
       const col = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 80, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.12, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); col.position.set(x, 46, z); surf.add(col);
@@ -10133,7 +10146,7 @@ function nwInteract() {
 }
 { const _hv11 = harvest; harvest = function () { if (G.state === 'surface' && NW_WORLDS.includes(W) && nwSpot()) { nwInteract(); return; } _hv11(); }; }
 { const _ush10 = updateSurfHUD; updateSurfHUD = function () { _ush10(); if (NW_WORLDS.includes(W)) { const pr = nwPrompt(); if (pr) setPrompt(pr); const got = (G.nw.tr[W.id] || []).length; $('#sDisc').textContent = `${W.nw.treasure.name}s found: ${got} of 5${W === GLASS_W ? (G.nw.chest ? ' · vault opened' : G.nw.vault ? ' · the vault is open!' : ' · the vault is sealed') : ''}`; } }; }
-{ const _uw4 = useWorld; useWorld = function (w) { _uw4(w); if (NW_WORLDS.includes(w) && !G.nw.visited[w.id]) { G.nw.visited[w.id] = true; const lines = { spore: ['Sporeholm', 'Sporeholm is a jungle of giant glowing mushrooms. Some are pink and VERY bouncy. Little Puffcap creatures hop around everywhere.'], glass: ['Glasswind', 'Glasswind is a desert of golden sand and huge humming crystals. There are giant whale bones in the dunes, and an old stone vault with five crystals around it.'], nimbus: ['Nimbus', 'Nimbus has no ground. Just islands floating above a sea of clouds, rainbow bridges and warm winds that push you up into the sky.'] }[w.id]; logAdd(lines); save(); } }; }
+{ const _uw4 = useWorld; useWorld = function (w) { _uw4(w); if (NW_WORLDS.includes(w) && !G.nw.visited[w.id]) { G.nw.visited[w.id] = true; const lines = { spore: ['Sporeholm', 'Sporeholm is a jungle of giant glowing mushrooms. Some are pink and VERY bouncy. Little Puffcap creatures hop around everywhere.'], glass: ['Glasswind', 'Glasswind is a desert of golden sand and huge humming crystals. There are giant whale bones in the dunes, and an old stone vault with five crystals around it.'], nimbus: ['Nimbus', 'Nimbus has no ground. Just islands floating above a sea of clouds, rainbow bridges and warm winds that push you up into the sky.'] }[w.id]; logAdd(lines || NW_LOG[w.id] || [w.title.replace('Explore ', ''), 'I landed somewhere brand new.']); save(); } }; }
 TROPHIES.explorer = { name: 'Explorer\'s compass', ok: () => ['spore', 'glass', 'nimbus'].every(k => G.nw.done[k]), make: () => { const g = new THREE.Group(), gm = new THREE.MeshStandardMaterial({ color: 0xffc23a, metalness: 0.9, roughness: 0.25 }); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 24), gm); b.position.y = 0.3; g.add(b); const n = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.45, 4), mGlow(0xff5a5a)); n.rotation.z = Math.PI / 2; n.position.set(0, 0.37, 0); g.add(n); return g; } };
 
 /* ============ Starhold fortress, your fleet and the Pirate Armada ============ */
@@ -10520,6 +10533,422 @@ function renderFleet() {
 }; }
 TROPHIES.armada = { name: 'Armada victory medal', ok: () => G.fb.wins > 0, make: () => { const g = new THREE.Group(), gm = new THREE.MeshStandardMaterial({ color: 0xffc23a, metalness: 0.9, roughness: 0.25, emissive: 0x4a3010, emissiveIntensity: 0.4 }); const m = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 24), gm); m.rotation.x = Math.PI / 2; m.position.y = 0.5; g.add(m); const st = new THREE.Mesh(new THREE.OctahedronGeometry(0.14), mGlow(0x7dffb0)); st.position.set(0, 0.5, 0.06); g.add(st); const rib = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.02), smat(0x3b66d9)); rib.position.y = 0.88; g.add(rib); return g; } };
 
+/* ============ hoverbikes and the Ember Reach Grand Prix ============ */
+const HB_DEF = { owned: false, paint: { body: 'red', trim: 'white', glow: 'cyan', decal: 'stripes' }, parts: { engine: 1, hover: 1, boost: 1, grip: 1 }, season: { round: 0, pts: {}, results: [] }, seasons: 0, champ: false, podiums: 0, wins: 0, races: 0, tricks: 0, best: {} };
+G.hb = Object.assign({}, HB_DEF, G.hb || {}); ['paint', 'parts', 'season'].forEach(k => G.hb[k] = Object.assign({}, HB_DEF[k], G.hb[k] || {}));
+const NW_LOG = {};
+const HB_BODY = { red: ['Red', 0xd8463a], blue: ['Blue', 0x3b66d9], green: ['Green', 0x3aa860], yellow: ['Yellow', 0xf0c040], purple: ['Purple', 0x8a5ad9], pink: ['Pink', 0xf08ac0], black: ['Black', 0x2a2c34], white: ['White', 0xe8eef4], gold: ['Champion gold', 0xffc23a, 'champ'] };
+const HB_TRIM = { white: ['White', 0xe8eef4], black: ['Black', 0x1a1c22], silver: ['Silver', 0xa8b0bc], orange: ['Orange', 0xff8a3a], teal: ['Teal', 0x2ab0a0], red: ['Red', 0xd8463a] };
+const HB_GLOW = { cyan: ['Cyan', 0x6fd8ff], green: ['Green', 0x7dffb0], pink: ['Pink', 0xff6fd8], orange: ['Orange', 0xff8a3a], yellow: ['Yellow', 0xffd060], purple: ['Purple', 0xb07bff] };
+const HB_DECAL = { none: ['Plain'], stripes: ['Racing stripes'], flames: ['Flames', 'tricks'], stars: ['Stars', 'win'] };
+const HB_PARTS = { engine: { name: 'Engine', d: 'Top speed' }, hover: { name: 'Hover pads', d: 'Jump height and air spins' }, boost: { name: 'Booster', d: 'Bigger, faster-charging boost' }, grip: { name: 'Steering fins', d: 'Sharper turns' } };
+const HB_TIER = [null, null, { cost: 3000, lock: () => G.hb.races >= 1, why: 'Finish 1 race' }, { cost: 7000, lock: () => G.hb.podiums >= 2, why: 'Get 2 podiums' }, { cost: 15000, lock: () => G.hb.wins >= 2, why: 'Win 2 races' }];
+const hbStats = () => { const p = G.hb.parts; return { top: 30 + (p.engine - 1) * 4, acc: 15 + p.engine * 2, turn: 1.5 + p.grip * 0.28, jump: 8 + p.hover * 1.4, spin: 6 + p.hover, cap: 100 + (p.boost - 1) * 25, regen: 4 + p.boost * 1.5 }; };
+const hbDecalOk = k => !HB_DECAL[k][1] || (HB_DECAL[k][1] === 'tricks' ? G.hb.tricks >= 15 : G.hb.wins >= 1);
+function makeHoverbike(pt) {
+  const g = new THREE.Group(), body = HB_BODY[pt.body][1], trim = HB_TRIM[pt.trim][1], glow = HB_GLOW[pt.glow][1];
+  const B = mStd(body, 0.5, 0.35), Tm = mStd(trim, 0.5, 0.4), Dk = mStd(0x22242c, 0.5, 0.5), add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+  add(new THREE.BoxGeometry(1.0, 0.45, 2.6), B, 0, 0.9, 0.1);
+  const nose = add(new THREE.ConeGeometry(0.5, 1.3, 4), B, 0, 0.9, -1.85); nose.rotation.x = -Math.PI / 2; nose.rotation.y = Math.PI / 4; nose.scale.set(1, 1, 0.5);
+  add(new THREE.BoxGeometry(1.04, 0.1, 2.4), Tm, 0, 0.72, 0.1);
+  add(new THREE.BoxGeometry(0.5, 0.16, 0.9), Dk, 0, 1.2, 0.45);
+  const bar = add(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6), Dk, 0, 1.35, -0.75); bar.rotation.z = Math.PI / 2;
+  add(new THREE.BoxGeometry(0.6, 0.35, 0.08), new THREE.MeshStandardMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.5, roughness: 0.1 }), 0, 1.35, -1.0).rotation.x = -0.5;
+  const thr = add(new THREE.CylinderGeometry(0.28, 0.36, 0.5, 10), Dk, 0, 0.9, 1.55); thr.rotation.x = Math.PI / 2;
+  const fl = glowSprite(glow, 1.6); fl.position.set(0, 0.9, 1.95); g.add(fl);
+  const pads = []; for (const z of [-0.9, 0.95]) { add(new THREE.CylinderGeometry(0.5, 0.38, 0.2, 14), Tm, 0, 0.55, z); const s = glowSprite(glow, 1.4); s.position.set(0, 0.35, z); g.add(s); pads.push(s); }
+  if (pt.decal === 'stripes') for (const x of [-0.18, 0.18]) add(new THREE.BoxGeometry(0.12, 0.02, 2.5), Tm, x, 1.13, 0.05);
+  if (pt.decal === 'flames') for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const f = add(new THREE.ConeGeometry(0.1, 0.6 - i * 0.12, 4), mGlow([0xff5a20, 0xff9a30, 0xffd060][i]), sx * 0.51, 0.9, -0.6 + i * 0.3); f.rotation.x = Math.PI / 2; }
+  if (pt.decal === 'stars') for (let i = 0; i < 4; i++) add(new THREE.OctahedronGeometry(0.08), mGlow(0xffe08a), (i % 2 ? 0.51 : -0.51), 0.95, -0.7 + i * 0.4);
+  g.userData = { pads, fl }; return g;
+}
+const hbKey = () => JSON.stringify(G.hb.paint);
+// ---- riding ----
+const BK = { obj: null, key: '', pos: new V3(), speed: 0, vy: 0, air: false, airT: 0, spin: 0, flip: 0, lean: 0, boost: 100, padT: 0, wob: 0, hitT: 0, lastGate: null, trickT: 0 };
+function hbMount() {
+  if (!G.hb.owned) { say('Build a hoverbike in the Hoverbike tab at any station first.', 'bad'); return; }
+  if (W.interior || S.mech || G.state !== 'surface') { say('There is no room to ride a hoverbike here.', 'bad'); return; }
+  S.bike = true; BK.pos.copy(S.pos); BK.speed = 0; BK.vy = 0; BK.air = false; BK.spin = BK.flip = 0; BK.boost = hbStats().cap; sfx('build'); say(`Hoverbike out! W go · A/D steer · SHIFT boost · SPACE jump · in the air A/D spin and W/S flip for boost · Y get off`, 'good');
+}
+function hbDismount(quiet) { if (!S.bike) return; S.bike = false; if (BK.obj && BK.obj.parent) BK.obj.parent.remove(BK.obj); if (HB.on) hbEnd(); S.vel.set(0, 0, 0); if (S.astro) { S.astro.g.rotation.set(0, S.heading, 0); } if (!quiet) sfx('ui'); }
+addEventListener('keydown', e => { if (e.code !== 'KeyY' || e.repeat || G.state !== 'surface' || (e.target.matches && e.target.matches('input, textarea'))) return; if (S.bike) hbDismount(); else hbMount(); });
+function hbTrickText(t) { const el = $('#hbTrick'); el.textContent = t; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; clearTimeout(BK.trickTO); BK.trickTO = setTimeout(() => el.hidden = true, 1300); }
+function hbRespawn() { const p = BK.lastGate || { x: PAD.x + 6, y: PAD_H + 1, z: PAD.z + 8, h: S.heading }; BK.pos.set(p.x, p.y + 1, p.z); S.heading = p.h; BK.speed = 0; BK.vy = 0; BK.air = false; BK.spin = BK.flip = 0; sfx('whoosh'); say(HB.on ? 'Into the clouds! Back to the last gate...' : 'Whoops! Back to safety.', 'bad'); }
+function bikeUpdate(dt) {
+  const st = hbStats();
+  if (BK.pos.distanceTo(S.pos) > 6) { BK.pos.copy(S.pos); BK.speed = 0; BK.vy = 0; }
+  if (S.vel.y > 12 && !BK.air) { BK.vy = Math.max(BK.vy, S.vel.y * 0.9); BK.air = true; BK.airT = 0; }
+  else if (S.vel.y > 12) BK.vy = Math.max(BK.vy, S.vel.y * 0.9);
+  const locked = HB.on && HB.count > 0;
+  const up = !locked && (keys.KeyW || keys.ArrowUp || (isTouch && stick.y < -0.3)), dn = !locked && (keys.KeyS || keys.ArrowDown || (isTouch && stick.y > 0.3));
+  const lt = keys.KeyA || keys.ArrowLeft || (isTouch && stick.x < -0.3), rt = keys.KeyD || keys.ArrowRight || (isTouch && stick.x > 0.3);
+  const boosting = !locked && (keys.ShiftLeft || keys.ShiftRight || touchBtn.boost) && BK.boost > 0 && BK.speed > 5;
+  BK.padT -= dt; BK.wob -= dt; BK.hitT -= dt;
+  let top = st.top * (boosting ? 1.45 : 1) * (BK.padT > 0 ? 1.6 : 1) * (BK.wob > 0 ? 0.35 : 1);
+  if (W === VELO_W && !BK.air && HBV.onRoad === false) top *= 0.78;
+  if (!BK.air) {
+    if (up) BK.speed = Math.min(top, BK.speed + st.acc * (boosting ? 1.6 : 1) * dt); else if (dn) BK.speed = Math.max(-8, BK.speed - 30 * dt); else BK.speed *= 1 - dt * 0.6;
+    if (BK.speed > top) BK.speed += (top - BK.speed) * Math.min(1, dt * 2);
+    const steer = (lt ? 1 : 0) - (rt ? 1 : 0); S.heading += steer * st.turn * dt * Math.min(1, Math.abs(BK.speed) / 8) * Math.sign(BK.speed || 1); BK.lean += (-steer * Math.min(1, Math.abs(BK.speed) / 20) * 0.45 - BK.lean) * Math.min(1, dt * 6);
+    if (!locked && keys.Space && !BK.jumpHeld) { BK.vy = st.jump; BK.air = true; BK.airT = 0; sfx('whoosh'); }
+  } else {
+    BK.airT += dt; if (lt) BK.spin += st.spin * dt; if (rt) BK.spin -= st.spin * dt; if (up) BK.flip -= st.spin * 0.85 * dt; if (dn) BK.flip += st.spin * 0.85 * dt;
+    if (!lt && !rt) BK.spin += (Math.round(BK.spin / TAU) * TAU - BK.spin) * Math.min(1, dt * 4); if (!up && !dn) BK.flip += (Math.round(BK.flip / TAU) * TAU - BK.flip) * Math.min(1, dt * 4);
+  }
+  BK.jumpHeld = !!keys.Space;
+  if (boosting) BK.boost = Math.max(0, BK.boost - 32 * dt); else BK.boost = Math.min(st.cap, BK.boost + st.regen * dt);
+  const f = fwdOf(S.heading); BK.pos.x += f.x * BK.speed * dt; BK.pos.z += f.z * BK.speed * dt;
+  const gnd = Math.max(groundAt(BK.pos.x, BK.pos.z), -1.4), hov = gnd + 0.85;
+  if (!BK.air) { const ny = hov + Math.sin(T * 6) * 0.04, vyG = (ny - BK.pos.y) / Math.max(dt, 0.001); if (BK.lastVy !== undefined && vyG < BK.lastVy - 18 && BK.lastVy > 4 && BK.speed > 14) { BK.air = true; BK.airT = 0; BK.vy = BK.lastVy * 0.8; } else { BK.pos.y = ny; BK.lastVy = clamp(vyG, -40, 40); } }
+  if (BK.air) {
+    BK.vy -= 24 * dt; BK.pos.y += BK.vy * dt;
+    if (BK.pos.y <= hov && BK.vy <= 0) {
+      BK.air = false; BK.pos.y = hov; BK.vy = 0; BK.lastVy = 0;
+      const spins = Math.round(Math.abs(BK.spin) / TAU), flips = Math.round(Math.abs(BK.flip) / TAU), offS = Math.abs(BK.spin - Math.round(BK.spin / TAU) * TAU), offF = Math.abs(BK.flip - Math.round(BK.flip / TAU) * TAU);
+      if (offS > 1.1 || offF > 1.1) { BK.wob = 0.9; BK.speed *= 0.4; sfx('thud'); hbTrickText('WOBBLE!'); }
+      else if (spins || flips) { const gain = spins * 22 + flips * 32; BK.boost = Math.min(st.cap, BK.boost + gain); G.hb.tricks += spins + flips; const nm = [spins ? `${spins > 1 ? spins + 'x ' : ''}${spins * 360} SPIN` : '', flips ? `${flips > 1 ? 'DOUBLE ' : ''}${BK.flip < 0 ? 'FRONT' : 'BACK'}FLIP` : ''].filter(Boolean).join(' + '); hbTrickText(`${nm}! +${gain} BOOST`); sfx('ring'); if (HB.on) HB.trickPts += gain; if (G.hb.tricks >= 15 && G.hb.tricks - spins - flips < 15) say('You unlocked the Flames decal for your hoverbike!', 'good'); }
+      else if (BK.airT > 0.6) sfx('thud', 0.5);
+      BK.spin = 0; BK.flip = 0;
+    }
+  }
+  for (const c of S.colliders) { if (BK.pos.y > c.top) continue; const dx = BK.pos.x - c.x, dz = BK.pos.z - c.z, d = Math.hypot(dx, dz), r = c.r + 1.1; if (d < r && d > 1e-4) { BK.pos.x = c.x + dx / d * r; BK.pos.z = c.z + dz / d * r; if (BK.hitT <= 0 && Math.abs(BK.speed) > 10) { BK.hitT = 0.6; BK.speed *= 0.5; sfx('thud'); shake = Math.min(1, shake + 0.3); } } }
+  const bx = BK.pos.x - PAD.x, bz = BK.pos.z - PAD.z, bd = Math.hypot(bx, bz); if (bd > 515) { BK.pos.x = PAD.x + bx / bd * 515; BK.pos.z = PAD.z + bz / bd * 515; BK.speed *= 0.5; }
+  if ((W === NIMBUS_W || W === VELO_W) && BK.pos.y < (W === NIMBUS_W ? 9 : -50) && gnd < 5) hbRespawn();
+  hbTrackTriggers(dt);
+  // the model
+  if (!BK.obj || BK.key !== hbKey()) { if (BK.obj && BK.obj.parent) BK.obj.parent.remove(BK.obj); BK.obj = makeHoverbike(G.hb.paint); BK.key = hbKey(); }
+  if (BK.obj.parent !== surf) surf.add(BK.obj);
+  const o = BK.obj; o.position.copy(BK.pos).add(new V3(0, -0.85, 0));
+  const pitchG = BK.air ? 0 : Math.atan2(groundAt(BK.pos.x + f.x * 1.5, BK.pos.z + f.z * 1.5) - groundAt(BK.pos.x - f.x * 1.5, BK.pos.z - f.z * 1.5), 3);
+  o.rotation.set(0, 0, 0, 'YXZ'); o.rotation.order = 'YXZ'; o.rotation.y = S.heading + BK.spin; o.rotation.x = BK.flip + clamp(pitchG, -0.5, 0.5) * 0.8 + (BK.air ? 0 : 0); o.rotation.z = BK.lean + (BK.wob > 0 ? Math.sin(T * 30) * 0.2 : 0);
+  o.userData.pads.forEach(p => p.scale.setScalar(1.2 + Math.random() * 0.4)); o.userData.fl.scale.setScalar((boosting ? 3.2 : 1.2 + Math.abs(BK.speed) / 30) + Math.random() * 0.4);
+  if (boosting && Math.random() < dt * 30) { const s = glowSprite(HB_GLOW[G.hb.paint.glow][1], 1.2); s.position.copy(o.localToWorld(new V3(0, 0.9, 2.2))); surf.add(s); S.pulses.push({ obj: s, t: 0, life: 0.35, kind: 'flash' }); }
+  if (Math.abs(BK.speed) > 2 && Math.random() < dt * 4) sfx('thud', 0.05);
+}
+{ const _us5 = updateSurface; updateSurface = function (dt) {
+  if (!S.bike) { _us5(dt); return; }
+  bikeUpdate(dt);
+  const ks = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'], sv = ks.map(k => keys[k]), sx = stick.x, sy = stick.y, tj = touchBtn.jet;
+  ks.forEach(k => keys[k] = false); stick.x = stick.y = 0; touchBtn.jet = false;
+  try { _us5(dt); } finally { ks.forEach((k, i) => keys[k] = sv[i]); stick.x = sx; stick.y = sy; touchBtn.jet = tj; }
+  S.pos.copy(BK.pos); const f = fwdOf(S.heading); S.vel.set(f.x * BK.speed, BK.vy, f.z * BK.speed); S.fuel = fuelMax();
+  const a = S.astro; if (a && BK.obj) { a.g.quaternion.copy(BK.obj.quaternion); a.g.position.copy(BK.obj.localToWorld(new V3(0, 0.32, 0.45))); a.legs.forEach((l, i) => l.rotation.x = -1.1); a.arms.forEach(r => r.rotation.x = -1.2); a.flames.forEach(fl => fl.scale.setScalar(0.01)); }
+  if (S.drone) S.drone.position.lerp(tmp.copy(S.pos).add(new V3(0, 3.5, 0)).addScaledVector(f, -3), Math.min(1, dt * 4));
+}; }
+{ const _usc5 = updateSurfCamera; updateSurfCamera = function (dt) {
+  if (!S.bike) return _usc5(dt);
+  const f = fwdOf(S.heading), sp = Math.abs(BK.speed), d = 8 + sp * 0.08, want = tmp2.copy(BK.pos).addScaledVector(f, -d).add(new V3(0, 3 + sp * 0.03, 0)); const gh = Math.max(groundAt(want.x, want.z), -1.4); if (want.y < gh + 1.2) want.y = gh + 1.2;
+  camera.position.lerp(want, 1 - Math.exp(-dt * 6)); camera.up.set(0, 1, 0); camera.lookAt(tmp.copy(BK.pos).addScaledVector(f, 6).add(new V3(0, 1, 0)));
+  const fov = 62 + Math.min(14, sp * 0.25); camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix();
+}; }
+{ const _bd = board; board = function () { if (S.bike) hbDismount(true); return _bd.apply(this, arguments); }; }
+{ const _uw5 = useWorld; useWorld = function (w) { if (S.bike) hbDismount(true); _uw5(w); }; }
+
+/* ---- the tracks ---- */
+const hbLoop = (R, A, k1, p1, B, k2, p2, n = 32) => Array.from({ length: n }, (_, i) => { const a = i / n * TAU, r = R + A * Math.sin(k1 * a + p1) + B * Math.sin(k2 * a + p2); return [Math.cos(a) * r, Math.sin(a) * r]; });
+const HB_NIMSEQ = [0, 1, 5, 2, 3, 6, 4, 7];
+const HB_TRACKS = {
+  spore: { name: 'Spore Sprint', world: 'spore', planet: 'Sporeholm', loop: hbLoop(175, 45, 3, 0.5, 20, 5, 0), gateEvery: 4, laps: 2 },
+  glass: { name: 'Dune Dash', world: 'glass', planet: 'Glasswind', loop: hbLoop(195, 55, 2, 1, 25, 5, 2), gateEvery: 4, laps: 2 },
+  nimbus: { name: 'Sky Circuit', world: 'nimbus', planet: 'Nimbus', loop: HB_NIMSEQ.map(i => [NIM_ISL[i][0], NIM_ISL[i][1]]), gateWps: [0, 1, 2, 3, 4, 6, 7], laps: 2, road: true, width: 8 },
+  velocity: { name: 'Velocity Grand Finale', world: 'velocity', planet: 'Velocity', loop: hbLoop(215, 70, 2, 0.3, 28, 6, 1, 40), gateEvery: 5, laps: 2, road: true, width: 11 },
+};
+const HB_SEASON = ['spore', 'glass', 'nimbus', 'velocity'];
+function hbVeloY(x, z) { const a = Math.atan2(z, x); return 0.6 + Math.max(0, 16 * Math.sin(2 * a + 0.9) + 5); }
+function hbDense(tr) {
+  if (tr.pts) return tr.pts; const pts = [], L = tr.loop;
+  for (let i = 0; i < L.length; i++) { const a = L[i], b = L[(i + 1) % L.length], d = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(d / 6)); for (let k = 0; k < n; k++) pts.push({ x: a[0] + (b[0] - a[0]) * k / n, z: a[1] + (b[1] - a[1]) * k / n, wp: k === 0 ? i : -1, seg: i, t: k / n }); }
+  let s = 0; pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; p.s = s; p.len = Math.hypot(q.x - p.x, q.z - p.z); s += p.len; p.dir = new V3(q.x - p.x, 0, q.z - p.z).normalize(); }); tr.L = s;
+  if (tr.world === 'nimbus') pts.forEach(p => { const A = NIM_ISL[HB_NIMSEQ[p.seg]], B = NIM_ISL[HB_NIMSEQ[(p.seg + 1) % HB_NIMSEQ.length]]; p.ry = A[3] + (B[3] - A[3]) * p.t + 0.3; p.gap = (p.seg === 1 || p.seg === 6) && p.t > 0.44 && p.t < 0.56; p.ramp = (p.seg === 1 || p.seg === 6) && p.t > 0.34 && p.t < 0.4; });
+  if (tr.world === 'velocity') pts.forEach(p => { p.ry = hbVeloY(p.x, p.z); const a = Math.atan2(p.z, p.x); const near = (c) => Math.abs(((a - c + Math.PI) % TAU + TAU) % TAU - Math.PI); p.gap = near(0.335) < 0.03 || near(0.335 + Math.PI) < 0.03; p.ramp = !p.gap && (near(0.335 - 0.075) < 0.02 || near(0.335 + Math.PI - 0.075) < 0.02); });
+  tr.pts = pts; return pts;
+}
+// roads for the sky and speedway tracks
+const HB_ROADS = { nimbus: null, velocity: null };
+function hbRoadSegs(key) {
+  if (HB_ROADS[key]) return HB_ROADS[key]; const tr = HB_TRACKS[key], pts = hbDense(tr), segs = [];
+  pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; if (p.gap || q.gap) return; segs.push({ ax: p.x, az: p.z, ay: p.ry + (p.ramp ? 2.2 : 0), bx: q.x, bz: q.z, by: q.ry + (q.ramp ? 2.2 : 0), w: tr.width / 2 }); });
+  if (key === 'nimbus') { const A = NIM_ISL[3], B = NIM_ISL[4]; segs.push({ ax: A[0], az: A[1], ay: A[3] + 0.3, bx: B[0], bz: B[1], by: B[3] + 0.3, w: 1.7, shortcut: true }); }
+  let mnx = Infinity, mxx = -Infinity, mnz = Infinity, mxz = -Infinity; segs.forEach(s => { s.minx = Math.min(s.ax, s.bx) - s.w; s.maxx = Math.max(s.ax, s.bx) + s.w; s.minz = Math.min(s.az, s.bz) - s.w; s.maxz = Math.max(s.az, s.bz) + s.w; });
+  HB_ROADS[key] = segs; return segs;
+}
+function hbRoadY(key, x, z) {
+  let best = -99; for (const s of hbRoadSegs(key)) { if (x < s.minx || x > s.maxx || z < s.minz || z > s.maxz) continue; const dx = s.bx - s.ax, dz = s.bz - s.az, L2 = dx * dx + dz * dz, t = clamp(((x - s.ax) * dx + (z - s.az) * dz) / L2, 0, 1); if (Math.hypot(x - s.ax - dx * t, z - s.az - dz * t) < s.w) { const y = s.ay + (s.by - s.ay) * t; if (y > best) best = y; } }
+  return best;
+}
+const HBV = { onRoad: null };
+function hbRoadMesh(key) {
+  const segs = hbRoadSegs(key), pos = [], uv = [], idx = []; let n = 0, vv = 0;
+  segs.forEach(s => { const dx = s.bx - s.ax, dz = s.bz - s.az, L = Math.hypot(dx, dz), nx = -dz / L * s.w, nz = dx / L * s.w; pos.push(s.ax + nx, s.ay, s.az + nz, s.ax - nx, s.ay, s.az - nz, s.bx + nx, s.by, s.bz + nz, s.bx - nx, s.by, s.bz - nz); uv.push(0, vv, 1, vv, 0, vv + L / 8, 1, vv + L / 8); vv += L / 8; idx.push(n, n + 2, n + 1, n + 1, n + 2, n + 3); n += 4; });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+  const tex = canvasTex(64, 128, (c, w, h) => { c.fillStyle = '#23252e'; c.fillRect(0, 0, w, h); c.fillStyle = key === 'nimbus' ? '#ff9ad8' : '#ff8a3a'; c.fillRect(0, 0, 5, h); c.fillRect(w - 5, 0, 5, h); c.fillStyle = '#e8eef4'; c.fillRect(w / 2 - 2, 10, 4, 50); });
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35, roughness: 0.6, side: THREE.DoubleSide })); surf.add(m);
+  segs.forEach((s, i) => { if (i % 3) return; const sup = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, Math.max(1, s.ay + 40), 6), mStd(0x6a6e7a, 0.5, 0.5)); sup.position.set(s.ax, s.ay - Math.max(1, s.ay + 40) / 2 - 0.3, s.az); if (key === 'velocity' && s.ay > 2) { sup.scale.y = s.ay / (s.ay + 40); sup.position.y = s.ay / 2 - 0.3; surf.add(sup); } else if (key === 'nimbus') surf.add(sup); });
+}
+// ---- track objects on the world ----
+const HB = { on: false, tr: null, key: '', champ: false, next: 1, lap: 0, t: 0, count: 0, ai: [], finished: [], trickPts: 0, built: {} };
+function hbTrackBuild(key) {
+  const tr = HB_TRACKS[key], v = HB.built[key] = { gates: [], pads: [], ramps: [] }, pts = hbDense(tr);
+  const yAt = p => tr.road ? Math.max(p.ry, groundAt(p.x, p.z)) : Math.max(groundAt(p.x, p.z), -1.4);
+  pts.forEach(p => p.y = p.gap ? null : yAt(p));
+  for (let i = 0; i < pts.length; i++) if (pts[i].y === null) { let a = i, b = i; while (pts[(a - 1 + pts.length) % pts.length].y === null) a--; while (pts[(b + 1) % pts.length].y === null) b++; const pa = pts[(a - 1 + pts.length) % pts.length], pb = pts[(b + 1) % pts.length], f = (i - a + 1) / (b - a + 2); pts[i].ay = pa.y + (pb.y - pa.y) * f + Math.sin(f * Math.PI) * 6; } else pts[i].ay = pts[i].y;
+  // clear decorations that block the racing line
+  if (!tr.road || key === 'nimbus') for (let i = S.colliders.length - 1; i >= 0; i--) { const c = S.colliders[i]; if (!c.objs) continue; if (pts.some(p => Math.hypot(p.x - c.x, p.z - c.z) < c.r + 6)) { c.objs.forEach(o => o.visible = false); S.colliders.splice(i, 1); } }
+  if (tr.road) hbRoadMesh(key);
+  const gw = tr.gateWps ? tr.gateWps : tr.loop.map((_, i) => i).filter(i => i % tr.gateEvery === 0);
+  tr.gates = gw.map(wi => pts.findIndex(p => p.wp === wi));
+  tr.gates.forEach((pi, gi) => { const p = pts[pi], side = new V3(-p.dir.z, 0, p.dir.x), g = new THREE.Group(), half = (tr.width || 14) / 2 + 2;
+    for (const s of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.7, 9, 0.7), mStd(0x2a2c34, 0.6, 0.4)); post.position.copy(side).multiplyScalar(s * half).setY(4.5); g.add(post); }
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(half * 2 + 0.7, 1, 0.6), new THREE.MeshStandardMaterial({ color: gi === 0 ? 0xffffff : 0x6fd8ff, emissive: gi === 0 ? 0xffffff : 0x6fd8ff, emissiveIntensity: 0.3 })); bar.position.y = 9; bar.rotation.y = Math.atan2(-side.z, side.x); g.add(bar);
+    if (gi === 0) { const sign = new THREE.Mesh(new THREE.PlaneGeometry(half * 2, 2), new THREE.MeshBasicMaterial({ map: hvText(`${tr.name.toUpperCase()} · START`, 1024, 128, '#14161e', '#ffd060'), side: THREE.DoubleSide, transparent: true })); sign.position.y = 11; sign.rotation.y = bar.rotation.y; g.add(sign); }
+    g.position.set(p.x, p.ay, p.z); surf.add(g); v.gates.push({ g, bar, p }); });
+  pts.forEach((p, i) => { if (p.gap) return;
+    if (i % 23 === 11) { const m = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), new THREE.MeshBasicMaterial({ map: HB_PADTEX, transparent: true, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; m.rotation.z = Math.atan2(-p.dir.x, -p.dir.z); m.position.set(p.x, p.ay + 0.12, p.z); surf.add(m); v.pads.push({ p, m }); }
+    if (p.ramp && !(pts[(i - 1 + pts.length) % pts.length].ramp) || (!tr.road && i % 29 === 20)) { const r = new THREE.Mesh(new THREE.BoxGeometry(6, 1.6, 6), new THREE.MeshStandardMaterial({ map: HB_RAMPTEX, roughness: 0.6 })); r.position.set(p.x, p.ay + 0.2, p.z); r.rotation.order = 'YXZ'; r.rotation.y = Math.atan2(-p.dir.x, -p.dir.z); r.rotation.x = 0.28; surf.add(r); v.ramps.push({ p, r }); }
+    if (i % 4 === 0) for (const s of [-1, 1]) { const side = new V3(-p.dir.z, 0, p.dir.x).multiplyScalar(s * ((tr.width || 14) / 2 + 1)); const post = glowSprite(s > 0 ? 0xffd060 : 0x6fd8ff, 1.2); post.position.set(p.x + side.x, p.ay + 0.8, p.z + side.z); surf.add(post); } });
+}
+const HB_PADTEX = canvasTex(128, 128, (c, w, h) => { c.fillStyle = 'rgba(0,40,60,.7)'; c.fillRect(0, 0, w, h); c.strokeStyle = '#6fd8ff'; c.lineWidth = 10; for (let k = 0; k < 3; k++) { c.beginPath(); c.moveTo(20, 100 - k * 32); c.lineTo(64, 60 - k * 32); c.lineTo(108, 100 - k * 32); c.stroke(); } });
+const HB_RAMPTEX = canvasTex(128, 128, (c, w, h) => { for (let k = 0; k < 8; k++) { c.fillStyle = k % 2 ? '#1a1c22' : '#ffc23a'; c.beginPath(); c.moveTo(k * 32 - 64, 0); c.lineTo(k * 32 - 32, 0); c.lineTo(k * 32 + 32, h); c.lineTo(k * 32, h); c.fill(); } });
+function hbTrackTriggers(dt) {
+  const key = HB_W_TRACK[W.id]; if (!key) return; const v = HB.built[key]; if (!v) return;
+  if (W === VELO_W) HBV.onRoad = hbRoadY('velocity', BK.pos.x, BK.pos.z) > -50;
+  for (const pd of v.pads) if (Math.hypot(BK.pos.x - pd.p.x, BK.pos.z - pd.p.z) < 3 && Math.abs(BK.pos.y - pd.p.ay) < 3 && BK.padT < 0.8) { BK.padT = 1.3; BK.boost = Math.min(hbStats().cap, BK.boost + 15); BK.speed = Math.max(BK.speed, hbStats().top * 1.3); sfx('ring'); }
+  for (const r of v.ramps) if (!BK.air && Math.hypot(BK.pos.x - r.p.x, BK.pos.z - r.p.z) < 3.4 && Math.abs(BK.pos.y - r.p.ay) < 3 && BK.speed > 8) { BK.air = true; BK.airT = 0; BK.vy = 9 + BK.speed * 0.16; sfx('whoosh'); }
+}
+const HB_W_TRACK = { spore: 'spore', glass: 'glass', nimbus: 'nimbus', velocity: 'velocity' };
+function hbWorldTick(dt) {
+  const key = HB_W_TRACK[W.id]; if (!key || G.state !== 'surface' && G.state !== 'hbres') return;
+  if (!HB.built[key]) hbTrackBuild(key);
+  const v = HB.built[key], tr = HB_TRACKS[key];
+  v.gates.forEach((g, i) => { const on = HB.on && HB.tr === tr && i === HB.next % tr.gates.length; g.bar.material.emissiveIntensity = on ? 1.4 + Math.sin(T * 8) * 0.5 : 0.3; });
+  v.pads.forEach(pd => pd.m.material.opacity = 0.7 + Math.sin(T * 6) * 0.3);
+  if (HB.on && HB.tr === tr) hbRaceTick(dt);
+}
+{ const _usw2 = updateSurfaceWorld; updateSurfaceWorld = function (dt) { _usw2(dt); if (S.built) hbWorldTick(dt); if (S.bike && RB.surf) RB.surf.visible = false; }; }
+
+/* ---- racers ---- */
+const HB_RIVALS = [
+  { n: 'Zippy Zara', base: 29.5, paint: { body: 'yellow', trim: 'black', glow: 'orange', decal: 'flames' }, shirt: 0xf0c040, style: 'zara', hi: ['Catch me if you can!', 'Wheee! Too slow!'], lo: ['No fair, I was waving at fans!'] },
+  { n: 'Old Grumble', base: 28, paint: { body: 'green', trim: 'silver', glow: 'green', decal: 'none' }, shirt: 0x6a5a4a, style: 'grumble', hi: ['Hmph. Kids these days.', 'Steady wins the race.'], lo: ['My knees hurt. That is why.'] },
+  { n: 'Twinkle', base: 28.5, paint: { body: 'purple', trim: 'white', glow: 'pink', decal: 'stars' }, shirt: 0xff9ad8, style: 'twinkle', hi: ['Did you see my flip? Did you?!', 'La la la, flying!'], lo: ['I was busy being pretty.'] },
+  { n: 'Captain Rustbucket', base: 29, paint: { body: 'black', trim: 'red', glow: 'orange', decal: 'flames' }, shirt: 0xb8562a, style: 'rust', hi: ['Arr! Out of me way!', 'Bump bump bump!'], lo: ['Arr... I let ye win.'] },
+  { n: 'Professor Hoot', base: 27.5, paint: { body: 'white', trim: 'teal', glow: 'cyan', decal: 'stripes' }, shirt: 0x3b66d9, style: 'hoot', hi: ['A perfect racing line, if I say so myself.', 'Physics is on my side.'], lo: ['Fascinating. You are faster than my maths.'] },
+];
+function hbLineup() {
+  const L = HB_RIVALS.map(r => Object.assign({}, r));
+  if (rbOn()) L[4] = { n: G.rb.name, base: 29, paint: { body: G.rb.cfg.body in HB_BODY ? G.rb.cfg.body : 'white', trim: 'silver', glow: G.rb.cfg.glow in HB_GLOW ? G.rb.cfg.glow : 'cyan', decal: 'stripes' }, robot: true, style: 'robot', hi: ['BEEP BOOP! Robot speed!', 'I calculated a 98% chance of winning!'], lo: ['Recalculating... you are very fast, captain!'] };
+  const caps = (G.fb && G.fb.fleet) ? G.fb.fleet.slice(0, 2) : [];
+  caps.forEach((c, i) => { L[3 - i] = { n: `Capt. ${c.name}`, base: 28.5 + (c.trait === 'Speedy' ? 1 : 0), paint: { body: pick(['blue', 'green', 'pink', 'white']), trim: 'teal', glow: 'green', decal: 'stripes' }, shirt: 0x2a8a7a, style: 'cap', hi: ['For Starhold!', 'Fleet captains do not lose!'], lo: ['Good racing, commander!'] }; });
+  return L;
+}
+function hbStart(key, champ) {
+  const tr = HB_TRACKS[key], pts = hbDense(tr); if (!S.bike) hbMount(); if (!S.bike) return;
+  HB.ai.forEach(a => surf.remove(a.obj));
+  const round = HB_SEASON.indexOf(key), diff = 1 + Math.max(0, round) * 0.035 + (G.hb.seasons || 0) * 0.03;
+  HB.ai = hbLineup().map((r, i) => { const o = makeHoverbike(r.paint); let rider; if (r.robot) { rider = makeRobot(G.rb.cfg); rider.scale.setScalar(0.75); rider.position.set(0, 0.95, 0.45); } else { const pp = makePerson(r.shirt || 0x3b66d9); rider = pp.g; rider.position.set(0, 0.4, 0.45); pp.legs.forEach(l => l.rotation.x = -1.1); } o.add(rider); surf.add(o); return { r, obj: o, s: -(i + 1) * 5, off: ((i % 3) - 1) * 3, done: false, hop: 0, hopT: 0, flip: 0, v: r.base * diff, said: 0 }; });
+  Object.assign(HB, { on: true, tr, key, champ, next: 1, lap: 0, t: 0, count: 3.5, finished: [], trickPts: 0 });
+  const p0 = pts[tr.gates[0]]; BK.pos.set(p0.x, p0.ay + 0.9, p0.z).addScaledVector(p0.dir, -10); S.pos.copy(BK.pos); S.heading = Math.atan2(-p0.dir.x, -p0.dir.z); BK.speed = 0; BK.vy = 0; BK.air = false; BK.boost = hbStats().cap; BK.lastGate = { x: BK.pos.x, y: BK.pos.y, z: BK.pos.z, h: S.heading };
+  $('#comms').hidden = true; sfx('ring'); say(`${champ ? `Grand Prix round ${round + 1}` : 'Practice race'}: ${tr.name}! ${tr.laps} laps through ${tr.gates.length} gates. Boost pads, ramps and tricks give you speed. Look for shortcuts!`, 'good');
+}
+function hbEnd() { HB.on = false; HB.ai.forEach(a => surf.remove(a.obj)); HB.ai = []; $('#hbHud').hidden = true; $('#hbCount').hidden = true; }
+function hbPos(tr, s) { const pts = tr.pts, L = tr.L; s = ((s % L) + L) % L; let lo = 0, hi = pts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (pts[m].s <= s) lo = m; else hi = m - 1; } const p = pts[lo], q = pts[(lo + 1) % pts.length], f = p.len ? (s - p.s) / p.len : 0; return { x: p.x + (q.x - p.x) * f, z: p.z + (q.z - p.z) * f, y: p.ay + (q.ay - p.ay) * f, dir: p.dir, ramp: p.ramp, gap: p.gap, i: lo }; }
+function hbPlayerS() { const tr = HB.tr, n = tr.gates.length, gi = HB.next % n, gp = tr.pts[tr.gates[gi]], prevS = tr.pts[tr.gates[(gi - 1 + n) % n]].s, nextS = gi === 0 ? tr.L : gp.s; return HB.lap * tr.L + Math.max(prevS, nextS - Math.hypot(BK.pos.x - gp.x, BK.pos.z - gp.z)); }
+function hbRaceTick(dt) {
+  const tr = HB.tr, n = tr.gates.length, total = tr.L * tr.laps;
+  if (!S.bike) { hbEnd(); return; }
+  if (HB.count > 0) { const b = Math.ceil(HB.count); HB.count -= dt; const a = Math.ceil(HB.count); const el = $('#hbCount'); el.hidden = false; el.textContent = HB.count > 0 ? a : 'GO!'; if (a !== b) sfx(HB.count > 0 ? 'ui' : 'ring'); if (HB.count <= 0) { setTimeout(() => $('#hbCount').hidden = true, 700); const r = pick(HB.ai); say(`${r.r.n}: "${pick(r.r.hi)}"`); } }
+  else HB.t += dt;
+  // gates
+  const gi = HB.next % n, gp = tr.pts[tr.gates[gi]];
+  if (HB.count <= 0 && Math.hypot(BK.pos.x - gp.x, BK.pos.z - gp.z) < (tr.width || 14) / 2 + 5 && Math.abs(BK.pos.y - gp.ay) < 12) {
+    BK.lastGate = { x: gp.x, y: gp.ay + 0.9, z: gp.z, h: Math.atan2(-gp.dir.x, -gp.dir.z) }; sfx('pickup');
+    if (gi === 0) { HB.lap++; if (HB.lap >= tr.laps) { hbFinish(); return; } hbTrickText(`LAP ${HB.lap + 1}!`); }
+    HB.next = (HB.next + 1) % n === 0 ? 0 : HB.next + 1; if (HB.next >= n) HB.next = 0;
+  }
+  // rivals
+  const ps = hbPlayerS();
+  HB.ai.forEach(a => {
+    if (HB.count > 0) { const q = hbPos(tr, a.s); a.obj.position.set(q.x, q.y, q.z).addScaledVector(new V3(-q.dir.z, 0, q.dir.x), a.off); a.obj.rotation.y = Math.atan2(-q.dir.x, -q.dir.z); return; }
+    if (a.done) { a.s += a.v * 0.6 * dt; } else {
+      let v = a.v; const gap = a.s - ps; if (gap > 40) v *= 0.84; else if (gap < -70) v *= 1.16; else if (gap < -20) v *= 1.06;
+      const prog = a.s / total; if (a.r.style === 'hoot') v *= 0.95 + prog * 0.12; if (a.r.style === 'zara') v *= 1.04 - prog * 0.06; if (a.r.style === 'grumble') v *= 1;
+      if (a.stun > 0) { a.stun -= dt; v *= 0.4; }
+      a.s += v * dt; if (a.s >= total) { a.done = true; HB.finished.push(a); }
+    }
+    const q = hbPos(tr, a.s), side = new V3(-q.dir.z, 0, q.dir.x);
+    if (q.ramp && a.hopT <= 0) { a.hopT = 1.1; a.flip = (a.r.style === 'twinkle' || a.r.style === 'robot') ? 1 : 0; }
+    let hy = 0; if (a.hopT > 0) { a.hopT -= dt; hy = Math.sin((1 - a.hopT / 1.1) * Math.PI) * 5; }
+    a.obj.position.set(q.x, q.y + 0.05 + hy + Math.sin(T * 6 + a.off) * 0.05, q.z).addScaledVector(side, a.off + Math.sin(a.s * 0.02) * 1.5);
+    a.obj.rotation.order = 'YXZ'; a.obj.rotation.y = Math.atan2(-q.dir.x, -q.dir.z) + (a.flip && a.hopT > 0 ? (1 - a.hopT / 1.1) * TAU : 0); a.obj.rotation.x = 0;
+    a.obj.children.forEach(c => { if (c.isSprite) c.scale.setScalar(1.2 + Math.random() * 0.5); });
+    const d = a.obj.position.distanceTo(BK.pos);
+    if (d < 2.4 && !a.done) { const push = tmp.subVectors(BK.pos, a.obj.position).setY(0).normalize(); BK.pos.addScaledVector(push, 2.4 - d); if (T - (a.bumpT || 0) > 1.5) { a.bumpT = T; sfx('thud'); if (a.r.style === 'rust') { BK.speed *= 0.7; say(`${a.r.n}: "Arr! Bump!"`); } else a.stun = 0.6; } }
+    if (!a.done && T - a.said > 12 && Math.abs(a.s - ps) < 25 && Math.random() < dt * 0.3) { a.said = T; say(`${a.r.n}: "${pick(a.s > ps ? a.r.hi : a.r.lo)}"`); }
+  });
+  const ahead = HB.ai.filter(a => a.s > ps).length;
+  const hud = $('#hbHud'); hud.hidden = false;
+  $('#hbPos').textContent = `${ahead + 1}${['st', 'nd', 'rd'][ahead] || 'th'}`;
+  $('#hbInfo').innerHTML = `${HB.champ ? 'GRAND PRIX' : 'PRACTICE'} · ${tr.name}<br>Lap ${Math.min(tr.laps, HB.lap + 1)} / ${tr.laps} · Gate ${HB.next === 0 ? n : HB.next} / ${n} · ${HB.t.toFixed(1)}s`;
+}
+{ const surfM = (w) => { const _sm = w.surfMarkers; w.surfMarkers = function () { if (_sm) _sm(); const key = HB_W_TRACK[w.id], tr = HB_TRACKS[key]; if (!tr || !tr.pts || !tr.gates) return; const p = tr.pts[tr.gates[HB.on && HB.tr === tr ? HB.next % tr.gates.length : 0]]; const el = marker('hb-gate', 'target', HB.on && HB.tr === tr ? 'Next gate' : `${tr.name} start`); el.querySelector('.dst').textContent = fmtD(Math.hypot(S.pos.x - p.x, S.pos.z - p.z)); placeMarker(el, tmp.set(p.x, p.ay + 10, p.z)); }; }; [SPORE_W, GLASS_W, NIMBUS_W].forEach(surfM); HB.surfM = surfM; }
+function hbFinish() {
+  const tr = HB.tr, place = HB.finished.length + 1, time = HB.t, key = HB.key, champ = HB.champ;
+  const rest = HB.ai.filter(a => !a.done).sort((a, b) => b.s - a.s), order = HB.finished.map(a => a.r.n); order.splice(place - 1, 0, 'You'); rest.forEach(a => order.push(a.r.n));
+  hbEnd(); G.hb.races++; if (place <= 3) G.hb.podiums++; if (place === 1) G.hb.wins++;
+  const prev = G.hb.best[key]; if (!prev || time < prev) G.hb.best[key] = time;
+  const cash = [4000, 2500, 1500, 800, 500, 300][place - 1]; G.credits += cash;
+  sfx(place <= 3 ? 'win' : 'ui');
+  let pointsHtml = '', champMsg = '';
+  if (champ) {
+    const PTS = [10, 7, 5, 3, 2, 1], se = G.hb.season; order.forEach((nm, i) => se.pts[nm] = (se.pts[nm] || 0) + PTS[i]); se.results.push({ key, place }); se.round++;
+    if (se.round >= HB_SEASON.length) {
+      const table = Object.entries(se.pts).sort((a, b) => b[1] - a[1]); const won = table[0][0] === 'You' || (se.pts.You || 0) >= table[0][1];
+      if (won) { const first = !G.hb.champ; G.hb.champ = true; G.credits += 25000; champMsg = `<p style="color:#ffd060;font-weight:600;font-size:16px">🏆 YOU ARE THE GRAND PRIX CHAMPION! +25,000 cr. ${first ? 'Your golden trophy is waiting, Champion gold paint is unlocked, and your face is going up on a giant billboard at Haven Ring!' : 'Champion again! The billboard at Haven Ring gets a fresh coat of glitter.'}</p>`; logAdd(['Grand Prix champion!', 'I won the whole Ember Reach Grand Prix. Mushrooms, dunes, sky islands and the Velocity speedway. There is a GIANT picture of me at Haven Ring now. I look amazing.']); hbBillboard(); }
+      else champMsg = `<p>The season is over. ${table[0][0]} is champion this time with ${table[0][1]} points. Upgrade your bike and start a new season from the Hoverbike tab!</p>`;
+      G.hb.seasons = (G.hb.seasons || 0) + 1; G.hb.lastSeason = se; G.hb.season = { round: 0, pts: {}, results: [] };
+    }
+    const table = Object.entries((G.hb.lastSeason && se.round === 0 ? G.hb.lastSeason : se).pts).sort((a, b) => b[1] - a[1]);
+    pointsHtml = `<h4 style="margin:14px 0 6px">Championship points</h4><div class="hb-table">${table.map(([nm, p], i) => `<div class="${nm === 'You' ? 'me' : ''}"><span>${i + 1}. ${nm}</span><b>${p}</b></div>`).join('')}</div>`;
+  }
+  if (G.hb.wins === 1 && place === 1) logAdd(['First hoverbike win', `I won the ${tr.name}! ${order[1]} came second and did not stop talking about it.`]);
+  $('#hbResEye').textContent = champ ? `Grand Prix · round ${G.hb.season.round || HB_SEASON.length} of ${HB_SEASON.length}` : 'Practice race'; $('#hbResTitle').textContent = `${tr.name}: you finished ${place}${['st', 'nd', 'rd'][place - 1] || 'th'}!`;
+  $('#hbResBody').innerHTML = `<p>Time ${time.toFixed(1)}s${G.hb.best[key] === time ? ' · new best!' : ''} · Trick boost earned: ${HB.trickPts} · +${cash.toLocaleString()} cr</p><div class="hb-table">${order.map((nm, i) => `<div class="${nm === 'You' ? 'me' : ''}"><span>${i + 1}. ${nm}</span>${champ ? `<b>+${[10, 7, 5, 3, 2, 1][i]}</b>` : ''}</div>`).join('')}</div>${pointsHtml}${champMsg}`;
+  setState('hbres'); $('#hbRes').hidden = false; save();
+}
+$('#hbResOk').addEventListener('click', () => { $('#hbRes').hidden = true; if (G.state === 'hbres') setState('surface'); });
+{ const _hv12 = harvest; harvest = function () {
+  if (G.state === 'surface' && S.bike && !HB.on) { const key = HB_W_TRACK[W.id], tr = HB_TRACKS[key]; if (tr && tr.pts && tr.gates) { const p = tr.pts[tr.gates[0]]; if (Math.hypot(BK.pos.x - p.x, BK.pos.z - p.z) < 16) { hbStart(key, G.hb.season.round === HB_SEASON.indexOf(key)); return; } } }
+  _hv12();
+}; }
+{ const _ush11 = updateSurfHUD; updateSurfHUD = function () { _ush11(); if (S.bike) { const key = HB_W_TRACK[W.id], tr = HB_TRACKS[key]; let pr = ''; if (!HB.on && tr && tr.pts && tr.gates) { const p = tr.pts[tr.gates[0]]; if (Math.hypot(BK.pos.x - p.x, BK.pos.z - p.z) < 16) pr = `${isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'} to start ${G.hb.season.round === HB_SEASON.indexOf(key) ? `Grand Prix round ${HB_SEASON.indexOf(key) + 1}: ${tr.name}` : `a practice race: ${tr.name}`}`; } setPrompt(pr || `${Math.round(Math.abs(BK.speed) * 3.6)} km/h · boost ${Math.round(BK.boost)} · <kbd>Y</kbd> get off`); } }; }
+// the champion billboard at Haven Ring
+let hbBoard = null;
+function hbBillboard() {
+  if (hbBoard || !G.hb.champ) return;
+  const col = '#' + HB_BODY[G.hb.paint.body][1].toString(16).padStart(6, '0'), glow = '#' + HB_GLOW[G.hb.paint.glow][1].toString(16).padStart(6, '0');
+  const tex = canvasTex(1024, 512, (c, w, h) => { const gr = c.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#1a0a3a'); gr.addColorStop(1, '#3a0a2a'); c.fillStyle = gr; c.fillRect(0, 0, w, h); for (let i = 0; i < 120; i++) { c.fillStyle = `rgba(255,255,255,${Math.random() * 0.8})`; c.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    c.fillStyle = '#ffd060'; for (let i = 0; i < 14; i++) { const a = Math.PI * (0.65 + i * 0.05); c.beginPath(); c.ellipse(260 + Math.cos(a) * 200, 260 + Math.sin(a) * 200, 30, 12, a + Math.PI / 2, 0, Math.PI * 2); c.fill(); c.beginPath(); c.ellipse(260 - Math.cos(a) * 200, 260 + Math.sin(a) * 200, 30, 12, -a - Math.PI / 2, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = col; c.beginPath(); c.arc(260, 250, 170, 0, Math.PI * 2); c.fill(); c.fillStyle = '#e8eef4'; c.beginPath(); c.arc(260, 250, 150, 0, Math.PI * 2); c.fill();
+    const vg = c.createLinearGradient(160, 170, 360, 330); vg.addColorStop(0, '#2a3a6a'); vg.addColorStop(1, '#0a1020'); c.fillStyle = vg; c.beginPath(); c.ellipse(260, 255, 115, 85, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(215, 215, 40, 18, -0.5, 0, Math.PI * 2); c.fill(); c.strokeStyle = glow; c.lineWidth = 10; c.beginPath(); c.arc(260, 270, 50, 0.2, Math.PI - 0.2); c.stroke(); c.fillStyle = glow; c.beginPath(); c.arc(225, 245, 10, 0, Math.PI * 2); c.arc(295, 245, 10, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffd060'; c.font = 'bold 74px sans-serif'; c.fillText('GRAND PRIX', 470, 190); c.fillText('CHAMPION!', 470, 280); c.fillStyle = '#ffffff'; c.font = '30px sans-serif'; c.fillText('Fastest captain in Ember Reach', 470, 350); c.fillStyle = glow; c.fillRect(470, 380, 480, 8); });
+  const g = new THREE.Group(); const panel = new THREE.Mesh(new THREE.PlaneGeometry(320, 160), new THREE.MeshBasicMaterial({ map: tex })); g.add(panel); const back = panel.clone(); back.rotation.y = Math.PI; back.position.z = -0.5; g.add(back);
+  const fm = mStd(0xffc23a, 0.8, 0.3); for (const [w, h, x, y] of [[334, 7, 0, 83], [334, 7, 0, -83], [7, 174, 163, 0], [7, 174, -163, 0]]) { const bar = new THREE.Mesh(new THREE.BoxGeometry(w, h, 4), fm); bar.position.set(x, y, 0); g.add(bar); }
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(5, 7, 160, 8), mStd(0x8a8f9a, 0.6, 0.4)); pole.position.y = -160; g.add(pole);
+  for (let i = 0; i < 12; i++) { const s = glowSprite(i % 2 ? 0xffd060 : 0xff6fd8, 14); s.position.set(-165 + i * 30, 90, 4); g.add(s); }
+  g.position.set(420, 180, -320); g.lookAt(0, 120, 300); scene.add(g); hbBoard = g;
+}
+if (G.hb.champ) hbBillboard();
+{ const _ub12 = updateBoss; updateBoss = function (dt) { _ub12(dt); if (hbBoard) hbBoard.visible = G.sys === 'ember'; }; }
+TROPHIES.grandprix = { name: 'Golden Grand Prix trophy', ok: () => G.hb.champ, make: () => { const g = new THREE.Group(), gm = new THREE.MeshStandardMaterial({ color: 0xffc23a, metalness: 0.95, roughness: 0.2, emissive: 0x6a4a10, emissiveIntensity: 0.4 }); const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.12, 0.4, 16, 1, true), gm); cup.position.y = 0.6; g.add(cup); const st = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.25, 8), gm); st.position.y = 0.3; g.add(st); const base = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.12, 16), gm); base.position.y = 0.12; g.add(base); for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.025, 6, 12, Math.PI), gm); h.position.set(sx * 0.3, 0.62, 0); h.rotation.z = sx * Math.PI / 2; g.add(h); } return g; } };
+
+/* ---- the Hoverbike dock tab ---- */
+function hbSVG(pt) { const c = k => '#' + k.toString(16).padStart(6, '0'), B = c(HB_BODY[pt.body][1]), Tr = c(HB_TRIM[pt.trim][1]), Gl = c(HB_GLOW[pt.glow][1]);
+  return `<svg viewBox="0 0 220 110" width="220" height="110" role="img" aria-label="Your hoverbike"><ellipse cx="70" cy="96" rx="26" ry="5" fill="${Gl}" opacity=".7"/><ellipse cx="150" cy="96" rx="26" ry="5" fill="${Gl}" opacity=".7"/><rect x="48" y="80" width="44" height="10" rx="4" fill="${Tr}"/><rect x="128" y="80" width="44" height="10" rx="4" fill="${Tr}"/><path d="M20 62 L60 46 L170 46 L196 58 L196 74 L30 76 Z" fill="${B}"/><path d="M30 72 L196 70" stroke="${Tr}" stroke-width="5"/>${pt.decal === 'stripes' ? `<path d="M64 52 L170 52 M64 58 L170 58" stroke="${Tr}" stroke-width="3"/>` : pt.decal === 'flames' ? `<path d="M70 66 q10 -16 20 0 q10 -20 22 0 q8 -14 18 0" fill="#ff8a30"/>` : pt.decal === 'stars' ? `<text x="80" y="66" font-size="14" fill="#ffe08a">★ ★ ★</text>` : ''}<rect x="110" y="38" width="40" height="10" rx="3" fill="#22242c"/><path d="M60 46 L48 26" stroke="#22242c" stroke-width="4"/><path d="M52 30 L40 22" stroke="#9fe8ff" stroke-width="6" opacity=".6"/><circle cx="202" cy="66" r="9" fill="${Gl}"/></svg>`; }
+function renderHB() {
+  const h = G.hb;
+  if (!h.owned) return `<div class="item co-card"><div class="rb-prev">${hbSVG(h.paint)}<div><h4>Build your own hoverbike</h4><p>A fast little bike that floats on glowing pads. Ride it on any planet (press Y), do flips and spins in the air for boost, and race in the Ember Reach Grand Prix on Sporeholm, Glasswind, Nimbus and the speedway world Velocity!</p></div></div><div><div class="reward">4,000 cr</div><button class="btn" data-act="hbbuy" ${G.credits >= 4000 ? '' : 'disabled'}>Build it</button></div></div>`;
+  const st = hbStats();
+  let o = `<div class="item co-card"><div class="rb-prev">${hbSVG(h.paint)}<div><h4>Your hoverbike ${h.champ ? '<span class="tag race">Champion</span>' : ''}</h4><p class="shipstats">Top speed ${Math.round(st.top * 3.6)} km/h · Boost ${st.cap} · ${h.races} races · ${h.wins} wins · ${h.podiums} podiums · ${h.tricks} tricks landed</p><p class="shipstats">Ride it on any planet with <kbd>Y</kbd>. W go · A/D steer · SHIFT boost · SPACE jump · in the air A/D spin and W/S flip. Land straight or you wobble!</p></div></div></div>`;
+  const sw = (grp, list, cur) => Object.entries(list).filter(([k, v]) => v[2] !== 'champ' || h.champ).map(([k, v]) => `<button class="rb-sw ${k === cur ? 'on' : ''}" data-act="hbset" data-g="${grp}" data-k="${k}" title="${v[0]}" aria-label="${v[0]}" style="background:#${v[1].toString(16).padStart(6, '0')}"></button>`).join('');
+  o += `<div class="item"><div><h4>Paint shop</h4><p class="shipstats">Body</p><div class="row-btns">${sw('body', HB_BODY, h.paint.body)}</div><p class="shipstats">Trim</p><div class="row-btns">${sw('trim', HB_TRIM, h.paint.trim)}</div><p class="shipstats">Glow</p><div class="row-btns">${sw('glow', HB_GLOW, h.paint.glow)}</div><p class="shipstats">Decals</p><div class="row-btns">${Object.entries(HB_DECAL).map(([k, v]) => hbDecalOk(k) ? `<button class="${h.paint.decal === k ? 'btn' : 'ghost'}" data-act="hbset" data-g="decal" data-k="${k}">${v[0]}</button>` : `<button class="ghost" disabled>${v[0]} (${v[1] === 'tricks' ? 'land 15 tricks' : 'win a race'})</button>`).join('')}</div></div></div>`;
+  o += `<div class="item"><div style="width:100%"><h4>Garage: new parts</h4>${Object.entries(HB_PARTS).map(([k, p]) => { const lv = h.parts[k], nx = HB_TIER[lv + 1]; return `<div class="fb-offer"><div><b>${p.name}</b> <span class="shipstats">level ${lv} of 4 · ${p.d}</span></div><div>${!nx ? '<span class="reward" style="font-size:12px">Maxed</span>' : nx.lock() ? `<button class="ghost" data-act="hbpart" data-k="${k}" ${G.credits >= nx.cost ? '' : 'disabled'}>Upgrade · ${nx.cost.toLocaleString()} cr</button>` : `<button class="ghost" disabled>Locked: ${nx.why}</button>`}</div></div>`; }).join('')}</div></div>`;
+  const se = h.season, table = Object.entries(se.pts).sort((a, b) => b[1] - a[1]);
+  o += `<div class="item"><div style="width:100%"><h4>Ember Reach Grand Prix · season ${(h.seasons || 0) + 1}</h4><p class="shipstats">Race the rounds in order: land on the planet, get on your bike and press E at the start gate. Your rivals: ${hbLineup().map(r => r.n).join(', ')}.</p><div class="hb-table">${HB_SEASON.map((k, i) => { const r = se.results[i]; return `<div class="${i === se.round ? 'me' : ''}"><span>Round ${i + 1}: ${HB_TRACKS[k].name} on ${HB_TRACKS[k].planet}</span><b>${r ? `${r.place}${['st', 'nd', 'rd'][r.place - 1] || 'th'}` : i === se.round ? 'NEXT' : ''}</b></div>`; }).join('')}</div>${table.length ? `<p class="shipstats" style="margin-top:8px">Points: ${table.map(([n, p]) => `${n} ${p}`).join(' · ')}</p>` : ''}${se.round ? `<div class="row-btns" style="margin-top:6px"><button class="ghost" data-act="hbreset">Start the season over</button></div>` : ''}</div></div>`;
+  return o;
+}
+{ const _rd7 = renderDock; renderDock = function () { _rd7(); if (G.docked && dockTab === 'hoverbike') $('#tabBody').innerHTML = renderHB(); }; }
+{ const _ea11 = expAct; expAct = function (act, b) {
+  if (act === 'hbbuy') { if (G.hb.owned || G.credits < 4000) return; G.credits -= 4000; G.hb.owned = true; sfx('win'); showComms('Hoverbike garage', 'Your hoverbike is ready! Land on any planet and press Y to ride it. The Grand Prix season starts on Sporeholm: find the start gate and press E. Tip: spin and flip in the air, then land straight, to fill up your boost!'); logAdd(['My hoverbike', 'I built a hoverbike. It floats. It goes VERY fast. I have already crashed it into a mushroom.']); save(); renderDock(); return; }
+  if (act === 'hbset') { G.hb.paint[b.dataset.g] = b.dataset.k; sfx('ui'); save(); renderDock(); return; }
+  if (act === 'hbpart') { const k = b.dataset.k, nx = HB_TIER[G.hb.parts[k] + 1]; if (!nx || !nx.lock() || G.credits < nx.cost) return; G.credits -= nx.cost; G.hb.parts[k]++; sfx('build'); say(`${HB_PARTS[k].name} upgraded to level ${G.hb.parts[k]}!`, 'good'); save(); renderDock(); return; }
+  if (act === 'hbreset') { G.hb.season = { round: 0, pts: {}, results: [] }; sfx('ui'); save(); renderDock(); return; }
+  _ea11(act, b);
+}; }
+
+/* ============ more worlds: Velocity, Petalia and Gloomfen ============ */
+// ---------- Velocity: the hoverbike world ----------
+function veloFlat(x, z) { const d = Math.hypot(x, z); let h = 0.5 + fbm(x * 0.02, z * 0.02) * 0.4; if (d > 380) h += (d - 380) * 0.6 * (0.6 + fbm(x * 0.01, z * 0.01)); return h; }
+const VELO = { id: 'velocity', name: 'Velocity', pos: new V3(-4200, -1500, 1800), R: 520 };
+const VELO_W = nwWorld({ id: 'velocity', brand: 'VELOCITY · SPEEDWAY WORLD', title: 'Explore Velocity', padH: veloFlat(0, 0), hgt: veloFlat, items: [['sun', 6, 0], ['prism', 8, 0]], critterMinH: 0.2, accent: 0xff8a3a, waterY: null, fogFar: 1500,
+  pal: { dayTop: new THREE.Color(0x3a1a6a), dayHor: new THREE.Color(0xff9a6a), setTop: new THREE.Color(0x2a0a4a), setHor: new THREE.Color(0xff5a8a), nightTop: new THREE.Color(0x05020f), nightHor: new THREE.Color(0x2a0a3a), water: new THREE.Color(0x3a8ad8) }, skyLight: 0xffd8f0, groundLight: 0xc8b8a8,
+  night: 'Night on Velocity. The speedway lights glow!', hint: 'WASD walk · Y ride your hoverbike · E start a race at the start gate · F board your ship',
+  color: (x, y, z, ny) => { const n = fbm(x * 0.05, z * 0.05); colr.setRGB(0.92, 0.88, 0.84).multiplyScalar(0.9 + n * 0.2); if (y > 3) colr.setRGB(0.75, 0.42, 0.32).multiplyScalar(0.8 + n * 0.3); if (Math.abs(((x + 2000) % 40) - 20) < 0.4 || Math.abs(((z + 2000) % 40) - 20) < 0.4) colr.multiplyScalar(0.92); },
+  critter: () => { const g = new THREE.Group(), m = smat(0xe8c8a8, 0.7); const b = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 6), m); b.scale.set(1, 0.7, 1.3); b.position.y = 0.4; g.add(b); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.5, 4), m); e.position.set(sx * 0.2, 0.85, -0.3); g.add(e); } return g; }, critN: 8, fauna: { id: 'saltfox', name: 'Salt fox', bonus: 90 },
+  treasure: { name: 'Golden spark plug', col: 0xffd060, at: [[60, 120], [-150, -40], [300, 60], [-60, -300], [180, -250]], make: () => { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0xffd060, metalness: 0.9, roughness: 0.2, emissive: 0x6a4a10, emissiveIntensity: 0.6 }); g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8), m)); const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.3, 6), m); t.position.y = -0.2; g.add(t); return g; } },
+  decor(v) {
+    const tr = HB_TRACKS.velocity, p0 = hbDense(tr)[0], side = new V3(-p0.dir.z, 0, p0.dir.x);
+    for (const s of [-1, 1]) { const gs = new THREE.Group(); for (let r = 0; r < 6; r++) { const step = new THREE.Mesh(new THREE.BoxGeometry(40, 1.4, 3), mStd(0x8a8f9a, 0.4, 0.6)); step.position.set(0, r * 1.4 + 0.7, r * 3); gs.add(step); for (let k = 0; k < 14; k++) { const fan = glowSprite(pick([0xff6fd8, 0x6fd8ff, 0xffd060, 0x7dffb0, 0xffffff]), 1.1); fan.position.set(-19 + k * 2.9, r * 1.4 + 2, r * 3); gs.add(fan); } } gs.position.set(p0.x + side.x * s * 26, 0, p0.z + side.z * s * 26); gs.lookAt(p0.x, 0, p0.z); gs.rotateY(Math.PI); surf.add(gs); }
+    const holo = []; for (let i = 0; i < 8; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(14, 0.5, 6, 40), mGlow(pick([0xff6fd8, 0x6fd8ff, 0xffd060]))); const a = i / 8 * TAU; r.position.set(Math.cos(a) * 120, 40 + (i % 3) * 10, Math.sin(a) * 120); surf.add(r); holo.push(r); } v.holo = holo;
+    const bb = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshBasicMaterial({ map: hvText('VELOCITY SPEEDWAY · GRAND PRIX FINALE', 1024, 512, '#2a0a3a', '#ffd060'), side: THREE.DoubleSide })); bb.position.set(-60, 30, -60); bb.lookAt(0, 30, 0); surf.add(bb); v.bb = bb;
+    const tex = canvasTex(256, 256, (c, w, h) => { c.fillStyle = '#2a0a3a'; c.fillRect(0, 0, w, h); c.fillStyle = '#ffd060'; c.font = 'bold 30px sans-serif'; c.textAlign = 'center'; c.fillText('YOUR FACE', w / 2, 110); c.fillText('HERE?', w / 2, 150); c.font = '18px sans-serif'; c.fillText('Win the Grand Prix!', w / 2, 200); }); v.champTex = tex;
+  },
+  update(dt, v) { v.holo.forEach((r, i) => { r.rotation.y += dt * (0.4 + i * 0.05); r.position.y += Math.sin(T + i) * dt * 2; }); } });
+VELO_W.hgtFn = (x, z) => Math.max(veloFlat(x, z), hbRoadY('velocity', x, z));
+{ const _nh2 = NIMBUS_W.hgtFn; NIMBUS_W.hgtFn = (x, z) => Math.max(_nh2(x, z), hbRoadY('nimbus', x, z)); }
+HB.surfM(VELO_W);
+NW_LOG.velocity = ['Velocity', 'Velocity is a whole planet made for racing. Salt flats, red mesas, a twisting neon speedway in the sky and grandstands full of cheering fans.'];
+// ---------- Petalia: giant flowers and bumblebees ----------
+function petalHgt(x, z) { let h = 6 + fbm(x * 0.005 + 1, z * 0.005 + 7) * 22 + fbm(x * 0.05, z * 0.05) * 1.2; const d = Math.hypot(x, z); if (d < 30) { const k = smooth(30, 15, d); h = h * (1 - k) + 6 * k; } return h; }
+function makeBee(big) { const g = new THREE.Group(), y = smat(0xffc23a, 0.6), k = smat(0x1a1a1a, 0.6); const b = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), y); b.scale.set(0.8, 0.8, 1.2); b.position.y = 1; g.add(b); for (const z of [-0.15, 0.25]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.41, 0.41, 0.14, 12), k); st.rotation.x = Math.PI / 2; st.position.set(0, 1, z); g.add(st); } const wm = new THREE.MeshStandardMaterial({ color: 0xe8f8ff, transparent: true, opacity: 0.6 }); const wings = []; for (const sx of [-1, 1]) { const w = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), wm); w.scale.set(1, 0.1, 0.6); w.position.set(sx * 0.4, 1.4, 0); g.add(w); wings.push(w); } for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 4), mGlow(0x101010)); e.position.set(sx * 0.18, 1.1, -0.5); g.add(e); } g.userData.wings = wings; if (big) g.scale.setScalar(4); return g; }
+const PETAL = { id: 'petal', name: 'Petalia', pos: new V3(2600, -1800, -6800), R: 500 };
+const PETAL_W = nwWorld({ id: 'petal', brand: 'PETALIA · SURFACE', title: 'Explore Petalia', padH: 6, hgt: petalHgt, items: [['lumen', 14, 1], ['ember', 12, 1], ['sun', 4, 2]], critterMinH: 1, accent: 0xffd060, waterY: -1.0, fogFar: 1200,
+  pal: { dayTop: new THREE.Color(0x4a9ae8), dayHor: new THREE.Color(0xfff0c8), setTop: new THREE.Color(0x5a4a9a), setHor: new THREE.Color(0xffb080), nightTop: new THREE.Color(0x050a1a), nightHor: new THREE.Color(0x1a2040), water: new THREE.Color(0x5ac8e8) }, skyLight: 0xfff8e0, groundLight: 0x6a9a4a,
+  night: 'Night on Petalia. The flowers close up and the bees go to sleep.', hint: 'WASD walk · Stand on yellow pollen geysers to fly up · E pick up honey drops · C scan · F board your ship',
+  color: (x, y, z, ny) => { const n = fbm(x * 0.03, z * 0.03); colr.setRGB(0.4, 0.72, 0.3).multiplyScalar(0.85 + n * 0.3); const fl = fbm(x * 0.35 + 5, z * 0.35); if (fl > 0.28) colr.setHex(pick([0xff8ac8, 0xffe060, 0xffffff, 0xb08aff])); if (y < 0) colr.setRGB(0.5, 0.6, 0.4); },
+  critter: () => makeBee(false), critN: 12, fauna: { id: 'bumblebuzz', name: 'Bumblebuzz', bonus: 100 },
+  treasure: { name: 'Golden honey drop', col: 0xffc23a, at: [[-130, 90], [170, 140], [220, -120], [-220, -160], [40, -280]], make: () => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), new THREE.MeshStandardMaterial({ color: 0xffb020, emissive: 0xc87a10, emissiveIntensity: 0.7, roughness: 0.1, transparent: true, opacity: 0.9 })); m.scale.y = 1.3; return m; } },
+  decor(v) {
+    const PC = [0xff6fb0, 0xffd060, 0xffffff, 0xb07bff, 0xff8a3a, 0x6fd8ff]; v.heads = [];
+    for (let i = 0; i < 55; i++) { const a = rand(0, TAU), r = rand(40, 480), x = Math.cos(a) * r, z = Math.sin(a) * r, y = petalHgt(x, z); if (y < 1) continue; const H = rand(10, 30), c = pick(PC), objs = [];
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, H, 8), smat(0x4a9a3a)); st.position.set(x, y + H / 2, z); surf.add(st); objs.push(st);
+      const head = new THREE.Group(); head.position.set(x, y + H, z); head.rotation.x = rand(-0.4, 0.4); head.rotation.z = rand(-0.4, 0.4); const R = H * rand(0.2, 0.32); const pm = smat(c, 0.6); for (let k = 0; k < 8; k++) { const p = new THREE.Mesh(new THREE.SphereGeometry(R * 0.5, 10, 6), pm); p.scale.set(1, 0.18, 0.5); const ka = k / 8 * TAU; p.position.set(Math.cos(ka) * R * 0.6, 0, Math.sin(ka) * R * 0.6); p.rotation.y = -ka; head.add(p); } const ctr = new THREE.Mesh(new THREE.SphereGeometry(R * 0.32, 12, 8), smat(c === 0xffd060 ? 0x8a5a2a : 0xffc23a)); ctr.scale.y = 0.5; head.add(ctr); surf.add(head); objs.push(head); v.heads.push({ head, ph: rand(0, TAU), base: head.rotation.z });
+      S.colliders.push({ x, z, r: 1.2, top: y + H, objs }); }
+    v.geys = []; for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + 0.2, r = 50 + (i % 3) * 40, x = Math.cos(a) * r, z = Math.sin(a) * r, y = petalHgt(x, z); const base = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3, 0.6, 14), smat(0xffd060, 0.5, { emissive: 0xc89a20, emissiveIntensity: 0.5 })); base.position.set(x, y + 0.2, z); surf.add(base); const puffs = []; for (let k = 0; k < 8; k++) { const s = glowSprite(0xffe060, 2); s.position.set(x, y + k * 3, z); surf.add(s); puffs.push(s); } v.geys.push({ x, z, y, puffs }); }
+    const hive = new THREE.Group(), hm = smat(0xe8a830, 0.6, { flatShading: true }); for (let k = 0; k < 6; k++) { const ring = new THREE.Mesh(new THREE.CylinderGeometry(6 - Math.abs(k - 2.5) * 1.3, 6 - Math.abs(k - 2.5 - 1) * 1.3, 2.2, 6), hm); ring.position.y = k * 2.2; hive.add(ring); } const door = new THREE.Mesh(new THREE.CircleGeometry(1.4, 12), mGlow(0x2a1a0a)); door.position.set(0, 3, 5.6); hive.add(door); const hx = -110, hz = 70; hive.position.set(hx, petalHgt(hx, hz), hz); surf.add(hive); S.colliders.push({ x: hx, z: hz, r: 6, top: 14 });
+    const queen = makeBee(true); queen.position.set(hx + 9, petalHgt(hx, hz) + 3, hz + 6); surf.add(queen); v.queen = queen; const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.15, 6), new THREE.MeshStandardMaterial({ color: 0xffd060, metalness: 0.9, roughness: 0.2 })); crown.position.set(0, 1.55, -0.1); queen.add(crown);
+  },
+  update(dt, v) {
+    S.critters.forEach((c, i) => { c.g.position.y += 2 + Math.sin(T * 2 + i) * 0.8; if (c.g.userData.wings) c.g.userData.wings.forEach((w, k) => w.rotation.z = Math.sin(T * 40) * 0.5 * (k ? 1 : -1)); });
+    v.queen.position.y += Math.sin(T * 1.5) * dt; v.queen.userData.wings.forEach((w, k) => w.rotation.z = Math.sin(T * 30) * 0.5 * (k ? 1 : -1));
+    v.heads.forEach(h => h.head.rotation.z = h.base + Math.sin(T * 0.6 + h.ph) * 0.05);
+    v.geys.forEach(g => { g.puffs.forEach((s, k) => { s.position.y += dt * 10; if (s.position.y > g.y + 26) s.position.y = g.y; s.material.opacity = 1 - (s.position.y - g.y) / 26; }); if (G.state === 'surface' && Math.hypot(S.pos.x - g.x, S.pos.z - g.z) < 3 && S.pos.y < g.y + 24) { S.vel.y = Math.max(S.vel.y, 15); S.fuel = Math.min(fuelMax(), S.fuel + 40 * dt); if (!G.nw.geyser) { G.nw.geyser = true; say('FWOOSH! The pollen geyser blows you up into the air!', 'good'); } } });
+  } });
+NW_LOG.petal = ['Petalia', 'Petalia is a meadow where the flowers are taller than houses and the bees are as big as dogs. Very friendly dogs. There is a giant hive with a Queen Bee wearing a tiny crown.'];
+// ---------- Gloomfen: a misty firefly swamp ----------
+const FEN_PADS = []; { let sd = 77; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 150; i++) { const a = rnd() * TAU, r = 30 + Math.sqrt(rnd()) * 420; FEN_PADS.push([Math.cos(a) * r, Math.sin(a) * r, 2.5 + rnd() * 4]); } }
+function fenBase(x, z) { let h = -2.2 + fbm(x * 0.008 + 4, z * 0.008) * 9 + fbm(x * 0.05, z * 0.05) * 0.8; const d = Math.hypot(x, z); if (d < 26) { const k = smooth(26, 14, d); h = h * (1 - k) + 1.2 * k; } return h; }
+function fenHgt(x, z) { let h = fenBase(x, z); if (h < -0.6) for (const [px, pz, r] of FEN_PADS) if (Math.abs(x - px) < r && Math.abs(z - pz) < r && Math.hypot(x - px, z - pz) < r) { h = -0.55; break; } return h; }
+function makeGlowfrog() { const g = new THREE.Group(), m = smat(0x3aa860, 0.5, { emissive: 0x1a5a2a, emissiveIntensity: 0.5 }); const b = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 8), m); b.scale.set(1, 0.7, 1.1); b.position.y = 0.3; g.add(b); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), mGlow(0xffe060)); e.position.set(sx * 0.18, 0.55, -0.25); g.add(e); } const spot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), mGlow(0x7dffb0)); spot.position.set(0, 0.55, 0.1); g.add(spot); return g; }
+const FEN = { id: 'fen', name: 'Gloomfen', pos: new V3(-7000, 600, 4600), R: 480 };
+const FEN_W = nwWorld({ id: 'fen', brand: 'GLOOMFEN · SURFACE', title: 'Explore Gloomfen', padH: 1.2, hgt: fenHgt, items: [['lumen', 14, -0.6], ['prism', 6, 0], ['obs', 6, 0]], critterMinH: -0.6, accent: 0x7dffb0, waterY: -1.0, waterGlow: 0x0a2a1a, fogFar: 520,
+  pal: { dayTop: new THREE.Color(0x3a4a5a), dayHor: new THREE.Color(0x7a8a7a), setTop: new THREE.Color(0x2a2a4a), setHor: new THREE.Color(0x8a6a8a), nightTop: new THREE.Color(0x081420), nightHor: new THREE.Color(0x1a3a30), water: new THREE.Color(0x1a3a2a) }, skyLight: 0xb8d8c8, groundLight: 0x2a3a2a,
+  night: 'Night in Gloomfen. The fireflies come out!', hint: 'WASD walk · Hop across the lily pads · Follow the blue wisps to lost lanterns · E pick up · F board your ship',
+  color: (x, y, z, ny) => { const n = fbm(x * 0.04, z * 0.04); colr.setRGB(0.24, 0.3, 0.18).multiplyScalar(0.8 + n * 0.4); if (y < -0.4 && y > -0.7) colr.setRGB(0.3, 0.6, 0.28); if (y <= -0.7) colr.setRGB(0.15, 0.2, 0.14); },
+  critter: makeGlowfrog, critN: 14, fauna: { id: 'glowfrog', name: 'Glowfrog', bonus: 105 },
+  treasure: { name: 'Lost lantern', col: 0xffd060, at: [[120, 80], [-160, 120], [-90, -200], [240, -150], [30, 300]], make: () => { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.5), new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffb030, emissiveIntensity: 1, transparent: true, opacity: 0.85 }))); const cap = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.3, 4), smat(0x3a2a1a)); cap.position.y = 0.5; cap.rotation.y = Math.PI / 4; g.add(cap); return g; } },
+  decor(v) {
+    const padM = smat(0x3a9a40, 0.7); FEN_PADS.forEach(([x, z, r]) => { if (fenBase(x, z) >= -0.6) return; const p = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.15, 18, 1, false, 0.3, TAU - 0.5), padM); p.position.set(x, -0.6, z); surf.add(p); if (Math.random() < 0.25) { const fl = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), smat(0xffb0e0, 0.5, { emissive: 0xff6fd8, emissiveIntensity: 0.5 })); fl.position.set(x + r * 0.4, -0.3, z); surf.add(fl); } });
+    const bark = smat(0x2a2218, 0.9); for (let i = 0; i < 45; i++) { const a = rand(0, TAU), r = rand(40, 460), x = Math.cos(a) * r, z = Math.sin(a) * r, y = fenBase(x, z); if (y < -0.3) continue; const g = new THREE.Group(), objs = [g]; let px = 0, py = 0, pz = 0; for (let k = 0; k < 4; k++) { const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.4 - k * 0.08, 0.55 - k * 0.08, 5, 6), bark); const lean = rand(-0.4, 0.4), lz = rand(-0.4, 0.4); seg.position.set(px, py + 2.5, pz); seg.rotation.set(lz, 0, lean); g.add(seg); px += -Math.sin(lean) * 5; py += Math.cos(lean) * 4.6; pz += Math.sin(lz) * 5; } for (let k = 0; k < 5; k++) { const moss = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.02, rand(2, 4), 4), smat(0x6a8a4a)); moss.position.set(px + rand(-2, 2), py - 1.5, pz + rand(-2, 2)); g.add(moss); } g.position.set(x, y, z); surf.add(g); S.colliders.push({ x, z, r: 0.8, top: y + 12, objs }); }
+    for (let i = 0; i < 40; i++) { const a = rand(0, TAU), r = rand(20, 400), x = Math.cos(a) * r, z = Math.sin(a) * r, y = fenBase(x, z); if (y < -0.3) continue; const m = new THREE.Mesh(new THREE.SphereGeometry(rand(0.3, 0.7), 10, 6, 0, TAU, 0, Math.PI / 2), smat(0x6fd8ff, 0.5, { emissive: 0x2a8aff, emissiveIntensity: 0.9 })); m.position.set(x, y + 0.3, z); surf.add(m); }
+    v.flies = []; for (let i = 0; i < 160; i++) { const s = glowSprite(pick([0xd8ff6a, 0xffe060, 0x9fff9f]), 0.5); const h = new V3(rand(-250, 250), rand(0.5, 6), rand(-250, 250)); s.position.copy(h); surf.add(s); v.flies.push({ s, h, ph: rand(0, TAU), sp: rand(0.4, 1.2) }); }
+    v.mist = []; for (let i = 0; i < 40; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xc8e0d0, map: TEX_GLOW, transparent: true, opacity: 0.25, depthWrite: false })); s.scale.set(rand(30, 70), rand(5, 10), 1); s.position.set(rand(-300, 300), rand(0, 3), rand(-300, 300)); surf.add(s); v.mist.push(s); }
+    v.wisps = v.tr.length ? [] : []; v.wispObjs = []; for (let i = 0; i < 5; i++) { const w = glowSprite(0x6fd8ff, 2.2); surf.add(w); v.wispObjs.push(w); }
+    const frog = new THREE.Group(), stone = smat(0x5a6a5a, 0.9, { flatShading: true }); const body = new THREE.Mesh(new THREE.SphereGeometry(6, 14, 10), stone); body.scale.set(1.2, 0.8, 1.1); frog.add(body); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(1.8, 10, 8), stone); e.position.set(sx * 3, 4.5, -3.5); frog.add(e); const pu = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 6), mGlow(0xffe060)); pu.position.set(sx * 3, 4.8, -5); frog.add(pu); } const fx = 60, fz = -90; frog.position.set(fx, -1.5, fz); frog.rotation.y = 0.5; surf.add(frog); S.colliders.push({ x: fx, z: fz, r: 7, top: 6 });
+  },
+  update(dt, v) {
+    const n = 0.3 + S.night * 0.7;
+    v.flies.forEach(f => { f.s.position.set(f.h.x + Math.sin(T * f.sp + f.ph) * 3, f.h.y + Math.sin(T * f.sp * 1.7 + f.ph) * 1, f.h.z + Math.cos(T * f.sp * 0.8 + f.ph) * 3); f.s.material.opacity = n * (0.5 + Math.sin(T * 3 + f.ph) * 0.5); });
+    v.mist.forEach((m, i) => { m.position.x += dt * (1 + i % 3); if (m.position.x > 300) m.position.x = -300; });
+    const got = G.nw.tr.fen || []; v.wispObjs.forEach((w, i) => { const t = v.tr[i]; if (!t || got.includes(t.i)) { w.visible = false; return; } w.visible = true; const d = Math.hypot(S.pos.x - t.x, S.pos.z - t.z), k = clamp(1 - d / 400, 0.15, 0.97), x = S.pos.x + (t.x - S.pos.x) * k, z = S.pos.z + (t.z - S.pos.z) * k; w.position.set(x + Math.sin(T * 2 + i) * 2, Math.max(fenHgt(x, z), -0.6) + 2.5 + Math.sin(T * 3 + i) * 0.5, z); });
+  } });
+NW_LOG.fen = ['Gloomfen', 'Gloomfen is a foggy swamp with lily pads as big as trampolines and frogs that glow. Little blue wisps float around like they want me to follow them. So I did.'];
+const MORE_WORLDS = [VELO_W, PETAL_W, FEN_W];
+MORE_WORLDS.forEach(w => NW_WORLDS.push(w));
+NW_INFO.push([VELO, ['#e8d8c8', '255,240,220', '160,90,70'], null, 0xff8a3a], [PETAL, ['#6ab84a', '255,220,120', '40,100,40'], [33, '255,255,255', 0.4], null], [FEN, ['#2a4a3a', '120,180,120', '20,30,25'], [61, '200,230,210', 0.6], null]);
+NW_INFO.slice(-3).forEach(([def, tex, cl, ring]) => nwPlanet(def, tex, cl, ring));
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
   if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
@@ -10558,7 +10987,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel' && G.state !== 'starmap' && G.state !== 'zoopanel' && G.state !== 'elev' && G.state !== 'robopuz';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel' && G.state !== 'starmap' && G.state !== 'zoopanel' && G.state !== 'elev' && G.state !== 'robopuz' && G.state !== 'hbres';
   const onSurf = renderScene !== scene;
   if (running) {
     T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt); expTick(dt); citySim(dt); dvTick(dt);
