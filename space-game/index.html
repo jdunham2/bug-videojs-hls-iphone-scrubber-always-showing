@@ -567,6 +567,19 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 #hbRes header { padding: 18px 22px 12px; border-bottom: 1px solid var(--line); } #hbRes header h2 { margin: 4px 0 0; font-family: var(--display); font-size: 24px; }
 #hbRes header .eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: #ffd060; }
 .hb-table { display: grid; gap: 3px; } .hb-table div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 8px; border-radius: 4px; background: rgba(255,255,255,.04); font-size: 13px; } .hb-table div.me { background: rgba(255,208,96,.14); color: #ffd060; }
+#coop .panel { width: min(640px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(8px); margin-block: 24px; }
+#coop header { display: flex; justify-content: space-between; align-items: start; padding: 18px 22px 12px; border-bottom: 1px solid var(--line); } #coop header h2 { margin: 4px 0 0; font-family: var(--display); font-size: 26px; }
+#coop header .eyebrow { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: #7dffb0; }
+#coop { z-index: 40; }
+.coop-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; } .coop-choice > div { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: grid; gap: 8px; align-content: start; } .coop-choice h4 { margin: 0; }
+#coopCode { font: 600 22px var(--display); letter-spacing: .3em; text-transform: uppercase; text-align: center; padding: 8px; background: rgba(0,0,0,.3); color: #fff; border: 1px solid var(--line); border-radius: 4px; width: 100%; box-sizing: border-box; }
+.coop-code { font: 700 46px var(--display); letter-spacing: .3em; text-align: center; color: #7dffb0; margin: 6px 0 10px; }
+.coop-msg { color: #ffb090; }
+@media (max-width: 560px) { .coop-choice { grid-template-columns: 1fr; } }
+#coopHud { position: fixed; left: 16px; bottom: 120px; z-index: 6; background: rgba(8,20,16,.78); border: 1px solid rgba(125,255,176,.45); border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #dff8ea; line-height: 1.6; pointer-events: none; max-width: min(320px, calc(100vw - 32px)); }
+.coop-bad { color: #ff8a6a; font-weight: 600; }
+#coopCross { position: fixed; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 2px solid #7dffb0; border-radius: 50%; z-index: 6; pointer-events: none; box-shadow: 0 0 10px rgba(125,255,176,.6); }
+#coopCross::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #7dffb0; border-radius: 50%; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -664,6 +677,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
     </div>
     <div class="row-btns">
       <button class="btn" id="startBtn">Launch</button>
+      <button class="ghost" id="coopTitleBtn">Play with a friend</button>
       <button class="ghost" id="resetBtn" hidden>New pilot</button>
       <small id="saveNote" style="color:var(--dim)"></small>
     </div>
@@ -739,6 +753,8 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
 <div id="fbHud" hidden></div>
+<div id="coopHud" hidden></div><div id="coopCross" hidden></div>
+<div class="overlay" id="coop" hidden><div class="panel"><header><div><div class="eyebrow">Online co-op</div><h2>Fly together</h2></div><button class="ghost" id="coopClose">Close</button></header><div class="tabbody" id="coopBody"></div></div></div>
 <div id="hbHud" hidden><div class="hb-pos" id="hbPos">1st</div><div class="hb-info" id="hbInfo"></div></div><div id="hbTrick" hidden></div><div id="hbCount" hidden></div>
 <div class="overlay" id="hbRes" hidden><div class="panel"><header><div class="eyebrow" id="hbResEye">Grand Prix</div><h2 id="hbResTitle"></h2></header><div class="tabbody" id="hbResBody"></div><div style="padding:0 22px 18px;text-align:right"><button class="btn" id="hbResOk">Continue</button></div></div></div>
 <div id="tac" hidden><canvas id="tacCv" aria-label="Tactical map of Starhold and the battle"></canvas><div class="tac-side"><div style="font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#7dffb0">Tactical map</div><h3>Starhold fleet</h3><div id="tacStatus"></div><p class="tac-help">Orders for the selected ships:</p><div class="tac-orders"><button class="btn" data-tac="follow">Follow me</button><button class="btn" data-tac="defend">Defend</button><button class="btn" data-tac="attack">Attack</button></div><div class="row-btns"><button class="ghost" id="tacAll">Select all</button></div><div id="tacList"></div><p class="tac-help">Click ships on the map or in the list to select them. Click a red pirate to send the selected ships after it. Shift-click to pick more than one.</p><button class="ghost" id="tacClose">Back to my ship (O)</button></div></div>
@@ -788,6 +804,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
     <h2>Paused</h2>
     <p>Your progress saves every time you dock.</p>
     <button class="btn" id="resumeBtn">Resume</button>
+    <button class="ghost" id="coopPauseBtn">Co-op with a friend</button>
   </div>
 </div>
 
@@ -1438,7 +1455,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyG' && G.state === 'surface' && !e.repeat) petInteract();
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'hbres') { $('#hbRes').hidden = true; setState('surface'); } else if (G.state === 'tactical') closeTac(); else if (G.state === 'robopuz') closeRobPuz(); else if (G.state === 'zoopanel') closeZooPanel(); else if (G.state === 'starmap') closeStarMap(); else if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (!$('#coop').hidden) closeCoop(); else if (G.state === 'turret') exitTurret(); else if (G.state === 'hbres') { $('#hbRes').hidden = true; setState('surface'); } else if (G.state === 'tactical') closeTac(); else if (G.state === 'robopuz') closeRobPuz(); else if (G.state === 'zoopanel') closeZooPanel(); else if (G.state === 'starmap') closeStarMap(); else if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -10948,6 +10965,234 @@ const MORE_WORLDS = [VELO_W, PETAL_W, FEN_W];
 MORE_WORLDS.forEach(w => NW_WORLDS.push(w));
 NW_INFO.push([VELO, ['#e8d8c8', '255,240,220', '160,90,70'], null, 0xff8a3a], [PETAL, ['#6ab84a', '255,220,120', '40,100,40'], [33, '255,255,255', 0.4], null], [FEN, ['#2a4a3a', '120,180,120', '20,30,25'], [61, '200,230,210', 0.6], null]);
 NW_INFO.slice(-3).forEach(([def, tex, cl, ring]) => nwPlanet(def, tex, cl, ring));
+
+/* ============ online co-op: one flies, one crews the ship ============ */
+const COOP = { ns: null, r: null, role: null, code: '', pilot: null, pilotT: 0, crew: null, lastFix: {}, fix: { engine: 0, shield: 0, weapons: 0, hull: 0 }, prog: {}, broken: {}, cid: 0, sendT: 0, fireT: 0, ghosts: new Map(), ghostShip: null, ghostKey: '', at: 'in', saved: null, tur: null, lastHull: null, lastKills: null, msg: '', lostT: 0 };
+const COOP_SYS = { engine: { name: 'Engine', fx: 'The ship is slow' }, shield: { name: 'Shield generator', fx: 'Shields will not recharge' }, weapons: { name: 'Weapons', fx: 'The main guns fire slowly' }, hull: { name: 'Hull', fx: 'Air is leaking, the hull is slowly getting worse' } };
+try { if (window.claude && window.claude.use) window.claude.use('room').then(ns => { COOP.ns = ns; if (!$('#coop').hidden) renderCoop(); }).catch(() => {}); } catch (e) {}
+const rd1 = v => Math.round(v * 10) / 10, rd3 = v => Math.round(v * 1000) / 1000;
+// ---- the co-op panel ----
+function openCoop() { $('#coop').hidden = false; renderCoop(); sfx('ui'); }
+function closeCoop() { $('#coop').hidden = true; }
+function renderCoop() {
+  const b = $('#coopBody'); let h = '';
+  if (!COOP.ns) h = `<p>Co-op connects you with a friend who has this game open at the same time. It works when the game is opened on claude.ai while signed in, and your friend has been given access to it (Share menu → invite them). Right now this copy of the game cannot connect.</p>`;
+  else if (!COOP.role) h = `<p>Play together in the same ship! One of you is the <b>pilot</b> and flies. The other is the <b>crew</b>: walk around inside the ship, fix machines when pirates break them, and jump into the two extra gun turrets to shoot.</p>
+    <div class="coop-choice"><div><h4>Be the pilot</h4><p class="shipstats">You fly. You get a crew code to give to your friend.</p><button class="btn" id="coopPilot">Be the pilot</button></div>
+    <div><h4>Join a friend's ship</h4><p class="shipstats">Type the 4-letter crew code from your friend.</p><input id="coopCode" maxlength="4" placeholder="CODE" aria-label="Crew code" autocomplete="off"><button class="btn" id="coopJoin">Join as crew</button></div></div>`;
+  else if (COOP.role === 'pilot') h = `<p>You are the <b>pilot</b>. Give your friend this crew code:</p><div class="coop-code">${COOP.code}</div><p>${COOP.crew ? `✅ Your crewmate is aboard: ${coopWhere(COOP.crew)}.` : '⏳ Waiting for your crewmate to join...'}</p><p class="shipstats">When pirates hit your ship, machines can break (engine, shields, weapons, hull). Your crewmate fixes them. Fly into a fight so they can use the turrets!</p><div class="row-btns"><button class="ghost" id="coopLeave">Leave co-op</button></div>`;
+  else h = `<p>You are the <b>crew</b> on ship <b>${COOP.code}</b>.</p><p>${COOP.pilot ? `✅ Connected to your pilot. ${coopPilotWhere()}` : '⏳ Looking for the pilot... make sure they chose "Be the pilot" with this code.'}</p><div class="row-btns">${COOP.pilot && W !== SHIP_W && G.state !== 'turret' ? '<button class="btn" id="coopBoard">Go aboard the ship</button>' : ''}<button class="ghost" id="coopLeave">Leave co-op</button></div>`;
+  b.innerHTML = h + (COOP.msg ? `<p class="coop-msg"></p>` : ''); if (COOP.msg) b.querySelector('.coop-msg').textContent = COOP.msg;
+}
+function coopWhere(c) { return c.at === 'tL' ? 'in the left gun turret' : c.at === 'tR' ? 'in the right gun turret' : 'walking around inside the ship'; }
+function coopPilotWhere() { const p = COOP.pilot; if (!p) return ''; return p.st === 'fly' ? 'The pilot is flying in space.' : p.st === 'docked' ? `The pilot is docked${p.loc ? ' at ' + p.loc : ''}.` : p.st === 'surface' ? 'The pilot is out exploring on foot.' : 'The pilot is busy.'; }
+$('#coopBody').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && e.target.id === 'coopCode') coopJoin(); });
+$('#coopBody').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.id === 'coopPilot') coopHost(); if (b.id === 'coopJoin') coopJoin(); if (b.id === 'coopLeave') coopLeave(); if (b.id === 'coopBoard') { closeCoop(); crewBoard(); } });
+$('#coopClose').addEventListener('click', closeCoop);
+async function coopRoom(code) {
+  try { const r = await COOP.ns.join('ember-crew-' + code.toLowerCase()); COOP.r = r; COOP.code = code; COOP.msg = ''; return true; }
+  catch (e) { COOP.msg = 'Could not connect right now. Try again in a moment.'; renderCoop(); return false; }
+}
+async function coopHost() {
+  const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let code = ''; for (let i = 0; i < 4; i++) code += L[Math.floor(Math.random() * L.length)];
+  if (!await coopRoom(code)) return; COOP.role = 'pilot'; COOP.broken = {}; COOP.lastFix = {}; sfx('win'); renderCoop();
+  logAdd(['A crewmate!', `I opened my ship to a friend. Crew code ${code}. Two people, one ship, a lot of pirates.`]);
+}
+async function coopJoin() {
+  const code = (($('#coopCode') || {}).value || '').toUpperCase().replace(/[^A-Z]/g, ''); if (code.length !== 4) { COOP.msg = 'The crew code has 4 letters.'; renderCoop(); return; }
+  if (!await coopRoom(code)) return; COOP.role = 'crew'; COOP.fix = { engine: 0, shield: 0, weapons: 0, hull: 0 }; COOP.at = 'in'; COOP.pilotT = performance.now(); sfx('win'); renderCoop();
+}
+function coopLeave() {
+  const wasCrew = COOP.role === 'crew'; try { COOP.r && COOP.r.leave(); } catch (e) {} COOP.r = null; COOP.role = null; COOP.pilot = null; COOP.crew = null; COOP.broken = {};
+  coopClearGhosts(); if (COOP.tur) { Object.values(COOP.tur).forEach(g => g.parent && g.parent.remove(g)); COOP.tur = null; } $('#coopHud').hidden = true;
+  if (wasCrew && (W === SHIP_W || G.state === 'turret')) { renderScene = scene; applyBloom(false); camera.near = shipNear(); camera.fov = 68; camera.updateProjectionMatrix(); dock(stationById(G.lastDock || 'haven')); }
+  renderCoop(); sfx('ui');
+}
+// ---- the network tick ----
+function coopPeer(role) { if (!COOP.r) return null; try { const p = COOP.r.peers().find(q => !q.isMe && q.presence && q.presence.role === role); return p ? p.presence : null; } catch (e) { return null; } }
+function coopNet(dt) {
+  if (!COOP.r) return;
+  if ((COOP.sendT -= dt) <= 0) { COOP.sendT = 1 / 15; try { COOP.r.presence(COOP.role === 'pilot' ? coopPilotSnap() : coopCrewSnap()); } catch (e) {} }
+  if (COOP.role === 'pilot') {
+    const c = coopPeer('crew'), had = !!COOP.crew; COOP.crew = c;
+    if (c && !had) { say('Your crewmate came aboard! They can fix machines and use the gun turrets.', 'good'); sfx('ring'); if (!$('#coop').hidden) renderCoop(); }
+    if (!c && had) { say('Your crewmate left the ship.', 'bad'); COOP.broken = {}; if (!$('#coop').hidden) renderCoop(); }
+    if (c && c.fix) for (const k of Object.keys(COOP_SYS)) { const n = +c.fix[k] || 0; if (COOP.lastFix[k] === undefined) COOP.lastFix[k] = n; if (n > COOP.lastFix[k]) { COOP.lastFix[k] = n; if (COOP.broken[k]) { delete COOP.broken[k]; sfx('win'); say(`Your crewmate fixed the ${COOP_SYS[k].name}!`, 'good'); } } }
+  } else {
+    const p = coopPeer('pilot');
+    if (p) { const first = !COOP.pilot; COOP.pilot = p; COOP.lostT = 0; if (first) { say('Connected to your pilot! Press Esc → Co-op → "Go aboard the ship".', 'good'); if (!$('#coop').hidden) renderCoop(); } }
+    else if (COOP.pilot) { COOP.lostT += dt; if (COOP.lostT > 6) { COOP.pilot = null; say('Lost contact with the pilot...', 'bad'); if (G.state === 'turret') exitTurret(); if (!$('#coop').hidden) renderCoop(); } }
+    if (COOP.pilot) { const k = COOP.pilot.kills, aboard = W === SHIP_W || G.state === 'turret'; if (aboard && COOP.lastKills !== null && k > COOP.lastKills) { const n = k - COOP.lastKills; G.credits += 40 * n; say(`Pirate down! +${40 * n} cr crew share`, 'good'); } COOP.lastKills = k;
+      const hp = COOP.pilot.hull; if (COOP.lastHull !== null && hp < COOP.lastHull - 0.5 && (W === SHIP_W || G.state === 'turret')) { sfx('hit'); shake = Math.min(1, shake + 0.4); flashDamage(); } COOP.lastHull = hp; }
+  }
+  coopHud();
+}
+function coopPilotSnap() {
+  const near = enemies.filter(e => e.obj && e.obj.position.distanceTo(player.position) < 3500).slice(0, 16);
+  const en = near.map(e => { if (!e._cid) e._cid = ++COOP.cid; const p = e.obj.position, q = e.obj.quaternion; return [e._cid, e.kind === 'dread' ? 'd' : e.kind === 'battleship' ? 'b' : e.heavy ? 'h' : 'r', rd1(p.x), rd1(p.y), rd1(p.z), rd3(q.x), rd3(q.y), rd3(q.z), rd3(q.w), Math.round(e.hp / e.maxHp * 100)]; });
+  const p = player.position, q = player.quaternion;
+  return { role: 'pilot', st: G.state, sys: G.sys, ship: G.ship, sr: rd1(P.r), p: [rd1(p.x), rd1(p.y), rd1(p.z)], q: [rd3(q.x), rd3(q.y), rd3(q.z), rd3(q.w)], hull: Math.round(G.hull), hm: Math.round(D.maxHull), sh: Math.round(G.shield), sm: Math.round(D.maxShield), br: Object.keys(COOP.broken), kills: G.stats.kills, loc: G.docked ? G.docked.name : '', en };
+}
+function coopCrewSnap() { const aim = COOP.aim || new V3(0, 0, -1); return { role: 'crew', at: G.state === 'turret' ? COOP.at : 'in', aim: [rd3(aim.x), rd3(aim.y), rd3(aim.z)], fire: G.state === 'turret' && (mouse.down || keys.Space) ? 1 : 0, fix: COOP.fix }; }
+{ const _et5 = expTick; expTick = function (dt) { _et5(dt); coopNet(dt); }; }
+// ---- pilot: things break, turrets on the hull ----
+{ const _dp = damagePlayer; damagePlayer = function (amt) { _dp(amt); if (COOP.role === 'pilot' && COOP.crew && G.hull > 0 && Math.random() < 0.22) { const ok = Object.keys(COOP_SYS).filter(k => !COOP.broken[k]); if (ok.length) { const k = pick(ok); COOP.broken[k] = true; sfx('fail'); say(`⚠ ${COOP_SYS[k].name.toUpperCase()} DAMAGED! ${COOP_SYS[k].fx}. Your crewmate can fix it.`, 'bad'); } } }; }
+{ const ms = Object.getOwnPropertyDescriptor(D, 'maxSpeed'), fd = Object.getOwnPropertyDescriptor(D, 'fireDelay');
+  Object.defineProperty(D, 'maxSpeed', { configurable: true, get() { return ms.get.call(D) * (COOP.broken.engine ? 0.55 : 1); } });
+  Object.defineProperty(D, 'fireDelay', { configurable: true, get() { return fd.get.call(D) * (COOP.broken.weapons ? 2.2 : 1); } }); }
+const COOP_MOUNT = { tL: new V3(-0.62, 0.38, 0.05), tR: new V3(0.62, 0.38, 0.05) };
+function coopTurretModel(sr) { const g = new THREE.Group(), M = mStd(0x8a8f9a, 0.6, 0.4); g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 0.5, 10), M)); const head = new THREE.Group(); head.position.y = 0.6; g.add(head); head.add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), M)); for (const sx of [-0.2, 0.2]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.8, 6), mStd(0x2a2c34)); b.rotation.x = Math.PI / 2; b.position.set(sx, 0, -0.9); head.add(b); } const tip = glowSprite(0x7dffb0, 0.8); tip.position.set(0, 0, -1.9); head.add(tip); g.userData.head = head; g.scale.setScalar(Math.max(1, sr * 0.22)); return g; }
+function coopPilotTick(dt) {
+  if (COOP.role !== 'pilot') return;
+  if (COOP.crew) {
+    if (!COOP.tur || COOP.tur.sr !== P.r) { if (COOP.tur) Object.values(COOP.tur).forEach(g => g.isObject3D && g.parent && g.parent.remove(g)); COOP.tur = { tL: coopTurretModel(P.r), tR: coopTurretModel(P.r), sr: P.r }; }
+    for (const k of ['tL', 'tR']) { const g = COOP.tur[k]; if (g.parent !== player) player.add(g); g.position.copy(COOP_MOUNT[k]).multiplyScalar(P.r); const c = COOP.crew; if (c.at === k && c.aim) { const ld = new V3(c.aim[0], c.aim[1], c.aim[2]).applyQuaternion(player.quaternion.clone().invert()).normalize(); g.userData.head.quaternion.slerp(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, -1), ld), Math.min(1, dt * 10)); } }
+    const c = COOP.crew; COOP.fireT -= dt;
+    if (G.state === 'fly' && c.fire && (c.at === 'tL' || c.at === 'tR') && c.aim && COOP.fireT <= 0) { COOP.fireT = 0.16; const from = player.localToWorld(COOP_MOUNT[c.at].clone().multiplyScalar(P.r).add(new V3(0, P.r * 0.12, 0))), dir = new V3(c.aim[0], c.aim[1], c.aim[2]).normalize(); FBV.dummy.position.copy(from); orientTo(FBV.dummy, from.clone().add(dir)); fireBolt(from, FBV.dummy.quaternion, P.vel, 'player', D.dmg * 0.9, new V3(0, 0, -2)); sfx('laser', 0.3); }
+  } else if (COOP.tur) { Object.values(COOP.tur).forEach(g => g.isObject3D && g.parent && g.parent.remove(g)); COOP.tur = null; }
+  if (COOP.broken.shield) G.lastHit = T;
+  if (COOP.broken.hull && G.state === 'fly' && G.hull > 5) G.hull -= 1.5 * dt;
+}
+// ---- crew: the pilot's ship, seen from a gun turret ----
+function coopClearGhosts() { COOP.ghosts.forEach(g => scene.remove(g.obj)); COOP.ghosts.clear(); if (COOP.ghostShip) scene.remove(COOP.ghostShip); COOP.ghostShip = null; COOP.ghostKey = ''; }
+function coopGhostModel(k) { let g; if (k === 'b' || k === 'd') g = armBig(k === 'd'); else { g = new THREE.Group(); const f = makeFighter(k === 'h' ? STYLE_PIRATE_HEAVY : STYLE_PIRATE); g.add(f); g.userData.engines = f.userData.engines; } const mk = glowSprite(0xff3a2a, k === 'b' || k === 'd' ? 60 : 22); mk.material.opacity = 0.55; g.add(mk); return g; }
+function coopCrewTick(dt) {
+  if (COOP.role !== 'crew' || !COOP.pilot) return; const p = COOP.pilot;
+  for (const e of enemies.slice()) removeEnemy(e);
+  if (p.sys && p.sys !== G.sys && SYS[p.sys]) setSystem(p.sys);
+  if (!COOP.ghostShip || COOP.ghostKey !== p.ship) { if (COOP.ghostShip) scene.remove(COOP.ghostShip); const sh = SHIPS[p.ship] || SHIPS.lancer; COOP.ghostShip = sh.make(); COOP.ghostKey = p.ship; scene.add(COOP.ghostShip); COOP.ghostShip.position.set(p.p[0], p.p[1], p.p[2]); for (const k of ['tL', 'tR']) { const t = coopTurretModel(p.sr); t.position.copy(COOP_MOUNT[k]).multiplyScalar(p.sr); COOP.ghostShip.add(t); COOP.ghostShip.userData['tur' + k] = t; } }
+  const gs = COOP.ghostShip; gs.visible = p.st === 'fly' || p.st === 'warp' || p.st === 'descent';
+  gs.position.lerp(tmp.set(p.p[0], p.p[1], p.p[2]), Math.min(1, dt * 12)); gs.quaternion.slerp(new THREE.Quaternion(p.q[0], p.q[1], p.q[2], p.q[3]), Math.min(1, dt * 12));
+  if (gs.userData.engines) gs.userData.engines.forEach(s => s.scale.setScalar(4 + Math.random()));
+  player.position.copy(gs.position); player.quaternion.copy(gs.quaternion);
+  const seen = new Set();
+  (p.en || []).forEach(a => { const [id, k, x, y, z, qx, qy, qz, qw] = a; seen.add(id); let g = COOP.ghosts.get(id); if (!g) { const o = coopGhostModel(k); o.position.set(x, y, z); scene.add(o); g = { obj: o, k }; COOP.ghosts.set(id, g); } g.obj.position.lerp(tmp.set(x, y, z), Math.min(1, dt * 10)); g.obj.quaternion.slerp(new THREE.Quaternion(qx, qy, qz, qw), Math.min(1, dt * 10)); if (g.obj.userData.engines) g.obj.userData.engines.forEach(s => s.scale.setScalar((k === 'b' || k === 'd' ? 7 : 4) + Math.random())); });
+  COOP.ghosts.forEach((g, id) => { if (!seen.has(id)) { if (g.obj.position.distanceTo(gs.position) < 3000) { explode(g.obj.position, g.k === 'b' || g.k === 'd' ? 3 : 1.2); sfx('boom', 0.6); } scene.remove(g.obj); COOP.ghosts.delete(id); } });
+  if (G.state === 'turret') {
+    if (p.st !== 'fly') { exitTurret(); say('The pilot stopped flying, so you climb back down into the ship.'); return; }
+    const t = gs.userData['tur' + COOP.at]; COOP.yaw = clamp(-mouse.x * 2.6, -2.6, 2.6); COOP.pitch = clamp(-mouse.y * 1.1, -0.5, 1.1);
+    const look = new THREE.Quaternion().setFromEuler(new THREE.Euler(COOP.pitch, COOP.yaw, 0, 'YXZ')); COOP.camQ = gs.quaternion.clone().multiply(look); COOP.aim = new V3(0, 0, -1).applyQuaternion(COOP.camQ);
+    if (t) t.userData.head.quaternion.copy(look);
+    COOP.fireT -= dt; if ((mouse.down || keys.Space) && COOP.fireT <= 0) { COOP.fireT = 0.16; const from = gs.localToWorld(COOP_MOUNT[COOP.at].clone().multiplyScalar(p.sr).add(new V3(0, p.sr * 0.12, 0))); FBV.dummy.position.copy(from); orientTo(FBV.dummy, from.clone().add(COOP.aim)); fireBolt(from, FBV.dummy.quaternion, new V3(), 'npc', 0, new V3(0, 0, -2)); sfx('laser', 0.3); }
+  }
+}
+{ const _ub13 = updateBoss; updateBoss = function (dt) { _ub13(dt); coopPilotTick(dt); coopCrewTick(dt); }; }
+{ const _uc2 = updateCamera; updateCamera = function (dt) {
+  if (G.state === 'turret' && COOP.ghostShip && COOP.pilot) { const p = COOP.pilot, gs = COOP.ghostShip, pos = gs.localToWorld(COOP_MOUNT[COOP.at].clone().multiplyScalar(p.sr).add(new V3(0, p.sr * 0.12 + Math.max(1.2, p.sr * 0.3), 0))); camera.position.copy(pos); if (COOP.camQ) camera.quaternion.copy(COOP.camQ); if (shake > 0) { camera.position.add(randDir().multiplyScalar(shake)); shake = Math.max(0, shake - dt * 2.5); } camPos.copy(camera.position); return; }
+  _uc2(dt);
+}; }
+function enterTurret(side) {
+  if (!COOP.pilot || COOP.pilot.st !== 'fly') { say('The guns only work while the pilot is flying in space. Tell your pilot to undock!', 'bad'); return; }
+  COOP.saved = S.pos.clone(); COOP.at = side; COOP.fireT = 0; COOP.turT = performance.now(); $('#comms').hidden = true;
+  renderScene = scene; applyBloom(false); camera.near = 0.5; camera.fov = 70; camera.updateProjectionMatrix(); setState('turret'); $('#coopCross').hidden = false; sfx('ui');
+  say(`You climb into the ${side === 'tL' ? 'left' : 'right'} gun turret! Move the mouse to aim, hold the mouse button (or Space) to shoot. E or Esc to climb back down.`, 'good');
+}
+function exitTurret() {
+  if (G.state !== 'turret') return; renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 62; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); $('#coopCross').hidden = true;
+  if (COOP.saved) S.pos.copy(COOP.saved); S.vel.set(0, 0, 0); setState('surface'); updateSurfCamera(1); COOP.at = 'in';
+}
+addEventListener('keydown', e => { if (G.state === 'turret' && e.code === 'KeyE' && !e.repeat && performance.now() - (COOP.turT || 0) > 400) exitTurret(); });
+// ---- the inside of the ship ----
+const SHIP_W = { id: 'shipint', interior: true, brand: 'CO-OP · INSIDE THE SHIP', title: 'Inside the ship', scene: new THREE.Scene(), pad: { x: 0, z: 0 }, padH: 0, hgtFn: () => 0, itemPlan: [], critterMinH: 99, bob: false, buildable: false,
+  pal: HAVEN_W.pal, nightMsg: 'The ship hums quietly.', hint: 'WASD walk · E fix broken machines and climb into the gun turrets · Esc menu',
+  bounds(p) { p.x = clamp(p.x, -9.2, 9.2); p.z = clamp(p.z, -19.2, 19.2); if (p.y > 3) { p.y = 3; S.vel.y = Math.min(0, S.vel.y); } },
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+WORLDS.shipint = SHIP_W;
+const SI = { cons: {}, ladders: {}, alarms: [], stars: null, pilot: null, fires: [] };
+const SI_CONS = { engine: [5.5, 13], shield: [-7, -5], weapons: [-7, 6], hull: [7, -5] }, SI_LAD = { tL: [-8.3, 15.5], tR: [8.3, 15.5] };
+function buildShipInt() {
+  if (S.built) return; S.built = true;
+  surf.fog = new THREE.Fog(0x10121a, 30, 120); surf.background = new THREE.Color(0x0a0c12);
+  const sky = makeSkyDome(0x10121a, 0x10121a); sky.visible = false; surf.add(sky); S.sky = sky;
+  S.sun = new THREE.DirectionalLight(0xfff4e8, 0.5); S.sun.position.set(0.2, 1, 0.3); surf.add(S.sun); S.hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a3440, 1); surf.add(S.hemi); S.moonLight = new THREE.DirectionalLight(0x6fd8ff, 0); surf.add(S.moonLight);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), smat(0x000000)); water.visible = false; surf.add(water); S.water = water;
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; };
+  const tile = canvasTex(128, 128, c => { c.fillStyle = '#4a4e5a'; c.fillRect(0, 0, 128, 128); c.strokeStyle = '#363a44'; c.lineWidth = 4; c.strokeRect(2, 2, 124, 124); c.fillStyle = '#5a5e6a'; for (const [a, b] of [[10, 10], [110, 10], [10, 110], [110, 110]]) c.fillRect(a, b, 6, 6); }); tile.wrapS = tile.wrapT = THREE.RepeatWrapping; tile.repeat.set(10, 20);
+  add(new THREE.PlaneGeometry(20, 40), new THREE.MeshStandardMaterial({ map: tile, roughness: 0.6, metalness: 0.3 }), 0, 0, 0).rotation.x = -Math.PI / 2;
+  const wallM = mStd(0x8a8f9a, 0.4, 0.5), darkM = mStd(0x2a2c34, 0.5, 0.5), glowB = mGlow(0x6fd8ff);
+  const wall = (x, z, w, d, h = 3.4, m = wallM) => add(new THREE.BoxGeometry(w, h, d), m, x, h / 2, z);
+  wall(-10, 0, 0.4, 40); wall(10, 0, 0.4, 40); wall(0, 20, 20, 0.4);
+  for (const s of [-1, 1]) for (let z = -18; z <= 18; z += 3) add(new THREE.BoxGeometry(0.15, 0.15, 1.6), mGlow(0xffc070), s * 9.7, 0.15, z);
+  wall(-6.5, -0.5, 7, 0.3, 1.2); wall(6.5, -0.5, 7, 0.3, 1.2); wall(-6.5, 10.5, 7, 0.3, 1.2); wall(6.5, 10.5, 7, 0.3, 1.2);
+  // the bridge, with a big window and your pilot
+  const stars = canvasTex(512, 256, c => { c.fillStyle = '#02030a'; c.fillRect(0, 0, 512, 256); for (let i = 0; i < 400; i++) { c.fillStyle = `rgba(255,255,255,${Math.random()})`; c.fillRect(Math.random() * 512, Math.random() * 256, Math.random() < 0.1 ? 2 : 1, 1); } }); stars.wrapS = THREE.RepeatWrapping;
+  const win = add(new THREE.PlaneGeometry(18, 6), new THREE.MeshBasicMaterial({ map: stars }), 0, 3.2, -19.8); SI.stars = stars;
+  add(new THREE.BoxGeometry(20, 1, 0.4), wallM, 0, 0.5, -20); add(new THREE.BoxGeometry(20, 0.4, 0.5), wallM, 0, 6.3, -20); for (const x of [-9.8, 9.8]) add(new THREE.BoxGeometry(0.4, 6.5, 0.5), wallM, x, 3.2, -20);
+  add(new THREE.BoxGeometry(8, 1.1, 1.4), darkM, 0, 0.55, -16.8); for (let i = 0; i < 5; i++) add(new THREE.PlaneGeometry(1.2, 0.7), mGlow([0x6fd8ff, 0x7dffb0, 0xffc23a, 0x6fd8ff, 0xff6fd8][i]), -3 + i * 1.5, 1.15, -16.08).rotation.x = -0.6;
+  const seat = add(new THREE.BoxGeometry(1.4, 0.6, 1.4), mStd(0x3b66d9, 0.4, 0.5), 0, 0.5, -14.6); add(new THREE.BoxGeometry(1.4, 1.6, 0.3), mStd(0x3b66d9, 0.4, 0.5), 0, 1.3, -13.95);
+  const pa = makeAstronaut(); pa.g.position.set(0, 0.55, -14.7); pa.g.rotation.y = 0; pa.legs.forEach(l => l.rotation.x = -1.3); pa.arms.forEach(a => a.rotation.x = -1.1); pa.flames.forEach(f => f.scale.setScalar(0.01)); surf.add(pa.g); SI.pilot = pa;
+  S.colliders.push({ x: 0, z: -16.8, r: 2.2, top: 2 }, { x: -3, z: -16.8, r: 1.5, top: 2 }, { x: 3, z: -16.8, r: 1.5, top: 2 });
+  const sign = (text, x, z, ry, col = '#6fd8ff') => { const mat = new THREE.MeshBasicMaterial({ map: hvText(text, 512, 96, '#14161e', col), transparent: true }); const m = add(new THREE.PlaneGeometry(3.2, 0.6), mat, x, 2.9, z); m.rotation.y = ry || 0; const bk = add(new THREE.PlaneGeometry(3.2, 0.6), mat, x, 2.9, z - 0.02); bk.rotation.y = (ry || 0) + Math.PI; return m; };
+  sign('BRIDGE', 0, -12.5, 0); sign('ENGINE ROOM', 6, 10.8, 0, '#ffc23a'); sign('SHIELDS', -6.5, -0.8, 0); sign('WEAPONS', -6.5, 10.8, 0, '#ff8a3a'); sign('HULL REPAIR', 6.5, -0.8, 0, '#7dffb0');
+  // the machines that can break
+  const conCol = { engine: 0xffc23a, shield: 0x6fd8ff, weapons: 0xff8a3a, hull: 0x7dffb0 };
+  for (const [k, [x, z]] of Object.entries(SI_CONS)) { const g = new THREE.Group(); g.add(rbAt(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 1), darkM), 0, 0.65, 0)); const scr = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.6), new THREE.MeshBasicMaterial({ color: conCol[k] })); scr.position.set(0, 1.05, x < 0 ? 0.51 : -0.51); scr.rotation.y = x < 0 ? 0 : Math.PI; g.add(scr);
+    if (k === 'shield') { const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 1), mGlow(0x6fd8ff)); orb.position.set(-1.6, 1.4, 0); g.add(orb); g.userData.orb = orb; }
+    if (k === 'weapons') for (let i = 0; i < 4; i++) { const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.2, 8), mStd(0xffc23a, 0.7, 0.3)); sh.position.set(-1.6, 0.6, -0.6 + i * 0.4); g.add(sh); }
+    if (k === 'hull') { const kit = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.6), mStd(0xd8463a)); kit.position.set(1.4, 0.25, 0); g.add(kit); }
+    const spk = []; for (let i = 0; i < 4; i++) { const s = glowSprite(0xff6a3a, 1); s.visible = false; g.add(s); spk.push(s); }
+    g.position.set(x, 0, z); surf.add(g); S.colliders.push({ x, z, r: 1.1, top: 1.4 }); SI.cons[k] = { g, scr, spk, col: conCol[k] }; }
+  const core = add(new THREE.CylinderGeometry(1.6, 1.6, 3, 16), new THREE.MeshStandardMaterial({ color: 0xffd070, emissive: 0xffa030, emissiveIntensity: 0.9, transparent: true, opacity: 0.85 }), 0, 1.5, 16.5); SI.core = core; S.colliders.push({ x: 0, z: 16.5, r: 2, top: 3 });
+  for (const s of [-1, 1]) { const r = add(new THREE.TorusGeometry(1.9, 0.15, 6, 24), mStd(0x8a8f9a, 0.6, 0.4), 0, 1.5 + s, 16.5); r.rotation.x = Math.PI / 2; }
+  for (const [k, [x, z]] of Object.entries(SI_LAD)) { for (const dx of [-0.35, 0.35]) add(new THREE.CylinderGeometry(0.06, 0.06, 3.4, 6), mStd(0xffc23a, 0.6, 0.4), x + dx, 1.7, z); for (let y = 0.3; y < 3.4; y += 0.4) add(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 6), mStd(0xffc23a, 0.6, 0.4), x, y, z).rotation.z = Math.PI / 2; const ring = add(new THREE.TorusGeometry(0.9, 0.06, 6, 24), mGlow(0x7dffb0), x, 3.3, z); ring.rotation.x = Math.PI / 2; SI.ladders[k] = ring; sign(k === 'tL' ? 'LEFT GUN ▲' : 'RIGHT GUN ▲', x + (x < 0 ? 1.6 : -1.6), z - 1.5, 0, '#7dffb0'); }
+  for (let i = 0; i < 6; i++) { const a = glowSprite(0xff2020, 3); a.position.set(i % 2 ? 8 : -8, 3.1, -15 + Math.floor(i / 2) * 15); a.visible = false; surf.add(a); SI.alarms.push(a); }
+  for (let i = 0; i < 6; i++) { const f = glowSprite(0xff8a20, 1.2); f.visible = false; surf.add(f); SI.fires.push(f); }
+  for (const s of [-1, 1]) for (let z = -15; z <= 15; z += 5) add(new THREE.BoxGeometry(0.1, 0.5, 2), glowB, s * 9.75, 2.6, z);
+  S.astro = makeAstronaut(); surf.add(S.astro.g); S.drone = makeDrone(); surf.add(S.drone); S.drone.visible = false;
+}
+SHIP_W.build = buildShipInt;
+SHIP_W.update = function (dt) {
+  const p = COOP.pilot, br = p && p.br ? p.br : [];
+  for (const [k, c] of Object.entries(SI.cons)) { const bad = br.includes(k); c.scr.material.color.setHex(bad ? (Math.sin(T * 10) > 0 ? 0xff2020 : 0x400000) : c.col); c.spk.forEach(s => { s.visible = bad && Math.random() < 0.4; if (s.visible) s.position.set(rand(-0.8, 0.8), rand(0.8, 1.6), rand(-0.6, 0.6)); }); if (c.g.userData.orb) { c.g.userData.orb.rotation.y += dt * (bad ? 0.2 : 2); c.g.userData.orb.visible = !bad || Math.sin(T * 12) > 0; } }
+  SI.alarms.forEach((a, i) => { a.visible = br.length > 0; a.material.opacity = 0.5 + Math.sin(T * 8 + i) * 0.5; });
+  SI.fires.forEach((f, i) => { f.visible = br.includes('hull'); if (f.visible) { f.position.set(9 - Math.random() * 0.5, 0.5 + Math.random() * 2, -7 + i * 1.2 + Math.random()); f.scale.setScalar(0.8 + Math.random()); } });
+  SI.core.material.emissiveIntensity = br.includes('engine') ? 0.2 + Math.random() * 0.3 : 0.9 + Math.sin(T * 3) * 0.2; SI.core.rotation.y += dt;
+  if (p && p.p) { if (SI.lastP) { const v = Math.hypot(p.p[0] - SI.lastP[0], p.p[2] - SI.lastP[2]); SI.speed = (SI.speed || 0) * 0.9 + v * 0.1; } SI.lastP = p.p.slice(); }
+  SI.stars.offset.x += dt * (p && p.st === 'fly' ? 0.02 + (SI.speed || 0) * 0.002 : 0.002);
+  SI.pilot.g.visible = !!p; Object.values(SI.ladders).forEach(r => r.material.color.setHex(p && p.st === 'fly' ? 0x7dffb0 : 0x555555));
+};
+function shipSpot() {
+  for (const [k, [x, z]] of Object.entries(SI_CONS)) if (Math.hypot(S.pos.x - x, S.pos.z - z) < 2.6) return { t: 'con', k };
+  for (const [k, [x, z]] of Object.entries(SI_LAD)) if (Math.hypot(S.pos.x - x, S.pos.z - z) < 2) return { t: 'lad', k };
+  if (Math.hypot(S.pos.x, S.pos.z + 14.6) < 2.4) return { t: 'pilot' };
+  return null;
+}
+function shipPrompt() {
+  const s = shipSpot(), key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>', br = COOP.pilot && COOP.pilot.br ? COOP.pilot.br : []; if (!s) return '';
+  if (s.t === 'con') return br.includes(s.k) ? `${key} to bang it with your wrench and fix the ${COOP_SYS[s.k].name}! (${Math.round(COOP.prog[s.k] || 0)}%)` : `${COOP_SYS[s.k].name}: working fine.`;
+  if (s.t === 'lad') return `${key} to climb into the ${s.k === 'tL' ? 'left' : 'right'} gun turret`;
+  return COOP.pilot ? 'Your friend is flying the ship. Wave!' : 'The pilot seat is empty...';
+}
+function shipInteract() {
+  const s = shipSpot(); if (!s) return; const br = COOP.pilot && COOP.pilot.br ? COOP.pilot.br : [];
+  if (s.t === 'con') { if (!br.includes(s.k)) { say(`The ${COOP_SYS[s.k].name} is working fine. Nothing to fix here.`); return; } COOP.prog[s.k] = (COOP.prog[s.k] || 0) + 34; sfx('build'); const c = SI.cons[s.k]; for (let i = 0; i < 5; i++) { const f = glowSprite(0xffd060, 0.6); f.position.copy(c.g.position).add(new V3(rand(-0.8, 0.8), rand(0.8, 1.6), rand(-0.6, 0.6))); surf.add(f); S.pulses.push({ obj: f, t: 0, life: 0.4, kind: 'flash' }); }
+    if (COOP.prog[s.k] >= 100) { COOP.prog[s.k] = 0; COOP.fix[s.k] = (COOP.fix[s.k] || 0) + 1; sfx('win'); say(`You fixed the ${COOP_SYS[s.k].name}! Great work, crew.`, 'good'); } return; }
+  if (s.t === 'lad') { enterTurret(s.k); return; }
+  if (s.t === 'pilot') { say(COOP.pilot ? 'You wave at your pilot. They wave back (probably).' : 'Nobody is flying right now.'); }
+}
+{ const _hv13 = harvest; harvest = function () { if (G.state === 'surface' && W === SHIP_W) { shipInteract(); return; } _hv13(); }; }
+{ const _bd2 = board; board = function () { if (W === SHIP_W) { say('You are the crew! Fix machines and use the turrets. To leave, press Esc → Co-op → Leave co-op.'); return; } return _bd2.apply(this, arguments); }; }
+{ const _ush12 = updateSurfHUD; updateSurfHUD = function () { _ush12(); if (W === SHIP_W) { const pr = shipPrompt(); const br = COOP.pilot && COOP.pilot.br ? COOP.pilot.br : []; setPrompt(pr || (br.length ? `⚠ Broken: ${br.map(k => COOP_SYS[k].name).join(', ')}! Find the machine and press E.` : '')); $('#sDisc').textContent = COOP.pilot ? `Ship ${COOP.code} · ${coopPilotWhere()} · hull ${COOP.pilot.hull}/${COOP.pilot.hm} · shields ${COOP.pilot.sh}/${COOP.pilot.sm}` : `Ship ${COOP.code} · looking for the pilot...`; } }; }
+function crewBoard() {
+  if (!COOP.pilot) { say('Wait until you are connected to your pilot.', 'bad'); return; }
+  const go = () => arkTransition(() => {
+    G.docked = null; useWorld(SHIP_W); W.build(); renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 62; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
+    S.pos.set(0, 0, -8); S.vel.set(0, 0, 0); S.heading = Math.PI; S.yaw = Math.PI; S.pitch = 0.45; S.fuel = fuelMax(); S.heat = 100; S.astro.g.visible = true; setState('surface'); updateSurfCamera(1);
+    say('Welcome aboard, crew! Fix machines when they break (they flash red) and climb the yellow ladders at the back to use the gun turrets.', 'good');
+    logAdd(['Crewing for a friend', `I climbed aboard my friend's ship as crew. I have a wrench and two big guns. I am ready.`]);
+  }, 'Going aboard');
+  if (G.state === 'title') { $('#startBtn').click(); setTimeout(go, 400); } else go();
+}
+// ---- the co-op HUD ----
+function coopHud() {
+  const h = $('#coopHud'), show = COOP.role && (G.state === 'fly' || G.state === 'turret' || (G.state === 'surface' && COOP.role === 'pilot')); h.hidden = !show; if (!show) return;
+  let t = '';
+  if (COOP.role === 'pilot') { const br = Object.keys(COOP.broken); t = `<b>CO-OP · PILOT</b> · code ${COOP.code}<br>${COOP.crew ? `Crewmate: ${coopWhere(COOP.crew)}` : 'Waiting for your crewmate...'}${br.length ? `<br><span class="coop-bad">⚠ Broken: ${br.map(k => COOP_SYS[k].name).join(', ')}</span>` : ''}`; }
+  else { const p = COOP.pilot; t = `<b>CO-OP · ${COOP.at === 'tL' ? 'LEFT' : 'RIGHT'} GUN</b><br>${p ? `Ship hull ${p.hull}/${p.hm} · shields ${p.sh}/${p.sm} · ${(p.en || []).length} pirates near` : 'No pilot'}<br><span class="shipstats">Mouse aim · hold click or Space to shoot · E climb down</span>`; }
+  if (h._t !== t) { h.innerHTML = t; h._t = t; }
+}
+
+$('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
