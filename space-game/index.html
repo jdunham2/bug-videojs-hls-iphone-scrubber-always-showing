@@ -473,6 +473,16 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 #dgHud .dgb { height: 9px; border-radius: 5px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,120,40,.5); overflow: hidden; }
 #dgFill { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff3a00, #ffc040); }
 #dgTxt { font-size: 12px; color: #ffe0c0; }
+#starMap { z-index: 22; background: rgba(8,6,4,.82); }
+.sm-card { width: min(760px, 100%); margin-block: 24px; background: #2a1e14; border-radius: 10px; padding: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 0 0 2px rgba(217,165,32,.4); display: grid; gap: 10px; }
+.sm-card h2 { margin: 0; font-family: "Caveat", cursive; font-size: 44px; color: #ffd890; }
+#smTiles { display: grid; grid-template-columns: repeat(5, 1fr); aspect-ratio: 5 / 2; border-radius: 6px; overflow: hidden; border: 2px solid #8a6a3a; }
+.smt { background-image: var(--map); background-size: 500% 200%; display: grid; place-items: center; font-family: "Caveat", cursive; font-size: 40px; color: #8a6a3a; }
+.smt:not(.on) { background: #3a2a1a; box-shadow: inset 0 0 0 1px #5a4024; }
+#smList { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; max-height: 34vh; overflow-y: auto; }
+#smList li { font-size: 13px; color: #e8d8b8; padding: 4px 6px; border-radius: 4px; background: rgba(0,0,0,.2); }
+#smList li.ok { color: #9fe8b0; }
+#smStatus { color: #ffd890; font-size: 13px; margin: 0; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -638,6 +648,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="cityBubble" hidden></div>
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
+<div class="overlay" id="starMap" hidden><div class="sm-card"><div class="eyebrow" style="color:#d9a520;font-size:10px;letter-spacing:.24em;text-transform:uppercase">Blackstar the Pirate King's</div><h2>Star map</h2><div id="smTiles"></div><p id="smStatus"></p><ol id="smList"></ol><div style="text-align:right"><button class="ghost" id="smClose">Close</button></div></div></div>
 <div id="mrHud" hidden><span id="mrGate"></span><span id="mrPos"></span><span id="mrTime"></span><span id="mrBest"></span></div>
 <div id="dgHud" hidden><b>MAGMA GOLEM</b><div class="dgb"><i id="dgFill"></i></div><span id="dgTxt"></span></div>
 <div id="mbBar" hidden><div id="mbPieces"></div><div id="mbInfo"></div></div>
@@ -1099,8 +1110,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -1329,7 +1340,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH' && G.state === 'photo') $('#photoUI').classList.toggle('min');
   if (e.code === 'KeyG' && G.state === 'surface' && !e.repeat) petInteract();
   if (e.code === 'KeyR' && G.state === 'surface' && !S.build && !e.repeat) fishAction();
-  if (e.code === 'Escape') { if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
+  if (e.code === 'Escape') { if (G.state === 'starmap') closeStarMap(); else if (G.state === 'hpanel') closeHPanel(); else if (G.state === 'door') { $('#seaSecret').hidden = true; closeDoorUI(); } else if (G.state === 'naming') closeNaming(); else if (G.state === 'song') closeSong(); else if (G.state === 'arenares') closeArenaRes(); else if (G.state === 'book') closeBook(); else if (G.state === 'ending') closeEnding(); else if (G.state === 'board') closeExpPanel(); else if (G.state === 'wander') closeWanderer(); else if (G.state === 'photo') exitPhoto(); else if (G.state === 'surface' && S.fish) endFish('You reel in your line.'); else if (G.state === 'fly' || G.state === 'surface') { G.prev = G.state; setState('pause'); } else if (G.state === 'pause') setState(G.prev || 'fly'); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('mousemove', e => {
@@ -8647,6 +8658,263 @@ function presentUpdate() {
     const a = T * 0.05; PRESENT.seaWhale.position.set(Math.cos(a) * 70, -28 + Math.sin(T * 0.3) * 4, Math.sin(a) * 70 - 40); PRESENT.seaWhale.rotation.y = -a; PRESENT.seaWhale.userData.tail.rotation.x = Math.sin(T * 1.4) * 0.35; }
 }; }
 
+/* ============ the Pirate King's star map: a galaxy-wide treasure hunt ============ */
+G.th = G.th || { started: false, got: {}, stage: '', flyT: 0, gold: [], chest: false };
+const TH_PIECES = [
+  { id: 'p1', where: 'space', sys: 'ember', riddle: 'Where miners melt the rocks of Kessel, look high above the forge, where the furnace fires dazzle.', pos: () => stationById('forge').pos.clone().add(new V3(0, 260, 0)) },
+  { id: 'p2', where: 'space', sys: 'frost', riddle: 'In the rings of ice where comets sleep, the second piece drifts cold and deep.', pos: () => FROST_FIELD.clone().add(new V3(250, 180, -350)) },
+  { id: 'p3', where: 'space', sys: 'cinder', riddle: 'Where the red giant burns and the watchtower stands guard, the third piece spins in the heat.', pos: () => stationById('cinderwatch').pos.clone().add(new V3(350, 260, 250)) },
+  { id: 'p4', world: 'verdance', riddle: 'On the green world, climb the highest hill you can see from your landing pad.' },
+  { id: 'p5', world: 'rime', riddle: 'On the frozen world, where the ice lake shines like glass, the fifth piece lies.' },
+  { id: 'p6', world: 'pyre', riddle: 'On the burning world, beside the volcano mouth where only mechs may enter.' },
+  { id: 'p7', world: 'ruin', riddle: 'Behind the three dials in the Room of Signs, ancient pirates hid a piece.' },
+  { id: 'p8', world: 'sea', riddle: 'Down where the HMS Soggy Biscuit sank, the eighth piece sleeps with the fish.' },
+  { id: 'p9', world: 'dungeon', riddle: 'Under the volcano, past the fire vents and just before the crumbling bridge.' },
+  { id: 'p10', world: 'past', riddle: 'Ten million years ago, beside the smooth boulder where you will one day leave your mark.' },
+];
+const thCount = () => TH_PIECES.filter(p => G.th.got[p.id]).length;
+const TH = { objs: {} };
+function makeMapPiece(big) {
+  const g = new THREE.Group(), s = big ? 6 : 1;
+  const scroll = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * s, 0.18 * s, 1.1 * s, 12), new THREE.MeshStandardMaterial({ color: 0xe8d8a8, roughness: 0.8, emissive: 0x3a2a10, emissiveIntensity: 0.3 })); scroll.rotation.z = Math.PI / 2; g.add(scroll);
+  for (const x of [-0.6, 0.6]) { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * s, 0.24 * s, 0.1 * s, 12), mStd(0xd9a520, 0.8, 0.3)); cap.rotation.z = Math.PI / 2; cap.position.x = x * s; g.add(cap); }
+  const gl = glowSprite(0xffd060, 3 * s); g.add(gl);
+  if (!big) { const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 50, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false })); beam.position.y = 25; g.add(beam); }
+  g.userData.inner = scroll; return g;
+}
+function thPlace(p) {
+  if (p.world === 'verdance') { let best = null, bh = -1e9; for (let i = 0; i < 400; i++) { const a = rand(0, TAU), r = rand(60, 320), x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r, h = hgt(x, z); if (h > bh) { bh = h; best = [x, z]; } } return new V3(best[0], bh + 1.4, best[1]); }
+  if (p.world === 'rime') { for (let i = 0; i < 600; i++) { const a = rand(0, TAU), r = rand(50, 400), x = PAD.x + Math.cos(a) * r, z = PAD.z + Math.sin(a) * r; if (rimeBase(x, z) < 0.05) return new V3(x, 1.4, z); } return new V3(PAD.x + 80, hgt(PAD.x + 80, PAD.z) + 1.4, PAD.z); }
+  if (p.world === 'pyre') { const w = MECH.w.pyre; const d = w && w.door ? w.door : new V3(PAD.x + 50, 0, PAD.z - 40); const x = d.x + 10, z = d.z + 10; return new V3(x, Math.max(hgt(x, z), 0) + 1.4, z); }
+  if (p.world === 'ruin') return new V3(10, 1.4, -128);
+  if (p.world === 'sea') { const w = WRECKS[2], x = w.x + 9, z = w.z + 7; return new V3(x, seaFloor(x, z) + 2, z); }
+  if (p.world === 'dungeon') return new V3(9, 1.6, -116);
+  if (p.world === 'past') return new V3(CARVE_SPOT.x + 6, pastHgt(CARVE_SPOT.x + 6, CARVE_SPOT.z - 5) + 1.4, CARVE_SPOT.z - 5);
+  return null;
+}
+function thGot(p) {
+  G.th.got[p.id] = true; sfx('win'); const n = thCount();
+  say(`Star map piece found! (${n} of 10) Press J to look at the map.`, 'good');
+  if (n === 1) logAdd(['The first piece', 'I found a torn piece of old parchment covered in stars. One-Eye Jory was telling the truth! Nine to go.']);
+  if (n === 10) { G.th.stage = 'fortress'; setTimeout(() => { showComms('Old One-Eye Jory', 'ARRR, ye did it! All ten pieces! Look at the map, captain: the X is on a lonely asteroid in Ember Reach, far beyond Kessel Forge. That rock is hollow. Blackstar the Pirate King hides inside it with all his gold! Fly there and find the cave mouth.'); logAdd(['The map is complete', 'All ten pieces fit together. The X marks a hollow asteroid in Ember Reach. Blackstar the Pirate King lives inside. Time to pay him a visit.']); }, 1500); }
+  save();
+}
+function thSurf() {
+  if (!G.th.started || G.state !== 'surface') return;
+  TH_PIECES.forEach(p => {
+    if (!p.world || G.th.got[p.id] || W.id !== p.world) return;
+    let o = TH.objs[p.id];
+    if (!o || o.parent !== surf) { const at = thPlace(p); if (!at) return; o = makeMapPiece(false); o.position.copy(at); surf.add(o); TH.objs[p.id] = o; }
+    o.userData.inner.rotation.y += 0.02; o.position.y += Math.sin(T * 2) * 0.004;
+    const r = (S.mech ? 6.5 : W === SEA_W ? 6 : 4);
+    if (S.pos.distanceTo(o.position) < r + 1.4) { surf.remove(o); delete TH.objs[p.id]; thGot(p); }
+  });
+}
+{ const _usw = updateSurfaceWorld; updateSurfaceWorld = function (dt) { _usw(dt); thSurf(); }; }
+// space pieces, the start of the hunt, and the hidden fortress
+const FORT_POS = new V3(5400, -600, -5800), FORT_R = 460;
+const FORT_MOUTH = FORT_POS.clone().add(new V3(-0.55, 0.1, 0.83).normalize().multiplyScalar(FORT_R));
+const FORT = { obj: null };
+function buildFortRock() {
+  const g = new THREE.Group(), geo = new THREE.IcosahedronGeometry(FORT_R, 2); jitterGeo(geo, 0.12, 4);
+  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x3a3438, roughness: 0.95, flatShading: true })));
+  const mouthDir = FORT_MOUTH.clone().sub(FORT_POS).normalize();
+  const mouth = new THREE.Mesh(new THREE.CircleGeometry(70, 24), new THREE.MeshBasicMaterial({ color: 0x1a0606 })); mouth.position.copy(mouthDir).multiplyScalar(FORT_R + 4); mouth.lookAt(mouthDir.clone().multiplyScalar(FORT_R * 3)); g.add(mouth);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(72, 5, 8, 40), mGlow(0xff3a3a)); ring.position.copy(mouth.position); ring.quaternion.copy(mouth.quaternion); g.add(ring);
+  const gl = glowSprite(0xff4a3a, 260); gl.position.copy(mouthDir).multiplyScalar(FORT_R + 40); g.add(gl);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(90, 60), new THREE.MeshBasicMaterial({ map: canvasTex(256, 170, (c) => { c.fillStyle = '#111'; c.fillRect(0, 0, 256, 170); c.fillStyle = '#eee'; c.font = '110px sans-serif'; c.textAlign = 'center'; c.fillText('☠', 128, 125); }), side: THREE.DoubleSide }));
+  flag.position.copy(mouthDir).multiplyScalar(FORT_R + 10).add(new V3(0, 130, 0)); flag.lookAt(flag.position.clone().add(mouthDir)); g.add(flag);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 160, 6), mStd(0x2a2a30)); pole.position.copy(flag.position).add(new V3(-45, -40, 0)); g.add(pole);
+  for (let i = 0; i < 8; i++) { const d = randDir(), t = new THREE.Mesh(new THREE.CylinderGeometry(10, 14, 30, 8), mStd(0x2a2a30, 0.6, 0.5)); t.position.copy(d).multiplyScalar(FORT_R); t.quaternion.setFromUnitVectors(UP, d); g.add(t); const l = glowSprite(0xff3a3a, 30); l.position.copy(d).multiplyScalar(FORT_R + 20); g.add(l); }
+  g.position.copy(FORT_POS); scene.add(g); return g;
+}
+function thSpace(dt) {
+  if (!G.th.started && G.state === 'fly') { G.th.flyT += dt; if (G.th.flyT > 50) thStart(); }
+  if (G.th.started) TH_PIECES.forEach(p => {
+    if (!p.where) return; let o = TH.objs[p.id];
+    if (G.th.got[p.id] || G.sys !== p.sys) { if (o) o.visible = false; return; }
+    if (!o) { o = makeMapPiece(true); o.position.copy(p.pos()); scene.add(o); TH.objs[p.id] = o; }
+    o.visible = true; o.rotation.y += dt; o.rotation.x += dt * 0.4;
+    if (G.state === 'fly' && player.position.distanceTo(o.position) < 45 + P.r) { scene.remove(o); delete TH.objs[p.id]; thGot(p); }
+  });
+  if (G.th.stage) { if (!FORT.obj) FORT.obj = buildFortRock(); FORT.obj.visible = G.sys === 'ember'; FORT.obj.rotation.y += dt * 0.004;
+    if (G.sys === 'ember' && G.state === 'fly') { const d = player.position.distanceTo(FORT_POS), lim = FORT_R + 20 + P.r * 0.8; if (d < lim && player.position.distanceTo(FORT_MOUTH) > 90) { const n = new V3().subVectors(player.position, FORT_POS).normalize(); player.position.copy(FORT_POS).addScaledVector(n, lim); const vn = P.vel.dot(n); if (vn < 0) P.vel.addScaledVector(n, -vn); } }
+    if (G.th.stage === 'boss' && !BOSS.active && G.sys === 'ember' && G.state === 'fly' && player.position.distanceTo(FORT_POS) < 6000) kingSpawn(); }
+}
+{ const _ub7 = updateBoss; updateBoss = function (dt) { _ub7(dt); thSpace(dt); }; }
+function thStart() {
+  G.th.started = true;
+  showComms('Old One-Eye Jory', 'Psst, captain! Old Jory here, retired pirate. Ye look brave. Long ago, Blackstar the Pirate King tore his star map into TEN pieces and hid them all over the Reach: in space, on the planets, in the ruins, under the sea, in the volcano... even in the PAST, they say. I wrote the riddles in yer captain\'s log. Find them all and the map shows where his treasure is! Press J to see the map.');
+  logAdd(['Blackstar\'s star map', 'A retired pirate called One-Eye Jory told me about a treasure map in ten pieces. The riddles: ' + TH_PIECES.map((p, i) => `(${i + 1}) ${p.riddle}`).join(' ')]);
+  save();
+}
+const nearMouth = () => G.th.stage && G.sys === 'ember' && G.state === 'fly' && player.position.distanceTo(FORT_MOUTH) < 220 + P.r;
+{ const _td = tryDock; tryDock = function () { if (nearMouth()) { enterFort(); return; } _td(); }; }
+{ const _uh2 = updateHUD; updateHUD = function (dt) { _uh2(dt); if (nearMouth()) setPrompt(`${isTouch ? 'Tap DOCK' : 'Press <kbd>E</kbd>'} to fly into Blackstar's fortress`); }; }
+{ const _em13 = extraMarkers; extraMarkers = function () {
+  _em13(); if (!G.th.started) return;
+  TH_PIECES.forEach(p => { const o = TH.objs[p.id]; if (!p.where || !o || !o.visible) return; const d = player.position.distanceTo(o.position); if (d > 3500) return; const el = marker('th-' + p.id, 'target', 'Star map piece'); el.querySelector('.dst').textContent = fmtD(d); placeMarker(el, o.position); });
+  if (G.th.stage && G.th.stage !== 'done' && G.sys === 'ember') { const boss = G.th.stage === 'boss' && BOSS.active && BOSS.variant === 'king' ? BOSS.obj.position : null; if (!boss) { const el = marker('th-fort', 'enemy', G.th.stage === 'boss' ? 'Blackstar flees from here' : 'Blackstar\'s fortress'); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(FORT_MOUTH)); placeMarker(el, FORT_MOUTH); } else { const el = marker('th-boss', 'enemy', 'The Black Comet'); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(boss)); placeMarker(el, boss); } }
+}; }
+// surface helper markers for nearby pieces
+const _thMarkWorlds = {};
+function thSurfMarkers() { TH_PIECES.forEach(p => { const o = TH.objs[p.id]; if (!p.world || !o || o.parent !== surf) return; const d = S.pos.distanceTo(o.position); if (d > 260) return; const el = marker('ths-' + p.id, 'target', 'Star map piece'); el.querySelector('.dst').textContent = fmtD(d); placeMarker(el, o.position); }); }
+[VERD_W, RIME_W, PYRE_W, RUIN_W, SEA_W, DG_W, PAST_W].forEach(w => { const _sm = w.surfMarkers; w.surfMarkers = function () { if (_sm) _sm.call(w); thSurfMarkers(); }; });
+// the star map screen
+const TH_MAP = canvasTex(1000, 400, (c, w, h) => {
+  c.fillStyle = '#e8d8a8'; c.fillRect(0, 0, w, h); for (let i = 0; i < 4000; i++) { c.fillStyle = `rgba(120,90,40,${Math.random() * 0.08})`; c.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
+  c.strokeStyle = 'rgba(80,50,20,.5)'; c.lineWidth = 2; c.setLineDash([8, 6]);
+  const pts = [[90, 300], [230, 120], [380, 260], [520, 90], [640, 300], [780, 160], [900, 280]]; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.stroke(); c.setLineDash([]);
+  pts.forEach(([x, y]) => { c.fillStyle = '#5a3a1a'; c.beginPath(); c.arc(x, y, 7, 0, TAU); c.fill(); });
+  for (let i = 0; i < 90; i++) { c.fillStyle = 'rgba(60,40,20,.7)'; c.beginPath(); c.arc(Math.random() * w, Math.random() * h, Math.random() * 2 + 0.5, 0, TAU); c.fill(); }
+  c.strokeStyle = '#a01a1a'; c.lineWidth = 10; c.beginPath(); c.moveTo(870, 250); c.lineTo(930, 310); c.moveTo(930, 250); c.lineTo(870, 310); c.stroke();
+  c.fillStyle = '#5a3a1a'; c.font = 'bold 30px serif'; c.fillText('BLACKSTAR', 60, 50); c.font = 'italic 20px serif'; c.fillText('here be treasure', 800, 360);
+});
+function renderStarMap() {
+  const n = thCount(); let tiles = '';
+  TH_PIECES.forEach((p, i) => { const col = i % 5, row = Math.floor(i / 5); tiles += `<div class="smt ${G.th.got[p.id] ? 'on' : ''}" style="background-position:${-col * 100}% ${-row * 100}%">${G.th.got[p.id] ? '' : '?'}</div>`; });
+  $('#smTiles').innerHTML = tiles; $('#smTiles').style.setProperty('--map', `url(${TH_MAP.image.toDataURL()})`);
+  $('#smList').innerHTML = TH_PIECES.map((p, i) => `<li class="${G.th.got[p.id] ? 'ok' : ''}"><b>${i + 1}.</b> ${G.th.got[p.id] ? '✔' : ''} ${p.riddle}</li>`).join('');
+  $('#smStatus').textContent = !G.th.started ? 'Fly around for a bit. Someone wants to talk to you about a treasure map...' : n < 10 ? `${n} of 10 pieces found. Follow the riddles! Glowing beams of light mark pieces on the ground.` : G.th.stage === 'done' ? 'Blackstar is beaten. The Reach is pirate-free (mostly).' : 'The map is complete! The X marks a hollow asteroid far beyond Kessel Forge in Ember Reach.';
+}
+let smPrev = null;
+function openStarMap() { if (G.state === 'starmap') return; smPrev = G.state; renderStarMap(); setState('starmap'); $('#starMap').hidden = false; sfx('ui'); }
+function closeStarMap() { $('#starMap').hidden = true; if (G.state === 'starmap') setState(smPrev || 'fly'); }
+$('#smClose').addEventListener('click', closeStarMap);
+addEventListener('keydown', e => { if (e.code !== 'KeyJ' || e.repeat || (e.target.matches && e.target.matches('input, textarea'))) return; if (G.state === 'starmap') closeStarMap(); else if (['fly', 'surface', 'docked'].includes(G.state)) openStarMap(); });
+{ const _rj3 = renderJournal; renderJournal = function () { return `<div class="item"><div><h4>Blackstar's star map</h4><p>${thCount()} of 10 pieces found. Press J anywhere to look at it.</p></div><div><button class="btn" data-act="openmap">Open map</button></div></div>` + _rj3(); }; }
+{ const _ea6 = expAct; expAct = function (act, b) { if (act === 'openmap') { openStarMap(); return; } _ea6(act, b); }; }
+
+/* ============ inside the fortress: traps and treasure ============ */
+const FT_RECTS = [[-15, 15, -25, 4], [-6, 6, -76, -24], [-10, 10, -116, -75], [-6, 6, -166, -115], [-18, 18, -206, -165]];
+const ftIn = p => FT_RECTS.some(r => p.x > r[0] && p.x < r[1] && p.z > r[2] && p.z < r[3]);
+const FTL = new V3();
+function fortHgt(x, z) { if (z < -165) return 6; if (z < -115) return (-115 - z) / 50 * 6; return 0; }
+const FORT_W = { id: 'fort', interior: true, brand: 'BLACKSTAR\'S FORTRESS · ON FOOT', title: 'The pirate fortress', scene: new THREE.Scene(), pad: { x: 0, z: 0 }, padH: 0, hgtFn: fortHgt, itemPlan: [], critterMinH: 99, bob: false, buildable: false,
+  pal: { dayTop: new THREE.Color(0x1a0a0a), dayHor: new THREE.Color(0x2a1410), setTop: new THREE.Color(0x1a0a0a), setHor: new THREE.Color(0x2a1410), nightTop: new THREE.Color(0x1a0a0a), nightHor: new THREE.Color(0x2a1410), water: new THREE.Color(0x222222) },
+  nightMsg: '', hint: 'WASD walk · Space jetpack · dodge the traps · E grab gold and open chests',
+  bounds(p) { if (ftIn(p)) FTL.copy(p); else { p.x = FTL.x; p.z = FTL.z; } if (p.y > fortHgt(p.x, p.z) + 4) { p.y = fortHgt(p.x, p.z) + 4; S.vel.y = Math.min(0, S.vel.y); } },
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+WORLDS.fort = FORT_W;
+const FTR = { lasers: [], spikes: [], barrels: [], barrelT: 0, gold: [], chest: null, king: null, rooms: {}, zapT: -9 };
+function buildFort() {
+  if (S.built) return; S.built = true;
+  surf.fog = new THREE.Fog(0x2a1410, 20, 140); surf.background = new THREE.Color(0x0e0606);
+  const sky = makeSkyDome(0x0e0606, 0x1a0a0a); sky.visible = false; surf.add(sky); S.sky = sky;
+  S.sun = new THREE.DirectionalLight(0xffb070, 0.3); S.sun.position.set(0.2, 1, 0.3); surf.add(S.sun); S.hemi = new THREE.HemisphereLight(0xffc090, 0x2a1008, 0.55); surf.add(S.hemi); S.moonLight = new THREE.DirectionalLight(0xff6a40, 0); surf.add(S.moonLight);
+  const rock = smat(0x3a3034, 0.9, { flatShading: true }), wood = smat(0x5a3a22, 0.9), add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; };
+  FT_RECTS.forEach(([x0, x1, z0, z1]) => {
+    const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, y0 = fortHgt(cx, cz);
+    const f = add(new THREE.PlaneGeometry(w, d), smat(0x4a3a30, 0.9), cx, 0, cz); f.rotation.x = -Math.PI / 2; if (z1 <= -115 && z0 >= -166) { f.rotation.x = -Math.PI / 2 + Math.atan(6 / 50); f.position.y = 3; } else f.position.y = y0;
+    for (const s of [x0, x1]) add(new THREE.BoxGeometry(1, 10, d), rock, s, y0 + 4, cz);
+    add(new THREE.BoxGeometry(w + 2, 1, d), rock, cx, y0 + 9, cz);
+  });
+  add(new THREE.BoxGeometry(38, 14, 1), rock, 0, 12, -206.5);
+  [[0, -10], [0, -50], [0, -95], [0, -140], [-10, -185], [10, -185]].forEach(([x, z]) => { const L = new THREE.PointLight(0xff8a50, 1.2, 45); L.position.set(x, fortHgt(x, z) + 7, z); surf.add(L); const lan = glowSprite(0xffa060, 2); lan.position.copy(L.position); surf.add(lan); });
+  for (let i = 0; i < 10; i++) { const b = add(new THREE.CylinderGeometry(0.8, 0.8, 1.6, 10), wood, pick([-12, 12]) + rand(-1.5, 1.5), 0.8, rand(-22, -4)); S.colliders.push({ x: b.position.x, z: b.position.z, r: 1, top: 1.6 }); }
+  const sh = makeFighter({ hull: 0x2a2226, trim: 0xc4271f, glass: 0xff6040, glow: 0xff4020 }); sh.scale.setScalar(1.2); sh.position.set(8, 2, -12); sh.rotation.y = 0.6; surf.add(sh);
+  // laser gates
+  [-32, -40, -48, -56, -64].forEach((z, i) => { const beams = []; for (const y of [0.5, 1.4, 2.4, 3.4]) { const b = add(new THREE.BoxGeometry(12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xff2020 }), 0, y, z); beams.push(b); } for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.6, 4, 0.6), mStd(0x2a2a30), s * 6, 2, z); FTR.lasers.push({ z, beams, ph: i * 0.45 }); });
+  // spike tiles
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 5; c++) { const x = -8 + c * 4, z = -79 - r * 4.2; const plate = add(new THREE.BoxGeometry(3.8, 0.1, 4), smat(0x2a2224), x, 0.05, z); const sp = new THREE.Group(); for (let k = 0; k < 9; k++) { const s = new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.4, 5), mStd(0x9a9aa8, 0.8, 0.3)); s.position.set((k % 3 - 1) * 1.1, 0.7, (Math.floor(k / 3) - 1) * 1.1); sp.add(s); } sp.position.set(x, -1.5, z); surf.add(sp); FTR.spikes.push({ x, z, sp, row: r, col: c, up: false }); }
+  // gold and the treasure chest
+  for (let i = 0; i < 6; i++) { const x = -14 + (i % 3) * 14 + rand(-2, 2), z = -172 - Math.floor(i / 3) * 14, pile = new THREE.Group(); const cone = new THREE.Mesh(new THREE.ConeGeometry(2.2, 2.2, 12), new THREE.MeshStandardMaterial({ color: 0xffc23a, metalness: 0.9, roughness: 0.25, emissive: 0x5a3a00, emissiveIntensity: 0.4 })); cone.position.y = 1.1; pile.add(cone); for (let k = 0; k < 8; k++) { const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.08, 12), mStd(0xffd060, 0.9, 0.2)); coin.position.set(rand(-2.4, 2.4), 0.05, rand(-2.4, 2.4)); coin.rotation.set(rand(-0.3, 0.3), 0, rand(-0.3, 0.3)); pile.add(coin); } const gl = glowSprite(0xffd060, 6); gl.position.y = 2; pile.add(gl); pile.position.set(x, 6, z); surf.add(pile); if (!G.th.gold.includes(i)) FTR.gold.push({ i, obj: pile }); else pile.visible = false; }
+  const chest = new THREE.Group(), box = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2, 2.2), wood); box.position.y = 1; chest.add(box); const lid = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.7, 2.3), mStd(0xd9a520, 0.8, 0.3)); lid.position.y = 2.3; chest.add(lid); const cg = glowSprite(0xffc23a, 8); cg.position.y = 3; chest.add(cg); chest.position.set(0, 6, -200); surf.add(chest); FTR.chest = chest; FTR.chestLid = lid; S.colliders.push({ x: 0, z: -200, r: 2.2, top: 8.2 });
+  const throne = add(new THREE.BoxGeometry(4, 6, 3), mStd(0x6a1a1a, 0.3, 0.6), 12, 9, -202);
+  const k = makePerson(0x1a1a1a); k.g.scale.setScalar(1.6); k.g.position.set(12, 6, -199); k.g.rotation.y = Math.PI; const hat = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.5, 3), mStd(0x111111)); hat.position.y = 2; hat.rotation.y = Math.PI / 6; k.g.add(hat); const fh = glowSprite(0xff3a3a, 0.5); fh.position.set(0, 1.7, -0.25); k.g.add(fh); surf.add(k.g); FTR.king = k;
+  if (G.th.stage !== 'fortress') k.g.visible = false;
+  S.astro = makeAstronaut(); surf.add(S.astro.g); S.drone = makeDrone(); surf.add(S.drone);
+}
+FORT_W.build = buildFort;
+function ftZap(back, why) {
+  if (T - FTR.zapT < 0.8) return; FTR.zapT = T; hitFlash(S.pos.clone().add(new V3(0, 1, 0)), 0xff4040, 4); sfx('fail');
+  S.pos.set(0, fortHgt(0, back), back); S.vel.set(0, 0, 0); FTL.copy(S.pos); say(`${why} Back to the start of the trap!`, 'bad');
+}
+FORT_W.update = function (dt) {
+  if (G.state !== 'surface') return;
+  const z = S.pos.z, onFoot = S.pos.y - fortHgt(S.pos.x, S.pos.z) < 0.8;
+  // laser gates blink on and off
+  FTR.lasers.forEach(l => { const on = ((T * 0.42 + l.ph) % 1) < 0.5; l.beams.forEach(b => { b.visible = on; }); if (on && Math.abs(z - l.z) < 0.6 && S.pos.y < 3.8) ftZap(-27, 'ZAP! A laser gate got you.'); });
+  // spikes pop up row by row
+  const wave = Math.floor(T / 1.6) % 2;
+  FTR.spikes.forEach(s => { const up = (s.row + wave) % 2 === 0; if (up !== s.up) { s.up = up; } s.sp.position.y += ((up ? 0 : -1.5) - s.sp.position.y) * Math.min(1, dt * 14); if (up && s.sp.position.y > -0.4 && Math.abs(S.pos.x - s.x) < 1.9 && Math.abs(S.pos.z - s.z) < 2 && onFoot) ftZap(-77, 'OUCH! Spikes!'); });
+  // rolling barrels
+  if (z < -112 && z > -168) { FTR.barrelT -= dt; if (FTR.barrelT <= 0) { FTR.barrelT = 1.3; const lane = pick([-3.6, 0, 3.6]), b = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 2, 12), smat(0x6a4a2a)); b.rotation.z = Math.PI / 2; b.position.set(lane, 7, -163); surf.add(b); FTR.barrels.push({ obj: b }); } }
+  FTR.barrels.slice().forEach(b => { b.obj.position.z += 13 * dt; b.obj.position.y = fortHgt(b.obj.position.x, b.obj.position.z) + 1.1; b.obj.rotation.x -= dt * 12; if (b.obj.position.z > -113) { surf.remove(b.obj); FTR.barrels.splice(FTR.barrels.indexOf(b), 1); return; } if (Math.abs(S.pos.x - b.obj.position.x) < 1.9 && Math.abs(S.pos.z - b.obj.position.z) < 1.3 && S.pos.y < b.obj.position.y + 1) ftZap(-118, 'BONK! A rolling barrel flattened you.'); });
+  if (z < -24 && !FTR.rooms.a) { FTR.rooms.a = true; say('Laser gates! Wait until the beams switch off, then run through.', 'bad'); }
+  if (z < -75 && !FTR.rooms.b) { FTR.rooms.b = true; say('Spike floor! The spikes pop up in rows. Step only on the flat rows.', 'bad'); }
+  if (z < -115 && !FTR.rooms.c) { FTR.rooms.c = true; say('Barrel ramp! Dodge left and right as the barrels roll down.', 'bad'); }
+  if (z < -167 && !FTR.rooms.d) { FTR.rooms.d = true; if (G.th.stage === 'fortress') { sfx('ring'); showComms('Blackstar the Pirate King', 'HAR HAR HAR! So ye solved my riddles and dodged my traps, eh? Impressive, little captain. Take a coin or two, I have plenty. But ye\'ll never take ME! To the Black Comet, ye scurvy dogs!'); setTimeout(() => { if (FTR.king) FTR.king.g.visible = false; hitFlash(new V3(12, 8, -199), 0xff3a3a, 10); }, 2500); G.th.stage = 'treasure'; save(); } }
+  if (FTR.king && FTR.king.g.visible) FTR.king.g.rotation.y = Math.atan2(-(S.pos.x - 12), -(S.pos.z + 199));
+  FTR.gold.forEach(g => { g.obj.rotation.y += dt * 0.3; });
+};
+function fortPrompt() {
+  const key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>';
+  if (S.pos.z > -3) return `${key} to go back to your ship`;
+  const g = FTR.gold.find(q => Math.hypot(S.pos.x - q.obj.position.x, S.pos.z - q.obj.position.z) < 4); if (g) return `${key} to scoop up the pirate gold`;
+  if (!G.th.chest && Math.hypot(S.pos.x, S.pos.z + 200) < 5) return `${key} to open Blackstar's treasure chest`;
+  if (S.pos.z < -190 && G.th.stage !== 'fortress') return `${key} to use the secret escape tube back to your ship`;
+  return '';
+}
+function fortInteract() {
+  if (S.pos.z > -3) { leaveFort(); return; }
+  const g = FTR.gold.find(q => Math.hypot(S.pos.x - q.obj.position.x, S.pos.z - q.obj.position.z) < 4);
+  if (g) { g.obj.visible = false; FTR.gold.splice(FTR.gold.indexOf(g), 1); G.th.gold.push(g.i); G.credits += 3000; sfx('win'); say('A pile of pirate gold! +3,000 cr', 'good'); save(); return; }
+  if (!G.th.chest && Math.hypot(S.pos.x, S.pos.z + 200) < 5) { G.th.chest = true; G.credits += 10000; G.mats.void += 3; G.mats.sun += 5; FTR.chestLid.rotation.x = -1.2; FTR.chestLid.position.z -= 0.8; sfx('win'); showComms('Blackstar\'s treasure chest', 'Gold! Gems! A rubber duck wearing an eyepatch! +10,000 cr, +3 Void glass, +5 Sunstone. Under it all, a note: "If ye be readin\' this, I am already on the Black Comet. Come and get me." Leave through the secret escape tube.'); logAdd(['Pirate treasure', 'Blackstar\'s treasure room was FULL of gold. I filled my pockets, my helmet and my boots. The Pirate King himself ran off to his flagship. He will not get far.']); save(); return; }
+  if (S.pos.z < -190 && G.th.stage !== 'fortress') { leaveFort(); return; }
+}
+{ const _hv7 = harvest; harvest = function () { if (G.state === 'surface' && W === FORT_W) { fortInteract(); return; } _hv7(); }; }
+{ const _ush6 = updateSurfHUD; updateSurfHUD = function () { _ush6(); if (W === FORT_W) setPrompt(fortPrompt()); }; }
+FORT_W.surfMarkers = function () {
+  const m = (id, cls, label, x, y, z) => { const el = marker(id, cls, label); el.querySelector('.dst').textContent = fmtD(Math.hypot(S.pos.x - x, S.pos.z - z)); placeMarker(el, tmp.set(x, y, z)); };
+  m('ft-exit', 'station', 'Your ship', 0, 4, 2); if (!G.th.chest) m('ft-chest', 'target', 'Treasure chest', 0, 10, -200);
+};
+{ const _upt4 = updatePet; updatePet = function (dt) { if (W === FORT_W) { if (PET.obj) PET.obj.visible = false; return; } _upt4(dt); }; }
+function enterFort() {
+  arkTransition(() => {
+    useWorld(FORT_W); W.build(); renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 62; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
+    FTR.rooms = {}; S.pos.set(0, 0, -6); FTL.copy(S.pos); S.vel.set(0, 0, 0); S.heading = 0; S.yaw = 0; S.pitch = 0.25; S.fuel = fuelMax(); S.heat = 100; S.astro.g.visible = true;
+    setState('surface'); updateSurfCamera(1);
+    say('You land inside the hollow asteroid. Pirate lanterns, barrels... and a lot of traps. The treasure must be at the far end.', 'good');
+    if (!G.th.inLog) { G.th.inLog = true; logAdd(['Inside the asteroid', 'The X on the map was right. The asteroid is hollow, full of pirate stuff. I can smell gold. And danger. Mostly gold.']); }
+  }, 'Landing in the fortress');
+  $('#entryTitle').textContent = 'Blackstar\'s fortress';
+}
+function leaveFort() {
+  arkTransition(() => {
+    renderScene = scene; applyBloom(false); const dir = FORT_MOUTH.clone().sub(FORT_POS).normalize();
+    player.position.copy(FORT_MOUTH).addScaledVector(dir, 400 + P.r); orientTo(player, player.position.clone().add(dir)); P.vel.set(0, 0, 0);
+    camera.near = shipNear(); camera.fov = 68; camera.updateProjectionMatrix(); camPos.copy(player.position).add(new V3(0, 4.2 * (SH().camUp || 1), 15).multiplyScalar(SH().cam).applyQuaternion(player.quaternion)); camera.position.copy(camPos); camera.quaternion.copy(player.quaternion);
+    G.throttle = 0.3; setState('fly'); wingSnap();
+    if (G.th.stage === 'treasure') { G.th.stage = 'boss'; save(); }
+  }, 'Back to your ship');
+  $('#entryTitle').textContent = 'Ember Reach';
+}
+// the finale: the Black Comet
+function kingSpawn() {
+  spawnBoss(FORT_POS.clone().add(new V3(-1800, 400, 2000)), 'king');
+  BOSS.name = 'The Black Comet'; BOSS.obj.scale.setScalar(1.6);
+  BOSS.obj.traverse(o => { if (o.isMesh && o.material && o.material.color && !o.material.emissive?.getHex?.()) o.material = o.material.clone(), o.material.color.multiplyScalar(0.35); });
+  enemies.forEach(e => { if (e.turret) { e.hp = e.maxHp = Math.round(e.maxHp * 3); e.dmg = 12; } });
+  showComms('Blackstar the Pirate King', 'HAR! Ye followed me! Meet the Black Comet, the biggest, meanest flagship in the Reach! Gunners, BLAST THEM! Six turrets, then my reactor. As if ye could ever get that far!');
+}
+{ const _bpd = bossPartDown; bossPartDown = function (e) {
+  const king = BOSS.variant === 'king';
+  _bpd(e);
+  if (!king) return;
+  if (e.turret) { const left = enemies.filter(q => q.turret).length; if (left === 3) showComms('Blackstar the Pirate King', 'Me turrets! Me beautiful turrets! Ye\'ll pay for that, ye barnacle-brained space rat!'); }
+  if (e.core) kingDown();
+}; }
+function kingDown() {
+  G.th.stage = 'done'; G.credits += 50000; if (!G.paints.includes('blackstar')) G.paints.push('blackstar'); addRep('patrol', 30); G.rep.pirates = Math.min(G.rep.pirates, -60);
+  setTimeout(() => showComms('Blackstar the Pirate King', 'NOOOOO! Me ship! Me beautiful ship! ...Fine. FINE. Ye win, captain. Ye are the greatest treasure hunter in the Reach. I surrender. Can I at least keep me hat? (Reach Patrol arrests Blackstar. Reward: +50,000 cr, the Pirate King\'s crown for your quarters and the Blackstar paint job.)'), 2600);
+  logAdd(['The Pirate King falls', 'I blasted the Black Comet\'s turrets, cracked its reactor and Blackstar gave up. Reach Patrol took him away. He asked to keep his hat. They said no. I got his crown instead.']);
+  save();
+}
+PAINTS.blackstar = { name: 'Blackstar', hull: 0x141418, trim: 0xd9a520, emissive: 0x2a0a0a, arena: true };
+TROPHIES.crown = { name: 'Pirate King\'s crown', ok: () => G.th.stage === 'done', make: () => { const g = new THREE.Group(), m = mStd(0xffc23a, 0.95, 0.2); const band = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12, 1, true), m); band.position.y = 0.3; g.add(band); for (let i = 0; i < 5; i++) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 4), m); const a = i / 5 * TAU; sp.position.set(Math.cos(a) * 0.33, 0.55, Math.sin(a) * 0.33); g.add(sp); } const gem = glowSprite(0xff3a3a, 0.6); gem.position.y = 0.35; g.add(gem); return g; } };
+TROPHIES.starmap = { name: 'Framed star map', ok: () => thCount() >= 10, make: () => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.05), new THREE.MeshBasicMaterial({ map: TH_MAP })); m.position.y = 0.4; return m; } };
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
   if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
@@ -8685,7 +8953,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel' && G.state !== 'starmap';
   const onSurf = renderScene !== scene;
   if (running) {
     T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt); expTick(dt); citySim(dt); dvTick(dt);
