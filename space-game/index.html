@@ -586,6 +586,8 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 #qchat button { text-align: left; } #qchat kbd { margin-right: 6px; }
 #radar { position: fixed; right: 16px; bottom: 120px; width: 150px; height: 150px; z-index: 5; pointer-events: none; }
 @media (max-width: 700px) { #radar { width: 110px; height: 110px; bottom: 170px; } }
+#tmHud { position: fixed; top: 62px; left: 50%; transform: translateX(-50%); z-index: 6; background: rgba(8,20,24,.8); border: 1px solid rgba(125,255,176,.5); border-radius: 6px; padding: 6px 14px; font-size: 13px; color: #dff8ea; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
+#tmInvite { position: fixed; top: 110px; left: 50%; transform: translateX(-50%); z-index: 31; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; background: var(--panel); border: 1px solid rgba(255,154,216,.6); border-radius: 8px; padding: 10px 14px; color: #fff; font-size: 14px; max-width: calc(100vw - 32px); box-shadow: 0 8px 30px rgba(0,0,0,.5); }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -716,6 +718,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
       <button class="tab" role="tab" data-tab="fortress" aria-selected="false">Fortress</button>
       <button class="tab" role="tab" data-tab="fleet" aria-selected="false">Fleet</button>
       <button class="tab" role="tab" data-tab="hoverbike" aria-selected="false">Hoverbike</button>
+      <button class="tab" role="tab" data-tab="team" aria-selected="false">Team</button>
       <button class="tab" role="tab" data-tab="ships" aria-selected="false">Ships</button>
       <button class="tab" role="tab" data-tab="crew" aria-selected="false">Crew</button>
       <button class="tab" role="tab" data-tab="crafting" aria-selected="false">Crafting</button>
@@ -760,7 +763,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
 <div id="fbHud" hidden></div>
-<div id="coopHud" hidden></div><canvas id="radar" width="300" height="300" hidden aria-label="Radar"></canvas><div id="qchat" hidden></div><div id="coopCross" hidden></div>
+<div id="coopHud" hidden></div><div id="tmHud" hidden></div><div id="tmInvite" hidden></div><canvas id="radar" width="300" height="300" hidden aria-label="Radar"></canvas><div id="qchat" hidden></div><div id="coopCross" hidden></div>
 <div class="overlay" id="coop" hidden><div class="panel"><header><div><div class="eyebrow">Online</div><h2>Play with friends</h2></div><button class="ghost" id="coopClose">Close</button></header><div class="tabbody" id="coopBody"></div></div></div>
 <div id="hbHud" hidden><div class="hb-pos" id="hbPos">1st</div><div class="hb-info" id="hbInfo"></div></div><div id="hbTrick" hidden></div><div id="hbCount" hidden></div>
 <div class="overlay" id="hbRes" hidden><div class="panel"><header><div class="eyebrow" id="hbResEye">Grand Prix</div><h2 id="hbResTitle"></h2></header><div class="tabbody" id="hbResBody"></div><div style="padding:0 22px 18px;text-align:right"><button class="btn" id="hbResOk">Continue</button></div></div></div>
@@ -1232,8 +1235,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th, zoo: G.zoo, tf: G.tf, rb: G.rb, fb: G.fb, nw: G.nw, hb: G.hb })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; G.zoo = s.zoo || null; G.tf = s.tf || null; G.rb = s.rb || null; G.fb = s.fb || null; G.nw = s.nw || null; G.hb = s.hb || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th, zoo: G.zoo, tf: G.tf, rb: G.rb, fb: G.fb, nw: G.nw, hb: G.hb, team: G.team })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; G.zoo = s.zoo || null; G.tf = s.tf || null; G.rb = s.rb || null; G.fb = s.fb || null; G.nw = s.nw || null; G.hb = s.hb || null; G.team = s.team || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -11102,7 +11105,7 @@ addEventListener('keydown', e => { if (e.target.matches && e.target.matches('inp
 // ---- the radar and the galaxy map ----
 function netRadar() {
   const cv = $('#radar'), on = G.state === 'fly'; cv.hidden = !on; if (!on) return; if ((NET.radarT -= 1 / 60) > 0) return; NET.radarT = 0.08;
-  const c = cv.getContext('2d'), w = cv.width, R = w / 2, range = 3000 + P.r * 10, inv = player.quaternion.clone().invert();
+  const c = cv.getContext('2d'), w = cv.width, R = w / 2, range = (3000 + P.r * 10) * (fsHas('observatory') ? 2 : 1), inv = player.quaternion.clone().invert();
   c.clearRect(0, 0, w, w); c.fillStyle = 'rgba(6,14,24,.7)'; c.beginPath(); c.arc(R, R, R - 1, 0, TAU); c.fill(); c.strokeStyle = 'rgba(111,216,255,.35)'; c.lineWidth = 1.5; c.stroke(); c.beginPath(); c.arc(R, R, R / 2, 0, TAU); c.stroke();
   const dot = (pos, col, sz, label) => { const l = tmp.copy(pos).sub(player.position).applyQuaternion(inv); let x = l.x / range * R, y = l.z / range * R; const d = Math.hypot(x, y); if (d > R - 5) { x *= (R - 5) / d; y *= (R - 5) / d; } c.fillStyle = col; c.beginPath(); c.arc(R + x, R + y, sz, 0, TAU); c.fill(); if (label) { c.font = 'bold 10px sans-serif'; c.fillText(label, R + x + 5, R + y + 3); } };
   for (const s of STATIONS) if (!s.sys || s.sys === G.sys) dot(s.pos, '#6fd8ff', 2.5);
@@ -11275,6 +11278,286 @@ function crewBoard() {
   }, 'Going aboard');
   if (G.state === 'title') { $('#startBtn').click(); setTimeout(go, 400); } else go();
 }
+
+/* ============ Friendship Station, team missions, gifts and ship jobs ============ */
+G.team = Object.assign({ badges: {}, cape: true, garden: 0, races: 0 }, G.team || {});
+const FS_POS = new V3(-1000, 1500, -2200);
+const FS_ROOMS = {
+  hangar: { name: 'Hangar', cost: 8000, col: 0xffc23a, d: 'Parks both your ships side by side and unlocks the Escort mission.' },
+  trophy: { name: 'Trophy room', cost: 6000, col: 0xffd060, d: 'Shows off every team badge you earn.' },
+  garden: { name: 'Garden', cost: 5000, col: 0x7dffb0, d: 'Grows free materials for each of you every 30 minutes.' },
+  games: { name: 'Games room', cost: 7000, col: 0xff6fd8, d: 'Unlocks the Asteroid Canyon race and its high-score board.' },
+  observatory: { name: 'Observatory', cost: 6000, col: 0x6fd8ff, d: 'Doubles your radar range for both of you.' },
+  cantina: { name: 'Cantina', cost: 5000, col: 0xff8a3a, d: 'A notice board where you leave each other notes, even when one of you is offline.' },
+};
+const TEAM_COL = { teal: ['Teal', 0x2ab0a0], pink: ['Pink', 0xff6fb0], blue: ['Blue', 0x3b66d9], purple: ['Purple', 0x8a5ad9], orange: ['Orange', 0xff8a3a], gold: ['Best-friends gold', 0xffc23a, 'bff'] };
+const BADGES = { convoy: { name: 'Convoy Guardian', icon: '🚚', col: 0x7dffb0 }, defender: { name: 'Station Defender', icon: '🛡️', col: 0x6fd8ff }, racer: { name: 'Canyon Racer', icon: '🏁', col: 0xff6fd8 }, bff: { name: 'Best Friends', icon: '💛', col: 0xffc23a } };
+const FS = { db: null, uid: null, rooms: {}, team: { color: 'teal' }, notes: [], board: [], grp: null, roomObjs: [], parked: [], err: '' };
+const fsHas = k => Object.values(FS.rooms).some(r => r.k === k);
+const fsName = r => (r && r.by && NET.names[r.by]) || (r && typeof r.nm === 'string' && r.nm.trim().slice(0, 16)) || 'a friend';
+try { if (window.claude && window.claude.use) window.claude.use('db').then(db => { if (!db) return; FS.db = db; fsSubscribe(); }).catch(() => {}); } catch (e) {}
+function fsSubscribe() {
+  const db = FS.db; try { if (NET.user && NET.user.id) NET.user.id().then(id => FS.uid = id).catch(() => {}); } catch (e) {}
+  db.collection('srooms').onSnapshot(s => { FS.rooms = {}; s.docs.forEach(d => { const v = d.data(); if (v && FS_ROOMS[v.k]) { FS.rooms[d.id] = v; if (v.by && NET.user && !NET.asked[v.by]) { NET.asked[v.by] = true; try { NET.user.profiles([v.by]).then(ps => { const n = ps && ps[v.by] && ps[v.by].name; if (n) { NET.names[v.by] = n; fsBuild(); } }).catch(() => {}); } catch (er) {} } } }); fsBuild(); fsRedock(); }, () => {});
+  db.doc('team/main').onSnapshot(s => { const v = s.exists ? s.data() : null; FS.team = Object.assign({ color: 'teal' }, v || {}); fsRedock(); }, () => {});
+  db.collection('board').onSnapshot(s => { FS.notes = s.docs.map(d => d.data()).filter(v => v && QCHAT[v.m]).sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 8); fsRedock(); }, () => {});
+  db.collection('sboard').orderBy('t').limit(5).onSnapshot(s => { FS.board = s.docs.map(d => d.data()).filter(v => v && typeof v.t === 'number'); fsRedock(); }, () => {});
+}
+fsBuild();
+const fsRedock = () => { if (G.docked && dockTab === 'team') renderDock(); };
+async function fsWrite(fn) { if (!FS.db) { say('Shared building needs the game opened on claude.ai while signed in.', 'bad'); return false; } try { await fn(FS.db); return true; } catch (e) { say(e && (e.code === 'not_granted' || e.code === 'revoked') ? 'You are not allowed to build here. Ask the game\'s owner to give you Contributor access in the Share menu.' : 'Could not save that right now. Try again in a moment.', 'bad'); return false; } }
+// ---- the station in space ----
+function buildFriendCore() {
+  const g = new THREE.Group(), M = mStd(0xe8eef4, 0.5, 0.4), Dk = mStd(0x3a3e4a, 0.5, 0.5);
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(36, 40, 40, 12), M)); g.add(rbAt(new THREE.Mesh(new THREE.CylinderGeometry(40.5, 40.5, 4, 12), mGlow(0xff9ad8)), 0, 8, 0));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(70, 4, 8, 48), Dk); ring.rotation.x = Math.PI / 2; g.add(ring); g.userData.spin = ring;
+  const heart = new THREE.Group(); for (const sx of [-1, 1]) { const lobe = new THREE.Mesh(new THREE.SphereGeometry(7, 14, 10), mGlow(0xff6fb0)); lobe.position.set(sx * 5, 4, 0); heart.add(lobe); } const tip = new THREE.Mesh(new THREE.ConeGeometry(9.5, 12, 14), mGlow(0xff6fb0)); tip.rotation.z = Math.PI; tip.position.y = -5; heart.add(tip); heart.position.y = 46; g.add(heart); g.userData.heart = heart; g.add(rbAt(glowSprite(0xff9ad8, 70), 0, 46, 0));
+  g.add(rbAt(new THREE.Mesh(new THREE.CylinderGeometry(4, 6, 30, 8), M), 0, 26, 0));
+  for (let i = 0; i < 6; i++) blinker(g, new V3(Math.cos(i / 6 * TAU) * 70, 0, Math.sin(i / 6 * TAU) * 70), i % 2 ? 0xff9ad8 : 0x6fd8ff, 10, i);
+  return g;
+}
+STATIONS.push({ id: 'friendship', sys: 'ember', name: 'Friendship Station', kind: 'Shared station', build: buildFriendCore, pos: FS_POS.clone(), dockR: 340, colR: 70, exit: new V3(0, 0.2, 1), orePrice: 24, view: 620,
+  blurb: 'A station you and your friends build together. Every room shows who built it. Team missions start here.' });
+{ const s = STATIONS[STATIONS.length - 1]; s.obj = s.build(); s.obj.position.copy(s.pos); scene.add(s.obj); s.obj.traverse(o => { if (o.isSprite && o.userData.blink !== undefined) blinkers.push(o); }); PROFILE.friendship = { food: 1.2, ice: 1.2, parts: 1.2, med: 1.2, fuel: 1.2, lux: 1.2 }; RECRUIT_CAP.friendship = 20; }
+function fsSign(text, col) { const tex = canvasTex(1024, 160, (c, w, h) => { c.fillStyle = 'rgba(14,16,30,.9)'; c.fillRect(0, 0, w, h); c.fillStyle = '#' + col.toString(16).padStart(6, '0'); c.fillRect(0, h - 10, w, 10); c.fillStyle = '#fff'; c.font = 'bold 54px sans-serif'; c.textAlign = 'center'; c.fillText(text, w / 2, 98); }); const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ map: tex, transparent: true }); const a = new THREE.Mesh(new THREE.PlaneGeometry(90, 14), m); g.add(a); const b = a.clone(); b.rotation.y = Math.PI; g.add(b); return g; }
+function fsRoomModel(k) {
+  const g = new THREE.Group(), r = FS_ROOMS[k], M = mStd(0xd8dde8, 0.5, 0.4), glass = new THREE.MeshStandardMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.35, roughness: 0.1, metalness: 0.2, depthWrite: false });
+  if (k === 'hangar') { g.add(new THREE.Mesh(new THREE.BoxGeometry(70, 30, 50), M)); const door = new THREE.Mesh(new THREE.PlaneGeometry(50, 20), mGlow(0xffc23a)); door.position.set(0, -2, 25.2); g.add(door); }
+  if (k === 'trophy' || k === 'garden' || k === 'observatory') { g.add(rbAt(new THREE.Mesh(new THREE.CylinderGeometry(30, 32, 8, 20), M), 0, -12, 0)); g.add(rbAt(new THREE.Mesh(new THREE.SphereGeometry(30, 24, 12, 0, TAU, 0, Math.PI / 2), glass), 0, -8, 0)); }
+  if (k === 'trophy') { g.add(rbAt(new THREE.Mesh(new THREE.CylinderGeometry(4, 5, 10, 8), mStd(0xffc23a, 0.8, 0.3)), 0, -3, 0)); g.userData.trophies = true; }
+  if (k === 'garden') for (let i = 0; i < 9; i++) { const a = i / 9 * TAU, t = new THREE.Mesh(new THREE.ConeGeometry(4, 12, 7), smat(pick([0x4fb06a, 0x7dd85a, 0x3a9a50]))); t.position.set(Math.cos(a) * 16, -2, Math.sin(a) * 16); g.add(t); const f = new THREE.Mesh(new THREE.SphereGeometry(1.6, 8, 6), mGlow(pick([0xff8ac8, 0xffe060, 0xffffff]))); f.position.set(Math.cos(a + 0.3) * 9, -6, Math.sin(a + 0.3) * 9); g.add(f); }
+  if (k === 'observatory') { const tel = new THREE.Mesh(new THREE.CylinderGeometry(4, 6, 34, 12), mStd(0x3a3e4a)); tel.position.set(0, 6, 0); tel.rotation.z = 0.6; g.add(tel); g.userData.tel = tel; }
+  if (k === 'games') { g.add(new THREE.Mesh(new THREE.BoxGeometry(56, 26, 56), mStd(0x2a1a3a, 0.4, 0.5))); for (let i = 0; i < 4; i++) { const p = new THREE.Mesh(new THREE.PlaneGeometry(14, 10), mGlow([0xff6fd8, 0x6fd8ff, 0xffd060, 0x7dffb0][i])); p.position.set(-21 + i * 14, 2, 28.2); g.add(p); } }
+  if (k === 'cantina') { g.add(new THREE.Mesh(new THREE.CylinderGeometry(26, 28, 22, 16), mStd(0x8a5a3a, 0.3, 0.6))); g.add(rbAt(new THREE.Mesh(new THREE.ConeGeometry(30, 14, 16), mStd(0xd8463a, 0.3, 0.6)), 0, 18, 0)); for (let i = 0; i < 10; i++) { const s = glowSprite(pick([0xffd060, 0xff8a3a, 0xff6fd8]), 6); const a = i / 10 * TAU; s.position.set(Math.cos(a) * 27, 8, Math.sin(a) * 27); g.add(s); } }
+  g.add(rbAt(glowSprite(r.col, 40), 0, 14, 0)); return g;
+}
+function fsBuild() {
+  if (FS.grp) scene.remove(FS.grp); const grp = new THREE.Group(); grp.position.copy(FS_POS); scene.add(grp); FS.grp = grp; FS.roomObjs = [];
+  for (let i = 0; i < 6; i++) { const r = FS.rooms['s' + i]; const a = i / 6 * TAU + 0.3, pos = new V3(Math.cos(a) * 140, 0, Math.sin(a) * 140);
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 100, 8), mStd(0x8a8f9a, 0.6, 0.4)); tube.position.copy(pos).multiplyScalar(0.5); tube.rotation.z = Math.PI / 2; tube.rotation.y = -a; tube.visible = !!r; grp.add(tube);
+    if (!r) { const pad = new THREE.Mesh(new THREE.TorusGeometry(18, 1.2, 6, 30), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: 0.35 })); pad.rotation.x = Math.PI / 2; pad.position.copy(pos); grp.add(pad); continue; }
+    const m = fsRoomModel(r.k); m.position.copy(pos); m.lookAt(FS_POS.clone().add(pos.clone().multiplyScalar(2))); grp.add(m); const sign = fsSign(`${FS_ROOMS[r.k].name.toUpperCase()} · built by ${fsName(r)}`, FS_ROOMS[r.k].col); sign.position.copy(pos).add(new V3(0, 42, 0)); sign.lookAt(FS_POS.clone().add(pos.clone().multiplyScalar(3)).setY(FS_POS.y + 42)); grp.add(sign);
+    FS.roomObjs.push({ k: r.k, m, pos }); if (r.k === 'trophy') fsTrophies(m); }
+}
+function fsTrophies(m) { Object.keys(BADGES).filter(k => G.team.badges[k]).forEach((k, i) => { const b = new THREE.Mesh(new THREE.OctahedronGeometry(3.4), mGlow(BADGES[k].col)); const a = i / 4 * TAU; b.position.set(Math.cos(a) * 14, 0, Math.sin(a) * 14); b.userData.spinB = true; m.add(b); m.add(rbAt(new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3, 6, 8), mStd(0xd8dde8)), b.position.x, -6, b.position.z)); }); }
+function fsTick(dt) {
+  const st = stationById('friendship'); if (st && st.obj) { st.obj.visible = G.sys === 'ember'; st.obj.userData.spin.rotation.z += dt * 0.15; st.obj.userData.heart.rotation.y += dt; st.obj.userData.heart.scale.setScalar(1 + Math.sin(T * 3) * 0.06); }
+  if (FS.grp) { FS.grp.visible = G.sys === 'ember'; FS.roomObjs.forEach(o => { if (o.m.userData.tel) o.m.userData.tel.rotation.y += dt * 0.1; o.m.children.forEach(c => { if (c.userData.spinB) c.rotation.y += dt * 1.5; }); }); }
+  // both ships parked at the hangar
+  const hg = FS.roomObjs.find(o => o.k === 'hangar'); const want = hg && G.sys === 'ember' ? [{ key: 'me', ship: G.ship }].concat([...NET.friends.values()].filter(F => F.p && F.p.ship).map(F => ({ key: F.peer, ship: F.p.ship }))) : [];
+  const sig = want.map(w => w.key + w.ship).join(); if (sig !== FS.parkSig) { FS.parkSig = sig; FS.parked.forEach(o => scene.remove(o)); FS.parked = want.map((w, i) => { const sh = SHIPS[w.ship] || SHIPS.lancer, o = sh.make(); if (sh.r > 12) o.scale.multiplyScalar(12 / sh.r); o.position.copy(FS_POS).add(hg.pos).add(hg.pos.clone().normalize().multiplyScalar(48)).add(new V3(-12 + i * 24, -14, 0)); o.lookAt(FS_POS.clone().add(hg.pos.clone().multiplyScalar(3))); scene.add(o); return o; }); }
+}
+// ---- outfits: a matching team cape ----
+function fsCape(astro) { if (!astro) return; const col = (TEAM_COL[FS.team.color] || TEAM_COL.teal)[1]; let c = astro.g.userData.cape; if (!G.team.cape) { if (c) { astro.g.remove(c); astro.g.userData.cape = null; } return; } if (!c) { c = new THREE.Group(); const cl = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.95, 1, 4), new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.7 })); cl.position.y = -0.47; c.add(cl); const em = new THREE.Mesh(new THREE.CircleGeometry(0.12, 12), mGlow(0xffffff)); em.position.set(0, -0.4, 0.01); c.add(em); c.position.set(0, 1.42, 0.26); c.rotation.x = 0.18; astro.g.add(c); astro.g.userData.cape = c; c.userData.cl = cl; } c.userData.cl.material.color.setHex(col); c.rotation.x = 0.18 + (S.vel ? Math.min(0.6, Math.hypot(S.vel.x, S.vel.z) * 0.06) : 0) + Math.sin(T * 6) * 0.03; }
+{ const _usw3 = updateSurfaceWorld; updateSurfaceWorld = function (dt) { _usw3(dt); if (S.built) { fsCape(S.astro); if (W === SHIP_W && SI.pilot) fsCape(SI.pilot); } }; }
+
+/* ---- gifts ---- */
+const GIFT = { n: 0, to: null, cr: 0, mat: '', amt: 0, seen: {} };
+function fsGift(peer, kind) {
+  const F = NET.friends.get(peer); if (!F) { say('Your friend is not online.', 'bad'); return; }
+  const opts = { cr1: { cr: 1000 }, cr5: { cr: 5000 }, sap: { mat: 'sap', amt: 5 }, resin: { mat: 'resin', amt: 5 }, prism: { mat: 'prism', amt: 5 }, cryo: { mat: 'cryo', amt: 5 } }, o = opts[kind]; if (!o) return;
+  if (o.cr && G.credits < o.cr) { say('You do not have enough credits.', 'bad'); return; } if (o.mat && (G.mats[o.mat] || 0) < o.amt) { say(`You need ${o.amt} ${MATS[o.mat].name}.`, 'bad'); return; }
+  if (o.cr) G.credits -= o.cr; else G.mats[o.mat] -= o.amt;
+  GIFT.n++; GIFT.to = peer; GIFT.cr = o.cr || 0; GIFT.mat = o.mat || ''; GIFT.amt = o.amt || 0; NET.sendT = 0; sfx('win'); say(`🎁 You sent ${F.name} ${o.cr ? o.cr.toLocaleString() + ' cr' : o.amt + ' ' + MATS[o.mat].name}!`, 'good'); save(); renderDock();
+}
+function fsGiftsIn() {
+  for (const F of NET.friends.values()) { const g = F.p && F.p.gift; if (GIFT.seen[F.peer] === undefined) { GIFT.seen[F.peer] = g && typeof g.n === 'number' ? g.n : 0; continue; } if (!g || typeof g.n !== 'number') continue; if (g.n <= GIFT.seen[F.peer]) continue; GIFT.seen[F.peer] = g.n; if (g.to !== NET.me) continue;
+    const cr = clamp(+g.cr || 0, 0, 5000), amt = clamp(+g.amt || 0, 0, 5); if (cr) G.credits += cr; if (amt && MATS[g.mat]) G.mats[g.mat] = (G.mats[g.mat] || 0) + amt; sfx('win'); showComms('A gift!', `🎁 ${F.name} sent you ${cr ? cr.toLocaleString() + ' cr' : amt + ' ' + MATS[g.mat].name}! What a good friend.`); save(); }
+}
+
+/* ---- team missions ---- */
+const TM = { mine: null, join: null, ans: {}, invite: null, rc: null, ghostFx: null, course: null };
+const TM_INFO = { escort: { name: 'Convoy escort', need: 'hangar', d: 'Guard a giant cargo ship all the way from Haven Ring to Kessel Forge while pirates attack it.' }, siege: { name: 'Station siege', need: null, d: 'Three waves of pirates attack Friendship Station. Keep it standing!' }, race: { name: 'Asteroid Canyon race', need: 'games', d: 'A two-player race through 12 ring gates in a canyon of floating rocks.' } };
+const rid = () => Math.random().toString(36).slice(2, 8);
+function tmInvite(k, peer) {
+  const F = NET.friends.get(peer); if (!F) { say('Your friend needs to be online for team missions.', 'bad'); return; }
+  if (TM.mine || TM.join) { say('You are already on a team mission.', 'bad'); return; }
+  if (TM_INFO[k].need && !fsHas(TM_INFO[k].need)) { say(`Build the ${FS_ROOMS[TM_INFO[k].need].name} at Friendship Station first.`, 'bad'); return; }
+  TM.mine = { id: rid(), k, to: peer, st: 'invite', at: performance.now() }; NET.sendT = 0; sfx('ui'); say(`Invitation sent to ${F.name}: ${TM_INFO[k].name}. Waiting for them to say yes...`, 'good'); renderDock();
+}
+function tmTeam() { const F = TM.mine ? NET.friends.get(TM.mine.to) : TM.join ? NET.friends.get(TM.join.host) : null; return F; }
+function tmBegin() {
+  const M = TM.mine; M.st = 'run'; M.t0 = Date.now() + (M.k === 'race' ? 7000 : 0); sfx('ring');
+  if (G.docked) undock();
+  if (M.k === 'escort') { const from = new V3(700, 0, 900), to = stationById('forge').pos.clone().add(new V3(0, 0, 360)); const o = tmFreighter(); o.position.copy(from); orientTo(o, to); scene.add(o); M.fr = { o, hp: 1400, max: 1400, to, spawnT: 5 }; M.tgt = { obj: o, alive: true }; showComms('Team mission', `CONVOY ESCORT! A giant cargo ship is leaving Haven Ring for Kessel Forge. Stay close to it and blast every pirate that comes for it. ${tmTeam() ? tmTeam().name : 'Your friend'} is with you!`); }
+  if (M.k === 'siege') { M.sg = { hp: 2400, max: 2400, wave: 0, t: 4 }; M.tgt = { obj: stationById('friendship').obj, alive: true }; showComms('Team mission', 'STATION SIEGE! Pirates are coming for Friendship Station. Three waves. Fly there and defend it together!'); }
+  if (M.k === 'race') { tmCourse(M.id); tmRaceStart(-1); showComms('Team mission', 'ASTEROID CANYON RACE! Fly through all 12 glowing rings. Watch out for the rocks! The race starts when the countdown hits zero.'); }
+  logAdd(['Team mission', `My friend and I started a team mission: ${TM_INFO[M.k].name}.`]);
+}
+function tmFreighter() { const g = new THREE.Group(), W2 = mStd(0xe8eef4, 0.5, 0.4), T2 = mStd(0x2ab0a0, 0.5, 0.4); g.add(new THREE.Mesh(new THREE.BoxGeometry(26, 18, 150), W2)); g.add(rbAt(new THREE.Mesh(new THREE.BoxGeometry(27, 3, 151), T2), 0, -4, 0)); for (let i = 0; i < 8; i++) g.add(rbAt(new THREE.Mesh(new THREE.BoxGeometry(11, 9, 14), mStd(pick([0xd8463a, 0xffc23a, 0x3b66d9, 0x4fb06a]), 0.4, 0.6)), i % 2 ? 6 : -6, 13, -50 + Math.floor(i / 2) * 26)); g.add(rbAt(new THREE.Mesh(new THREE.BoxGeometry(18, 14, 18), W2), 0, 14, 62)); g.add(rbAt(new THREE.Mesh(new THREE.BoxGeometry(19, 3, 19), mGlow(0x7dffb0)), 0, 17, 62)); const eng = []; for (const x of [-8, 8]) { const s = glowSprite(0x6fd8ff, 14); s.position.set(x, 0, 80); g.add(s); eng.push(s); } g.userData.engines = eng; g.add(rbAt(glowSprite(0x7dffb0, 30), 0, 30, 0)); return g; }
+function tmSpawn(n, center, tgt, heavy) { for (let i = 0; i < n; i++) { const e = spawnPirate(center.clone().add(randDir().multiplyScalar(1200).setY(rand(-200, 200))), { heavy: heavy && i === 0 }); e.tgt = tgt; e.mission = true; e.tmE = true; e.aggroP = false; } }
+function tmHostTick(dt) {
+  const M = TM.mine; if (!M) return; const F = NET.friends.get(M.to);
+  if (M.st === 'invite') { if (!F) { TM.mine = null; say('Your friend went offline.', 'bad'); return; } if (F.p && F.p.tma === M.id) tmBegin(); else if (F.p && F.p.tmn === M.id) { TM.mine = null; say(`${F.name} said "maybe later".`); } else if (performance.now() - M.at > 60000) { TM.mine = null; say('No answer to your invitation.'); } return; }
+  if (M.st !== 'run') return;
+  if (!F) { tmEnd(false, 'Your friend went offline, so the team mission is over.'); return; }
+  if (M.k === 'escort') { const f = M.fr, o = f.o; const dir = tmp.subVectors(f.to, o.position); const d = dir.length(); o.position.addScaledVector(dir.normalize(), Math.min(d, 48 * dt)); turnToward(o, f.to, dt * 0.5); o.userData.engines.forEach(s => s.scale.setScalar(12 + Math.random() * 4));
+    if ((f.spawnT -= dt) <= 0) { f.spawnT = 13; tmSpawn(2 + Math.floor(Math.random() * 2), o.position, M.tgt, Math.random() < 0.4); }
+    for (const e of enemies) if (e.tmE && e.obj.position.distanceTo(o.position) < 650) f.hp -= (e.heavy ? 6 : 4) * dt;
+    if (f.hp <= 0) { explode(o.position, 4); tmEnd(false, 'The cargo ship was destroyed! The pirates got away with the cargo. Try again!'); return; }
+    if (d < 140) { tmEnd(true); return; } }
+  if (M.k === 'siege') { const s = M.sg; const left = enemies.filter(e => e.tmE).length;
+    if (left === 0) { if (s.wave >= 3) { tmEnd(true); return; } if ((s.t -= dt) <= 0) { s.wave++; s.t = 6; tmSpawn([0, 4, 6, 8][s.wave], FS_POS, M.tgt, s.wave > 1); say(`🛡️ Siege wave ${s.wave} of 3!`, 'bad'); sfx('fail'); } }
+    for (const e of enemies) if (e.tmE && e.obj.position.distanceTo(FS_POS) < 600) s.hp -= (e.heavy ? 7 : 5) * dt;
+    if (s.hp <= 0) { tmEnd(false, 'Friendship Station was overrun! The pirates painted mustaches on it. Repair crews are cleaning up. Try again!'); return; } }
+  if (M.k === 'race') { const pr = F.p && F.p.rc && F.p.rc.id === M.id ? F.p.rc.t : null, my = TM.rc && TM.rc.id === M.id ? TM.rc.t : null; if (my !== null && (pr !== null || Date.now() - M.t0 > 150000)) { M.win = pr === null || my <= pr ? 'host' : 'guest'; M.times = [my, pr]; tmEnd(true); return; } if (Date.now() - M.t0 > 240000) { M.win = pr !== null ? 'guest' : 'host'; M.times = [my, pr]; tmEnd(true); } }
+}
+function tmEnd(won, msg) {
+  const M = TM.mine; M.st = won ? 'won' : 'lost'; M.endAt = performance.now(); NET.sendT = 0;
+  enemies.slice().forEach(e => { if (e.tmE) removeEnemy(e); }); if (M.fr) { const o = M.fr.o; setTimeout(() => scene.remove(o), 3000); }
+  if (won) tmReward(M.k, M.k === 'race' ? (M.win === 'host' ? 1 : 2) : 1, M.times ? M.times[0] : null); else { sfx('fail'); showComms('Team mission', msg); }
+  setTimeout(() => { if (TM.mine === M) TM.mine = null; tmCourseClear(); }, 6000);
+}
+function tmReward(k, place, time) {
+  const cash = k === 'escort' ? 8000 : k === 'siege' ? 10000 : place === 1 ? 6000 : 3000; G.credits += cash; const nb = k === 'escort' ? 'convoy' : k === 'siege' ? 'defender' : 'racer', first = !G.team.badges[nb]; G.team.badges[nb] = true;
+  let extra = ''; if (['convoy', 'defender', 'racer'].every(b => G.team.badges[b]) && !G.team.badges.bff) { G.team.badges.bff = true; extra = ' And you earned the BEST FRIENDS badge: Best-friends gold capes are unlocked!'; }
+  sfx('win'); showComms('Team mission complete!', `${TM_INFO[k].name}: ${k === 'race' ? (place === 1 ? 'YOU WON the race' : 'you came second, so close') + (time ? ` (${time.toFixed(1)}s)` : '') : 'mission accomplished'}! +${cash.toLocaleString()} cr.${first ? ` New team badge: ${BADGES[nb].icon} ${BADGES[nb].name}!` : ''}${extra}`);
+  if (first) logAdd([BADGES[nb].name, `My friend and I won the ${TM_INFO[k].name} together. We have matching badges now.`]);
+  if (k === 'race' && time) { G.team.races++; fsWrite(db => db.collection('sboard').add({ nm: NET.nick || 'Captain', t: Math.round(time * 10) / 10, ts: Date.now() })); }
+  fsBuild(); save();
+}
+// the partner's side
+function tmGuestTick(dt) {
+  for (const F of NET.friends.values()) { const t = F.p && F.p.tm; if (t && t.to === NET.me && t.st === 'invite' && !TM.join && !TM.mine && TM.ans[t.id] === undefined && (!TM.invite || TM.invite.id !== t.id)) { TM.invite = { id: t.id, k: t.k, host: F.peer }; const bar = $('#tmInvite'); bar.hidden = false; bar.innerHTML = `<span>🤝 <b></b> wants to do a team mission: ${TM_INFO[t.k] ? TM_INFO[t.k].name : ''}!</span><button class="btn" data-tmans="yes">Let's go!</button><button class="ghost" data-tmans="no">Maybe later</button>`; bar.querySelector('b').textContent = F.name; sfx('ring'); } }
+  if (TM.invite) { const F = NET.friends.get(TM.invite.host), t = F && F.p && F.p.tm; if (!t || t.id !== TM.invite.id || t.st !== 'invite') { TM.invite = null; $('#tmInvite').hidden = true; } }
+  const J = TM.join; if (!J) return; const F = NET.friends.get(J.host), t = F && F.p && F.p.tm;
+  if (!t || t.id !== J.id) { if (performance.now() - J.at > 8000) { TM.join = null; tmCourseClear(); say('The team mission ended.'); } return; }
+  if (t.st === 'run' && !J.started) { J.started = true; if (J.k === 'race') { tmCourse(J.id); J.t0 = t.t0; tmRaceStart(1); } else if (G.docked) undock(); }
+  if (J.k === 'escort' && Array.isArray(t.fx)) { if (!TM.ghostFx) { TM.ghostFx = tmFreighter(); scene.add(TM.ghostFx); TM.ghostFx.position.set(t.fx[0], t.fx[1], t.fx[2]); } const o = TM.ghostFx; o.visible = G.sys === 'ember'; o.position.lerp(tmp.set(t.fx[0], t.fx[1], t.fx[2]), Math.min(1, dt * 8)); o.quaternion.slerp(new THREE.Quaternion(t.fx[3], t.fx[4], t.fx[5], t.fx[6]), Math.min(1, dt * 8)); }
+  if ((t.st === 'won' || t.st === 'lost') && !J.done) { J.done = true; if (t.st === 'won') tmReward(J.k, J.k === 'race' ? (t.win === 'guest' ? 1 : 2) : 1, TM.rc && TM.rc.id === J.id ? TM.rc.t : null); else { sfx('fail'); showComms('Team mission', 'The team mission failed this time. Try again together!'); } setTimeout(() => { if (TM.ghostFx) { scene.remove(TM.ghostFx); TM.ghostFx = null; } TM.join = null; tmCourseClear(); }, 5000); }
+}
+$('#tmInvite').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !TM.invite) return; const inv = TM.invite; TM.ans[inv.id] = b.dataset.tmans; $('#tmInvite').hidden = true; TM.invite = null; if (b.dataset.tmans === 'yes') { TM.join = { id: inv.id, k: inv.k, host: inv.host, at: performance.now() }; NET.sendT = 0; say('Team mission accepted! Get ready...', 'good'); sfx('win'); } else { TM.no = inv.id; NET.sendT = 0; } });
+// the asteroid canyon
+function tmCourse(id) {
+  tmCourseClear(); let sd = 0; for (const ch of id) sd = (sd * 31 + ch.charCodeAt(0)) % 2147483647; sd = sd || 7; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const start = FS_POS.clone().add(new V3(0, -200, 700)), gates = []; for (let i = 0; i <= 12; i++) gates.push(start.clone().add(new V3(Math.sin(i * 0.7) * 420 + (rnd() - 0.5) * 120, Math.sin(i * 0.45) * 160, i * 460)));
+  const grp = new THREE.Group(); scene.add(grp); const rings = [];
+  gates.forEach((p, i) => { if (i === 0) return; const r = new THREE.Mesh(new THREE.TorusGeometry(48, 3, 8, 40), mGlow(i === 12 ? 0xffd060 : 0x7dffb0)); r.position.copy(p); r.lookAt(gates[Math.min(12, i + 1)].clone().add(i === 12 ? p.clone().sub(gates[11]) : new V3())); grp.add(r); rings.push(r); });
+  const geo = new THREE.IcosahedronGeometry(1, 1), mat = new THREE.MeshStandardMaterial({ color: 0x6a625c, roughness: 1, flatShading: true }), N = 320, im = new THREE.InstancedMesh(geo, mat, N), dm = new THREE.Object3D(), rocks = [];
+  for (let i = 0; i < N; i++) { const seg = Math.floor(i / N * 12), f = rnd(), a = gates[seg].clone().lerp(gates[seg + 1], f), dir = gates[seg + 1].clone().sub(gates[seg]).normalize(), side = new V3(-dir.z, 0, dir.x).normalize(), up = new V3(0, 1, 0); const ang = rnd() * TAU, rad = 150 + rnd() * 130, r = 18 + rnd() * 40; const p = a.add(side.multiplyScalar(Math.cos(ang) * rad)).add(up.multiplyScalar(Math.sin(ang) * rad * 0.8)); dm.position.copy(p); dm.scale.setScalar(r); dm.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3); dm.updateMatrix(); im.setMatrixAt(i, dm.matrix); rocks.push({ p: p.clone(), r }); }
+  grp.add(im); TM.course = { id, gates, rings, rocks, grp, next: 1, done: false };
+}
+function tmCourseClear() { if (TM.course) { scene.remove(TM.course.grp); TM.course = null; } }
+function tmRaceStart(side) { const c = TM.course; if (!c) return; const g0 = c.gates[0], dir = c.gates[1].clone().sub(g0).normalize(), sideV = new V3(-dir.z, 0, dir.x).normalize(); if (G.docked) undock(); player.position.copy(g0).addScaledVector(dir, -120).addScaledVector(sideV, side * 45); orientTo(player, c.gates[1].clone().addScaledVector(sideV, side * 45)); P.vel.set(0, 0, 0); G.throttle = 0; camPos.copy(player.position); TM.rc = null; }
+function tmRaceTick(dt) {
+  const c = TM.course; if (!c || G.sys !== 'ember') return; const t0 = TM.mine && TM.mine.k === 'race' ? TM.mine.t0 : TM.join && TM.join.k === 'race' ? TM.join.t0 : null; if (!t0) return;
+  c.rings.forEach((r, i) => { const on = i + 1 === c.next; r.material.color.setHex(on ? (Math.sin(T * 8) > 0 ? 0xffffff : 0x7dffb0) : i + 1 < c.next ? 0x3a4a40 : (i === 11 ? 0xffd060 : 0x7dffb0)); });
+  if (G.state === 'fly') for (const k of c.rocks) { const d = player.position.distanceTo(k.p), rr = k.r + P.r; if (d < rr) { player.position.copy(k.p).addScaledVector(tmp.subVectors(player.position, k.p).normalize(), rr); P.vel.multiplyScalar(0.4); if (T - (c.bumpT || 0) > 0.6) { c.bumpT = T; sfx('thud'); shake = Math.min(1, shake + 0.4); } } }
+  const now = Date.now(); if (now < t0) { $('#tmHud').hidden = false; $('#tmHud').textContent = `🏁 Race starts in ${Math.ceil((t0 - now) / 1000)}...`; return; }
+  if (c.done) return; const g = c.gates[c.next];
+  if (player.position.distanceTo(g) < 60) { sfx('ring'); c.next++; if (c.next > 12) { c.done = true; TM.rc = { id: c.id, t: (now - t0) / 1000 }; NET.sendT = 0; say(`🏁 Finished in ${TM.rc.t.toFixed(1)}s! Waiting for your friend...`, 'good'); } }
+}
+{ const _em18 = extraMarkers; extraMarkers = function () { _em18(); if (G.sys !== 'ember') return;
+  const c = TM.course; if (c && !c.done) { const g = c.gates[c.next], el = marker('tm-gate', 'target', `Ring ${c.next} of 12`); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(g)); placeMarker(el, g); }
+  const fx = TM.mine && TM.mine.fr && TM.mine.st === 'run' ? TM.mine.fr.o : TM.ghostFx; if (fx) { const el = marker('tm-fx', 'friendly', 'Cargo ship (protect it!)'); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(fx.position)); placeMarker(el, fx.position); }
+  const sg = (TM.mine && TM.mine.k === 'siege' && TM.mine.st === 'run') || (TM.join && TM.join.k === 'siege' && TM.join.started && !TM.join.done); if (sg) { const el = marker('tm-sg', 'friendly', 'Friendship Station (defend it!)'); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(FS_POS)); placeMarker(el, FS_POS); } }; }
+function tmHud() {
+  const h = $('#tmHud'); const M = TM.mine && TM.mine.st === 'run' ? TM.mine : null, J = TM.join && TM.join.started && !TM.join.done ? TM.join : null; if (!M && !J) { if (!TM.course || TM.course.done) h.hidden = true; return; }
+  if (TM.course && Date.now() < (M ? M.t0 : J.t0)) return; const F = tmTeam(), t = J && F && F.p ? F.p.tm : null; let s = '';
+  const k = M ? M.k : J.k; if (k === 'escort') { const hp = M ? M.fr.hp / M.fr.max : t && t.hp; s = `🚚 CONVOY ESCORT · cargo ship ${Math.round((hp || 0) * 100)}%`; }
+  if (k === 'siege') { const hp = M ? M.sg.hp / M.sg.max : t && t.hp, wave = M ? M.sg.wave : t && t.wave; s = `🛡️ STATION SIEGE · wave ${wave || 0} of 3 · station ${Math.round((hp || 0) * 100)}%`; }
+  if (k === 'race' && TM.course) s = TM.course.done ? '🏁 Finished! Waiting for your friend...' : `🏁 CANYON RACE · ring ${TM.course.next} of 12 · ${((Date.now() - (M ? M.t0 : J.t0)) / 1000).toFixed(1)}s`;
+  h.hidden = !(G.state === 'fly'); h.textContent = s + (F ? ` · with ${F.name}` : '');
+}
+function teamSnap() {
+  const M = TM.mine; let tm = null;
+  if (M) { tm = { id: M.id, k: M.k, to: M.to, st: M.st, t0: M.t0 || 0 }; if (M.fr && M.st === 'run') { const o = M.fr.o, q = o.quaternion; tm.fx = [rd1(o.position.x), rd1(o.position.y), rd1(o.position.z), rd3(q.x), rd3(q.y), rd3(q.z), rd3(q.w)]; tm.hp = Math.round(M.fr.hp / M.fr.max * 100) / 100; } if (M.sg) { tm.hp = Math.round(M.sg.hp / M.sg.max * 100) / 100; tm.wave = M.sg.wave; } if (M.win) tm.win = M.win; }
+  return { tm, tma: TM.join ? TM.join.id : null, tmn: TM.no || null, rc: TM.rc, gift: GIFT.n ? { n: GIFT.n, to: GIFT.to, cr: GIFT.cr, mat: GIFT.mat, amt: GIFT.amt } : null, snack: COOP.role === 'crew' ? SJ.snack : null, scan: COOP.role === 'crew' ? SJ.scan : null, fuel: COOP.role === 'crew' ? SJ.fuel : null, cargo: COOP.role === 'crew' ? SJ.cargo : null, fires: COOP.role === 'crew' ? SJ.fires.length : null };
+}
+{ const _ns2 = netSnap; netSnap = function () { return Object.assign(_ns2(), teamSnap()); }; }
+function teamTick(dt) { if (!NET.ns) return; fsGiftsIn(); tmHostTick(dt); tmGuestTick(dt); tmRaceTick(dt); tmHud(); sjPilot(dt); }
+{ const _et6 = expTick; expTick = function (dt) { _et6(dt); teamTick(dt); }; }
+{ const _ub15 = updateBoss; updateBoss = function (dt) { _ub15(dt); fsTick(dt); }; }
+
+/* ---- more jobs aboard a friend's ship ---- */
+const SJ = { snack: 0, scan: 0, fuel: 0, cargo: 0, fires: [], carry: null, cookT: 0, scanT: 0, rackT: 0, crate: null, seen: {}, fuelT: 0, objs: null };
+const SJ_POS = { galley: [7, 5], scanner: [-6.5, -13], rack: [3, 6.5], crate: [-3.5, 2.5] }, SJ_PADS = [[-6.5, 18.3, 0xff5a5a], [-4, 18.3, 0x6fd8ff], [4, 18.3, 0xffd060]];
+function sjBuild() {
+  if (SJ.objs && SJ.objs.scene === surf) return; const o = SJ.objs = { scene: surf };
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); surf.add(m); return m; }, dk = mStd(0x2a2c34, 0.5, 0.5);
+  const sign = (t, x, z, col) => { const s = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.5), new THREE.MeshBasicMaterial({ map: hvText(t, 512, 96, '#14161e', col), transparent: true, side: THREE.DoubleSide })); s.position.set(x, 2.5, z); surf.add(s); };
+  const [gx, gz] = SJ_POS.galley; add(new THREE.BoxGeometry(1.8, 1, 1), mStd(0xd8dde8, 0.5, 0.4), gx, 0.5, gz); o.stove = add(new THREE.CylinderGeometry(0.3, 0.3, 0.05, 12), mGlow(0xff8a3a), gx - 0.4, 1.03, gz); add(new THREE.BoxGeometry(0.8, 2, 0.8), mStd(0xe8eef4, 0.4, 0.4), gx + 1.4, 1, gz); sign('GALLEY', gx, gz - 1.2, '#ff8a3a'); S.colliders.push({ x: gx, z: gz, r: 1.2, top: 2 });
+  const [sx, sz] = SJ_POS.scanner; add(new THREE.CylinderGeometry(0.6, 0.8, 1, 10), dk, sx, 0.5, sz); o.dish = add(new THREE.SphereGeometry(0.7, 14, 8, 0, TAU, 0, Math.PI / 2), mGlow(0x6fd8ff), sx, 1.2, sz); sign('SCANNER', sx, sz + 1.2, '#6fd8ff'); S.colliders.push({ x: sx, z: sz, r: 0.9, top: 2 });
+  const [rx, rz] = SJ_POS.rack; add(new THREE.BoxGeometry(1.4, 1.6, 0.6), dk, rx, 0.8, rz); o.cells = []; for (let i = 0; i < 3; i++) o.cells.push(add(new THREE.CylinderGeometry(0.15, 0.15, 0.5, 8), mGlow(0x7dffb0), rx - 0.4 + i * 0.4, 1.1, rz + 0.35)); sign('FUEL CELLS', rx, rz - 0.8, '#7dffb0'); S.colliders.push({ x: rx, z: rz, r: 0.9, top: 2 });
+  const [cx, cz] = SJ_POS.crate; o.cpad = add(new THREE.CylinderGeometry(1, 1, 0.1, 16), mStd(0x5a5e6a), cx, 0.05, cz); sign('CARGO IN', cx, cz - 1.3, '#ffd060');
+  o.pads = SJ_PADS.map(([x, z, c]) => { const m = add(new THREE.CylinderGeometry(0.9, 0.9, 0.1, 16), mGlow(c), x, 0.06, z); m.material = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6 }); return m; });
+  o.crate = add(new THREE.BoxGeometry(0.8, 0.8, 0.8), mStd(0xffffff, 0.3, 0.6), cx, 0.5, cz); o.carry = add(new THREE.BoxGeometry(0.5, 0.5, 0.5), mStd(0xffffff), 0, -10, 0);
+  o.fire = []; for (let i = 0; i < 4; i++) { const g = new THREE.Group(); for (let k = 0; k < 4; k++) g.add(glowSprite(k % 2 ? 0xff8a20 : 0xffd060, 1)); g.visible = false; surf.add(g); o.fire.push(g); }
+}
+function sjCrewTick(dt) {
+  if (W !== SHIP_W || COOP.role !== 'crew') return; sjBuild(); const o = SJ.objs; SJ.cookT -= dt; SJ.scanT -= dt; SJ.rackT -= dt;
+  o.stove.material.color.setHex(SJ.cookT > 0 ? 0x553322 : 0xff8a3a); o.dish.rotation.y += dt * (SJ.scanT > 0 ? 0.3 : 2); o.cells.forEach(c => c.visible = SJ.rackT <= 0);
+  if (SJ.crate === null && (SJ.crateT = (SJ.crateT || 0) - dt) <= 0) SJ.crate = Math.floor(Math.random() * 3); o.crate.visible = SJ.crate !== null; if (SJ.crate !== null) o.crate.material.color.setHex(SJ_PADS[SJ.crate][2]);
+  o.carry.visible = SJ.carry !== null; if (SJ.carry !== null) { o.carry.position.copy(S.pos).add(new V3(0, 2.3, 0)); o.carry.material.color.setHex(SJ.carry === 'fuel' ? 0x7dffb0 : SJ_PADS[SJ.carry][2]); o.carry.rotation.y += dt * 2; }
+  o.fire.forEach((g, i) => { const f = SJ.fires[i]; g.visible = !!f; if (f) { g.position.set(f.x, 0.3, f.z); g.children.forEach((s, k) => { s.position.set(Math.sin(T * 9 + k) * 0.3, 0.2 + k * 0.25 + Math.random() * 0.2, Math.cos(T * 7 + k) * 0.3); s.scale.setScalar(0.8 + Math.random() * 0.6); }); } });
+  const p = COOP.pilot; if (p && SJ.lastHull !== undefined && p.hull < SJ.lastHull - 3 && SJ.fires.length < 4 && Math.random() < 0.6) { SJ.fires.push({ x: rand(-8, 8), z: rand(-11, 9) }); say('🔥 A fire broke out inside the ship! Put it out (press E next to it).', 'bad'); } if (p) SJ.lastHull = p.hull;
+}
+{ const _usw4 = updateSurfaceWorld; updateSurfaceWorld = function (dt) { _usw4(dt); if (S.built) sjCrewTick(dt); }; }
+function sjSpot() {
+  if (W !== SHIP_W) return null; const near = ([x, z], r) => Math.hypot(S.pos.x - x, S.pos.z - z) < r;
+  const fi = SJ.fires.findIndex(f => Math.hypot(S.pos.x - f.x, S.pos.z - f.z) < 2.2); if (fi >= 0) return { t: 'fire', i: fi };
+  if (SJ.carry === 'fuel' && near([0, 16.5], 3.6)) return { t: 'core' };
+  if (typeof SJ.carry === 'number') { const pi = SJ_PADS.findIndex(([x, z]) => Math.hypot(S.pos.x - x, S.pos.z - z) < 1.6); if (pi >= 0) return { t: 'pad', i: pi }; }
+  if (near(SJ_POS.galley, 2.4)) return { t: 'galley' }; if (near(SJ_POS.scanner, 2.2)) return { t: 'scanner' }; if (near(SJ_POS.rack, 2)) return { t: 'rack' }; if (near(SJ_POS.crate, 1.8) && SJ.crate !== null) return { t: 'crate' };
+  return null;
+}
+{ const _sp = shipPrompt; shipPrompt = function () { const s = sjSpot(), key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'; if (!s) return _sp(); const flying = COOP.pilot && COOP.pilot.st === 'fly';
+  if (s.t === 'fire') return `${key} to spray the fire extinguisher!`; if (s.t === 'core') return `${key} to load the fuel cell into the reactor (speed boost for your pilot)`; if (s.t === 'pad') return `${key} to put the crate down here`;
+  if (s.t === 'galley') return SJ.cookT > 0 ? `The stove is cooling down (${Math.ceil(SJ.cookT)}s)` : `${key} to cook a space sandwich for your pilot (fixes their ship a bit)`;
+  if (s.t === 'scanner') return SJ.scanT > 0 ? `Scanner recharging (${Math.ceil(SJ.scanT)}s)` : flying ? `${key} to scan for pirates and ore rocks` : 'The scanner works while the ship is flying.';
+  if (s.t === 'rack') return SJ.carry ? 'Your hands are full.' : SJ.rackT > 0 ? `New fuel cells charging (${Math.ceil(SJ.rackT)}s)` : `${key} to grab a fuel cell`;
+  if (s.t === 'crate') return SJ.carry !== null ? 'Your hands are full.' : `${key} to pick up the cargo crate and carry it to the pad of the same color`; return ''; }; }
+{ const _si = shipInteract; shipInteract = function () { const s = sjSpot(); if (!s) return _si();
+  if (s.t === 'fire') { SJ.fires.splice(s.i, 1); G.credits += 15; sfx('whoosh'); say('Fire is out! +15 cr', 'good'); return; }
+  if (s.t === 'core') { SJ.carry = null; SJ.fuel++; NET.sendT = 0; sfx('win'); say('Reactor charged! Your pilot gets a speed boost.', 'good'); return; }
+  if (s.t === 'pad') { if (s.i === SJ.carry) { SJ.carry = null; SJ.cargo++; G.credits += 60; NET.sendT = 0; sfx('pickup'); say('Cargo sorted! +60 cr for you and a bonus for your pilot.', 'good'); } else say('Wrong color! Find the pad that matches the crate.', 'bad'); return; }
+  if (s.t === 'galley') { if (SJ.cookT > 0) return; SJ.cookT = 30; SJ.snack++; NET.sendT = 0; sfx('build'); say('You cook a wobbly space sandwich and send it up to the bridge!', 'good'); return; }
+  if (s.t === 'scanner') { if (SJ.scanT > 0 || !(COOP.pilot && COOP.pilot.st === 'fly')) return; SJ.scanT = 20; SJ.scan++; NET.sendT = 0; sfx('scan'); say(`Scan sent! ${(COOP.pilot.en || []).length} pirates nearby.`, 'good'); return; }
+  if (s.t === 'rack') { if (SJ.carry !== null || SJ.rackT > 0) return; SJ.carry = 'fuel'; SJ.rackT = 12; sfx('pickup'); say('You grab a glowing fuel cell. Carry it to the reactor at the back!'); return; }
+  if (s.t === 'crate') { if (SJ.carry !== null) return; SJ.carry = SJ.crate; SJ.crate = null; SJ.crateT = 4; sfx('pickup'); return; } }; }
+{ const _cr = crewReturn; crewReturn = function () { SJ.fires = []; SJ.carry = null; return _cr.apply(this, arguments); }; }
+// the pilot feels the crew's help
+function sjPilot(dt) {
+  SJ.fuelT -= dt; const c = COOP.crew; if (!c || COOP.role === 'crew') { SJ.seen = {}; return; }
+  for (const k of ['snack', 'scan', 'fuel', 'cargo']) { const n = +c[k] || 0; if (SJ.seen[k] === undefined) { SJ.seen[k] = n; continue; } if (n <= SJ.seen[k]) continue; SJ.seen[k] = n;
+    if (k === 'snack') { G.hull = Math.min(D.maxHull, G.hull + D.maxHull * 0.25); G.shield = D.maxShield; sfx('win'); say('🥪 Your crew made you a space sandwich! Hull +25%, shields full.', 'good'); }
+    if (k === 'scan') { const near = asteroids.filter(a => a.mesh.position.distanceTo(player.position) < 6000).sort((a, b) => a.mesh.position.distanceTo(player.position) - b.mesh.position.distanceTo(player.position)).slice(0, 3); RB.marks = near; RB.markT = 25; sfx('scan'); say(`📡 Your crew scanned the area: ${enemies.length} pirates around, ${near.length} ore rocks marked.`, 'good'); }
+    if (k === 'fuel') { SJ.fuelT = 20; sfx('ring'); say('⚡ Your crew charged the reactor! Speed boost for 20 seconds.', 'good'); }
+    if (k === 'cargo') { G.credits += 40; say('📦 Your crew sorted the cargo. +40 cr', 'good'); } }
+  const fires = clamp(+c.fires || 0, 0, 4); if (fires && G.state === 'fly' && G.hull > 5) G.hull -= 0.6 * fires * dt;
+}
+{ const ms2 = Object.getOwnPropertyDescriptor(D, 'maxSpeed'); Object.defineProperty(D, 'maxSpeed', { configurable: true, get() { return ms2.get.call(D) * (SJ.fuelT > 0 ? 1.35 : 1); } }); }
+{ const _ch = coopHud; coopHud = function () { _ch(); const h = $('#coopHud'); if (h.hidden || !COOP.crew || COOP.role === 'crew') return; const f = +COOP.crew.fires || 0, extra = (f ? `<br><span class="coop-bad">🔥 ${f} fire${f > 1 ? 's' : ''} aboard!</span>` : '') + (SJ.fuelT > 0 ? '<br>⚡ Reactor boost!' : ''); const full = (h._t || '') + extra; if (h._full !== full || h._lastT !== h._t) { h.innerHTML = full; h._full = full; h._lastT = h._t; } }; }
+
+/* ---- the Team dock tab ---- */
+function renderTeam() {
+  const fr = [...NET.friends.values()], atFS = G.docked && G.docked.id === 'friendship', o = [];
+  o.push(`<div class="item co-card"><div><h4>💞 Friendship Station</h4><p>A space station you and your friends build together, near the middle of Ember Reach. ${FS.db ? 'Every room shows who built it.' : 'Shared building needs the game opened on claude.ai while signed in.'}${atFS ? '' : ' Fly to Friendship Station and dock to build rooms.'}</p></div></div>`);
+  let slots = ''; for (let i = 0; i < 6; i++) { const r = FS.rooms['s' + i]; slots += r ? `<div class="fb-offer"><div><b>${FS_ROOMS[r.k].name}</b> <span class="shipstats">built by ${escH(fsName(r))} · ${FS_ROOMS[r.k].d}</span></div></div>` : `<div class="fb-offer"><div><b>Empty slot ${i + 1}</b></div><div class="row-btns">${Object.entries(FS_ROOMS).filter(([k]) => !fsHas(k)).map(([k, v]) => `<button class="ghost" data-act="fsbuild" data-s="${i}" data-k="${k}" ${atFS && FS.db && G.credits >= v.cost ? '' : 'disabled'} title="${v.d}">${v.name} · ${v.cost.toLocaleString()}</button>`).join('')}</div></div>`; }
+  o.push(`<div class="item"><div style="width:100%"><h4>Rooms</h4>${slots}</div></div>`);
+  if (fsHas('garden')) { const wait = Math.max(0, 1800000 - (Date.now() - (G.team.garden || 0))); o.push(`<div class="item"><div><h4>🌱 Garden harvest</h4><p class="shipstats">${wait ? `Ready again in ${Math.ceil(wait / 60000)} min.` : 'Fresh plants are ready to pick!'}</p></div><div><button class="ghost" data-act="fsgarden" ${wait ? 'disabled' : ''}>Pick</button></div></div>`); }
+  const mi = Object.entries(TM_INFO).map(([k, v]) => { const locked = v.need && !fsHas(v.need); return `<div class="fb-offer"><div><b>${v.name}</b> <span class="shipstats">${v.d}${locked ? ` Needs the ${FS_ROOMS[v.need].name}.` : ''}</span></div><div class="row-btns">${fr.map(F => `<button class="ghost" data-act="tminv" data-k="${k}" data-p="${escH(F.peer)}" ${locked || TM.mine || TM.join ? 'disabled' : ''}>Invite ${escH(F.name)}</button>`).join('') || '<span class="shipstats">Your friend must be online</span>'}</div></div>`; }).join('');
+  o.push(`<div class="item"><div style="width:100%"><h4>🤝 Team missions</h4><p class="shipstats">These only work when you are both online. Invite your friend, they say yes, and off you go!${TM.mine && TM.mine.st === 'invite' ? ' (Waiting for an answer...)' : ''}</p>${mi}</div></div>`);
+  if (fr.length) o.push(`<div class="item"><div style="width:100%"><h4>🎁 Send a gift</h4>${fr.map(F => `<div class="fb-offer"><div><b>${escH(F.name)}</b></div><div class="row-btns">${[['cr1', '1,000 cr'], ['cr5', '5,000 cr'], ['sap', '5 Lumen sap'], ['resin', '5 Ember resin'], ['prism', '5 Prism'], ['cryo', '5 Cryo']].map(([k, l]) => `<button class="ghost" data-act="fsgift" data-p="${escH(F.peer)}" data-k="${k}">${l}</button>`).join('')}</div></div>`).join('')}</div></div>`);
+  o.push(`<div class="item"><div style="width:100%"><h4>🏅 Team badges</h4><p>${Object.entries(BADGES).map(([k, b]) => G.team.badges[k] ? `${b.icon} <b>${b.name}</b>` : `<span style="opacity:.4">${b.icon} ${b.name}</span>`).join(' · ')}</p><p class="shipstats" style="margin-top:8px">Matching team cape (everyone on the team wears the same color)</p><div class="row-btns">${Object.entries(TEAM_COL).filter(([k, v]) => !v[2] || G.team.badges.bff).map(([k, v]) => `<button class="rb-sw ${FS.team.color === k ? 'on' : ''}" data-act="fscol" data-k="${k}" title="${v[0]}" aria-label="${v[0]}" style="background:#${v[1].toString(16).padStart(6, '0')}"></button>`).join('')}<button class="ghost" data-act="fscape">${G.team.cape ? 'Take the cape off' : 'Wear the cape'}</button></div></div></div>`);
+  if (fsHas('games')) o.push(`<div class="item"><div style="width:100%"><h4>🏁 Canyon race best times</h4>${FS.board.length ? `<div class="hb-table">${FS.board.map((r, i) => `<div><span>${i + 1}. ${escH(String(r.nm || 'Captain').slice(0, 16))}</span><b>${(+r.t).toFixed(1)}s</b></div>`).join('')}</div>` : '<p class="shipstats">No times yet. Race your friend!</p>'}</div></div>`);
+  if (fsHas('cantina')) o.push(`<div class="item"><div style="width:100%"><h4>🍹 Cantina notice board</h4>${FS.notes.length ? FS.notes.map(n => `<p>📌 <b>${escH(String(n.nm || 'Someone').slice(0, 16))}</b>: ${escH(QCHAT[n.m])}</p>`).join('') : '<p class="shipstats">No notes yet.</p>'}<p class="shipstats">Pin a note for your friend:</p><div class="row-btns">${QCHAT.map((m, i) => `<button class="ghost" data-act="fsnote" data-k="${i}">${escH(m)}</button>`).join('')}</div></div></div>`);
+  return o.join('');
+}
+{ const _rd8 = renderDock; renderDock = function () { _rd8(); if (G.docked && dockTab === 'team') $('#tabBody').innerHTML = renderTeam(); }; }
+{ const _dk6 = dock; dock = function (st) { _dk6(st); if (st.id === 'friendship') { dockTab = 'team'; renderDock(); } }; }
+{ const _ea12 = expAct; expAct = function (act, b) {
+  if (act === 'fsbuild') { const k = b.dataset.k, s = +b.dataset.s, r = FS_ROOMS[k]; if (!r || fsHas(k) || FS.rooms['s' + s] || G.credits < r.cost || !(G.docked && G.docked.id === 'friendship')) return; b.disabled = true;
+    fsWrite(db => db.doc('srooms/s' + s).set({ k, nm: NET.nick || 'Captain', by: FS.uid || null, t: Date.now() })).then(ok => { if (!ok) { renderDock(); return; } G.credits -= r.cost; sfx('build'); say(`You built the ${r.name} at Friendship Station!`, 'good'); logAdd([`Building with friends`, `I added a ${r.name} to Friendship Station. It has my name on it.`]); save(); renderDock(); }); return; }
+  if (act === 'fsgarden') { if (Date.now() - (G.team.garden || 0) < 1800000) return; G.team.garden = Date.now(); G.mats.sap += 3; G.mats.resin += 3; G.mats.prism += 1; sfx('pickup'); say('🌱 You picked 3 Lumen sap, 3 Ember resin and 1 Prism shard from the garden!', 'good'); save(); renderDock(); return; }
+  if (act === 'tminv') { tmInvite(b.dataset.k, b.dataset.p); return; }
+  if (act === 'fsgift') { fsGift(b.dataset.p, b.dataset.k); return; }
+  if (act === 'fscol') { const k = b.dataset.k; if (!TEAM_COL[k] || (TEAM_COL[k][2] && !G.team.badges.bff)) return; FS.team.color = k; fsWrite(db => db.doc('team/main').set({ color: k })); sfx('ui'); renderDock(); return; }
+  if (act === 'fscape') { G.team.cape = !G.team.cape; sfx('ui'); save(); renderDock(); return; }
+  if (act === 'fsnote') { const m = +b.dataset.k; if (!QCHAT[m]) return; const id = 'n_' + (FS.uid ? String(FS.uid).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) : (NET.nick || 'captain').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'captain'); fsWrite(db => db.doc('board/' + id).set({ nm: NET.nick || 'Captain', m, t: Date.now() })).then(ok => { if (ok) { sfx('ui'); say('Note pinned on the cantina board!', 'good'); } }); return; }
+  _ea12(act, b);
+}; }
+TROPHIES.bff = { name: 'Best Friends heart', ok: () => !!G.team.badges.bff, make: () => { const g = new THREE.Group(); for (const sx of [-1, 1]) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), new THREE.MeshStandardMaterial({ color: 0xffc23a, metalness: 0.9, roughness: 0.2 })); l.position.set(sx * 0.11, 0.62, 0); g.add(l); } const t = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.3, 12), new THREE.MeshStandardMaterial({ color: 0xffc23a, metalness: 0.9, roughness: 0.2 })); t.rotation.z = Math.PI; t.position.y = 0.45; g.add(t); return g; } };
 
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
