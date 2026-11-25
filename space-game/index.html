@@ -495,6 +495,14 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 .zc { font-style: normal; font-weight: 600; padding: 0 5px; border-radius: 3px; }
 .zc-golden { color: #1a1206; background: #ffc23a; } .zc-shadow { color: #e8e0ff; background: #2a2a3a; } .zc-crystal { color: #0a2a3a; background: #9ff4ff; }
 .zc-rainbow { color: #fff; background: linear-gradient(90deg, #ff5a5a, #ffc23a, #7dffb0, #6fd8ff, #b07aff); }
+#elevRide { position: fixed; inset: 0; z-index: 30; --k: 0; background: linear-gradient(180deg, color-mix(in srgb, #02030a calc(var(--k) * 100%), #4a90d8), color-mix(in srgb, #0a1020 calc(var(--k) * 100%), #dcecf8)); display: grid; place-items: center; overflow: hidden; }
+#elevRide::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 10px; transform: translateX(-50%); background: linear-gradient(90deg, #8a8f9a, #e8eef4, #8a8f9a); box-shadow: 0 0 20px rgba(125,255,176,.4); }
+#elevRide::after { content: ""; position: absolute; inset: 0; background-image: radial-gradient(2px 2px at 20% 30%, #fff, transparent), radial-gradient(2px 2px at 70% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 40% 80%, #fff, transparent), radial-gradient(1.5px 1.5px at 85% 20%, #fff, transparent); opacity: var(--k); }
+.er-car { position: relative; z-index: 1; width: 120px; height: 150px; border-radius: 14px; background: linear-gradient(180deg, #ffd060, #d9a520); box-shadow: 0 0 40px rgba(255,194,58,.6); display: grid; place-items: center; }
+.er-car i { width: 70px; height: 60px; border-radius: 8px; background: #7fd4ff; box-shadow: inset 0 0 12px #1a5a80; }
+.er-info { position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%); z-index: 1; text-align: center; font-family: var(--display); color: #fff; text-shadow: 0 2px 6px #000; display: grid; gap: 6px; justify-items: center; }
+#erAlt { font-size: 40px; font-weight: 600; }
+.er-bar { width: 260px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.2); overflow: hidden; } #erFill { display: block; height: 100%; width: 0; background: #7dffb0; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 </style>
 
@@ -619,6 +627,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
       <button class="tab" role="tab" data-tab="expeditions" aria-selected="false">Expeditions</button>
       <button class="tab" role="tab" data-tab="company" aria-selected="false">Company</button>
       <button class="tab" role="tab" data-tab="zoo" aria-selected="false">Zoo</button>
+      <button class="tab" role="tab" data-tab="terraform" aria-selected="false">Terraform</button>
       <button class="tab" role="tab" data-tab="ships" aria-selected="false">Ships</button>
       <button class="tab" role="tab" data-tab="crew" aria-selected="false">Crew</button>
       <button class="tab" role="tab" data-tab="crafting" aria-selected="false">Crafting</button>
@@ -661,6 +670,7 @@ body.ion .hud-b { animation: glitchb .2s steps(2) infinite; }
 <div id="cityBubble" hidden></div>
 <div id="dvBadge" hidden></div>
 <div id="wqHud" hidden></div>
+<div id="elevRide" hidden><div class="er-car"><i></i></div><div class="er-info"><span style="letter-spacing:.24em;font-size:12px">SPACE ELEVATOR · ALTITUDE</span><span id="erAlt">0 km</span><div class="er-bar"><i id="erFill"></i></div></div></div>
 <div class="overlay" id="zooPanel" hidden><div class="panel"><header><div><div class="eyebrow">Starlight Zoo</div><h2 id="zpTitle"></h2></div><button class="ghost" id="zpClose">Close</button></header><div class="tabbody" id="zpBody"></div></div></div>
 <div class="overlay" id="starMap" hidden><div class="sm-card"><div class="eyebrow" style="color:#d9a520;font-size:10px;letter-spacing:.24em;text-transform:uppercase">Blackstar the Pirate King's</div><h2>Star map</h2><div id="smTiles"></div><p id="smStatus"></p><ol id="smList"></ol><div style="text-align:right"><button class="ghost" id="smClose">Close</button></div></div></div>
 <div id="mrHud" hidden><span id="mrGate"></span><span id="mrPos"></span><span id="mrTime"></span><span id="mrBest"></span></div>
@@ -1124,8 +1134,8 @@ const D = {
   get maxSpeed() { return (140 + G.up.engine * 32) * SH().speed; },
   get hold() { return 10 + G.up.hold * 10 + SH().hold; },
 };
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th, zoo: G.zoo })); } catch (e) {} }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; G.zoo = s.zoo || null; return true; } } catch (e) {} return false; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: G.credits, ore: G.ore, up: G.up, lastDock: G.lastDock, stats: G.stats, hull: G.hull, mats: G.mats, disc: G.disc, craft: G.craft, missiles: G.missiles, paint: G.paint, paints: G.paints, base: G.base, tod: G.tod, weapon: G.weapon, ship: G.ship, ships: G.ships, crew: G.crew, recruit: G.recruit, story: G.story, cinderLane: G.cinderLane, cargo: G.cargo, wing: G.wing, wrecks: G.wrecks, arkPark: G.arkPark, arkBank: G.arkBank, storyIntro: G.storyIntro, rep: G.rep, fish: G.fish, fishBest: G.fishBest, aquarium: G.aquarium, raceBest: G.raceBest, trophies: G.trophies, stations: G.stations, coreKits: G.coreKits, wanderer: G.wanderer, pets: G.pets, petActive: G.petActive, eggs: G.eggs, hats: G.hats, abyssLane: G.abyssLane, guardianDown: G.guardianDown, ruinDone: G.ruinDone, log: G.log, day: G.day, visited: G.visited, roster: G.roster, expeditions: G.expeditions, expBoard: G.expBoard, reports: G.reports, expStats: G.expStats, city: G.city, alien: G.alien, dv: G.dv, ngp: G.ngp, syl: G.syl, arena: G.arena, wq: G.wq, sea: G.sea, co: G.co, quarters: G.quarters, moon: G.moon, mech: G.mech, mrace: G.mrace, dg: G.dg, tm: G.tm, th: G.th, zoo: G.zoo, tf: G.tf })); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.up) { Object.assign(G, { credits: s.credits, ore: s.ore, lastDock: s.lastDock || 'haven', hull: s.hull || 100 }); Object.assign(G.up, s.up); Object.assign(G.stats, s.stats || {}); Object.assign(G.mats, s.mats || {}); G.disc = s.disc || {}; Object.assign(G.craft, s.craft || {}); G.missiles = s.missiles || 0; G.paint = s.paint || 'blue'; G.paints = s.paints || ['blue']; if (s.base) { G.base.pieces = s.base.pieces || []; Object.assign(G.base.stash, s.base.stash || {}); } if (typeof s.tod === 'number') G.tod = s.tod; G.weapon = s.weapon || 'laser'; G.ship = s.ship || 'lancer'; G.ships = s.ships || ['lancer']; G.crew = s.crew || 1; G.recruit = s.recruit || {}; G.story = s.story || 0; G.cinderLane = !!s.cinderLane; G.cargo = s.cargo || {}; G.wing = s.wing || 0; G.wrecks = s.wrecks || {}; G.arkPark = s.arkPark || null; G.arkBank = s.arkBank || 0; G.storyIntro = !!s.storyIntro; Object.assign(G.rep, s.rep || {}); G.fish = s.fish || {}; G.fishBest = s.fishBest || {}; G.aquarium = s.aquarium || {}; G.raceBest = s.raceBest || {}; G.trophies = s.trophies || {}; G.stations = s.stations || {}; G.coreKits = s.coreKits || 0; G.wanderer = !!s.wanderer; G.pets = s.pets || []; G.petActive = s.petActive || null; G.eggs = s.eggs || []; G.hats = s.hats || []; G.abyssLane = !!s.abyssLane; G.guardianDown = !!s.guardianDown; G.ruinDone = s.ruinDone || [false, false, false]; G.log = s.log || null; G.day = s.day || 1; G.visited = s.visited || {}; G.roster = s.roster || []; G.expeditions = s.expeditions || []; G.expBoard = s.expBoard || []; G.reports = s.reports || []; G.expStats = s.expStats || { ok: 0, sent: 0 }; G.city = s.city || null; G.alien = s.alien || null; G.dv = s.dv || null; G.ngp = s.ngp || null; G.syl = s.syl || null; G.arena = s.arena || null; G.wq = s.wq || null; G.sea = s.sea || null; G.co = s.co || null; G.quarters = s.quarters || null; G.moon = s.moon || null; G.mech = s.mech || null; G.mrace = s.mrace || null; G.dg = s.dg || null; G.tm = s.tm || null; G.th = s.th || null; G.zoo = s.zoo || null; G.tf = s.tf || null; return true; } } catch (e) {} return false; }
 const hadSave = load();
 if (hadSave) { $('#startBtn').textContent = 'Continue'; $('#resetBtn').hidden = false; $('#saveNote').textContent = `${G.credits.toLocaleString()} credits · ${G.stats.kills} kills`; }
 
@@ -9139,6 +9149,245 @@ $('#zooBtn').addEventListener('click', enterZoo);
 { const _ea7 = expAct; expAct = function (act, b) { if (act === 'zoobuild') { if (G.zoo.built || G.credits < 25000) return; G.credits -= 25000; G.zoo.built = true; zooStation(); sfx('win'); showComms('Starlight Zoo builders', 'Your zoo station is finished! Look for the glass dome just past Haven Ring. Dock there and walk inside to set up the first habitat.'); logAdd(['The Starlight Zoo', 'I built a zoo. In space. It is a big glass dome full of grass. Now I need animals. And maybe a gift shop.']); save(); renderDock(); return; } _ea7(act, b); }; }
 TROPHIES.zoo = { name: 'Zoo award plaque', ok: () => Object.keys(G.zoo.awards).length >= 3, make: () => { const g = new THREE.Group(); const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.06), mStd(0x7dffb0, 0.5, 0.4)); p.position.y = 0.35; g.add(p); const h = makeCritter(); h.scale.setScalar(0.12); h.position.set(0, 0.6, 0.05); g.add(h); return g; } };
 
+/* ============ terraforming a dead planet ============ */
+G.tf = G.tf || { claimed: false, name: 'Grey Rock', water: 0, air: 0, life: 0, factories: [], seeds: {}, elevator: false, comet: false, alive: false, aliveAt: 0, city: 0, wild: [], comets: 0 };
+const TERRA_P = { name: G.tf.name, sys: 'ember', world: 'terra', pos: new V3(-7600, -400, -1300), R: 600 };
+TERRA_P.landR = TERRA_P.R + 480; PLANETS.push(TERRA_P);
+const TP = { layers: {} };
+{
+  const R = TERRA_P.R, grp = new THREE.Group(); grp.position.copy(TERRA_P.pos); scene.add(grp);
+  let seed = 31; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const land = []; for (let i = 0; i < 26; i++) land.push([rnd() * 1024, 80 + rnd() * 352, 40 + rnd() * 110]);
+  const isLand = (x, y) => land.some(([lx, ly, r]) => { for (const dx of [-1024, 0, 1024]) if (Math.hypot(x - lx - dx, (y - ly) * 1.4) < r) return true; return false; });
+  const base = new THREE.Mesh(new THREE.SphereGeometry(R, 72, 48), new THREE.MeshStandardMaterial({ map: planetTex('#6a625c', '150,140,130', '40,36,34'), roughness: 1 })); grp.add(base);
+  const mk = (draw) => canvasTex(1024, 512, (c, w, h) => { const img = c.createImageData(w, h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const l = isLand(x, y), [r, g, b, a] = draw(l, x, y), i = (y * w + x) * 4; img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = a; } c.putImageData(img, 0, 0); });
+  const oceanT = mk((l) => l ? [0, 0, 0, 0] : [30, 110, 190, 255]);
+  const lifeT = mk((l, x, y) => l ? [60 + (x * 7 + y * 3) % 40, 140 + (x * 3 + y * 5) % 50, 60, 255] : [0, 0, 0, 0]);
+  const shell = (map, k, extra = {}) => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * k, 72, 48), new THREE.MeshStandardMaterial(Object.assign({ map, transparent: true, opacity: 0, roughness: 0.6, depthWrite: false }, extra))); grp.add(m); return m; };
+  TP.layers.ocean = shell(oceanT, 1.003, { roughness: 0.85, metalness: 0, color: 0x6c7c90 });
+  TP.layers.life = shell(lifeT, 1.005, { roughness: 1, color: 0x6c7c70 });
+  TP.layers.clouds = shell(planetCloudTex(77, '255,255,255'), 1.03, { alphaMap: planetCloudTex(77, '255,255,255'), color: 0x7f8a9c, roughness: 1 });
+  const halo = glowSprite(0x8fd8ff, R * 2.5); halo.material.opacity = 0; grp.add(halo); TP.layers.halo = halo;
+  TP.grp = grp;
+}
+function tfPaint() {
+  const L = TP.layers; L.ocean.material.opacity = G.tf.water / 100 * 0.95; L.life.material.opacity = Math.min(1, G.tf.life / 70); L.clouds.material.opacity = G.tf.air / 100 * 0.35; L.halo.material.opacity = G.tf.air / 100 * 0.45;
+  L.clouds.rotation.y += 0.0004; L.ocean.visible = G.tf.water > 1; L.life.visible = G.tf.life > 1; L.clouds.visible = G.tf.air > 1; L.halo.visible = false;
+}
+const tfAvg = () => Math.round((G.tf.water + G.tf.air + G.tf.life) / 3);
+// the Skyhook station and its elevator
+const SKY_POS = TERRA_P.pos.clone().add(new V3(0, TERRA_P.R + 700, 0));
+function buildSkyhook() {
+  const g = new THREE.Group(), M = mStd(0xd8dde8, 0.5, 0.4), D = mStd(0x2a2c34, 0.6, 0.4);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(40, 40, 30, 16), M); g.add(hub);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(85, 7, 8, 40), M); ring.rotation.x = Math.PI / 2; g.add(ring); g.userData.spin = ring;
+  for (let i = 0; i < 4; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 85), D); sp.rotation.y = i / 4 * TAU; sp.position.set(Math.sin(i / 4 * TAU) * 42, 0, Math.cos(i / 4 * TAU) * 42); g.add(sp); }
+  const top = new THREE.Mesh(new THREE.ConeGeometry(30, 60, 12), M); top.position.y = 45; g.add(top);
+  for (let i = 0; i < 8; i++) blinker(g, new V3(Math.cos(i / 8 * TAU) * 85, 0, Math.sin(i / 8 * TAU) * 85), i % 2 ? 0x7dffb0 : 0x6fd8ff, 10, i);
+  return g;
+}
+function skyhookStation() {
+  if (stationById('skyhook')) return;
+  STATIONS.push({ id: 'skyhook', sys: 'ember', name: 'Skyhook Station', kind: 'Terraforming base', build: buildSkyhook, pos: SKY_POS.clone(), dockR: 300, colR: 100, exit: new V3(0, 0, 1), orePrice: 25, view: 560,
+    blurb: 'Your terraforming headquarters, hanging in orbit above your planet. Order comets, track the air and water, and ride the space elevator down to the surface.' });
+  const s = STATIONS[STATIONS.length - 1]; s.obj = s.build(); s.obj.position.copy(s.pos); scene.add(s.obj); s.obj.traverse(o => { if (o.isSprite && o.userData.blink !== undefined) blinkers.push(o); });
+  PROFILE.skyhook = { food: 1.4, ice: 1.5, parts: 1.2, med: 1.2, fuel: 1.1, lux: 1.3 }; RECRUIT_CAP.skyhook = 20;
+}
+const TETHER = { obj: null, car: null };
+function tfTether() {
+  if (TETHER.obj || !G.tf.elevator) return;
+  const a = SKY_POS.clone().add(new V3(0, -15, 0)), b = TERRA_P.pos.clone().add(new V3(0, TERRA_P.R - 5, 0)), len = a.distanceTo(b);
+  const t = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, len, 8), new THREE.MeshStandardMaterial({ color: 0xd8dde8, metalness: 0.7, roughness: 0.3, emissive: 0x1a3a4a, emissiveIntensity: 0.4 })); t.position.copy(a).lerp(b, 0.5); scene.add(t); TETHER.obj = t;
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, len, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false })); glow.position.copy(t.position); scene.add(glow);
+  const car = new THREE.Mesh(new THREE.BoxGeometry(16, 20, 16), mStd(0xffc23a, 0.5, 0.4)); car.add(glowSprite(0xffc23a, 40)); scene.add(car); TETHER.car = car; TETHER.a = a; TETHER.b = b;
+}
+if (G.tf.claimed) skyhookStation();
+// towing ice comets
+const TC = { obj: null, attached: false };
+function tfComet() {
+  if (TC.obj) return; const g = new THREE.Group(), geo = new THREE.DodecahedronGeometry(14, 1); jitterGeo(geo, 0.2, 3);
+  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xdff4ff, emissive: 0x3a8ad0, emissiveIntensity: 0.5, roughness: 0.3, flatShading: true })));
+  for (let i = 0; i < 8; i++) { const t = glowSprite(0x9fe8ff, 30 - i * 3); t.position.z = 10 + i * 9; g.add(t); }
+  g.position.copy(SKY_POS).add(new V3(300, 80, 400)); scene.add(g); TC.obj = g; TC.attached = false;
+}
+if (G.tf.comet) tfComet();
+function tfSpace(dt) {
+  tfPaint(); tfTether();
+  if (TETHER.car) { const k = (Math.sin(T * 0.15) + 1) / 2; TETHER.car.position.copy(TETHER.a).lerp(TETHER.b, k); }
+  if (!TC.obj || G.sys !== 'ember') { if (TC.obj) TC.obj.visible = G.sys === 'ember'; return; }
+  TC.obj.visible = true; TC.obj.rotation.x += dt * 0.3;
+  if (!TC.attached && G.state === 'fly' && player.position.distanceTo(TC.obj.position) < 70 + P.r) { TC.attached = true; sfx('pickup'); say(`Tractor beam locked on the ice comet! Fly it into ${G.tf.name} to make oceans.`, 'good'); }
+  if (TC.attached && !TC.drop) { const behind = new V3(0, -10, 60 + P.r * 2).applyQuaternion(player.quaternion).add(player.position); TC.obj.position.lerp(behind, Math.min(1, dt * 2)); TC.obj.lookAt(player.position); if (player.position.distanceTo(TERRA_P.pos) < TERRA_P.R + 420) { TC.drop = true; say('Tractor beam released! The comet plunges toward the planet...', 'good'); sfx('whoosh'); } }
+  if (TC.drop) {
+    const to = TERRA_P.pos.clone().sub(TC.obj.position), d = to.length(); TC.obj.position.addScaledVector(to.normalize(), Math.min(d, 500 * dt)); TC.obj.lookAt(TERRA_P.pos);
+    if (TC.obj.position.distanceTo(TERRA_P.pos) < TERRA_P.R + 20) { TC.drop = false;
+      scene.remove(TC.obj); TC.obj = null; TC.attached = false; G.tf.comet = false; G.tf.comets++;
+      G.tf.water = Math.min(100, G.tf.water + 14); explode(TERRA_P.pos.clone().add(player.position.clone().sub(TERRA_P.pos).normalize().multiplyScalar(TERRA_P.R + 10)), 6, 0x9fe8ff); sfx('boom', 1.2); shake = 1;
+      say(`SPLASH! The comet melts into ${G.tf.name}. Water ${Math.round(G.tf.water)}%`, 'good');
+      if (G.tf.comets === 1) logAdd(['The first comet', `I towed a giant ice comet across Ember Reach and dropped it on ${G.tf.name}. KABOOM. Then: a lake. My very first lake.`]);
+      save();
+    }
+  }
+}
+{ const _ub8 = updateBoss; updateBoss = function (dt) { _ub8(dt); tfSpace(dt); }; }
+{ const _em14 = extraMarkers; extraMarkers = function () { _em14(); if (G.sys !== 'ember') return; if (TC.obj && !TC.attached) { const el = marker('tf-comet', 'target', 'Ice comet (tow it)'); el.querySelector('.dst').textContent = fmtD(player.position.distanceTo(TC.obj.position)); placeMarker(el, TC.obj.position); } if (TC.attached) { const el = marker('tf-drop', 'target', `Drop it on ${G.tf.name}`); el.querySelector('.dst').textContent = fmtD(Math.max(0, player.position.distanceTo(TERRA_P.pos) - TERRA_P.R)); placeMarker(el, TERRA_P.pos); } }; }
+// slow changes over time
+let tfT = 1;
+function tfTick(dt) {
+  if (!G.tf.claimed) return; if ((tfT -= dt) > 0) return; tfT = 1;
+  const f = G.tf.factories.length, planted = Object.keys(G.tf.seeds).length;
+  if (f) G.tf.air = Math.min(100, G.tf.air + f * 2 / 60);
+  if (G.tf.water >= 40 && G.tf.air >= 40 && planted) G.tf.life = Math.min(100, G.tf.life + planted * 0.35 / 60);
+  if (!G.tf.alive && G.tf.water >= 80 && G.tf.air >= 80 && G.tf.life >= 60) { G.tf.alive = true; G.tf.aliveAt = Date.now(); sfx('win'); G.credits += 25000; showComms('Skyhook Station', `IT'S ALIVE! ${G.tf.name} has oceans, a blue sky and growing forests. People are already asking to move there! Colonists will start building a city by the elevator, and you can release animals from your zoo onto the planet. +25,000 cr`); logAdd([`${G.tf.name} is alive`, `It took comets, factories and seeds from every world, but ${G.tf.name} is not grey anymore. It is blue and green and it has weather. I made a planet. Me.`]); save(); }
+  if (G.tf.alive && G.tf.city < 30 && Date.now() - G.tf.aliveAt > (G.tf.city + 1) * 40000) { G.tf.city++; if (G.tf.city === 1 || G.tf.city % 10 === 0) say(`The city on ${G.tf.name} grows: ${G.tf.city} buildings!`, 'good'); }
+}
+{ const _et3 = expTick; expTick = function (dt) { _et3(dt); tfTick(dt); }; }
+
+/* ============ the surface of your planet ============ */
+function terraHgt(x, z) {
+  let h = 6 + (fbm(x * 0.005 + 11, z * 0.005) - 0.5) * 50 + (fbm(x * 0.03, z * 0.03 + 4) - 0.5) * 4;
+  const basin = fbm(x * 0.0025 + 3, z * 0.0025 + 8); if (basin < 0.45) h -= (0.45 - basin) * 120;
+  const d = Math.hypot(x, z); if (d < 45) { const k = smooth(45, 25, d); h = h * (1 - k) + 10 * k; }
+  return h;
+}
+const TERRA_W = { id: 'terra', brand: 'YOUR PLANET · SURFACE', title: 'Your planet', scene: new THREE.Scene(), pad: { x: 0, z: 0 }, padH: 10, hgtFn: terraHgt, itemPlan: [], critterMinH: 99, bob: false, buildable: false,
+  pal: { dayTop: new THREE.Color(0x1a1410), dayHor: new THREE.Color(0x5a4a3a), setTop: new THREE.Color(0x1a1410), setHor: new THREE.Color(0x6a4a3a), nightTop: new THREE.Color(0x020204), nightHor: new THREE.Color(0x0a0808), water: new THREE.Color(0x2a7ab0) },
+  nightMsg: 'Night on your planet.', hint: 'WASD walk · E build air factories, plant seeds and ride the elevator · F board your ship',
+  st: { built: false, items: [], critters: [], colliders: [], spires: [], pulses: [], clouds: [], ship: null, shipModel: null, astro: null, drone: null, water: null, sky: null, sun: null, hemi: null, moonLight: null, glims: [], base: [], fauna: null, snow: null, caves: [], aurora: [] } };
+WORLDS.terra = TERRA_W;
+const TFS = { terrain: null, lifeKey: -1, trees: null, grass: null, treePos: [], factories: [], gardens: [], houses: [], walkers: [], wild: {}, elev: null };
+const FACT_SPOTS = [[45, 20], [30, 50], [-15, 55], [-50, 25], [-45, -30], [20, -55]];
+const SEEDS = {
+  lumen: { name: 'Verdance lumenbloom', cost: { sap: 3 }, at: [16, -18], col: 0x5ff2ff, ok: () => true },
+  frost: { name: 'Hoarfrost snow-pine', cost: { cryo: 3 }, at: [24, -6], col: 0xdfefff, ok: () => true },
+  ember: { name: 'Pyre fire-cactus', cost: { obs: 3 }, at: [24, 8], col: 0xff6a3a, ok: () => true },
+  kelp: { name: 'Ocean glow-kelp', cost: { cr: 1500 }, at: [-24, 8], col: 0x7dffb0, ok: () => !!(G.sea && G.sea.dives), lock: 'Dive into the Verdance ocean first' },
+  star: { name: 'Ancient starfruit', cost: { sun: 2 }, at: [-24, -6], col: 0xffd060, ok: () => !!(G.tm && G.tm.tree), lock: 'Grow the starfruit tree through time first' },
+  veil: { name: 'Sylari crystal-flower', cost: { comet: 2 }, at: [-16, -18], col: 0xff9ad8, ok: () => !!(G.syl && G.syl.met), lock: 'Meet the Sylari first (New Game+)' },
+};
+function buildTerra() {
+  if (S.built) return; S.built = true;
+  SHIP_REST.set(PAD.x, PAD_H + 2.5, PAD.z); SHIP_START.set(PAD.x + 240, PAD_H + 160, PAD.z - 140);
+  surf.fog = new THREE.Fog(0x5a4a3a, 200, 1300);
+  const sky = makeSkyDome(0x1a1410, 0x5a4a3a); sky.renderOrder = -10; surf.add(sky); S.sky = sky;
+  S.sun = new THREE.DirectionalLight(0xfff0e0, 1); S.sun.position.copy(SURF_SUN); surf.add(S.sun); S.hemi = new THREE.HemisphereLight(0xcfe0ff, 0x5a4a3a, 0.5); surf.add(S.hemi); S.moonLight = new THREE.DirectionalLight(0x8fa8ff, 0); S.moonLight.position.set(0.6, 0.8, -0.3); surf.add(S.moonLight);
+  const SIZE = 2200, SEG = 170, tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); tg.rotateX(-Math.PI / 2);
+  const tp = tg.attributes.position; for (let i = 0; i < tp.count; i++) tp.setY(i, terraHgt(tp.getX(i), tp.getZ(i))); tg.computeVertexNormals(); tg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(tp.count * 3), 3));
+  TFS.terrain = new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true })); surf.add(TFS.terrain);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), new THREE.MeshStandardMaterial({ color: 0x2a7ab0, transparent: true, opacity: 0.85, roughness: 0.15, metalness: 0.2 })); water.rotation.x = -Math.PI / 2; surf.add(water); S.water = water;
+  // trees and grass appear as life grows
+  const dummy = new THREE.Object3D(); TFS.trees = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.8 }), 400); TFS.grass = new THREE.InstancedMesh(new THREE.ConeGeometry(0.12, 1, 3), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }), 3000);
+  let nT = 0; for (let i = 0; i < 2000 && nT < 400; i++) { const a = rand(0, TAU), r = rand(30, 600), x = Math.cos(a) * r, z = Math.sin(a) * r, y = terraHgt(x, z); if (y < 1.5) continue; const H = rand(6, 16); dummy.position.set(x, y + H / 2, z); dummy.scale.set(H * 0.3, H, H * 0.3); dummy.rotation.set(0, rand(0, 3), 0); dummy.updateMatrix(); TFS.trees.setMatrixAt(nT, dummy.matrix); TFS.trees.setColorAt(nT++, colr.setRGB(rand(0.15, 0.35), rand(0.45, 0.7), rand(0.15, 0.3))); }
+  let nG = 0; for (let i = 0; i < 9000 && nG < 3000; i++) { const a = rand(0, TAU), r = Math.sqrt(Math.random()) * 400, x = Math.cos(a) * r, z = Math.sin(a) * r, y = terraHgt(x, z); if (y < 1 || r < 14) continue; dummy.position.set(x, y, z); dummy.scale.setScalar(rand(0.5, 1.2)); dummy.rotation.set(rand(-0.3, 0.3), 0, rand(-0.3, 0.3)); dummy.updateMatrix(); TFS.grass.setMatrixAt(nG, dummy.matrix); TFS.grass.setColorAt(nG++, colr.setRGB(rand(0.3, 0.5), rand(0.6, 0.85), rand(0.2, 0.35))); }
+  [TFS.trees, TFS.grass].forEach(im => { im.count = 0; im.frustumCulled = false; im.instanceColor.needsUpdate = true; surf.add(im); }); TFS.nT = nT; TFS.nG = nG;
+  // pad, shuttle, elevator base
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(12, 13, 0.6, 32), smat(0x4a4c55, 0.6, { metalness: 0.4 })); pad.position.set(PAD.x, PAD_H + 0.05, PAD.z); surf.add(pad);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(10.5, 0.15, 6, 48), mGlow(0x7dffb0)); ring.rotation.x = Math.PI / 2; ring.position.set(PAD.x, PAD_H + 0.4, PAD.z); surf.add(ring);
+  S.ship = new THREE.Group(); const sm = makeFighter(STYLE_PLAYER); S.ship.add(sm); S.shipModel = sm; S.ship.userData.engines = sm.userData.engines;
+  for (const [x, z] of [[0, -3], [2.4, 2.4], [-2.4, 2.4]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 2, 6), mStd(0x2a2b33)); leg.position.set(x, -1.4, z); S.ship.add(leg); }
+  S.ship.position.copy(SHIP_REST); S.ship.rotation.y = SHIP_YAW; surf.add(S.ship); S.colliders.push({ x: PAD.x, z: PAD.z, r: 5, top: PAD_H + 3.5 });
+  const eb = new THREE.Group(); const base = new THREE.Mesh(new THREE.CylinderGeometry(6, 8, 6, 12), mStd(0xd8dde8, 0.5, 0.4)); base.position.y = 3; eb.add(base); const cable = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1600, 8), new THREE.MeshStandardMaterial({ color: 0xd8dde8, metalness: 0.7, roughness: 0.3, emissive: 0x1a3a4a, emissiveIntensity: 0.4, fog: false })); cable.position.y = 800; eb.add(cable); const door = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), mGlow(0xffc23a)); door.position.set(0, 2.5, 8.05); eb.add(door);
+  eb.position.set(0, terraHgt(0, -30), -30); surf.add(eb); TFS.elev = eb; S.colliders.push({ x: 0, z: -30, r: 8, top: 99 });
+  FACT_SPOTS.forEach(([x, z], i) => { const y = terraHgt(x, z), pad2 = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 0.4, 16), mStd(0x3a3c48)); pad2.position.set(x, y + 0.2, z); surf.add(pad2); const mark = glowSprite(0x6fd8ff, 3); mark.position.set(x, y + 1.5, z); surf.add(mark); TFS.factories.push({ x, z, y, mark, obj: null, puffs: [] }); });
+  Object.entries(SEEDS).forEach(([k, s]) => { const [x, z] = s.at, y = terraHgt(x, z), bed = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.5, 14), smat(0x5a3a22)); bed.position.set(x, y + 0.25, z); surf.add(bed); const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.8), new THREE.MeshBasicMaterial({ map: hvText(s.name.toUpperCase(), 512, 96, '#14161e', '#' + s.col.toString(16).padStart(6, '0')), transparent: true, side: THREE.DoubleSide })); sign.position.set(x, y + 2.2, z); sign.lookAt(0, y + 2.2, 0); surf.add(sign); TFS.gardens.push({ k, x, z, y, plant: null }); });
+  S.astro = makeAstronaut(); surf.add(S.astro.g); S.drone = makeDrone(); surf.add(S.drone);
+}
+TERRA_W.build = buildTerra;
+function tfColors() {
+  const key = Math.round(G.tf.life / 5) * 1000 + Math.round(G.tf.water / 10); if (key === TFS.lifeKey) return; TFS.lifeKey = key;
+  const g = TFS.terrain.geometry, tp = g.attributes.position, nrm = g.attributes.normal, col = g.attributes.color, life = G.tf.life / 100;
+  for (let i = 0; i < tp.count; i++) { const x = tp.getX(i), y = tp.getY(i), z = tp.getZ(i), n = fbm(x * 0.04, z * 0.04);
+    colr.setRGB(0.42, 0.38, 0.34).multiplyScalar(0.8 + n * 0.4).lerp(tmpC.setRGB(0.3, 0.27, 0.25), smooth(0.85, 0.65, nrm.getY(i)));
+    const sea = -18 + G.tf.water / 100 * 18; if (y < sea + 1.5 && G.tf.water > 5) colr.lerp(tmpC.setRGB(0.82, 0.74, 0.55), 0.7);
+    else if (life > 0) colr.lerp(tmpC.setRGB(0.25, 0.55, 0.2).multiplyScalar(0.8 + n * 0.4), clamp(life * 1.4 - (y > 30 ? 0.5 : 0), 0, 0.92) * smooth(0.6, 0.85, nrm.getY(i)));
+    col.setXYZ(i, colr.r, colr.g, colr.b); }
+  col.needsUpdate = true;
+}
+TERRA_W.update = function (dt) {
+  const air = G.tf.air / 100, P2 = TERRA_W.pal;
+  P2.dayTop.setRGB(0.1, 0.08, 0.06).lerp(tmpC.setHex(0x4a90d8), air); P2.dayHor.setRGB(0.35, 0.29, 0.23).lerp(tmpC.setHex(0xdcecf8), air); P2.setHor.setHex(0x6a4a3a).lerp(tmpC.setHex(0xffa070), air); P2.setTop.setHex(0x1a1410).lerp(tmpC.setHex(0x5a5a9a), air);
+  S.water.position.y = -18 + G.tf.water / 100 * 18; S.water.visible = G.tf.water > 2;
+  tfColors();
+  TFS.trees.count = Math.round(TFS.nT * clamp((G.tf.life - 10) / 70, 0, 1)); TFS.grass.count = Math.round(TFS.nG * clamp(G.tf.life / 50, 0, 1));
+  // factories
+  TFS.factories.forEach((f, i) => { const built = G.tf.factories.includes(i); f.mark.visible = !built; if (built && !f.obj) { const g = new THREE.Group(); const t = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.2, 10, 10), mStd(0xd8dde8, 0.5, 0.4)); t.position.y = 5; g.add(t); const fan = new THREE.Group(); fan.position.y = 10.5; for (let k = 0; k < 3; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(5, 0.2, 0.8), mStd(0x3b66d9)); b.rotation.y = k / 3 * TAU; fan.add(b); } g.add(fan); g.userData.fan = fan; g.position.set(f.x, f.y, f.z); surf.add(g); f.obj = g; S.colliders.push({ x: f.x, z: f.z, r: 3.4, top: f.y + 11 }); for (let k = 0; k < 6; k++) { const pf = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff, map: TEX_GLOW, transparent: true, opacity: 0.4, depthWrite: false })); pf.scale.setScalar(4); surf.add(pf); f.puffs.push({ s: pf, t: k / 6 }); } }
+    if (f.obj) { f.obj.userData.fan.rotation.y += dt * 4; f.puffs.forEach(p => { p.t = (p.t + dt * 0.25) % 1; p.s.position.set(f.x + p.t * 6, f.y + 12 + p.t * 30, f.z); p.s.scale.setScalar(4 + p.t * 14); p.s.material.opacity = 0.45 * (1 - p.t); }); } });
+  // gardens
+  TFS.gardens.forEach(gd => { if (G.tf.seeds[gd.k] && !gd.plant) { const s = SEEDS[gd.k], g = new THREE.Group(); for (let k = 0; k < 5; k++) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 1.6, 5), mStd(0x3a7a3a)); st.position.set(Math.cos(k * 1.3) * 1.2, 0.8, Math.sin(k * 1.3) * 1.2); g.add(st); const fl = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), new THREE.MeshStandardMaterial({ color: s.col, emissive: s.col, emissiveIntensity: 0.6 })); fl.position.set(st.position.x, 1.8, st.position.z); g.add(fl); } g.add(Object.assign(glowSprite(s.col, 4), {})); g.position.set(gd.x, gd.y + 0.5, gd.z); surf.add(g); gd.plant = g; } if (gd.plant) gd.plant.scale.setScalar(0.6 + G.tf.life / 100 * 0.8); });
+  // city and colonists
+  while (TFS.houses.length < G.tf.city) { const i = TFS.houses.length, a = i * 0.7 + 0.4, r = 22 + Math.floor(i / 9) * 9, x = Math.cos(a) * r, z = -30 + Math.sin(a) * r, y = terraHgt(x, z); if (y < 1) { TFS.houses.push(null); continue; } const h = makeCityPiece(pick(['house', 'house', 'house', 'farm', 'market', 'park'])); h.position.set(x, y, z); h.rotation.y = -a; surf.add(h); TFS.houses.push(h); }
+  const wantW = Math.min(14, Math.floor(G.tf.city / 2));
+  while (TFS.walkers.length < wantW) { const p = makePerson(pick([0x3b66d9, 0xd7712c, 0x4f9a3a, 0xb05ad9, 0xe8e2dc])); surf.add(p.g); TFS.walkers.push(Object.assign(p, { a: rand(0, TAU), r: rand(15, 40), sp: rand(0.04, 0.09) * (Math.random() < 0.5 ? 1 : -1), t: 0 })); }
+  TFS.walkers.forEach(w => { w.a += w.sp * dt; const x = Math.cos(w.a) * w.r, z = -30 + Math.sin(w.a) * w.r; w.g.position.set(x, Math.max(terraHgt(x, z), 0), z); w.g.rotation.y = -w.a + (w.sp > 0 ? Math.PI : 0); w.t += dt * 7; const sw = Math.sin(w.t) * 0.5; w.legs[0].rotation.x = sw; w.legs[1].rotation.x = -sw; });
+  // released zoo animals roam free
+  G.tf.wild.forEach((a, i) => { let v = TFS.wild[i]; if (!v) { const sp = ZSP[a.sp]; const o = sp.make(); zColorize(o, a.col); o.scale.setScalar(sp.s); const ang = i * 1.7, x = Math.cos(ang) * 60, z = Math.sin(ang) * 60; o.position.set(x, Math.max(terraHgt(x, z), 0), z); surf.add(o); v = TFS.wild[i] = { obj: o, goal: null, t: 0, fly: sp.fly }; }
+    const o = v.obj; v.t += dt; if (!v.goal || o.position.distanceTo(v.goal) < 1) { const ang = rand(0, TAU), r = rand(30, 120); v.goal = new V3(Math.cos(ang) * r, 0, Math.sin(ang) * r); if (terraHgt(v.goal.x, v.goal.z) < 1) v.goal.set(rand(-30, 30), 0, rand(-30, 30)); }
+    const dx = v.goal.x - o.position.x, dz = v.goal.z - o.position.z, d = Math.hypot(dx, dz) || 1; o.position.x += dx / d * 2.5 * dt; o.position.z += dz / d * 2.5 * dt; v.goal.y = 0; o.rotation.y = Math.atan2(-dx, -dz); o.position.y = Math.max(terraHgt(o.position.x, o.position.z), 0) + (v.fly ? 3 + Math.sin(v.t) : 0); if (o.userData.legs) o.userData.legs.forEach((l, k) => l.rotation.x = Math.sin(v.t * 10 + k) * 0.5); });
+};
+TERRA_W.surfMarkers = function () {
+  const m = (id, cls, label, x, y, z) => { const el = marker(id, cls, label); el.querySelector('.dst').textContent = fmtD(Math.hypot(S.pos.x - x, S.pos.z - z)); placeMarker(el, tmp.set(x, y, z)); };
+  m('tf-elev', 'station', G.tf.elevator ? 'Space elevator' : 'Elevator base (not built)', 0, terraHgt(0, -30) + 12, -30);
+  TFS.factories.forEach((f, i) => { if (!G.tf.factories.includes(i)) m('tf-f' + i, 'friendly', 'Factory pad', f.x, f.y + 4, f.z); });
+};
+function tfSpot() {
+  for (let i = 0; i < TFS.factories.length; i++) { const f = TFS.factories[i]; if (Math.hypot(S.pos.x - f.x, S.pos.z - f.z) < 5.5) return { t: 'factory', i }; }
+  for (const gd of TFS.gardens) if (Math.hypot(S.pos.x - gd.x, S.pos.z - gd.z) < 4) return { t: 'seed', gd };
+  if (Math.hypot(S.pos.x, S.pos.z + 30) < 11) return { t: 'elev' };
+  return null;
+}
+function terraPrompt() {
+  const s = tfSpot(), key = isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'; if (!s) return '';
+  if (s.t === 'factory') return G.tf.factories.includes(s.i) ? `Air factory: pumping out ${2} % air a minute.` : `${key} to build an air factory (3,000 cr + 2 Prism shard)`;
+  if (s.t === 'seed') { const sd = SEEDS[s.gd.k]; if (G.tf.seeds[s.gd.k]) return `${sd.name} is growing here.`; if (!sd.ok()) return `${sd.name}: ${sd.lock}.`; if (G.tf.water < 40 || G.tf.air < 40) return `Seeds need at least 40% water and 40% air to grow (now ${Math.round(G.tf.water)}% water, ${Math.round(G.tf.air)}% air).`; return `${key} to plant ${sd.name} (${costText(sd.cost)})`; }
+  if (s.t === 'elev') return G.tf.elevator ? `${key} to ride the space elevator up to Skyhook Station` : 'Build the space elevator at Skyhook Station to ride from here.';
+  return '';
+}
+function terraInteract() {
+  const s = tfSpot(); if (!s) return;
+  if (s.t === 'factory' && !G.tf.factories.includes(s.i)) { const c = { cr: 3000, prism: 2 }; if (!canAfford(c)) { say(`Air factories cost ${costText(c)}.`, 'bad'); return; } payCost(c); G.tf.factories.push(s.i); G.tf.air = Math.min(100, G.tf.air + 5); sfx('win'); say(`Air factory built! The sky of ${G.tf.name} is getting thicker. (${G.tf.factories.length} of 6)`, 'good'); if (G.tf.factories.length === 1) logAdd(['Making air', `I built my first air factory on ${G.tf.name}. It hums and puffs out clouds. Soon there will be a real sky up there.`]); save(); return; }
+  if (s.t === 'seed') { const sd = SEEDS[s.gd.k]; if (G.tf.seeds[s.gd.k] || !sd.ok() || G.tf.water < 40 || G.tf.air < 40) return; if (!canAfford(sd.cost)) { say(`You need ${costText(sd.cost)}.`, 'bad'); return; } payCost(sd.cost); G.tf.seeds[s.gd.k] = true; G.tf.life = Math.min(100, G.tf.life + 12); sfx('win'); say(`You planted ${sd.name}! Life ${Math.round(G.tf.life)}%`, 'good'); if (Object.keys(G.tf.seeds).length === 1) logAdd(['The first garden', `I planted the first seeds on ${G.tf.name}. A tiny green sprout poked out of the dust. I may have cried a little.`]); save(); return; }
+  if (s.t === 'elev' && G.tf.elevator) elevRide(false);
+}
+{ const _hv9 = harvest; harvest = function () { if (G.state === 'surface' && W === TERRA_W) { const s = tfSpot(); if (s) { terraInteract(); return; } } _hv9(); }; }
+{ const _ush8 = updateSurfHUD; updateSurfHUD = function () { _ush8(); if (W === TERRA_W) { const pr = terraPrompt(); if (pr) setPrompt(pr); $('#sDisc').textContent = `${G.tf.name}: water ${Math.round(G.tf.water)}% · air ${Math.round(G.tf.air)}% · life ${Math.round(G.tf.life)}%${G.tf.alive ? ` · city ${G.tf.city} buildings` : ''}`; } }; }
+{ const _uw2 = useWorld; useWorld = function (w) { _uw2(w); if (w === TERRA_W) { $('#sHudTL .brand').textContent = `${G.tf.name.toUpperCase()} · SURFACE`; $('#sHudTR h3').textContent = `Explore ${G.tf.name}`; } }; }
+// the elevator ride
+function elevRide(down) {
+  $('#comms').hidden = true; setState('elev'); const ov = $('#elevRide'); ov.hidden = false; ov.classList.toggle('down', down); sfx('whoosh');
+  const t0 = performance.now(), dur = 4200;
+  const tick = () => { const k = Math.min(1, (performance.now() - t0) / dur), alt = Math.round((down ? 1 - k : k) * 1200); $('#erAlt').textContent = `${alt.toLocaleString()} km`; $('#erFill').style.width = (k * 100) + '%'; ov.style.setProperty('--k', down ? 1 - k : k);
+    if (k < 1) requestAnimationFrame(tick); else { ov.hidden = true; if (down) { LAND = TERRA_P; G.docked = null; useWorld(TERRA_W); W.build(); spawnItems(); spawnStoryItems(); renderScene = surf; applyBloom(true); camera.near = 0.1; camera.fov = 62; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); S.pos.set(0, terraHgt(0, -20), -19); S.vel.set(0, 0, 0); S.heading = 0; S.yaw = Math.PI; S.pitch = 0.25; S.fuel = fuelMax(); S.heat = 100; S.astro.g.visible = true; S.drone.visible = true; setState('surface'); updateSurfCamera(1); say(`Ding! Ground floor: ${G.tf.name}.`, 'good'); if (!G.tf.rodeLog) { G.tf.rodeLog = true; logAdd(['Going down', `I rode the space elevator all the way down to ${G.tf.name}. 1,200 kilometers in an elevator. There was music. It was not good music.`]); } }
+      else { renderScene = scene; applyBloom(false); camera.near = shipNear(); camera.fov = 68; camera.updateProjectionMatrix(); dock(stationById('skyhook')); } } };
+  requestAnimationFrame(tick);
+}
+// the Terraform dock tab
+function renderTerra() {
+  const t = G.tf;
+  if (!t.claimed) return `<div class="item co-card"><div><h4>Claim a dead planet</h4><p>Far out in a quiet corner of Ember Reach floats a grey, dead, rocky planet. No air, no water, no life. Claim it, give it a name and bring it to life! Claiming builds Skyhook Station in orbit above it.</p><input class="tfname" maxlength="20" value="New Hope" aria-label="Planet name"></div><div><div class="reward">20,000 cr</div><button class="btn" data-act="tfclaim" ${G.credits >= 20000 ? '' : 'disabled'}>Claim the planet</button></div></div>`;
+  const barT = (v, c) => `<div class="exp-bar" style="width:160px;display:inline-block;vertical-align:middle"><i style="width:${v}%;background:${c}"></i></div>`;
+  let h = `<div class="item co-card"><div><h4>${t.name} ${t.alive ? '<span class="tag race">Alive!</span>' : `<span class="tag delivery">${tfAvg()}% terraformed</span>`}</h4><p>Water ${barT(t.water, '#3aa8e0')} ${Math.round(t.water)}% · Air ${barT(t.air, '#dfefff')} ${Math.round(t.air)}% · Life ${barT(t.life, '#5fc060')} ${Math.round(t.life)}%</p><p class="shipstats">To come alive it needs 80% water, 80% air and 60% life. ${t.factories.length} air factories · ${Object.keys(t.seeds).length} of 6 seeds planted · ${t.comets} comets dropped${t.alive ? ` · city: ${t.city} buildings · ${t.wild.length} wild animals` : ''}</p></div></div>`;
+  h += `<div class="item"><div><h4>Ice comet delivery</h4><p>${t.comet ? 'A comet is waiting near Skyhook Station. Fly close to lock your tractor beam on it, then fly it into the planet.' : 'Order an ice comet. Tow it into the planet: each comet adds 14% water.'}</p></div><div>${t.comet ? '<div class="reward" style="font-size:12px">Comet waiting</div>' : `<div class="reward">1,500 cr + 2 Cryo</div><button class="btn" data-act="tfcomet" ${canAfford({ cr: 1500, cryo: 2 }) && t.water < 100 ? '' : 'disabled'}>Order comet</button>`}</div></div>`;
+  h += `<div class="item"><div><h4>Space elevator</h4><p>${t.elevator ? `A cable 1,200 km long, from this station down to ${t.name}.` : `Build a giant cable from Skyhook Station down to the surface of ${t.name}, so you can ride straight down without your ship.`}</p></div><div>${t.elevator ? (G.docked && G.docked.id === 'skyhook' ? '<button class="btn" data-act="tfride">Ride the elevator down</button>' : '<div class="reward" style="font-size:12px">Ride it from Skyhook Station</div>') : `<div class="reward">30,000 cr + 4 Obsidian</div><button class="btn" data-act="tfelev" ${canAfford({ cr: 30000, obs: 4 }) ? '' : 'disabled'}>Build elevator</button>`}</div></div>`;
+  h += `<div class="item"><div><h4>On the surface</h4><p>Land on ${t.name} (or ride the elevator) to build air factories on the six glowing pads and plant seeds from every world in the gardens by the elevator.</p></div></div>`;
+  if (t.alive) { const zooA = G.zoo && G.zoo.animals ? G.zoo.animals : []; h += `<div class="item"><div><h4>Release zoo animals</h4><p>${zooA.length ? `Give your zoo animals a whole planet to roam on ${t.name}.` : 'Your zoo has no animals right now.'}</p><div class="row-btns" style="margin-top:6px">${zooA.slice(0, 20).map(a => `<button class="ghost" data-act="tfrelease" data-id="${a.id}">${a.name} (${ZSP[a.sp].name})</button>`).join('')}</div></div></div>`; }
+  h += `<div class="item"><div><h4>Rename the planet</h4><input class="tfname" maxlength="20" value="${t.name}" aria-label="Planet name"></div><div><button class="ghost" data-act="tfrename">Rename</button></div></div>`;
+  return h;
+}
+{ const _rd4 = renderDock; renderDock = function () { _rd4(); if (G.docked && dockTab === 'terraform') $('#tabBody').innerHTML = renderTerra(); }; }
+{ const _dk4 = dock; dock = function (st) { _dk4(st); if (st.id === 'skyhook') { dockTab = 'terraform'; renderDock(); } }; }
+$('#tabBody').addEventListener('keydown', e => { if (e.target.matches('.tfname')) e.stopPropagation(); });
+{ const _ea8 = expAct; expAct = function (act, b) {
+  const nm = () => { const i = document.querySelector('.tfname'); return ((i && i.value) || '').trim().slice(0, 20) || 'New Hope'; };
+  if (act === 'tfclaim') { if (G.tf.claimed || G.credits < 20000) return; G.credits -= 20000; G.tf.claimed = true; G.tf.name = nm(); TERRA_P.name = G.tf.name; skyhookStation(); sfx('win'); showComms('Skyhook Station', `${G.tf.name} is yours, captain! Skyhook Station is in orbit above it, out in the far corner of Ember Reach. Order ice comets for water, build air factories and plant seeds. Let's make this rock come alive!`); logAdd([`Claiming ${G.tf.name}`, `I bought a dead planet and named it ${G.tf.name}. It is grey and boring. For now.`]); save(); renderDock(); return; }
+  if (act === 'tfrename') { G.tf.name = nm(); TERRA_P.name = G.tf.name; sfx('ui'); say(`Your planet is now called ${G.tf.name}.`, 'good'); save(); renderDock(); return; }
+  if (act === 'tfcomet') { if (G.tf.comet || !canAfford({ cr: 1500, cryo: 2 })) return; payCost({ cr: 1500, cryo: 2 }); G.tf.comet = true; tfComet(); sfx('win'); say('An ice comet is waiting near Skyhook Station. Undock and tow it!', 'good'); save(); renderDock(); return; }
+  if (act === 'tfelev') { if (G.tf.elevator || !canAfford({ cr: 30000, obs: 4 })) return; payCost({ cr: 30000, obs: 4 }); G.tf.elevator = true; tfTether(); sfx('win'); showComms('Skyhook Station', `The space elevator is finished! A cable 1,200 km long now hangs from this station all the way down to ${G.tf.name}.`); logAdd(['The space elevator', 'There is now a cable from my space station to my planet. You can ride it like an elevator. Because it IS an elevator. A space elevator.']); save(); renderDock(); return; }
+  if (act === 'tfride') { if (G.tf.elevator) elevRide(true); return; }
+  if (act === 'tfrelease') { const a = G.zoo.animals.find(q => q.id === +b.dataset.id); if (!a || !G.tf.alive) return; G.zoo.animals.splice(G.zoo.animals.indexOf(a), 1); G.tf.wild.push({ sp: a.sp, col: a.col, name: a.name }); sfx('win'); say(`${a.name} the ${ZSP[a.sp].name} now roams free on ${G.tf.name}!`, 'good'); if (G.tf.wild.length === 1) logAdd(['Running free', `${a.name} was the first zoo animal to move to ${G.tf.name}. It ran in circles for ten minutes. Happy circles.`]); save(); renderDock(); return; }
+  _ea8(act, b);
+}; }
+TROPHIES.terra = { name: 'Planet globe', ok: () => G.tf.alive, make: () => { const g = new THREE.Group(); const s = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), new THREE.MeshStandardMaterial({ color: 0x3aa8e0 })); s.position.y = 0.45; g.add(s); for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshStandardMaterial({ color: 0x5fc060 })); c.position.set(Math.cos(i * 1.6) * 0.27, 0.45 + Math.sin(i * 2) * 0.15, Math.sin(i * 1.6) * 0.27); g.add(c); } return g; } };
+
 /* ============ camera / loop ============ */
 function updateCamera(dt) {
   if (G.state === 'fly' || G.state === 'dying' || G.state === 'pause' || G.state === 'descent' || G.state === 'warp' || G.state === 'map' || G.state === 'wander') {
@@ -9177,7 +9426,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel' && G.state !== 'starmap' && G.state !== 'zoopanel';
+  const running = G.state !== 'pause' && G.state !== 'map' && G.state !== 'photo' && G.state !== 'wander' && G.state !== 'board' && G.state !== 'book' && G.state !== 'ending' && G.state !== 'arenares' && G.state !== 'naming' && G.state !== 'song' && G.state !== 'door' && G.state !== 'hpanel' && G.state !== 'starmap' && G.state !== 'zoopanel' && G.state !== 'elev';
   const onSurf = renderScene !== scene;
   if (running) {
     T += dt; advanceTod(dt); arkIncome(dt); updateOwnStations(dt); updateWeather(dt); logWatch(dt); expTick(dt); citySim(dt); dvTick(dt);
