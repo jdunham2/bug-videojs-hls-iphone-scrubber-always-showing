@@ -65,11 +65,21 @@ Up to 4 players per party.
 | **Admin dashboard** | `/api/admin` (enabled by `EMBERFALL_ADMIN_KEY`) reports live rooms, zones, players and an anti-cheat log covering both damage and movement rejections. `/admin/` is a dashboard for it. The same page, published as a static Artifact, runs the real server simulation in the page with bot parties and a cheater as a demo. |
 | **Performance and scale** | Crowd separation uses a spatial hash, and big waves can move it to a **worker thread** (`EMBERFALL_WORKERS=1`). **Delta-compressed snapshots** use quantized positions with keyframes, about 49% less bandwidth in a 150-enemy wave. **Server movement validation** (a speed budget plus a burst allowance for rolls and blinks) works with **client prediction and reconciliation** (sequenced states, corrections replayed). **Experimental WebGPU renderer** (Settings → Renderer): the WebGPU build of three, TSL versions of every custom shader, instanced sprite particles and TSL bloom (`?gpu=gl` runs the same node renderer on its WebGL2 backend). |
 
+### Act III, endgame mastery and launch (milestone 5)
+| Feature | Details |
+|---|---|
+| **Act III: The Hollow Crown** | The **Sunken Citadel**: a drowned city whose tide (shared world clock, 2-minute cycle) floods and drains the streets; wading slows you. Six quests with **Sir Corvin**, a tank companion (taunts packs onto himself, Shield Wall halves party damage). Pick your companion in the quest log. **Tide Bells** you can only ring at low water, the **Drowned Warden**, and the 5-phase **Hollow King Reborn**: arena shifts, a party **sigil puzzle** (break the sigils in the order shown on his crown), tidal waves and an enrage. New cutscene style: **in-engine close-up dialogue with lip-flap**. |
+| **Endgame** | **Nightmare I–III** party difficulty: scaled enemies and loot luck, **Nightmare Essence** and four Nightmare-only legendary powers. **Weekly Rift Trials**: one seed, keystone and modifier set for everyone, a weekly ranking, and a **replay of the top run** you can watch from the Rift Obelisk (timeline, speed, follow camera). **Mystic Forge**: legendary recipes, **enchanting** a chosen affix (pick one of three results), **set transmutation**. Tooltips compare real **DPS and toughness** against what you have equipped. |
+| **Combat depth** | Server-tracked **elemental statuses and combos**: **Shock** (wet + storm: stun, +50%, arcs to wet neighbours), **Explosion** (oil + fire), **Steam** (wet + fire: blinds enemies). Rain, marsh water and the tide soak enemies. Telegraphed heavy blows glint; a perfect dodge or block **counters** them (stagger + exposed, +50% damage taken). **Combo points** from basic attacks fuel a class **finisher (F)**: Shield Slam, Ember Execution, Arcane Overload, Storm Arrow. **Training Grounds** (via the Trainer) with dummies, a DPS meter and a combat log. |
+| **Player housing** | Your own home off Emberhold: craft 12 furniture pieces, display a **trophy** from each boss you've slain, and keep a **fish tank** that shows every species you've caught. Decorate in build mode (B) with a grid-snapped ghost; the server validates every placement. Friends and party members can visit (🏠 in Social) but can't edit. |
+| **Launch readiness** | Optional **email login by magic link** (hashed emails, rate limits). A **directory service** (`node server/directory.js`) for a **server/region browser** with ping and **friends shown across servers**. **Chat moderation**: profanity filter, cleaned names, **mute** and **report** (click a name in chat). **Signed, rate-limited admin actions** from the dashboard (kick, ban, unban, grant, roll back to a daily backup), plus live reports and client errors. **Save versioning with ordered migrations**. Client error reporting. A **performance budget** step in CI. |
+| **Polish** | **SVG iconography**, panel transitions, **controller-navigable menus**. Accessibility tab: **reduced motion** (follows the OS setting), **high contrast**, **subtitle sizes**, **sound captions**, **gamepad remapping**. **English and Spanish** string tables with a language picker. A **90-second attract-mode trailer** on the title screen. |
+
 ### Static solo build
 `npm run build:artifact` writes `dist-artifact/`, a static solo build. It runs the server simulation inside the page and saves to localStorage. This is the version published as a claude.ai Artifact.
 
 ### Tests
-`npm test` runs the server-simulation suite (14 tests: combat, anti-cheat, levers, economy, trading, rifts, quests, rate limits, gems, Act II and the Herald, clock, weather and fishing, social, delta snapshots and movement validation).
+`npm test` runs the server-simulation suite (19 tests, including Act III, endgame, combat combos, housing and launch features, plus the earlier 14: combat, anti-cheat, levers, economy, trading, rifts, quests, rate limits, gems, Act II and the Herald, clock, weather and fishing, social, delta snapshots and movement validation).
 
 `npm run load` defends Emberhold with 4 players against a 150-enemy wave in three configurations:
 
@@ -82,12 +92,12 @@ Up to 4 players per party.
 The tick budget is 50 ms (20 Hz). At this size the worker gives no measurable win: the spatial hash already makes separation cheap. It is there for far larger waves.
 
 ### Server options
-`PORT`, `EMBERFALL_DB` (JSON file), `EMBERFALL_SQLITE=1` (SQLite store), `EMBERFALL_DEV=1` (dev chat commands, movement checks off), `EMBERFALL_WORKERS=1` (crowd worker thread), `EMBERFALL_ADMIN_KEY=<secret>` (enables `/api/admin` and the `/admin/` dashboard).
+`EMBERFALL_PUBLIC_URL` (links in login emails), `EMBERFALL_MAIL_WEBHOOK` (POST {to, subject, text} to your mail provider), `EMBERFALL_DIRECTORY` + `EMBERFALL_SERVER_NAME` + `EMBERFALL_REGION` (directory heartbeat), `PORT`, `EMBERFALL_DB` (JSON file), `EMBERFALL_SQLITE=1` (SQLite store), `EMBERFALL_DEV=1` (dev chat commands, movement checks off), `EMBERFALL_WORKERS=1` (crowd worker thread), `EMBERFALL_ADMIN_KEY=<secret>` (enables `/api/admin` and the `/admin/` dashboard).
 
 ### Dev mode
 Start with `EMBERFALL_DEV=1` to enable `/depth N`, `/gold N`, `/xp N`, `/wave N`, `/loot N`, `/gems N`, `/quest N`, `/hour N` and `/weather clear|rain|snow|ash` in chat.
 ## Controls
-WASD move (keep running out of combat to sprint) · Mouse look (click to lock) · LMB basic attack · 1–4 (and RMB) class skills · Shift dodge roll · Space jump · R potion · E interact / trade / fish · V or MMB lock-on · hold T emote wheel · M mount · I inventory · K talents · J quest log · O social · B build (U upgrade, R repair) · Enter chat (`/w name`, `/g`) · Esc settings · H help. Every key can be rebound in Settings.
+WASD move (keep running out of combat to sprint) · Mouse look (click to lock) · LMB basic attack · 1–4 (and RMB) class skills · Shift dodge roll · Space jump · R potion · E interact / trade / fish · V or MMB lock-on · hold T emote wheel · M mount · I inventory · K talents · J quest log · O social · B build (U upgrade, R repair) · F finisher · Enter chat (`/w name`, `/g`, `/mute name`, `/report name reason`) · Esc settings · H help. Every key can be rebound in Settings.
 
 Gamepad: left stick move · right stick camera · A jump · B dodge · X attack · Y interact · LB/RB/LT/RT skills 1–4 · R3 lock-on · L3 emotes · D-pad ↑ potion · Start settings · Back inventory.
 
