@@ -858,6 +858,8 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 #pkFlash { position: fixed; inset: 0; z-index: 75; background: #fff; pointer-events: none; animation: pkFlash .6s ease-out forwards; }
 #pkFlash[hidden] { display: none; }
 @keyframes pkFlash { from { opacity: .95; } to { opacity: 0; } }
+#pkWish .rides { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.12); font-size: 13px; }
+#pkWish .rides span { opacity: .3; filter: grayscale(1); margin-right: 2px; } #pkWish .rides span.on { opacity: 1; filter: none; }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -15302,6 +15304,11 @@ function pkHauntBuild() { if (PK.haunt) return PK.haunt; const g = new THREE.Gro
   for (const q of H.pops) { if (!q.done && u >= q.u - 0.02) { q.done = true; q.sp.visible = true; q.t = 0; shake = 0.3; if (AC) { tone('sawtooth', 300, 90, 0.5, 0.06); noise(0.3, 0.06, 1500, 200); } say(pick(['👻 BOO!', '💀 A skeleton waves at you!', '🦇 Bats! Everywhere!', '👀 Something is watching you...', '🕸️ Eek, spider webs!']), 'good'); } if (q.done && q.sp.visible) { q.t += dt; q.sp.scale.setScalar(Math.min(4, 1 + q.t * 14)); q.sp.position.y += Math.sin(T * 6) * 0.01; if (q.t > 2.5) q.sp.visible = false; } }
   if (R.t >= R.dur) { PK.ride = null; S.astro.g.visible = true; camera.up.set(0, 1, 0); S.pos.set(R.it.x, 0, R.it.z + 10); say('👻 You escaped the haunted house! That was SPOOKY (but fun)!', 'good'); sfx('win'); } }; }
 { const _ush166 = updateSurfHUD; updateSurfHUD = function () { _ush166.apply(this, arguments); if (W !== PARK_W || PK.ride) return; const n = pkNear(); if (n && n.it.k === 'haunted' && Math.hypot(S.pos.x - n.it.x, S.pos.z - n.it.z) < 12) setPrompt(`${isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'} to enter the haunted house 👻`); }; }
+/* ============ park: "Ride them all!" trophy ============ */
+const PK_RIDES = { coaster: '🎢', slide: '💦', wheel: '🎡', saucer: '🛸', bumper: '🚗', haunt: '👻' };
+PK.ridden = (() => { try { return JSON.parse(localStorage.getItem(PK_KEY + '_rides') || '{}') || {}; } catch (_) { return {}; } })();
+{ const _pu168 = PARK_W.update; PARK_W.update = function (dt) { _pu168(dt); const R = PK.ride; if (R && PK_RIDES[R.kind] && !PK.ridden[R.kind]) { PK.ridden[R.kind] = true; try { localStorage.setItem(PK_KEY + '_rides', JSON.stringify(PK.ridden)); } catch (_) {} const n = Object.keys(PK_RIDES).filter(k => PK.ridden[k]).length; if (n === 6 && !PK.ridden.trophy) { PK.ridden.trophy = true; try { localStorage.setItem(PK_KEY + '_rides', JSON.stringify(PK.ridden)); } catch (_) {} setTimeout(() => { G.credits += 5000; save(); sfx('win'); gx127Banner(5000); const b = document.getElementById('gx127'); if (b) b.querySelector('.gx127t').textContent = '🏆 RIDE THEM ALL! 🏆'; say('🏆 You rode every ride in your park! +5,000 cr', 'good'); }, 1500); } else say(`🎟️ New ride ridden! ${n} of 6 (ride them all for a trophy)`, 'good'); } }; }
+{ const _ush168 = updateSurfHUD; updateSurfHUD = function () { _ush168.apply(this, arguments); if (W !== PARK_W) return; const el = $('#pkWish'); if (!el || el.hidden) return; const line = `<div class="rides">🎟️ ${Object.entries(PK_RIDES).map(([k, e]) => `<span class="${PK.ridden[k] ? 'on' : ''}">${e}</span>`).join('')} ${Object.keys(PK_RIDES).filter(k => PK.ridden[k]).length}/6${PK.ridden.trophy ? ' 🏆' : ''}</div>`; if (!el.innerHTML.includes('class="rides"')) { el.insertAdjacentHTML('beforeend', line); el._h = null; } else if (el._rl !== line) { el.querySelector('.rides').outerHTML = line; } el._rl = line; }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
