@@ -15,6 +15,7 @@
   <canvas id="c"></canvas>
   <div id="labels"></div>
   <div id="vignette"></div>
+  <div id="slowmo"></div>
   <div id="fade"></div>
 
   <!-- LOBBY -->
@@ -22,6 +23,9 @@
     <div class="lobby-card">
       <div class="logo">EMBERFALL</div>
       <div class="tagline">Delve. Loot. Defend the last city.</div>
+      <label>Choose your hero</label>
+      <div id="classCards"></div>
+      <div id="classInfo"></div>
       <label>Hero name</label>
       <input id="nameInput" maxlength="16" placeholder="Hero" />
       <label>Banner color</label>
@@ -30,10 +34,9 @@
       <input id="roomInput" maxlength="6" placeholder="e.g. KXQR" />
       <button id="playBtn" class="btn primary">Enter Emberhold</button>
       <div id="lobbyMsg" class="muted"></div>
-      <div class="controls-mini">
-        <b>WASD</b> move · <b>Mouse</b> look · <b>LMB</b> attack combo · <b>Q</b> Ember Slam · <b>Shift</b> dash · <b>Space</b> jump · <b>R</b> potion · <b>E</b> interact · <b>I</b> inventory · <b>B</b> build · <b>Enter</b> chat · <b>H</b> help
-      </div>
+      <div id="lobbyGold" class="muted small"></div>
     </div>
+    <div class="preview-wrap"><canvas id="preview" width="640" height="720"></canvas><div class="muted small">Drag to rotate</div></div>
   </div>
 
   <!-- HUD -->
@@ -42,6 +45,7 @@
     <div id="topRight">
       <canvas id="minimap" width="180" height="180"></canvas>
       <div id="roomInfo"></div>
+      <button class="btn" id="gearBtn" title="Settings">⚙ Settings</button>
     </div>
     <div id="zoneBanner"><div class="zb-title"></div><div class="zb-sub"></div></div>
     <div id="bossBar" class="hidden"><div class="bb-name"></div><div class="bb-track"><div class="bb-fill"></div></div></div>
@@ -49,41 +53,40 @@
       <div class="dh-title"></div>
       <div class="dh-sub"></div>
       <div class="dh-core"><span>Ember Heart</span><div class="bb-track small"><div class="dh-fill"></div></div></div>
+      <div id="laneWarn"></div>
     </div>
+    <div id="style" class="hidden"><div id="styleRank">D</div><div class="sbox"><div id="styleName"></div><div class="strack"><div id="styleFill"></div></div><div id="comboNum"></div></div></div>
+    <div id="perfect"></div>
+    <div id="reticle"></div>
     <div id="prompt" class="hidden"></div>
     <div id="toasts"></div>
+    <div id="buffs"></div>
     <div id="chat"><div id="chatLog"></div><input id="chatInput" class="hidden" maxlength="160" placeholder="Say something…" /></div>
+    <div id="buildInfo" class="hidden"></div>
     <div id="buildBar" class="hidden"></div>
     <div id="bottom">
+      <div id="talentPip"></div>
       <div class="stat-row">
         <div class="lvl-badge" id="lvlBadge">1</div>
         <div class="bars">
           <div class="hpbar"><div id="hpFill"></div><span id="hpText"></span></div>
+          <div class="resbar"><div id="resFill"></div><span id="resText"></span></div>
           <div class="xpbar"><div id="xpFill"></div></div>
         </div>
         <div class="gold" id="goldText">0</div>
       </div>
-      <div class="skills">
-        <div class="skill" data-k="LMB"><div class="ico">⚔</div><div class="key">LMB</div><div class="cd"></div></div>
-        <div class="skill" id="skQ" data-k="Q"><div class="ico">💥</div><div class="key">Q</div><div class="cd"></div></div>
-        <div class="skill" id="skDash" data-k="Shift"><div class="ico">💨</div><div class="key">⇧</div><div class="cd"></div></div>
-        <div class="skill" id="skPot" data-k="R"><div class="ico">🧪</div><div class="key">R</div><div class="cnt" id="potCount">3</div><div class="cd"></div></div>
-      </div>
+      <div class="skills" id="skills"></div>
     </div>
     <div id="clickToPlay" class="hidden">Click to look around</div>
   </div>
 
+  <div id="letterbox"><div class="lb top"></div><div class="lb bot"></div><div id="cineTitle" class="cine-title"></div><div id="cineSub" class="cine-sub"></div><div id="skipHint">Press Space to skip</div></div>
+
   <div id="inventory" class="panel hidden">
     <div class="panel-head"><span>Inventory</span><button class="x" data-close="inventory">✕</button></div>
     <div class="inv-body">
-      <div class="inv-left">
-        <div class="equip" id="equipSlots"></div>
-        <div class="stats" id="statsBox"></div>
-      </div>
-      <div class="inv-right">
-        <div class="bag" id="bag"></div>
-        <div class="muted small" id="invHint">Click to equip · Right-click to sell at a merchant</div>
-      </div>
+      <div class="inv-left"><div class="equip" id="equipSlots"></div><div class="stats" id="statsBox"></div></div>
+      <div class="inv-right"><div class="bag" id="bag"></div><div class="muted small" id="invHint"></div></div>
     </div>
   </div>
 
@@ -94,23 +97,75 @@
     <div class="shop-foot"><button class="btn" id="rerollBtn">Restock (25g)</button><span class="muted small">Right-click items in your bag to sell</span></div>
   </div>
 
+  <div id="talents" class="panel hidden">
+    <div class="panel-head"><span>Talents</span><button class="x" data-close="talents">✕</button></div>
+    <div id="talentHead"></div>
+    <div id="talentTree"></div>
+    <div class="shop-foot"><button class="btn hidden" id="talentReset">Reset talents</button><span class="muted small">Earn a point every level. Higher tiers unlock as you invest.</span></div>
+  </div>
+
+  <div id="stash" class="panel hidden">
+    <div class="panel-head"><span>Shared Stash</span><button class="x" data-close="stash">✕</button></div>
+    <div class="stash-body">
+      <div><div class="sub-h">Stash <span id="stashGold" class="muted small"></span></div><div class="bag stashgrid" id="stashGrid"></div><div class="muted small">Click an item to take it</div></div>
+      <div><div class="sub-h">Your bag</div><div class="bag" id="stashBag"></div><div class="muted small">Click an item to store it</div></div>
+    </div>
+  </div>
+
+  <div id="trade" class="panel hidden">
+    <div class="panel-head"><span id="tradeWith">Trade</span><button class="x" data-close="trade">✕</button></div>
+    <div class="trade-body">
+      <div><div class="sub-h">Your offer</div><div id="tradeMine" class="tlist"></div><label class="small">Gold <input id="tradeGold" type="number" min="0" value="0" /></label></div>
+      <div><div class="sub-h">Their offer</div><div id="tradeTheirs" class="tlist"></div></div>
+    </div>
+    <div class="trade-bag"><div class="sub-h">Your bag — click to offer</div><div class="bag" id="tradeBag"></div></div>
+    <div id="tradeStatus" class="muted small"></div>
+    <div class="shop-foot"><button class="btn primary" id="tradeAccept">Accept trade</button><button class="btn" id="tradeCancel">Cancel</button></div>
+  </div>
+
+  <div id="settings" class="panel hidden">
+    <div class="panel-head"><span>Settings</span><button class="x" data-close="settings">✕</button></div>
+    <div class="stabs"><button class="stab on" data-p="sp-gfx">Graphics</button><button class="stab" data-p="sp-audio">Audio</button><button class="stab" data-p="sp-ctrl">Controls</button></div>
+    <div class="spage" id="sp-gfx">
+      <div class="srow"><span>Graphics quality</span><select id="setQuality"></select></div>
+      <div class="muted small">Low: no shadows/bloom, lower resolution, sparse grass. Ultra: 4K shadow maps, supersampling.</div>
+      <div class="srow"><span>Play intro cinematic on join</span><input type="checkbox" id="setIntro" /></div>
+      <div class="srow"><span></span><button class="btn" id="replayIntro">Replay intro now</button></div>
+    </div>
+    <div class="spage hidden" id="sp-audio">
+      <div class="srow"><span>Master volume</span><input type="range" min="0" max="1" step="0.01" id="setMaster" /><b id="setMasterV"></b></div>
+      <div class="srow"><span>Music</span><input type="range" min="0" max="1" step="0.01" id="setMusic" /><b id="setMusicV"></b></div>
+      <div class="srow"><span>Sound effects</span><input type="range" min="0" max="1" step="0.01" id="setSfx" /><b id="setSfxV"></b></div>
+    </div>
+    <div class="spage hidden" id="sp-ctrl">
+      <div class="srow"><span>Mouse sensitivity</span><input type="range" min="0.25" max="3" step="0.05" id="setSens" /><b id="setSensV"></b></div>
+      <div class="srow"><span>Invert Y axis</span><input type="checkbox" id="setInvert" /></div>
+      <div class="sub-h">Key bindings <button class="btn small-btn" id="resetBinds">Reset</button></div>
+      <div id="bindList"></div>
+      <div id="padInfo" class="muted small"></div>
+    </div>
+  </div>
+
+  <div id="emoteWheel" class="hidden"></div>
+  <div id="dialog" class="hidden"></div>
   <div id="tooltip" class="hidden"></div>
   <div id="death" class="hidden"><div class="d-title">YOU HAVE FALLEN</div><div class="d-sub" id="deathSub"></div></div>
   <div id="bigBanner" class="hidden"><div class="bb-t"></div><div class="bb-s"></div></div>
   <div id="help" class="panel hidden">
     <div class="panel-head"><span>How to play</span><button class="x" data-close="help">✕</button></div>
     <div class="help-body">
-      <p><b>Emberhold</b> is the last city. Explore the valley, find hidden chests, and step through the <span class="o">orange portal</span> to delve into the <b>Dungeon</b>. Slay the Bone Tyrant to clear it — every clear makes enemies <i>and</i> loot stronger.</p>
-      <p>The <span class="p">violet portal</span> leads to the <b>Dark World</b>, where the Hollow Merchant sells powerful gear for gold.</p>
-      <p>Ring the <b>Night Bell</b> beside the Ember Heart to start <b>Defend the City</b>. Press <b>B</b> to build barricades, towers, braziers and frost totems. Survive 5 waves for a big gold payout.</p>
-      <p>Share your party code so a friend can join you online.</p>
+      <p><b>Emberhold</b> is the last city. Explore the valley, find hidden chests, and step through the <span class="o">orange portal</span> to delve into the <b>Dungeon</b>. Dungeons rotate between the Bone Crypts, the Molten Forge (lava!) and the Frozen Catacombs (slippery ice). Pull the levers in the order shown on the boss gate, then slay the boss. Watch out for treasure goblins, elite monsters and spike traps, and use shrines for buffs.</p>
+      <p>The <span class="p">violet portal</span> leads to the <b>Dark World</b> merchant. The <b>Trainer</b> resets talents; the <b>Stash</b> is shared by all your heroes. Your progress is saved on the server.</p>
+      <p>Ring the <b>Night Bell</b> to <b>Defend the City</b>. Build walls to reroute the horde, upgrade structures (U) and repair them (R) in build mode. The Siege Ogre arrives on wave 5.</p>
+      <p>Dodge-roll through attacks at the last moment for a <b>Perfect Dodge</b>. Lock on with V or middle mouse. Mix up your skills to raise your <b>Style</b> rank for bonus damage and gold. Walk up to a party member and press E to trade. Hold T for emotes.</p>
       <table>
         <tr><td>WASD</td><td>Move</td><td>Mouse</td><td>Camera (click to lock)</td></tr>
-        <tr><td>LMB</td><td>Attack combo</td><td>Q / RMB</td><td>Ember Slam</td></tr>
-        <tr><td>Shift</td><td>Dash (invulnerable)</td><td>Space</td><td>Jump</td></tr>
-        <tr><td>R</td><td>Drink potion</td><td>E</td><td>Interact</td></tr>
-        <tr><td>I / Tab</td><td>Inventory</td><td>B</td><td>Build mode (1-4 select)</td></tr>
-        <tr><td>Enter</td><td>Chat</td><td>Wheel</td><td>Zoom</td></tr>
+        <tr><td>LMB</td><td>Basic attack</td><td>1–4 / RMB</td><td>Class skills</td></tr>
+        <tr><td>Shift</td><td>Dodge roll</td><td>Space</td><td>Jump</td></tr>
+        <tr><td>R</td><td>Potion</td><td>E</td><td>Interact / trade</td></tr>
+        <tr><td>I</td><td>Inventory</td><td>K</td><td>Talents</td></tr>
+        <tr><td>V / MMB</td><td>Lock-on</td><td>T (hold)</td><td>Emote wheel</td></tr>
+        <tr><td>B</td><td>Build mode</td><td>Esc</td><td>Settings / close</td></tr>
       </table>
     </div>
   </div>

@@ -80,6 +80,23 @@ export function buildWeapon(type, rarity = 0) {
     mesh(new THREE.TorusGeometry(0.17, 0.015, 6, 20), gold, 0, 0.72, 0, g);
   } else if (type === 'claws') {
     for (let i = -1; i <= 1; i++) { const c = mesh(cone(0.025, 0.35, 4), std('#d6d0ff', { emissive: '#8a5cff', ei: 1.5 }), i * 0.05, 0.12, 0.05, g); c.rotation.x = 0.4; }
+  } else if (type === 'staff') {
+    mesh(cyl(0.035, 0.045, 1.6, 8), wood, 0, 0.35, 0, g);
+    const crys = mesh(cg('staffCrystal', () => new THREE.OctahedronGeometry(0.15, 0)), std(col, { emissive: col, ei: 1.5 + RARITY_GLOW[rarity], rough: 0.2 }), 0, 1.32, 0, g);
+    crys.scale.y = 1.6;
+    for (const s of [-1, 1]) { const prong = mesh(cone(0.03, 0.32, 5), gold, 0.11 * s, 1.18, 0, g); prong.rotation.z = -0.35 * s; }
+    mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 14), gold, 0, 1.08, 0, g).rotation.x = Math.PI / 2;
+    mats.push(crys.material);
+  } else if (type === 'shield') {
+    const face = std(g.userData.color || '#5a6a8a', { metal: 0.5, rough: 0.45 });
+    mesh(cyl(0.42, 0.42, 0.07, 18), face, 0, 0.05, 0.05, g);
+    mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 24), gold, 0, 0.09, 0.05, g).rotation.x = Math.PI / 2;
+    mesh(sphere(0.1, 10, 8), gold, 0, 0.1, 0.05, g);
+    g.userData.face = face;
+  } else if (type === 'ram') {
+    mesh(cyl(0.22, 0.26, 2.8, 10), std('#4b3424', { rough: 1 }), 0, 0.6, 0, g);
+    mesh(cyl(0.32, 0.3, 0.5, 10), std('#3a3a40', { metal: 0.9, rough: 0.4 }), 0, 2.0, 0, g);
+    for (const y of [-0.3, 0.9]) mesh(new THREE.TorusGeometry(0.26, 0.04, 6, 14), std('#3a3a40', { metal: 0.9 }), 0, y, 0, g).rotation.x = Math.PI / 2;
   }
   g.userData.mats = mats;
   return g;
@@ -214,6 +231,7 @@ export function buildHumanoid(o = {}) {
 
 export function setWeapon(rig, type, rarity = 0, offhand) {
   const P = rig.P;
+  offhand = offhand || rig.opts.offhand || (rig.opts.dual && type !== 'staff' ? type : undefined);
   if (rig.weapon) { P.handR.remove(rig.weapon); rig.weapon = null; }
   if (rig.offhand) { P.handL.remove(rig.offhand); rig.offhand = null; }
   const w = buildWeapon(type, rarity);
@@ -222,6 +240,7 @@ export function setWeapon(rig, type, rarity = 0, offhand) {
   if (type === 'dagger' || offhand) {
     const w2 = buildWeapon(offhand || type, rarity);
     w2.rotation.x = Math.PI / 2; P.handL.add(w2); rig.offhand = w2;
+    if (offhand === 'shield') { w2.position.set(-0.06, -0.05, 0); if (rig.opts.shieldColor) w2.userData.face.color.set(rig.opts.shieldColor); }
   }
 }
 
@@ -251,9 +270,26 @@ export function applyGear(rig, gear, color) {
   rig.baseEmissive = rig.mats.map((m) => m.emissive.clone());
 }
 
-export function buildHero(color) {
-  const rig = buildHumanoid({ cloth: color, cape: color, armor: '#9aa3ad', weapon: 'sword', rarity: 0 });
-  return rig;
+export function buildHero(color, cls = 'warden') {
+  if (cls === 'emberblade') {
+    const rig = buildHumanoid({ cloth: '#2a2024', leather: '#3a2618', cape: color, armor: '#6a5a50', weapon: 'dagger', dual: true, hair: '#c23a1a' });
+    const scarf = mesh(new THREE.TorusGeometry(0.2, 0.07, 6, 14), std(color, { rough: 0.9 }), 0, 0.78, 0, rig.P.spine); scarf.rotation.x = Math.PI / 2;
+    rig.mats.push(scarf.material);
+    const mask = mesh(box(0.34, 0.1, 0.1), std('#1a1214', { rough: 0.8 }), 0, -0.03, 0.17, rig.P.head); rig.mats.push(mask.material);
+    rig.baseEmissive = rig.mats.map((m) => m.emissive.clone());
+    return rig;
+  }
+  if (cls === 'hexcaller') {
+    const rig = buildHumanoid({ legs: 'robe', cloth: '#2a1f4a', cape: color, armor: '#4a3a6a', weapon: 'staff', noHair: true });
+    const hatMat = std('#241a40', { rough: 0.9 }); rig.mats.push(hatMat);
+    const brim = mesh(cyl(0.42, 0.42, 0.04, 16), hatMat, 0, 0.17, 0, rig.P.head);
+    const tip = mesh(cone(0.24, 0.62, 12), hatMat, 0, 0.5, -0.04, rig.P.head); tip.rotation.x = -0.18;
+    const band = mesh(cyl(0.25, 0.25, 0.07, 14), std(color, { emissive: color, ei: 0.6 }), 0, 0.22, 0, rig.P.head); rig.mats.push(band.material);
+    rig.P.hat = [brim, tip, band];
+    rig.baseEmissive = rig.mats.map((m) => m.emissive.clone());
+    return rig;
+  }
+  return buildHumanoid({ cloth: color, cape: color, armor: '#9aa3ad', weapon: 'sword', rarity: 0, offhand: 'shield', shieldColor: color, chestPlate: true });
 }
 
 export function buildEnemy(type) {
@@ -264,6 +300,18 @@ export function buildEnemy(type) {
     case 'imp': return buildHumanoid({ scale: 0.62, skin: '#c2361f', cloth: '#5a1208', head: 'imp', horns: true, eyes: '#ffe84a', wings: true, tail: true, weapon: 'claws', noHair: true, armor: '#5a1208' });
     case 'wraith': return buildHumanoid({ legs: 'none', head: 'skull', skin: '#bfb6d8', cloth: '#1b1028', eyes: '#b26bff', weapon: 'claws', offhand: 'claws', armor: '#2b1a40', cape: '#120a1e' });
     case 'boss': return buildHumanoid({ scale: 2.5, bulk: 1.35, bones: true, pauldrons: true, skin: '#e3d9c0', head: 'skull', eyes: '#ff3018', crown: true, weapon: 'cleaver', armor: '#3b3233', cape: '#4a0a0a' });
+    case 'goblin': {
+      const rig = buildHumanoid({ scale: 0.72, skin: '#6aa83a', cloth: '#5a3a1a', head: 'imp', eyes: '#ffe84a', noHair: true, weapon: 'dagger', armor: '#5a3a1a' });
+      const sackMat = std('#8a6a3a', { rough: 1 }), goldMat = std('#ffd34d', { metal: 1, rough: 0.25, emissive: '#ff9a20', ei: 0.8 });
+      const sack = mesh(sphere(0.42, 12, 10), sackMat, 0, 0.55, -0.38, rig.P.spine); sack.scale.set(1, 1.15, 0.9);
+      for (let i = 0; i < 5; i++) mesh(cyl(0.07, 0.07, 0.03, 10), goldMat, Math.cos(i * 1.3) * 0.15, 0.98, -0.38 + Math.sin(i * 1.3) * 0.12, rig.P.spine);
+      for (const s of [-1, 1]) { const ear = mesh(cone(0.07, 0.3, 5), rig.mats[0], 0.24 * s, 0.1, 0, rig.P.head); ear.rotation.z = -1.3 * s; }
+      rig.mats.push(sackMat, goldMat); rig.baseEmissive = rig.mats.map((m) => m.emissive.clone());
+      return rig;
+    }
+    case 'ogre': return buildHumanoid({ scale: 2.3, bulk: 1.8, skin: '#7f8a62', cloth: '#3b2a1e', armor: '#4a4448', eyes: '#ff5a1a', horns: true, hornColor: '#d8cfb8', weapon: 'ram', chestPlate: true, noHair: true, pauldrons: true });
+    case 'spiderling': return buildSpider({ scale: 0.55, body: '#2a1416', mark: '#ff6a1a' });
+    case 'matriarch': return buildSpider({ scale: 2.2, body: '#1e1012', mark: '#ff3a10', crown: true });
     case 'merchant': return buildHumanoid({ legs: 'robe', head: 'hood', cloth: '#251a3a', eyes: '#9cf', skin: '#7a6a60', armor: '#3a2a50', weapon: 'orb' });
   }
   return buildHumanoid({});
@@ -328,12 +376,25 @@ export function animateRig(rig, s) {
   }
   if (s.cast > 0) { armRx = -1.6 * s.cast; armLx = -1.6 * s.cast; fx = -0.2; }
   if (s.dash) { sx = 0.55; armLx = 0.9; armRx = 0.9; }
+  if (s.block) { armLx = -1.35; armLz = 0.85; fLx = -1.2; sx = 0.18; }
+  if (s.channel) { armRx = -1.55; armRz = 1.2; armLx = -1.55; armLz = -1.2; sx = 0.1; }
+  if (s.emote) {
+    const e = s.emote, k = s.emoteT || 0;
+    if (e === 'wave') { armRx = -2.9; armRz = 0.3 + Math.sin(k * 10) * 0.45; fx = -0.4; }
+    else if (e === 'cheer') { armRx = -2.9; armLx = -2.9; armRz = 0.4; armLz = -0.4; P.hips.position.y += Math.abs(Math.sin(k * 7)) * 0.25; }
+    else if (e === 'dance') { P.hips.rotation.y = Math.sin(k * 6) * 0.5; sy = -Math.sin(k * 6) * 0.7; armRx = -1.5 + Math.sin(k * 12) * 1.2; armLx = -1.5 - Math.sin(k * 12) * 1.2; P.hips.position.y += Math.abs(Math.sin(k * 12)) * 0.1; }
+    else if (e === 'bow') { sx = 0.95; armRx = 0.4; armLx = -0.6; armLz = 0.6; }
+    else if (e === 'laugh') { sx = -0.25 + Math.sin(k * 20) * 0.08; armRx = -0.4; armLx = -0.4; armRz = 0.9; armLz = -0.9; }
+    else if (e === 'point') { armRx = -1.6; fx = 0; }
+    else if (e === 'taunt') { armRx = -1.2 + Math.sin(k * 8) * 0.4; armLx = -0.4; sx = -0.15; }
+  }
   if (s.hurt > 0) { sx -= 0.35 * s.hurt; }
   P.armL.rotation.x = armLx; P.armL.rotation.z = armLz - (floaty ? 0.3 : 0);
   P.armR.rotation.x = armRx; P.armR.rotation.z = armRz + (floaty ? 0.3 : 0);
   P.foreR.rotation.x = fx; P.foreL.rotation.x = fLx;
   P.spine.rotation.y = sy; P.spine.rotation.x = sx;
   P.head.rotation.x = -sx * 0.5;
+  if (rig.offhand?.userData.face) rig.offhand.rotation.set(Math.PI / 2 - (armLx + fLx + sx) * (s.block ? 1 : 0.4), 0, 0);
   if (P.cape) P.cape.rotation.x = 0.15 + mv * 0.55 + Math.sin(t * 3.1) * 0.06 + (s.dash ? 0.6 : 0);
   if (P.wingL) { const f = Math.sin(t * 18) * 0.6; P.wingL.rotation.y = 0.4 + f; P.wingR.rotation.y = -0.4 - f; }
   if (P.tail) P.tail.rotation.z = Math.sin(t * 4) * 0.4;
@@ -341,7 +402,68 @@ export function animateRig(rig, s) {
   // death
   const d = s.dead || 0;
   rig.body.rotation.x = -easeOut(Math.min(1, d * 1.6)) * Math.PI * 0.48;
-  rig.body.position.y = -Math.max(0, d - 0.6) * 0.8;
+  rig.body.position.set(0, -Math.max(0, d - 0.6) * 0.8, 0);
+  if (s.roll > 0) {
+    const th = easeIO(s.roll) * Math.PI * 2, h = 0.6;
+    rig.body.rotation.x = th;
+    rig.body.position.set(0, h - h * Math.cos(th) - Math.sin(Math.PI * s.roll) * 0.25, -h * Math.sin(th));
+    if (P.legL) { P.legL.rotation.x = P.legR.rotation.x = -1.4; P.shinL.rotation.x = P.shinR.rotation.x = 2; }
+    P.armL.rotation.x = P.armR.rotation.x = -0.6;
+  }
+}
+
+// ---------- SPIDERS ----------
+export function buildSpider(o) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  body.scale.setScalar(o.scale || 1);
+  const mats = [];
+  const M = (c, opt) => { const m = std(c, opt); mats.push(m); return m; };
+  const shell = M(o.body, { rough: 0.35, metal: 0.3 }), mark = M('#2a0a04', { emissive: o.mark, ei: 2.2 }), eye = M('#ff2a10', { emissive: '#ff3a10', ei: 3 });
+  const torso = new THREE.Group(); torso.position.y = 0.9; body.add(torso);
+  mesh(sphere(0.5, 14, 10), shell, 0, 0, 0, torso).scale.set(1, 0.7, 1.1);
+  const abdomen = new THREE.Group(); abdomen.position.set(0, 0.25, -0.95); torso.add(abdomen);
+  mesh(sphere(0.8, 16, 12), shell, 0, 0, 0, abdomen).scale.set(1, 0.85, 1.2);
+  for (let i = 0; i < 3; i++) mesh(sphere(0.16 - i * 0.03, 8, 6), mark, 0, 0.62, 0.35 - i * 0.38, abdomen).scale.set(1.6, 0.4, 1);
+  mesh(new THREE.TorusGeometry(0.45, 0.04, 6, 20, Math.PI), mark, 0, 0.45, -0.2, abdomen).rotation.y = Math.PI / 2;
+  const head = new THREE.Group(); head.position.set(0, 0.05, 0.6); torso.add(head);
+  mesh(sphere(0.32, 12, 10), shell, 0, 0, 0, head);
+  for (let i = 0; i < 6; i++) mesh(sphere(0.045, 6, 5), eye, ((i % 3) - 1) * 0.11, 0.12 + Math.floor(i / 3) * 0.08, 0.27, head);
+  for (const s of [-1, 1]) { const f = mesh(cone(0.05, 0.28, 5), M('#d8d0bc'), 0.1 * s, -0.2, 0.22, head); f.rotation.x = 2.6; }
+  if (o.crown) for (let i = 0; i < 5; i++) { const sp = mesh(cone(0.06, 0.35, 5), mark, -0.3 + i * 0.15, 0.3, -0.05, head); sp.rotation.x = -0.4; }
+  const legs = [];
+  for (const side of [-1, 1]) for (let i = 0; i < 4; i++) {
+    const hip = new THREE.Group(); hip.position.set(0.3 * side, 0, 0.35 - i * 0.24); torso.add(hip);
+    hip.rotation.y = side * (Math.PI / 2) + (i - 1.5) * -0.45 * side;
+    const upper = new THREE.Group(); upper.rotation.z = 0.9 * side * -1; hip.add(upper);
+    // segment along local +X for side=+1, -X for side=-1 handled via rotation of hip; build along +Z of hip
+    const segA = mesh(cyl(0.05, 0.06, 0.95, 6), shell, 0, 0, 0.47, upper); segA.rotation.x = Math.PI / 2;
+    const knee = new THREE.Group(); knee.position.z = 0.95; upper.add(knee);
+    const segB = mesh(cyl(0.025, 0.05, 1.25, 6), shell, 0, 0, 0.62, knee); segB.rotation.x = Math.PI / 2;
+    legs.push({ hip, upper, knee, side, i });
+  }
+  // orient legs: upper tilts up, knee bends down to the floor
+  for (const L of legs) { L.upper.rotation.set(-0.7, 0, 0); L.knee.rotation.set(1.75, 0, 0); }
+  const rig = { root, body, P: { torso, abdomen, head, legs }, mats, opts: { spider: true }, kind: 'spider', weapon: null, offhand: null };
+  rig.baseEmissive = mats.map((m) => m.emissive.clone());
+  return rig;
+}
+
+export function animateSpider(rig, s) {
+  const P = rig.P, t = s.t, mv = Math.min(1.2, s.move || 0), d = s.dead || 0;
+  for (const L of P.legs) {
+    const ph = (L.i % 2 === 0) === (L.side > 0) ? 0 : Math.PI;
+    const w = t * 13 + ph;
+    L.hip.rotation.x = Math.sin(w) * 0.35 * mv;
+    L.upper.rotation.x = -0.7 - Math.max(0, Math.cos(w)) * 0.35 * mv - d * 0.9;
+    L.knee.rotation.x = 1.75 + d * 1.0;
+  }
+  const atk = s.atk >= 0 ? Math.sin(s.atk * Math.PI) : 0;
+  for (const L of P.legs) if (L.i === 0) L.upper.rotation.x -= atk * 1.2;
+  P.torso.position.y = 0.9 + Math.abs(Math.sin(t * 13)) * 0.04 * mv + atk * 0.25 - d * 0.5 + (s.air ? 0.6 : 0);
+  P.torso.rotation.x = -atk * 0.35 - (s.air ? 0.3 : 0);
+  P.abdomen.rotation.x = Math.sin(t * 2) * 0.05 + atk * 0.2;
+  P.head.rotation.y = Math.sin(t * 1.3) * 0.15;
+  rig.body.rotation.z = d > 0.3 ? Math.min(1, (d - 0.3) * 2) * Math.PI : 0;
 }
 
 export function flashRig(rig, k) {

@@ -1,156 +1,215 @@
-// Local hero controller (movement, combo combat, skills) and the third-person camera rig.
+// Local hero controller (movement, dodge roll, combat, class skills, style) and the third-person camera.
 import * as THREE from 'three';
 import { G, clamp, angleLerp, damp } from './state.js';
 import { buildHero, animateRig, applyGear } from './models.js';
-import { computeStats, gearVisual } from './save.js';
+import { computeStats } from '../shared/stats.js';
+import { CLASSES } from '../shared/classes.js';
 import { RARITIES } from '../shared/items.js';
-import { ANIM } from './entities.js';
+import { tileAt } from '../shared/dungeon.js';
+import { levelMul } from '../shared/enemies.js';
+import { SkillKit, enemiesInArc, enemiesInRadius, fxPlay } from './skills.js';
 
 const angDiff = (a, b) => Math.abs(((a - b + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-export const SLAM_CD = 6, DASH_CD = 1.0, POT_CD = 1.0;
+export const ROLL_CD = 0.9, POT_CD = 1.0;
+export const ANIM = { idle: 0, run: 1, atk0: 2, atk1: 3, atk2: 4, slam: 5, roll: 6, dead: 7, air: 8, whirl: 9, cast: 10, block: 11, bash: 12 };
+export const STYLE_RANKS = [
+  { r: 'D', min: 0, name: 'Dull', color: '#9a9a9a' }, { r: 'C', min: 20, name: 'Cool', color: '#5eea8a' }, { r: 'B', min: 45, name: 'Brutal', color: '#5ab0ff' },
+  { r: 'A', min: 80, name: 'Awesome', color: '#c77dff' }, { r: 'S', min: 130, name: 'Savage!', color: '#ffb347' },
+];
+
+export function gearOf(char) {
+  const e = char.equipped;
+  return { w: e.weapon?.type || 'sword', wr: e.weapon?.rarity ?? 0, h: e.helm ? e.helm.rarity : -1, c: e.chest ? e.chest.rarity : -1, b: e.boots ? e.boots.rarity : -1 };
+}
 
 export class LocalPlayer {
-  constructor(save) {
-    this.save = save;
-    this.rig = buildHero(save.color);
+  constructor(prof) {
+    this.cls = prof.cls; this.prof = prof; this.char = prof.char;
+    this.rig = buildHero(prof.color, this.cls);
     this.root = this.rig.root;
-    this.pos = new THREE.Vector3();
-    this.vel = new THREE.Vector3();
-    this.vy = 0; this.onGround = true;
-    this.ry = Math.PI; this.t = 0; this.move = 0;
-    this.refreshStats(true);
+    this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
+    this.vy = 0; this.onGround = true; this.ry = Math.PI; this.t = 0; this.move = 0;
     this.atk = { t: -1, combo: 0, hit: false, queued: false, dur: 0.5, face: 0 };
-    this.comboT = 0; this.slamT = -1; this.slamCd = 0; this.dashT = 0; this.dashCd = 0; this.dashDir = new THREE.Vector3();
+    this.comboT = 0; this.slamT = -1; this.rollCd = 0; this.roll = 0; this.rollT = 0; this.rollDir = new THREE.Vector3();
     this.potCd = 0; this.invuln = 0; this.hurtT = 0; this.lastHurt = 99; this.dead = false; this.deadT = 0; this.deadAnim = 0;
+    this.combatT = 99; this.castT = 0; this.blocking = false; this.blockT = 0; this.tauntBuffT = 0;
+    this.slowT = 0; this.burnT = 0; this.burnDps = 0; this.unbreakCd = 0; this.dotAcc = 0; this.trapCd = 0; this.lavaAcc = 0;
+    this.style = 0; this.styleIdle = 0; this.styleKeys = []; this.comboCount = 0; this.comboTimer = 0; this.lastRank = 0;
+    this.emote = null; this.emoteT = 0; this.emoteDur = 0;
     this.anim = 0;
+    this.kit = new SkillKit(this);
+    this.setProfile(prof, true);
+    this.resource = CLASSES[this.cls].resource.start;
   }
 
-  refreshStats(full) {
-    this.stats = computeStats(this.save);
-    applyGear(this.rig, gearVisual(this.save), this.save.color);
+  setProfile(prof, full) {
+    this.prof = prof; this.char = prof.char;
+    this.stats = computeStats(this.char, this.cls, prof.buffs || {});
+    applyGear(this.rig, gearOf(this.char), prof.color);
     if (full || this.hp === undefined) this.hp = this.stats.maxHp;
     this.hp = Math.min(this.hp, this.stats.maxHp);
+    this.resource = Math.min(this.resource ?? 0, this.stats.resMax);
   }
-
-  get weaponColor() { const w = this.save.equipped.weapon; return w ? (w.rarity >= 2 ? RARITIES[w.rarity].color : '#ffe9c0') : '#ffe9c0'; }
+  get R() { return CLASSES[this.cls].resource; }
+  get weaponColor() { const w = this.char.equipped.weapon; return w && w.rarity >= 2 ? RARITIES[w.rarity].color : this.cls === 'emberblade' ? '#ffb070' : '#ffe9c0'; }
+  get rank() { let r = 0; STYLE_RANKS.forEach((s, i) => { if (this.style >= s.min) r = i; }); return r; }
 
   teleport(x, z, zone) {
     this.pos.set(x, zone.groundHeight(x, z), z);
     this.vel.set(0, 0, 0); this.vy = 0;
     this.root.position.copy(this.pos);
   }
+  heal(n) {
+    n = Math.round(n);
+    this.hp = Math.min(this.stats.maxHp, this.hp + n);
+    if (n >= 5) G.fx.text(this.pos.clone().setY(this.pos.y + 2.2), `+${n}`, 'heal');
+  }
 
-  aimDir(camYaw) {
+  aimTarget(camYaw, maxR) {
     let best = null, bd = 1e9;
     const fwd = Math.atan2(-Math.sin(camYaw), -Math.cos(camYaw));
     for (const e of G.enemies.values()) {
       if (e.dead) continue;
       const dx = e.pos.x - this.pos.x, dz = e.pos.z - this.pos.z, d = Math.hypot(dx, dz);
-      if (d > this.stats.range + e.radius + 2.5) continue;
-      const a = Math.atan2(dx, dz);
-      const diff = angDiff(a, fwd);
-      if (diff < 0.9 && d + diff * 3 < bd) { bd = d + diff * 3; best = a; }
+      if (d > maxR) continue;
+      const diff = angDiff(Math.atan2(dx, dz), fwd);
+      if (diff < 0.9 && d + diff * 4 < bd) { bd = d + diff * 4; best = e; }
     }
-    if (best === null) {
-      // nothing in front of the camera: lock onto the closest enemy within melee reach (any direction)
-      let nd = this.stats.range + 1.5;
-      for (const e of G.enemies.values()) {
-        if (e.dead) continue;
-        const dx = e.pos.x - this.pos.x, dz = e.pos.z - this.pos.z, d = Math.hypot(dx, dz) - e.radius;
-        if (d < nd) { nd = d; best = Math.atan2(dx, dz); }
-      }
+    return best;
+  }
+  aimDir(camYaw) {
+    if (G.lock && !G.lock.dead) return Math.atan2(G.lock.pos.x - this.pos.x, G.lock.pos.z - this.pos.z);
+    const reach = this.stats.ranged ? 16 : this.stats.range + 2.5;
+    const t = this.aimTarget(camYaw, reach);
+    if (t) return Math.atan2(t.pos.x - this.pos.x, t.pos.z - this.pos.z);
+    if (!this.stats.ranged) {
+      let nd = this.stats.range + 1.5, best = null;
+      for (const e of G.enemies.values()) { if (e.dead) continue; const d = Math.hypot(e.pos.x - this.pos.x, e.pos.z - this.pos.z) - e.radius; if (d < nd) { nd = d; best = e; } }
+      if (best) return Math.atan2(best.pos.x - this.pos.x, best.pos.z - this.pos.z);
     }
-    return best ?? fwd;
+    return Math.atan2(-Math.sin(camYaw), -Math.cos(camYaw));
+  }
+
+  addStyle(n, key) {
+    const reps = this.styleKeys.filter((k) => k === key).length;
+    this.style = Math.min(180, this.style + n * (reps >= 3 ? 0.35 : reps >= 2 ? 0.7 : 1));
+    this.styleKeys.push(key); if (this.styleKeys.length > 5) this.styleKeys.shift();
+    this.styleIdle = 0;
+    const r = this.rank;
+    if (r > this.lastRank) { G.audio.style(r); G.ui.styleUp(r); }
+    this.lastRank = r;
   }
 
   update(dt, input, cam, zone) {
     this.t += dt;
-    const S = this.stats;
-    this.dashCd -= dt; this.slamCd -= dt; this.potCd -= dt; this.invuln -= dt; this.comboT -= dt; this.lastHurt += dt;
+    const S = this.stats, R = this.R;
+    this.rollCd -= dt; this.slamT >= 0 || (this.slamT = -1); this.potCd -= dt; this.invuln -= dt; this.comboT -= dt; this.lastHurt += dt; this.combatT += dt;
+    this.castT = Math.max(0, this.castT - dt); this.tauntBuffT -= dt; this.slowT -= dt; this.burnT -= dt; this.unbreakCd -= dt; this.trapCd -= dt;
     this.hurtT = Math.max(0, this.hurtT - dt * 4);
+    // style decay
+    this.styleIdle += dt; this.comboTimer -= dt;
+    if (this.comboTimer <= 0) this.comboCount = 0;
+    if (this.styleIdle > 2.5) this.style = Math.max(0, this.style - dt * 9);
+    this.lastRank = Math.min(this.lastRank, this.rank);
+    // resource
+    if (R.regen > 0) this.resource = Math.min(S.resMax, this.resource + S.resRegen * dt);
+    else if (this.combatT > 4) this.resource = Math.max(0, this.resource + R.regen * dt);
     if (this.dead) {
-      this.deadT -= dt;
-      this.deadAnim = Math.min(1, this.deadAnim + dt);
-      this.vel.set(0, 0, 0);
+      this.deadT -= dt; this.deadAnim = Math.min(1, this.deadAnim + dt); this.vel.set(0, 0, 0);
       if (this.deadT <= 0) G.actions.respawn();
       this.finish(dt, zone);
       return;
     }
-    const active = G.inGame && !G.uiOpen;
+    const active = G.inGame && !G.uiOpen && !G.cinematic && !G.emoteWheel;
     const yaw = cam.yaw;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-    let mx = 0, mz = 0;
-    if (active) {
-      if (input.down('KeyW') || input.down('ArrowUp')) mz += 1;
-      if (input.down('KeyS') || input.down('ArrowDown')) mz -= 1;
-      if (input.down('KeyD') || input.down('ArrowRight')) mx += 1;
-      if (input.down('KeyA') || input.down('ArrowLeft')) mx -= 1;
-    }
-    const dir = new THREE.Vector3(rx * mx + fx * mz, 0, rz * mx + fz * mz);
-    const moving = dir.lengthSq() > 0;
-    if (moving) dir.normalize();
-
-    // actions
-    if (active && !G.buildMode) {
-      if ((input.mouse(0) || input.down('KeyF')) && this.slamT < 0) {
-        if (this.atk.t < 0) this.startAttack(yaw);
+    const ax = active ? input.moveAxes() : { x: 0, y: 0 };
+    const dir = new THREE.Vector3(rx * ax.x + fx * ax.y, 0, rz * ax.x + fz * ax.y);
+    const moving = dir.lengthSq() > 0.01;
+    if (moving && dir.lengthSq() > 1) dir.normalize();
+    if (moving && this.emote) this.emote = null;
+    const kit = this.kit;
+    // ---- actions ----
+    const cls = this.cls;
+    this.blocking = active && cls === 'warden' && input.act('skill3') && this.onGround && !this.roll && this.slamT < 0 && !kit.busy() && !G.buildMode;
+    this.blockT = this.blocking ? this.blockT + dt : 0;
+    if (active && !G.buildMode && !this.roll) {
+      if (input.attackHeld() && this.slamT < 0 && !this.blocking && !kit.busy()) {
+        if (this.stats.ranged) { if (this.atk.t < 0) this.startAttack(yaw); }
+        else if (this.atk.t < 0) this.startAttack(yaw);
         else if (this.atk.t > 0.4) this.atk.queued = true;
       }
-      if ((input.hit('KeyQ') || input.click(2)) && this.slamCd <= 0 && this.slamT < 0 && this.onGround) {
-        this.slamT = 0; this.slamCd = SLAM_CD; this.vy = 7; this.onGround = false; this.atk.t = -1;
-        this.ry = this.aimDir(yaw);
-        G.audio.swing(true);
-      }
+      for (let i = 0; i < 4; i++) if (input.actHit('skill' + (i + 1)) || (i === 0 && input.click(2))) { if (kit.tryCast(i, yaw)) { this.atk.t = -1; } }
     }
-    if (active) {
-      if ((input.hit('ShiftLeft') || input.hit('ShiftRight')) && this.dashCd <= 0) {
-        this.dashT = 0.2; this.dashCd = DASH_CD; this.invuln = 0.3;
-        this.dashDir.copy(moving ? dir : new THREE.Vector3(Math.sin(this.ry), 0, Math.cos(this.ry)));
-        this.ry = Math.atan2(this.dashDir.x, this.dashDir.z);
-        this.atk.t = -1;
-        G.audio.dash();
-      }
-      if (input.hit('Space') && this.onGround && this.slamT < 0) { this.vy = 9; this.onGround = false; G.audio.jump(); }
-      if (input.hit('KeyR')) this.drinkPotion();
-    }
+    if (active && input.actHit('dodge') && this.rollCd <= 0 && !this.roll && this.slamT < 0) this.startRoll(moving ? dir : null);
+    if (active && input.actHit('jump') && this.onGround && this.slamT < 0 && !this.roll) { this.vy = 9; this.onGround = false; G.audio.jump(); }
+    if (active && input.actHit('potion') && !G.buildMode) this.drinkPotion();
+    kit.update(dt, yaw);
 
-    // attack progression
+    // ---- attack progression ----
     if (this.atk.t >= 0) {
       this.atk.t += dt / this.atk.dur;
-      if (!this.atk.hit && this.atk.t >= 0.45) { this.atk.hit = true; this.doHit(); }
+      if (!this.atk.hit && this.atk.t >= 0.45) { this.atk.hit = true; this.doHit(yaw); }
       if (this.atk.t >= 1) {
         this.atk.t = -1; this.comboT = 0.4;
-        if (this.atk.queued || (active && input.mouse(0) && !G.buildMode)) { this.atk.queued = false; this.startAttack(yaw); }
+        if (this.atk.queued || (active && input.attackHeld() && !G.buildMode && !kit.busy() && !this.blocking)) { this.atk.queued = false; this.startAttack(yaw); }
       }
     }
     if (this.slamT >= 0) {
       const prev = this.slamT;
       this.slamT += dt / 0.7;
-      if (prev < 0.55 && this.slamT >= 0.55) this.doSlam();
+      if (prev < 0.55 && this.slamT >= 0.55) kit.quakeImpact();
       if (this.slamT >= 1) this.slamT = -1;
     }
 
-    // movement
+    // ---- movement ----
     let speed = 7.2 * S.moveSpeed;
-    if (this.atk.t >= 0) speed *= 0.3;
-    if (this.slamT >= 0) speed *= 0.15;
-    if (this.dashT > 0) {
-      this.dashT -= dt;
-      this.vel.copy(this.dashDir).multiplyScalar(24);
-      G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 3, speed: 0.5, color: this.save.color, color2: '#ffffff', size: 0.5, life: 0.35, radius: 0.3 });
-    } else {
-      this.vel.x = damp(this.vel.x, dir.x * speed, 14, dt);
-      this.vel.z = damp(this.vel.z, dir.z * speed, 14, dt);
+    if (this.atk.t >= 0 && !this.stats.ranged) speed *= 0.3;
+    if (this.castT > 0) speed *= 0.55;
+    if (this.blocking) speed *= 0.4;
+    if (this.slamT >= 0 || kit.exec) speed *= 0.15;
+    if (kit.whirlT > 0) speed *= 0.9;
+    if (this.slowT > 0) speed *= 0.5;
+    const tile = zone.d ? tileAt(zone.d, this.pos.x, this.pos.z) : 0;
+    const accel = tile === 4 ? 1.6 : 14;
+    if (this.roll) {
+      this.rollT += dt;
+      const k = this.rollT / 0.5;
+      this.roll = Math.min(1, k) || 0.0001;
+      const sp = 16 * (1 - k * 0.7);
+      this.vel.copy(this.rollDir).multiplyScalar(sp);
+      if (k >= 1) { this.roll = 0; this.vel.multiplyScalar(0.45); }
+    } else if (!kit.bash) {
+      this.vel.x = damp(this.vel.x, dir.x * speed, accel, dt);
+      this.vel.z = damp(this.vel.z, dir.z * speed, accel, dt);
     }
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
     zone.collide(this.pos, 0.45);
     if (this.atk.t >= 0) this.ry = angleLerp(this.ry, this.atk.face, Math.min(1, dt * 25));
-    else if (moving && this.dashT <= 0 && this.slamT < 0) this.ry = angleLerp(this.ry, Math.atan2(dir.x, dir.z), Math.min(1, dt * 14));
+    else if (G.lock && !G.lock.dead && !this.roll && (moving || this.blocking)) this.ry = angleLerp(this.ry, Math.atan2(G.lock.pos.x - this.pos.x, G.lock.pos.z - this.pos.z), Math.min(1, dt * 12));
+    else if (moving && !this.roll && this.slamT < 0 && !kit.bash && this.castT <= 0) this.ry = angleLerp(this.ry, Math.atan2(dir.x, dir.z), Math.min(1, dt * 14));
     this.move = damp(this.move, Math.hypot(this.vel.x, this.vel.z) / 7.2, 12, dt);
 
-    // regen
+    this.environment(dt, zone, tile);
     if (this.lastHurt > 6 && this.hp < S.maxHp) this.hp = Math.min(S.maxHp, this.hp + S.maxHp * 0.03 * dt);
+    if (this.emote) { this.emoteT += dt; if (this.emoteDur && this.emoteT > this.emoteDur) this.emote = null; }
     this.finish(dt, zone);
+  }
+
+  // hazards, lava, traps
+  environment(dt, zone, tile) {
+    const lv = levelMul(G.roomLevel).dmg;
+    if (this.burnT > 0) { this.dotAcc += this.burnDps * dt; if (Math.random() < dt * 10) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 1, speed: 1, color: '#ffb060', color2: '#ff2000', size: 0.3, life: 0.5, up: 1 }); }
+    if (zone.d) {
+      if (tile === 3 && this.onGround) { this.dotAcc += 16 * lv * dt; if (Math.random() < dt * 12) G.fx.emit({ pos: this.pos.clone(), count: 1, speed: 1.5, color: '#ffc060', color2: '#ff2000', size: 0.4, life: 0.5, up: 1.5 }); }
+      if (this.trapCd <= 0 && this.onGround && zone.trapAt?.(this.pos.x, this.pos.z)) { this.trapCd = 1; this.hurt(10 * lv, null, { trap: true }); }
+    }
+    for (const h of G.hazards.values()) {
+      if (h.delay > 0 || Math.hypot(h.x - this.pos.x, h.z - this.pos.z) > h.r) continue;
+      if (h.kind === 'web') this.slowT = Math.max(this.slowT, 0.35);
+      else this.dotAcc += h.dps * dt;
+    }
+    if (this.dotAcc >= 4) { const n = Math.floor(this.dotAcc); this.dotAcc -= n; this.hurt(n, null, { dot: true }); }
   }
 
   finish(dt, zone) {
@@ -162,13 +221,39 @@ export class LocalPlayer {
       this.pos.y = gh; this.vy = 0; this.onGround = true;
     } else if (this.pos.y > gh + 0.3) this.onGround = false;
     this.root.position.copy(this.pos);
-    this.root.rotation.y = this.ry;
+    const kit = this.kit;
+    const spin = kit.whirlT > 0 ? (this.t * 22) % (Math.PI * 2) : 0;
+    this.root.rotation.y = this.ry + spin;
     const atk = this.atk.t >= 0 ? this.atk.t : -1;
-    animateRig(this.rig, { t: this.t, move: this.move, atk, combo: this.atk.combo, slam: this.slamT, dash: this.dashT > 0, air: !this.onGround && this.slamT < 0, dead: this.dead ? this.deadAnim : 0, hurt: this.hurtT });
-    this.anim = this.dead ? ANIM.dead : this.slamT >= 0 ? ANIM.slam : this.dashT > 0 ? ANIM.dash : this.atk.t >= 0 ? ANIM.atk0 + this.atk.combo : !this.onGround ? ANIM.air : this.move > 0.1 ? ANIM.run : ANIM.idle;
+    animateRig(this.rig, {
+      t: this.t, move: this.move, atk, combo: this.atk.combo, slam: this.slamT, dash: !!kit.bash, air: !this.onGround && this.slamT < 0, dead: this.dead ? this.deadAnim : 0, hurt: this.hurtT,
+      roll: this.roll, block: this.blocking, channel: kit.whirlT > 0, cast: this.castT > 0 ? Math.min(1, this.castT * 4) : 0, emote: this.emote, emoteT: this.emoteT,
+    });
+    this.anim = this.dead ? ANIM.dead : this.roll ? ANIM.roll : this.slamT >= 0 ? ANIM.slam : kit.bash ? ANIM.bash : kit.whirlT > 0 ? ANIM.whirl : this.blocking ? ANIM.block : this.castT > 0 ? ANIM.cast : this.atk.t >= 0 ? ANIM.atk0 + this.atk.combo : !this.onGround ? ANIM.air : this.move > 0.1 ? ANIM.run : ANIM.idle;
+  }
+
+  startRoll(dir) {
+    this.roll = 0.0001; this.rollT = 0; this.rollCd = ROLL_CD; this.atk.t = -1; this.castT = 0;
+    this.rollDir.copy(dir ? dir.clone().normalize() : new THREE.Vector3(Math.sin(this.ry), 0, Math.cos(this.ry)));
+    this.ry = Math.atan2(this.rollDir.x, this.rollDir.z);
+    this.invuln = Math.max(this.invuln, 0.38);
+    if (this.stats.flags.afterimage) {
+      const at = this.pos.clone();
+      setTimeout(() => {
+        if (!G.zone) return;
+        for (const e of enemiesInRadius(at, 3)) this.dealDamage(e, this.stats.dmg * 1.2, { kb: 1.5 });
+        this.kit.send('afterimage', { x: at.x, z: at.z });
+      }, 250);
+    }
+    G.audio.dash();
   }
 
   startAttack(yaw) {
+    if (this.stats.ranged) {
+      this.atk.combo = 0; this.atk.dur = 0.42 / this.stats.atkSpeed; this.atk.t = 0.3; this.atk.hit = false; this.atk.face = this.aimDir(yaw);
+      this.castT = 0.25;
+      return;
+    }
     const combo = this.comboT > 0 ? (this.atk.combo + 1) % 3 : 0;
     this.atk.combo = combo;
     this.atk.dur = (combo === 2 ? 0.6 : 0.46) / this.stats.atkSpeed;
@@ -177,77 +262,96 @@ export class LocalPlayer {
     G.audio.swing(combo === 2);
   }
 
-  doHit() {
+  doHit(yaw) {
+    if (this.stats.ranged) { this.ry = this.atk.face; this.kit.basicBolt(yaw); return; }
     const S = this.stats, c = this.atk.combo;
     const range = S.range + (c === 2 ? 0.5 : 0), arc = S.arc + (c === 2 ? 0.7 : 0) + (S.cleave ? 0.4 : 0);
     const mul = [1, 1.15, 1.7][c];
-    let any = false;
-    for (const e of G.enemies.values()) {
-      if (e.dead) continue;
-      const dx = e.pos.x - this.pos.x, dz = e.pos.z - this.pos.z, d = Math.hypot(dx, dz);
-      if (d > range + e.radius) continue;
-      if (angDiff(Math.atan2(dx, dz), this.ry) > arc / 2 && d > e.radius + 0.6) continue;
-      this.dealDamage(e, S.dmg * mul);
-      e.target.x += (dx / (d || 1)) * 0.35; e.target.z += (dz / (d || 1)) * 0.35;
-      any = true;
-    }
+    const hit = enemiesInArc(this.pos, this.ry, range, arc);
+    for (const e of hit) this.dealDamage(e, S.dmg * mul, { kb: c === 2 ? 1.6 : 0.5, stun: c === 2 ? 0.3 : 0 });
     const sp = this.pos.clone(); sp.y += 1.15;
     G.fx.slash(sp, this.ry, this.weaponColor, range + 0.3, c, arc);
-    if (any) { G.hitstop = c === 2 ? 0.08 : 0.045; G.shake = Math.max(G.shake, c === 2 ? 0.35 : 0.15); }
+    if (hit.length) { G.hitstop = c === 2 ? 0.08 : 0.045; G.shake = Math.max(G.shake, c === 2 ? 0.35 : 0.15); }
   }
 
-  dealDamage(e, base) {
+  dealDamage(e, base, o = {}, quiet = false) {
     const S = this.stats;
-    const crit = Math.random() < S.crit;
-    const dmg = Math.max(1, Math.round(base * (0.9 + Math.random() * 0.2) * (crit ? 2 : 1)));
-    G.net.send({ t: 'hit', id: e.id, dmg, crit });
+    const crit = o.crit || Math.random() < S.crit;
+    const dmg = Math.max(1, Math.round(base * (0.9 + Math.random() * 0.2) * (crit ? S.critDmg : 1) * (1 + 0.04 * this.rank)));
+    G.net.send({ t: 'hit', id: e.id, dmg, crit, kb: o.kb || 0, stun: o.stun || 0 });
     e.hit(crit);
+    if (o.kb && e.def.poise > 0) { const dx = e.pos.x - this.pos.x, dz = e.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1; e.target.x += (dx / l) * o.kb * 0.5; e.target.z += (dz / l) * o.kb * 0.5; }
     const hp = e.pos.clone(); hp.y += e.height * 0.6;
-    G.fx.hitSpark(hp, crit);
+    if (!quiet || Math.random() < 0.5) G.fx.hitSpark(hp, crit);
     G.fx.text(hp, crit ? `${dmg}!` : `${dmg}`, crit ? 'crit' : '');
-    G.audio.hit(crit);
+    if (!quiet) G.audio.hit(crit);
     if (S.leech > 0) this.hp = Math.min(S.maxHp, this.hp + dmg * S.leech);
-  }
-
-  doSlam() {
-    const R = 4.8;
-    let any = false;
-    for (const e of G.enemies.values()) {
-      if (e.dead) continue;
-      const d = Math.hypot(e.pos.x - this.pos.x, e.pos.z - this.pos.z);
-      if (d < R + e.radius) { this.dealDamage(e, this.stats.dmg * 2.3); any = true; }
-    }
-    const p = this.pos.clone();
-    G.fx.shockwave(p, R, '#ffb347', 0.45);
-    G.fx.shockwave(p, R * 0.6, '#ffffff', 0.3);
-    G.fx.emit({ pos: p.clone().setY(p.y + 0.2), count: 70, speed: 9, color: '#ffd080', color2: '#ff3a00', size: 0.4, life: 0.7, flat: true, drag: 3 });
-    G.fx.emit({ pos: p.clone().setY(p.y + 0.2), count: 30, speed: 4, color: '#9a8a70', color2: '#3a3020', size: 0.6, life: 1, up: 1, gravity: 6 });
-    G.shake = Math.max(G.shake, 0.6); G.hitstop = any ? 0.09 : 0.03;
-    G.audio.slam();
+    if (this.R.onHit) this.resource = Math.min(S.resMax, this.resource + this.R.onHit);
+    this.combatT = 0;
+    this.comboCount++; this.comboTimer = 2.5;
+    this.addStyle(crit ? 3 : 2, 'hit');
   }
 
   drinkPotion() {
-    if (this.save.potions <= 0 || this.potCd > 0 || this.hp >= this.stats.maxHp) return;
-    this.potCd = POT_CD; this.save.potions--;
-    const heal = Math.round(this.stats.maxHp * 0.5);
-    this.hp = Math.min(this.stats.maxHp, this.hp + heal);
-    G.fx.text(this.pos.clone().setY(this.pos.y + 2.2), `+${heal}`, 'heal');
+    if (this.char.potions <= 0 || this.potCd > 0 || this.hp >= this.stats.maxHp) return;
+    this.potCd = POT_CD; this.char.potions--;
+    G.net.send({ t: 'potion' });
+    this.heal(this.stats.maxHp * 0.5);
     G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 0.3), count: 40, speed: 1.5, color: '#8affb0', color2: '#20a050', size: 0.3, life: 1.2, up: 1.5, radius: 0.6 });
     G.audio.potion();
-    G.actions.saveNow();
   }
 
-  hurt(dmg) {
-    if (this.dead || this.invuln > 0) return;
-    const final = Math.max(1, Math.round(dmg * 100 / (100 + this.stats.armor)));
-    this.hp -= final; this.hurtT = 1; this.lastHurt = 0;
-    G.fx.text(this.pos.clone().setY(this.pos.y + 2.2), `-${final}`, 'hurt');
-    G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1.2), count: 12, speed: 4, color: '#ff4a3a', color2: '#400000', size: 0.25, life: 0.5, gravity: 10 });
-    G.shake = Math.max(G.shake, 0.25);
-    G.ui.hurtFlash();
-    G.audio.hurt();
+  perfectDodge() {
+    G.slowmo = 1.1;
+    this.resource = Math.min(this.stats.resMax, this.resource + this.stats.resMax * 0.4);
+    this.addStyle(25, 'perfect');
+    G.audio.perfect();
+    G.ui.perfect();
+    G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 60, speed: 4, color: '#bfe8ff', color2: '#4a8cff', size: 0.35, life: 0.8 });
+    if (this.stats.flags.dance) { this.kit.resetCooldowns(); G.ui.toast('Ember Dance! Cooldowns reset', '#ffb347'); }
+  }
+
+  hurt(dmg, from, o = {}) {
+    if (this.dead) return;
+    if (!o.dot && !o.trap && this.roll && this.rollT < 0.32) { this.perfectDodge(); return; }
+    if (this.invuln > 0 && !o.dot) return;
+    const src = from != null ? G.enemies.get(from) : null;
+    if (this.blocking && src && !o.dot) {
+      const a = Math.atan2(src.pos.x - this.pos.x, src.pos.z - this.pos.z);
+      if (angDiff(a, this.ry) < 1.3) {
+        if (this.blockT < 0.3) {
+          G.net.send({ t: 'hit', id: src.id, dmg: Math.round(this.stats.dmg * 0.5), crit: false, kb: 1.5, stun: 1.6 });
+          this.resource = Math.min(this.stats.resMax, this.resource + 15);
+          G.audio.block(true); G.ui.perfect('PERFECT BLOCK');
+          this.addStyle(20, 'pblock');
+          G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1.3).add(new THREE.Vector3(Math.sin(this.ry), 0, Math.cos(this.ry))), count: 40, speed: 6, color: '#ffffff', color2: '#5ab0ff', size: 0.3, life: 0.4 });
+          if (this.stats.flags.aegis) { for (const e of enemiesInRadius(this.pos, 4)) this.dealDamage(e, this.stats.dmg * 1.5, { kb: 2.5, stun: 0.6 }, true); fxPlay('quake', { x: this.pos.x, z: this.pos.z, r: 4 }); }
+          return;
+        }
+        dmg *= Math.max(0.05, 0.25 - (this.stats.T.block || 0));
+        G.audio.block(false);
+        this.resource = Math.min(this.stats.resMax, this.resource + 6);
+      }
+    }
+    const armor = this.stats.armor * (this.tauntBuffT > 0 ? 1.4 : 1);
+    const final = Math.max(1, Math.round(o.dot ? dmg : dmg * 100 / (100 + armor)));
+    this.hp -= final; this.lastHurt = 0; this.combatT = 0;
+    if (!o.dot) {
+      this.hurtT = 1;
+      this.style *= 0.6; this.lastRank = Math.min(this.lastRank, this.rank);
+      if (this.R.onHurt) this.resource = Math.min(this.stats.resMax, this.resource + this.R.onHurt);
+      G.shake = Math.max(G.shake, 0.25); G.ui.hurtFlash(); G.audio.hurt();
+      G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1.2), count: 12, speed: 4, color: '#ff4a3a', color2: '#400000', size: 0.25, life: 0.5, gravity: 10 });
+      if (o.affix === 'frozen') { this.slowT = 2; G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 20, speed: 2, color: '#dffaff', color2: '#3ab0ff', size: 0.3, life: 0.8 }); }
+      if (o.affix === 'molten') { this.burnT = 3; this.burnDps = Math.max(3, dmg * 0.25); }
+      if (o.affix === 'venom') this.slowT = 1.5;
+      if (o.kb && src) { const dx = this.pos.x - src.pos.x, dz = this.pos.z - src.pos.z, l = Math.hypot(dx, dz) || 1; this.vel.x += (dx / l) * 9; this.vel.z += (dz / l) * 9; }
+    }
+    G.fx.text(this.pos.clone().setY(this.pos.y + 2.2), `-${final}`, 'hurt', o.dot ? 0.6 : 1);
+    if (this.hp <= 0 && this.stats.flags.unbreakable && this.unbreakCd <= 0) { this.hp = 1; this.unbreakCd = 90; this.invuln = 1.5; G.ui.toast('Unbreakable!', '#ffd34d'); G.audio.block(true); return; }
     if (this.hp <= 0) {
-      this.hp = 0; this.dead = true; this.deadT = 6; this.deadAnim = 0; this.atk.t = -1; this.slamT = -1;
+      this.hp = 0; this.dead = true; this.deadT = 6; this.deadAnim = 0; this.atk.t = -1; this.slamT = -1; this.roll = 0; this.style = 0;
+      this.kit.whirlT = 0; G.lock = null;
       G.ui.showDeath(true);
     }
   }
@@ -258,13 +362,16 @@ export class CameraRig {
     this.camera = camera;
     this.yaw = 0; this.pitch = 0.42; this.dist = 10;
     this.target = new THREE.Vector3();
-    this.cur = new THREE.Vector3();
   }
   snap(player) { this.target.copy(player.pos).add(new THREE.Vector3(0, 1.7, 0)); }
   update(dt, input, player, zone) {
-    if (input.locked && !G.uiOpen) {
+    if (!G.uiOpen && !G.emoteWheel) {
       this.yaw -= input.dx * 0.0024;
       this.pitch = clamp(this.pitch + input.dy * 0.002, -0.15, 1.3);
+    }
+    if (G.lock && !G.lock.dead) {
+      const dx = G.lock.pos.x - player.pos.x, dz = G.lock.pos.z - player.pos.z;
+      if (Math.hypot(dx, dz) > 1.5) this.yaw = angleLerp(this.yaw, Math.atan2(-dx, -dz), Math.min(1, dt * 5));
     }
     if (!G.uiOpen) this.dist = clamp(this.dist + input.wheel * 1.0, 4, 18);
     const desired = player.pos.clone(); desired.y += 1.7;

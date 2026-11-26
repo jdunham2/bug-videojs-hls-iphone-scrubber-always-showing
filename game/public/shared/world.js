@@ -7,6 +7,8 @@ export const TOWN = {
   bound: 122,
   core: { x: 0, z: 0, r: 2.6 },
   bell: { x: 6.5, z: -5 },
+  trainer: { x: -7, z: 6 },
+  stash: { x: 7.5, z: 6.5 },
   spawn: { x: 0, z: 13 },
   dungeonPortal: { x: -23, z: -25 },
   darkPortal: { x: 23, z: -25 },
@@ -27,7 +29,14 @@ export const STRUCTURES = {
   tower: { name: 'Arrow Tower', cost: 60, hp: 260, key: '2', icon: '🏹', range: 17, dmg: 16, rate: 0.85, desc: 'Fires homing arrows at enemies in range.' },
   brazier: { name: 'Ember Brazier', cost: 45, hp: 220, key: '3', icon: '🔥', radius: 3.8, dps: 24, desc: 'Burns everything that walks near it.' },
   frost: { name: 'Frost Totem', cost: 50, hp: 220, key: '4', icon: '❄', radius: 6, slow: 0.5, desc: 'Slows enemies in a wide aura.' },
+  wall: { name: 'Stone Wall', cost: 12, hp: 520, key: '5', icon: '🧱', snap: true, desc: 'Snaps to a grid and links up. Reroutes the horde.' },
 };
+
+export const MAX_TIER = 3;
+export const tierHp = (t) => Math.pow(1.7, t - 1);
+export const tierDmg = (t) => Math.pow(1.6, t - 1);
+export const upgradeCost = (kind, tier) => STRUCTURES[kind].cost * tier;
+export const repairCost = (s) => Math.ceil(Math.max(0, s.maxHp - s.hp) / 12);
 
 export function townHeight(x, z) {
   const r = Math.hypot(x, z);
@@ -132,6 +141,7 @@ export function townLayout() {
   }
   colliders.push({ x: TOWN.core.x, z: TOWN.core.z, r: TOWN.core.r });
   colliders.push({ x: TOWN.bell.x, z: TOWN.bell.z, r: 1.3 });
+  colliders.push({ x: TOWN.stash.x, z: TOWN.stash.z, r: 0.9 });
   for (const p of [TOWN.dungeonPortal, TOWN.darkPortal]) {
     const l = Math.hypot(p.x, p.z), fx = -p.x / l, fz = -p.z / l; // portal faces the town centre
     colliders.push({ x: p.x + fz * 2.8, z: p.z - fx * 2.8, r: 0.9 }, { x: p.x - fz * 2.8, z: p.z + fx * 2.8, r: 0.9 });

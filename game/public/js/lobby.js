@@ -1,0 +1,96 @@
+// Lobby: class selection with a live 3D hero preview, banner colours, party code.
+import * as THREE from 'three';
+import { CLASSES } from '../shared/classes.js';
+import { buildHero, animateRig } from './models.js';
+import { COLORS } from './ui.js';
+import { getToken } from './settings.js';
+
+const $ = (id) => document.getElementById(id);
+
+export class Lobby {
+  constructor() {
+    this.cls = localStorage.getItem('emberfall_cls') || 'warden';
+    if (!CLASSES[this.cls]) this.cls = 'warden';
+    this.color = localStorage.getItem('emberfall_color') || COLORS[0];
+    this.levels = {};
+    const canvas = $('preview');
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setSize(canvas.clientWidth || 320, canvas.clientHeight || 360, false);
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.shadowMap.enabled = true;
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(32, 320 / 360, 0.1, 50);
+    this.camera.position.set(0, 1.6, 6.4); this.camera.lookAt(0, 1.05, 0);
+    this.scene.add(new THREE.HemisphereLight('#c8d8ff', '#2a1a10', 1.1));
+    const key = new THREE.DirectionalLight('#ffe2b0', 2.6); key.position.set(2, 4, 3); key.castShadow = true; this.scene.add(key);
+    this.rim = new THREE.PointLight('#ff9a3c', 25, 8, 2); this.rim.position.set(-1.5, 2.2, -1.5); this.scene.add(this.rim);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.45, 0.18, 40), new THREE.MeshStandardMaterial({ color: '#2a2230', roughness: 0.6, metalness: 0.3 }));
+    disc.position.y = -0.09; disc.receiveShadow = true; this.scene.add(disc);
+    this.ring = new THREE.Mesh(new THREE.TorusGeometry(1.38, 0.025, 6, 64), new THREE.MeshBasicMaterial({ color: '#ff9a3c' }));
+    this.ring.rotation.x = Math.PI / 2; this.ring.position.y = 0.01; this.scene.add(this.ring);
+    this.rot = 0.4; this.t = 0; this.drag = null;
+    canvas.addEventListener('pointerdown', (e) => (this.drag = e.clientX));
+    addEventListener('pointerup', () => (this.drag = null));
+    addEventListener('pointermove', (e) => { if (this.drag !== null) { this.rot += (e.clientX - this.drag) * 0.01; this.drag = e.clientX; } });
+    const qp = new URLSearchParams(location.search).get('room');
+    if (qp) $('roomInput').value = qp.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    this.buildCards(); this.buildColors();
+    this.setClass(this.cls);
+    const token = getToken();
+    if (token) fetch('/api/profile?token=' + token).then((r) => r.json()).then((p) => {
+      if (!p) return;
+      this.levels = Object.fromEntries(Object.entries(p.chars || {}).map(([k, c]) => [k, c.level]));
+      if (!$('nameInput').value) $('nameInput').value = p.name || '';
+      if (p.color && !localStorage.getItem('emberfall_color')) { this.color = p.color; this.buildColors(); this.setClass(this.cls); }
+      $('lobbyGold').textContent = p.gold ? `◉ ${p.gold.toLocaleString()} gold in your account` : '';
+      this.buildCards();
+    }).catch(() => {});
+    this.active = true;
+  }
+  buildCards() {
+    $('classCards').innerHTML = Object.entries(CLASSES).map(([k, C]) => `<div class="ccard ${k === this.cls ? 'on' : ''}" data-k="${k}" style="--c:${C.color}"><div class="cicon">${{ warden: '🛡️', emberblade: '🔥', hexcaller: '🔮' }[k]}</div><div class="cname">${C.name}</div><div class="crole">${C.role}</div>${this.levels[k] ? `<div class="clvl">Lv ${this.levels[k]}</div>` : ''}</div>`).join('');
+    document.querySelectorAll('.ccard').forEach((c) => (c.onclick = () => this.setClass(c.dataset.k)));
+  }
+  buildColors() {
+    const sw = $('colors'); sw.innerHTML = '';
+    COLORS.forEach((c) => {
+      const d = document.createElement('div'); d.className = 'sw' + (c === this.color ? ' on' : ''); d.style.background = c; d.style.color = c;
+      d.onclick = () => { this.color = c; localStorage.setItem('emberfall_color', c); [...sw.children].forEach((x) => x.classList.remove('on')); d.classList.add('on'); this.setClass(this.cls); };
+      sw.appendChild(d);
+    });
+  }
+  setClass(k) {
+    this.cls = k; localStorage.setItem('emberfall_cls', k);
+    document.querySelectorAll('.ccard').forEach((c) => c.classList.toggle('on', c.dataset.k === k));
+    const C = CLASSES[k];
+    $('classInfo').innerHTML = `<div class="cdesc">${C.desc}</div><div class="cskills">${C.skills.map((s) => `<span title="${s.desc}">${s.icon} ${s.name}</span>`).join('')}</div><div class="cres" style="color:${C.resource.color}">Resource: ${C.resource.name}</div>`;
+    if (this.hero) this.scene.remove(this.hero.root);
+    this.hero = buildHero(this.color, k);
+    this.hero.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this.scene.add(this.hero.root);
+    this.rim.color.set(C.color); this.ring.material.color.set(C.color);
+    this.t = 0;
+  }
+  values() { return { name: $('nameInput').value.trim() || 'Hero', room: $('roomInput').value.trim().toUpperCase(), cls: this.cls, color: this.color }; }
+  update(dt) {
+    if (!this.active) return;
+    this.t += dt;
+    if (this.drag === null) this.rot += dt * 0.35;
+    this.hero.root.rotation.y = this.rot;
+    // cycle through showcase poses
+    const cyc = this.t % 6, s = { t: this.t, move: 0, atk: -1, slam: -1 };
+    if (cyc > 2 && cyc < 2.6) { s.atk = (cyc - 2) / 0.6; s.combo = 2; }
+    else if (cyc > 4 && cyc < 4.8) {
+      if (this.cls === 'warden') s.block = true;
+      else if (this.cls === 'hexcaller') s.cast = Math.sin(((cyc - 4) / 0.8) * Math.PI);
+      else s.channel = true;
+    }
+    if (s.channel) this.hero.root.rotation.y = this.rot + (this.t * 20) % (Math.PI * 2);
+    animateRig(this.hero, s);
+    this.ring.rotation.z += dt * 0.5;
+    this.renderer.render(this.scene, this.camera);
+  }
+  dispose() { this.active = false; this.renderer.dispose(); }
+}

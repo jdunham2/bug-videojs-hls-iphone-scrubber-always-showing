@@ -14,6 +14,7 @@ export const WEAPONS = {
   axe: { name: 'Axe', dmg: 17, speed: 0.82, range: 2.8, arc: 2.2 },
   hammer: { name: 'Warhammer', dmg: 25, speed: 0.62, range: 3.0, arc: 2.6, cleave: true },
   dagger: { name: 'Twin Daggers', dmg: 8, speed: 1.6, range: 2.2, arc: 1.6, crit: 0.1 },
+  staff: { name: 'Staff', dmg: 13, speed: 1.1, range: 16, arc: 0.6, ranged: true },
 };
 
 export const ARMOR = {
@@ -52,14 +53,14 @@ export function rollRarity(rng, level, luck = 1, min = 0) {
 
 export function generateItem(rng, level, opts = {}) {
   rng = rng || new RNG((Math.random() * 1e9) | 0);
-  const slot = opts.slot || rng.weighted([['weapon', 4], ['helm', 2], ['chest', 2], ['boots', 2]]);
+  const slot = opts.slot || rng.weighted([['weapon', 3.5], ['helm', 2], ['chest', 2], ['boots', 2]]);
   const rarity = opts.rarity ?? rollRarity(rng, level, opts.luck || 1, opts.minRarity || 0);
   const R = RARITIES[rarity];
   const scale = (1 + 0.2 * (level - 1)) * R.mult;
   const item = { id: uid(), slot, rarity, level, affixes: {} };
   let base;
   if (slot === 'weapon') {
-    const type = opts.type || rng.pick(Object.keys(WEAPONS));
+    const type = opts.type || rng.pick(opts.types && opts.types.length ? opts.types : Object.keys(WEAPONS));
     const W = WEAPONS[type];
     item.type = type;
     item.dmg = Math.round(W.dmg * scale * rng.range(0.92, 1.08));

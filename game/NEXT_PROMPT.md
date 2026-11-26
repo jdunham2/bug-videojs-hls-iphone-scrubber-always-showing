@@ -1,34 +1,33 @@
 # Next milestone prompt — copy and paste this into Claude
 
-> We have a working vertical slice of **Emberfall** in `game/` (read `game/README.md` first). It's a co-op 3D browser action RPG built with Three.js and a Node WebSocket server: a town hub to explore, procedural dungeons with a boss, gear and rarities, a Dark World merchant, and a night-time Defend the City mode with building. Now take it toward AAA "game feel" and depth with the milestone below. Keep everything procedural (no external asset downloads), keep the server authoritative for enemies and loot, and keep 60 fps on a mid-range laptop. Test each feature in a headless browser and show me screenshots.
+> **Emberfall** in `game/` (read `game/README.md` first) is a co-op 3D browser action RPG: Three.js client, authoritative Node WebSocket server, server-side saves. It already has 3 classes with skill trees, dodge/perfect-dodge/lock-on/style combat, elites, two multi-phase bosses, three rotating dungeon biomes with lever puzzles and goblins, flow-field Defend the City with tiered structures and a siege boss, a stash, trading, ready-checks, emotes, cinematics, adaptive music, settings and gamepad support. The next milestone is **endgame, story and launch-readiness**: the reasons people keep playing for months. Keep everything procedural, keep the server authoritative, keep 60 fps on a mid-range laptop, and test each feature in a headless browser with screenshots.
 >
-> **1. Classes and skill trees (the biggest gap)**
-> - Add 3 classes, chosen in the lobby with a 3D character preview: **Warden** (sword and shield tank: shield bash, taunt, block), **Emberblade** (fast dual-wield: blink strike, fire whirl, combo finisher) and **Hexcaller** (ranged caster: fire bolt, chain lightning, summon an ember spirit).
-> - Each class has 4 active skills on keys 1–4 with cooldowns and a resource bar (Rage, Focus or Mana), plus a 12-node passive talent tree. Players earn talent points on level-up and can reset them at a town NPC.
-> - Every skill gets its own VFX, SFX, animation pose, and a server-validated hit.
+> **1. Legendary powers and crafting**
+> - Legendary items roll one unique power that changes a skill (for example, "Chain Lightning splits into 3 bolts", "Fire Whirl pulls enemies in", "Shield Bash leaves a shockwave trail"). Add 4 per class plus 6 generic ones.
+> - Add 3 item **sets** per class with 2-piece and 4-piece bonuses, shown in the tooltip.
+> - Add a **Blacksmith** NPC in town: salvage items into Ember Shards, reroll one affix, and upgrade an item's level. Track material counts on the server.
 >
-> **2. Combat feel pass**
-> - Enemies get real hit reactions (knockback and stagger on the server), elite variants with affixes (Molten, Frozen, Vampiric, Shielded) and a coloured aura, and a champion pack in every dungeon.
-> - Add a dodge-roll with i-frames to replace the dash, a perfect-dodge slow-motion moment, a lock-on target (middle mouse), and a combo counter with a style rank (D→S) that boosts gold.
-> - Give the Bone Tyrant a 3-phase fight: arena hazards in phase 2, enrage in phase 3. Add a second boss, the **Ash Matriarch** (a spider queen with web traps), on even depths.
+> **2. Endgame: Ember Rifts and leaderboards**
+> - Timed **Rifts** (keystone levels 1–∞) with a progress bar filled by kills, a rift guardian at 100%, and modifiers (fast enemies, explosive deaths, darkness).
+> - Add a **seasonal leaderboard** on the server (highest rift cleared and time, per class), viewable on a town board.
+> - After level 30, extra XP feeds **Paragon** points with small stat choices.
 >
-> **3. Dungeon variety**
-> - Add 3 biomes that rotate by depth, each with its own palette, props, lighting and enemies: **Bone Crypts**, **Molten Forge** (lava floor hazards) and **Frozen Catacombs** (slippery ice).
-> - Add room events: trap corridors, locked doors with lever puzzles, a treasure goblin that flees, and a shrine that gives a random temporary buff.
+> **3. World and story**
+> - Grow the valley into 3 open-world regions (the existing valley, Ashen Marsh and Stormspire Peaks), each with world events (a meteor crash, a caravan escort, a rift breach) that any party nearby can join.
+> - Add a short questline with NPC dialogue boxes (portrait, typed text, choices) that introduces each system, ends with an act boss, and unlocks the next region.
+> - Add a **mount** (summoned ember steed, fast travel between waypoints).
 >
-> **4. Defend the City 2.0**
-> - Enemies use real pathfinding (a flow field on the server) so barricades actually reroute them.
-> - Add structure upgrades (3 tiers, each with a new look), walls that snap together, a repair action, and a tower-targeting priority setting.
-> - Add a siege boss on wave 5 (a battering-ram Ogre that goes for the gate) and minimap warnings showing which lane is under attack.
+> **4. New threats**
+> - 2 new bosses: a Storm Drake that flies with strafing breath runs, and a Hollow King in the Dark World who swaps arenas between phases.
+> - 4 new enemy families with distinct mechanics: shield-bearers you have to flank, burrowers, healers you should focus first, and bombers.
+> - Defend the City night **mutators** (blood moon, fog, double ogres) and a structure research tree.
 >
-> **5. Persistence and social**
-> - Move saves to the server: a JSON file database keyed by a player token, so friends can't edit gold in devtools. Add a stash in town shared across characters.
-> - Add a party ready-check before entering the dungeon, trading between players, and emotes on a wheel (hold T).
+> **5. Launch readiness**
+> - **Server-side damage validation**: a per-class DPS budget and range/arc checks, with rejected hits logged.
+> - Add **accounts** (email magic link or a passkey) so progress follows players across devices; keep the token as a fallback guest login.
+> - Add a party browser: list public parties with depth and class mix, plus quick-join.
+> - Production deploy: a Dockerfile, health checks, graceful shutdown that persists rooms, rate limiting, a SQLite profile store, and a GitHub Actions workflow that runs the headless tests.
+> - Performance: GPU timing overlay (press F3), dynamic resolution scaling to hold 60 fps, instanced enemies for large waves, and a measured test of 4 players plus 60 enemies.
+> - Touch controls for tablets (virtual stick and skill buttons), colour-blind-safe rarity and affix colours, and UI scale settings.
 >
-> **6. Presentation**
-> - A cinematic intro that flies the camera over Emberhold with title cards, and boss intro cameras with name splashes.
-> - A procedural music system (WebAudio): calm town theme, tense dungeon theme, drum-heavy night-defense theme, with crossfades.
-> - Settings menu: graphics quality (shadows, grass density, bloom, resolution scale), volume sliders, mouse sensitivity, key rebinding.
-> - Add gamepad support.
->
-> Plan the work in phases, build and test each phase before moving on, and commit after each phase.
+> Plan in phases, build and test each phase before moving on, show me screenshots, and commit after each phase.

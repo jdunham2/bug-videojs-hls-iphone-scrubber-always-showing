@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { TOWN, townHeight, townLayout, inGate } from '../../shared/world.js';
 import { fbm, smoothstep } from '../../shared/rng.js';
 import { G } from '../state.js';
+import { buildHumanoid, animateRig } from '../models.js';
 import { makeSky, buildPortal, textures, Batcher, mtx, makeSun, followSun, makeGrass, heightTerrain, envFromSky } from './common.js';
 
 const C = (h) => new THREE.Color(h);
@@ -285,6 +286,22 @@ export class TownZone {
       this.chests.push({ ...ch, g, lidP, open: false });
     }
 
+    // trainer NPC & shared stash
+    this.trainer = buildHumanoid({ cloth: '#2a3a5a', armor: '#c9a14a', cape: '#1a2a4a', chestPlate: true, weapon: 'hammer', rarity: 3, hair: '#d8d0c0' });
+    this.trainer.root.position.set(TOWN.trainer.x, townHeight(TOWN.trainer.x, TOWN.trainer.z), TOWN.trainer.z);
+    this.trainer.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    s.add(this.trainer.root);
+    {
+      const g = new THREE.Group(); g.position.set(TOWN.stash.x, townHeight(TOWN.stash.x, TOWN.stash.z), TOWN.stash.z);
+      const iron = new THREE.MeshStandardMaterial({ color: '#3a4a6a', metalness: 0.8, roughness: 0.35 });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 1.0), woodMat); body.position.y = 0.45; body.castShadow = true; g.add(body);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.6, 12, 1, false, 0, Math.PI), woodMat); lid.rotation.z = Math.PI / 2; lid.position.y = 0.9; lid.castShadow = true; g.add(lid);
+      for (const x of [-0.6, 0, 0.6]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.42, 1.04), iron); b.position.set(x, 0.7, 0); g.add(b); }
+      const rune = new THREE.Mesh(new THREE.CircleGeometry(1.2, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ab0ff').multiplyScalar(1.4), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+      rune.rotation.x = -Math.PI / 2; rune.position.y = 0.05; g.add(rune);
+      g.rotation.y = Math.atan2(-TOWN.stash.x, -TOWN.stash.z);
+      s.add(g); this.stashG = g;
+    }
     this.buildMinimap();
     this.setupInteractables();
   }
@@ -293,6 +310,8 @@ export class TownZone {
     this.interactables = [
       { x: TOWN.dungeonPortal.x, z: TOWN.dungeonPortal.z, r: 4, mark: 'DUNGEON', label: () => `Enter the Dungeon — Depth ${G.roomLevel}`, action: () => G.actions.travel('dungeon') },
       { x: TOWN.darkPortal.x, z: TOWN.darkPortal.z, r: 4, mark: 'DARK WORLD', label: () => 'Enter the Dark World', action: () => G.actions.travel('dark') },
+      { x: TOWN.trainer.x, z: TOWN.trainer.z, r: 3, mark: 'TRAINER', label: () => 'Talk to the Trainer (talents)', action: () => G.actions.openTalents(true) },
+      { x: TOWN.stash.x, z: TOWN.stash.z, r: 3, mark: 'STASH', label: () => 'Open the shared stash', action: () => G.actions.openStash() },
       { x: TOWN.bell.x, z: TOWN.bell.z, r: 3.2, mark: 'NIGHT BELL', label: () => (G.defense.phase === 'day' ? 'Ring the Night Bell — Defend the City' : null), action: () => G.actions.startNight() },
       ...this.chests.map((ch) => ({ x: ch.x, z: ch.z, r: 2.6, mark: null, label: () => (ch.open ? null : 'Open Ancient Chest'), action: () => G.actions.openChest(ch) })),
     ];
@@ -333,6 +352,8 @@ export class TownZone {
       { x: TOWN.darkPortal.x, z: TOWN.darkPortal.z, color: '#c77dff', icon: 'portal' },
       { x: 0, z: 0, color: '#ffcf6a', icon: 'core' },
       { x: TOWN.bell.x, z: TOWN.bell.z, color: '#e0b040', icon: 'bell' },
+      { x: TOWN.trainer.x, z: TOWN.trainer.z, color: '#5ab0ff', icon: 'npc' },
+      { x: TOWN.stash.x, z: TOWN.stash.z, color: '#8fd0ff', icon: 'stash' },
     ];
   }
 
@@ -397,6 +418,8 @@ export class TownZone {
     // bell
     if (this.bellSwing > 0) { this.bellSwing = Math.max(0, this.bellSwing - dt * 0.3); this.bellPivot.rotation.x = Math.sin(t * 6) * 0.5 * this.bellSwing; }
     for (const b of this.banners) b.rotation.x = Math.sin(t * 2 + b.position.x) * 0.08;
+    animateRig(this.trainer, { t, move: 0, atk: -1, slam: -1 });
+    this.trainer.root.rotation.y = Math.atan2(playerPos.x - TOWN.trainer.x, playerPos.z - TOWN.trainer.z);
     for (const ch of this.chests) if (ch.open && ch.lidP.rotation.x > -1.9) ch.lidP.rotation.x -= dt * 4;
     // night blend
     const target = d.phase === 'day' || d.phase === 'dawn' ? 0 : 1;
