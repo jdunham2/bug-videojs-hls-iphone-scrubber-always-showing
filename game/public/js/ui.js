@@ -9,6 +9,7 @@ import { SHRINES } from '../shared/dungeon.js';
 import { AFFIXES } from '../shared/enemies.js';
 import { RIFT_MODS, RIFT_TIME, PARAGON, LEVEL_CAP, paragonXp } from '../shared/rifts.js';
 import { QUESTS, EVENTS, REGIONS, ACT1_END } from '../shared/regions.js';
+import { renderSocial } from './socialui.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
 import { STYLE_RANKS, ROLL_CD } from './player.js';
 import { ACTION_LABELS, DEFAULT_BINDINGS, keyName } from './input.js';
@@ -262,12 +263,13 @@ class UI {
   }
 
   // ---------- panels ----------
-  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe'].some((id) => !$(id).classList.contains('hidden')); }
+  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe', 'social'].some((id) => !$(id).classList.contains('hidden')); }
   togglePanel(id) { if ($(id).classList.contains('hidden')) this.openPanel(id); else this.closePanel(id); }
   openPanel(id) {
     $(id).classList.remove('hidden');
     G.uiOpen = true; G.input.unlock();
     if (id === 'inventory') this.renderInventory();
+    if (id === 'social') { renderSocial(this); G.net.send({ t: 'social' }); }
     if (id === 'shop') { G.net.send({ t: 'shopOpen' }); $('inventory').classList.remove('hidden'); this.renderInventory(); this.sideBySide('shop', true); }
     if (id === 'stash') { $('inventory').classList.add('hidden'); this.renderStash(); }
     if (id === 'talents') this.renderTalents();
@@ -286,7 +288,7 @@ class UI {
     this.hideTip();
     G.uiOpen = this.anyPanel;
   }
-  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
+  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe', 'social'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
   sideBySide(id, on) {
     const inv = $('inventory'), other = $(id);
     if (on && innerWidth > 1400) { other.style.left = 'calc(50% - 400px)'; inv.style.left = 'calc(50% + 330px)'; }
@@ -435,8 +437,10 @@ class UI {
   renderBoard(m) {
     this.boardData = m; this.boardCls ||= G.prof?.cls || 'warden';
     $('boardSeason').textContent = `Season ${m.season}`;
-    $('boardTabs').innerHTML = Object.entries(CLASSES).map(([k, C]) => `<button class="stab ${k === this.boardCls ? 'on' : ''}" data-k="${k}" style="color:${C.color}">${C.name}</button>`).join('');
+    $('boardTabs').innerHTML = Object.entries(CLASSES).map(([k, C]) => `<button class="stab ${k === this.boardCls ? 'on' : ''}" data-k="${k}" style="color:${C.color}">${C.name}</button>`).join('') + `<button class="stab ${this.boardCls === 'guilds' ? 'on' : ''}" data-k="guilds" style="color:#7affb0">Guilds</button>`;
+    $('boardBounties').onclick = () => { this.closePanel('board'); this.socTab = 'bounties'; this.openPanel('social'); };
     $('boardTabs').querySelectorAll('button').forEach((b) => (b.onclick = () => { this.boardCls = b.dataset.k; this.renderBoard(this.boardData); }));
+    if (this.boardCls === 'guilds') { const g = m.guilds || []; $('boardRows').innerHTML = g.length ? `<table class="lb"><thead><tr><th>#</th><th>Guild</th><th>Rift</th><th>Time</th><th>By</th></tr></thead><tbody>${g.map((r, i) => `<tr><td>${i + 1}</td><td>&lt;${escapeHtml(r.tag)}&gt; ${escapeHtml(r.name)}</td><td>${r.k}</td><td>${Math.floor(r.time / 60)}:${String(Math.floor(r.time % 60)).padStart(2, '0')}</td><td>${escapeHtml(r.by)}</td></tr>`).join('')}</tbody></table>` : '<div class="muted" style="padding:12px">No guild has cleared a rift in time this season.</div>'; return; }
     const rows = (m.data[this.boardCls] || []).slice(0, 10);
     $('boardRows').innerHTML = rows.length ? `<table class="lb"><thead><tr><th>#</th><th>Hero</th><th>Rift</th><th>Time</th><th>Party</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${r.k}</td><td>${Math.floor(r.time / 60)}:${String(Math.floor(r.time % 60)).padStart(2, '0')}</td><td>${r.party}</td></tr>`).join('')}</tbody></table>` : '<div class="muted" style="padding:12px">No champions yet this season. Be the first.</div>';
   }

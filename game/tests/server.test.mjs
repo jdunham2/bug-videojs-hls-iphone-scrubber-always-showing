@@ -20,7 +20,7 @@ test('killing enemies pays gold and xp server-side', async () => {
   await wait(20);
   c.send({ t: 'zone', to: 'dungeon' }); await wait(80);
   const gold0 = c.prof.gold;
-  const e = c.ents.list.find((x) => x[1] !== 'boss' && x[1] !== 'goblin');
+  const e = c.ents.list.find((x) => !['boss', 'goblin', 'shieldbearer', 'burrower', 'matriarch', 'drake'].includes(x[1]));
   c.send({ t: 'state', x: e[2] + 1, y: 0, z: e[3], hp: 100, maxHp: 100 });
   c.send({ t: 'hit', id: e[0], dmg: e[5] });
   await wait(120);
@@ -208,4 +208,72 @@ test('world clock and weather reach the client; fishing is validated server-side
   c.send({ t: 'fishEnd', ok: true }); await wait(120);
   assert.equal(c.count('fishCaught'), 1);
   assert.equal(Object.values(c.prof.fish).reduce((a, b) => a + b, 0), 1);
+});
+
+test('friends, whispers, guilds with a shared stash, bounties, seasons and the admin feed', async () => {
+  const { TOWN } = await import('../public/shared/world.js');
+  const { allBounties, SEASON_TRACK } = await import('../public/shared/social.js');
+  const game = G();
+  const a = client(game, { name: 'Ash' }), b = client(game, { name: 'Bryn', room: 'ZZZZ' });
+  await wait(60);
+  assert.ok(a.last.social?.tag && b.last.social?.tag, 'friend codes issued');
+  const A = a.last.social.tag, B = b.last.social.tag;
+  // friend request across rooms, accept, whisper
+  a.send({ t: 'friendAdd', code: B }); await wait(30);
+  assert.equal(b.last.social.requests[0].tag, A);
+  b.send({ t: 'friendAccept', code: A }); await wait(30);
+  assert.equal(a.last.social.friends[0].online, true);
+  a.send({ t: 'chat', text: '/w Bryn meet me at the obelisk' }); await wait(30);
+  assert.equal(b.last.whisper.text, 'meet me at the obelisk'); assert.equal(b.last.whisper.from, 'Ash');
+  // guild: costs gold, invite by code, shared stash only at the stash chest
+  a.send({ t: 'guildCreate', name: 'Ember Wardens', tag: 'EW' }); await wait(30);
+  assert.match(a.last.notice.text, /costs 1000/);
+  a.send({ t: 'chat', text: '/gold 2000' }); await wait(80);
+  a.send({ t: 'guildCreate', name: 'Ember Wardens', tag: 'EW' }); await wait(30);
+  assert.equal(a.last.social.guild.tag, 'EW');
+  a.send({ t: 'guildInvite', code: B }); await wait(30);
+  b.send({ t: 'guildAccept', id: b.last.social.guildInvites[0].id }); await wait(30);
+  assert.equal(b.last.social.guild.members.length, 2);
+  a.send({ t: 'guildStash', op: 'put', i: 0 }); await wait(30);
+  assert.match(a.last.notice.text, /stash chest/);
+  a.send({ t: 'chat', text: '/loot 1' }); await wait(80);
+  a.send({ t: 'state', x: TOWN.stash.x, y: 0, z: TOWN.stash.z + 1, hp: 100, maxHp: 100 });
+  a.send({ t: 'guildStash', op: 'put', i: 0 }); await wait(30);
+  assert.equal(b.last.social.guild.stash.length, 1, 'guild-mate sees the deposit');
+  a.send({ t: 'chat', text: '/g for the guild!' }); await wait(30);
+  assert.equal(b.last.chat.text, 'for the guild!');
+  // bounties: progress from real events, claim only when done and at the board
+  const room = game.rooms.get(a.room), p = [...room.players.values()][0];
+  const fishB = allBounties().find((x) => x.kind === 'kill') || allBounties()[0];
+  room.bounty(p, fishB.kind, fishB.n, { zone: fishB.zone }); await wait(600);
+  const vb = a.last.social.bounties.find((x) => x.id === fishB.id);
+  assert.equal(vb.prog, fishB.n);
+  a.send({ t: 'state', x: -20, y: 0, z: 10, hp: 100, maxHp: 100 });
+  a.send({ t: 'bountyClaim', id: fishB.id }); await wait(30);
+  assert.match(a.last.notice.text, /Bounty Board/);
+  a.send({ t: 'state', x: TOWN.board.x, y: 0, z: TOWN.board.z + 1, hp: 100, maxHp: 100 });
+  a.send({ t: 'bountyClaim', id: fishB.id }); a.send({ t: 'bountyClaim', id: fishB.id }); await wait(60);
+  assert.equal(a.last.social.bounties.find((x) => x.id === fishB.id).claimed, true);
+  const marks = a.last.social.season.marks;
+  assert.equal(marks, fishB.reward.marks, 'claimed exactly once');
+  // season track: locked until enough marks, then unlocks a cosmetic you can equip
+  a.send({ t: 'seasonClaim', tier: 6 }); await wait(30);
+  assert.match(a.last.notice.text, /Season Marks/);
+  room.marks(p, 20); // e.g. from a rift clear
+  a.send({ t: 'seasonClaim', tier: 0 }); await wait(30);
+  assert.ok(a.last.social.cosmetics.includes(SEASON_TRACK[0].cos));
+  a.send({ t: 'cosEquip', type: 'title', id: SEASON_TRACK[0].cos }); await wait(30);
+  assert.equal(a.last.social.cos.title, SEASON_TRACK[0].cos);
+  a.send({ t: 'cosEquip', type: 'aura', id: 'aura_storm' }); await wait(30);
+  assert.match(a.last.notice.text, /not unlocked/);
+  // admin feed: rooms, players and the anti-cheat log
+  a.send({ t: 'chat', text: '/depth 1' });
+  a.send({ t: 'hit', id: 999999, dmg: 1 });
+  const ad0 = game.admin(); assert.equal(ad0.online, 2); assert.equal(ad0.rooms.length, 2);
+  a.send({ t: 'zone', to: 'marsh' }); await wait(80);
+  const e = room.zones.get('marsh').enemies.values().next().value;
+  a.send({ t: 'state', x: e.x + 1, y: 0, z: e.z, hp: 100, maxHp: 100 }); a.send({ t: 'hit', id: e.id, dmg: 9e9 }); await wait(30);
+  const ad = game.admin();
+  assert.equal(ad.anticheat[0].name, 'Ash');
+  assert.ok(ad.rooms.some((r) => r.players.some((pl) => pl.guild === 'EW')));
 });

@@ -631,8 +631,14 @@ export function buildSteed(color = '#e8a33d') {
   mesh(cone(0.12, 0.9, 5), ember, 0, 1.25, -1.05, g).rotation.x = -2.2;
   const legs = [];
   for (const [x, z] of [[-0.24, 0.6], [0.24, 0.6], [-0.24, -0.6], [0.24, -0.6]]) { const l = new THREE.Group(); l.position.set(x, 0.9, z); g.add(l); mesh(capsule(0.08, 0.7), hide, 0, -0.45, 0, l); mesh(sphere(0.1, 6, 5), ember, 0, -0.85, 0, l); legs.push(l); }
-  g.userData = { legs, neck, ember };
+  g.userData = { legs, neck, ember, hide, base: color };
   return g;
+}
+/** recolour a steed for the season cosmetics (null restores the default look) */
+export function tintSteed(g, color) {
+  if (!g?.userData.ember) return;
+  const U = g.userData;
+  U.ember.emissive.set(color || U.base); U.hide.color.set(color ? new THREE.Color(color).multiplyScalar(0.55) : '#6a3a24');
 }
 export function animateSteed(st, t, mv) {
   st.userData.legs.forEach((l, i) => { l.rotation.x = Math.sin(t * 14 + (i % 2 ? Math.PI : 0) + (i > 1 ? 0.6 : 0)) * 0.8 * mv; });

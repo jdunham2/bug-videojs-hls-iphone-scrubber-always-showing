@@ -4,7 +4,8 @@ import { G, angleLerp, damp } from './state.js';
 import { ENEMIES, AFFIXES, AFFIX_KEYS } from '../shared/enemies.js';
 import { RARITIES } from '../shared/items.js';
 import { STRUCTURES } from '../shared/world.js';
-import { buildSteed, animateSteed, buildEnemy, buildHero, animateRig, animateSpider, animateWorm, animateDrake, flashRig, fadeRig, applyGear, buildWeapon, RARITY_TINT, RARITY_GLOW } from './models.js';
+import { COSMETICS } from '../shared/social.js';
+import { tintSteed, buildSteed, animateSteed, buildEnemy, buildHero, animateRig, animateSpider, animateWorm, animateDrake, flashRig, fadeRig, applyGear, buildWeapon, RARITY_TINT, RARITY_GLOW } from './models.js';
 import { buildSpiritMesh } from './skills.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
@@ -208,7 +209,10 @@ export class RemoteView {
     const want = p.spirit || 0;
     while (this.spirits.length < want) { const m = buildSpiritMesh(); entityRoot.add(m); this.spirits.push(m); }
     while (this.spirits.length > want) entityRoot.remove(this.spirits.pop());
-    this.tag.innerHTML = `<span style="color:${p.color}">${escapeHtml(p.name)}</span> <span style="color:#aaa;font-size:11px">Lv${p.level}</span><div class="hpm"><i style="width:${Math.max(0, (p.hp / p.maxHp) * 100)}%"></i></div>`;
+    const T = p.cos?.title && COSMETICS[p.cos.title];
+    const html = `${T ? `<div class="ntitle" style="color:${T.color}">${T.name}</div>` : ''}${p.gtag ? `<span style="color:#7affb0;font-size:11px">&lt;${escapeHtml(p.gtag)}&gt;</span> ` : ''}<span style="color:${p.color}">${escapeHtml(p.name)}</span> <span style="color:#aaa;font-size:11px">Lv${p.level}</span><div class="hpm"><i style="width:${Math.max(0, (p.hp / p.maxHp) * 100)}%"></i></div>`;
+    if (html !== this._html) { this.tag.innerHTML = html; this._html = html; }
+    const sc = p.cos?.steed || null; if (sc !== this._steed) { this._steed = sc; tintSteed(this.steed, sc ? COSMETICS[sc].color : null); }
   }
   showEmote(kind) { this.emote = kind; this.emoteT = 0; this.bubble.textContent = EMOTES[kind] || '❗'; this.bubble.style.display = ''; }
   update(dt, camera) {

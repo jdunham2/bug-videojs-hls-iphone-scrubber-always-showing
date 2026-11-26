@@ -654,6 +654,13 @@ export class Zone {
         }
       }
     }
+    const bz = this.dungeon ? 'dungeon' : this.region ? this.key : this.type;
+    for (const p of this.players()) {
+      this.room.bounty(p, 'kill', 1, { zone: bz });
+      if (e.affix) this.room.bounty(p, 'elite');
+      if (def.boss) { this.room.bounty(p, 'boss'); this.room.marks(p, 5); }
+      if (def.boss && this.type === 'dungeon') this.room.bounty(p, 'dungeon');
+    }
     if (def.boss && this.type === 'dungeon') for (const p of this.players()) this.room.questEvent(p, 'dungeon');
     if (e.type === 'colossus') for (const p of this.players()) this.room.questEvent(p, 'actboss');
     if (this.key === 'peaks') for (const p of this.players()) {
@@ -720,7 +727,7 @@ export class Zone {
     for (const p of this.players()) if (dist(p, ev) < 60) {
       this.room.reward(p, 80 * this.lvl, 150 * this.lvl, ev.x, ev.z, true);
       this.room.giveLoot(p, this.lvl, { minRarity: 2, luck: 2 }, ev.x + rng.range(-2, 2), ev.z + rng.range(-2, 2));
-      this.room.questEvent(p, 'event');
+      this.room.questEvent(p, 'event'); this.room.bounty(p, 'event');
     }
   }
   summonColossus(p) {

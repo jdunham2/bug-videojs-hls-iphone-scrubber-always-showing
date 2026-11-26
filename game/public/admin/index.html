@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Emberfall Live Ops</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE work: an operator's console for a live game service
+   IDEA a control-room status board: one big readout, thin live strips beside it
+   PICTURE the live strip chart of players and enemies, drawn large under the main readout
+   COLOUR steel panel, black ink, white cards, alarm red for anti-cheat; night #16191c
+   TYPE Inter Tight 600 display + Inter text
+   LAYOUT laptop: 40% readout+chart left, rooms and anti-cheat strips right; phone: stacked readout, chart, rooms, log */
+:root{color-scheme:light dark;--bg:light-dark(#d5dbe0,#16191c);--panel:light-dark(#ffffff,#20252a);--ink:light-dark(#0c0e10,#eef1f3);--mute:light-dark(#5a646c,#9aa5ae);--line:light-dark(#c2cad1,#2f363d);--red:#e8251a;--ok:light-dark(#0f7a3e,#4fd88a);--bar:light-dark(#0c0e10,#eef1f3)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;overflow-x:clip}
+.band{padding-block:clamp(18px,3vw,36px);padding-left:max(4vw,16px,env(safe-area-inset-left,0px));padding-right:max(4vw,16px,env(safe-area-inset-right,0px));max-width:1320px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;justify-content:space-between}
+h1{font:600 clamp(30px,4vw,44px)/1.05 'Inter Tight',Inter,sans-serif;letter-spacing:-.02em;margin:0}
+.sub{color:var(--mute);margin:4px 0 0}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{font:600 14px Inter;border:0;background:none;color:var(--ink);padding:10px 14px;min-height:44px;cursor:pointer}
+.seg button.on{background:var(--ink);color:var(--panel)}
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 13px Inter;padding:6px 10px;border-radius:99px;background:var(--panel);border:1px solid var(--line);white-space:nowrap}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.pill.err i{background:var(--red)}
+input{font:16px Inter;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:180px}
+.grid{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,6fr);gap:16px;margin-top:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.big{font:700 clamp(64px,9vw,104px)/.95 'Inter Tight',Inter,sans-serif;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.lab{color:var(--mute);font-size:13px}
+.figs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 10px;border-top:1px solid var(--line);padding-top:12px}
+.figs b{display:block;font:600 28px/1.1 'Inter Tight',Inter,sans-serif;font-variant-numeric:tabular-nums}
+.figs .alarm b{color:var(--red)}
+.readout{display:flex;flex-direction:column}.fig{position:relative;min-height:240px;margin-top:6px;flex:1}.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+svg text{font:12px Inter;fill:var(--mute);paint-order:stroke;stroke:var(--panel);stroke-width:4px}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--mute)}.legend b{margin-left:auto;font-weight:500}.legend span::before{content:'';display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;background:currentColor}
+h2{font:600 18px/1.2 'Inter Tight',Inter,sans-serif;margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+h2 small{font:500 13px Inter;color:var(--mute)}
+.room{border-top:1px solid var(--line);padding:10px 0;display:grid;grid-template-columns:96px minmax(0,1fr);gap:4px 14px}
+.room:first-of-type{border-top:0}
+.code{font:700 20px/1 'Inter Tight',Inter,sans-serif;letter-spacing:.04em}
+.meta{font-size:13px;color:var(--mute)}
+.night{color:var(--red);font-weight:600}
+.pl{display:flex;flex-wrap:wrap;gap:6px 14px}
+.p{display:grid;grid-template-columns:auto 64px;gap:2px 8px;align-items:center;font-size:13px;white-space:nowrap}
+.p .hp{height:5px;background:var(--line);border-radius:3px;overflow:hidden}.p .hp i{display:block;height:100%;background:var(--bar)}
+.p.dead{opacity:.45}.p .flag{color:var(--red);font-weight:700}
+.zones{font-size:12px;color:var(--mute);grid-column:2}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mute);font-weight:500;border-bottom:1px solid var(--line);padding:6px 8px}
+td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+td.x{color:var(--red);font-weight:600}
+.empty{color:var(--mute);padding:14px 0}
+.note{color:var(--mute);font-size:13px;margin-top:14px}
+@media(max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.room{grid-template-columns:minmax(0,1fr)}.zones{grid-column:1}table{font-size:13px}th,td{padding:6px 4px}.hide-s{display:none}}
+</style>
+</head>
+<body>
+<div class="band">
+  <header>
+    <div><h1>Emberfall Live Ops</h1><p class="sub" id="srcNote">Live rooms, players and the anti-cheat log.</p></div>
+    <div class="ctl">
+      <div class="seg" role="tablist"><button id="mDemo" class="on">Demo simulation</button><button id="mLive">Live server</button></div>
+      <input id="key" type="password" placeholder="Admin key" hidden autocomplete="off" />
+      <span class="pill" id="status"><i></i><span id="statusT">Starting…</span></span>
+    </div>
+  </header>
+  <div class="grid">
+    <section class="card readout">
+      <div class="lab">Players online</div>
+      <div class="big" id="online">0</div>
+      <div class="figs">
+        <div><span class="lab">Rooms</span><b id="rooms">0</b></div>
+        <div><span class="lab">Enemies alive</span><b id="enemies">0</b></div>
+        <div class="alarm"><span class="lab">Rejected, 5 min</span><b id="rej">0</b></div>
+      </div>
+      <div class="legend"><span style="color:var(--ink)">Players</span><span style="color:var(--red)">Enemies &divide; 10</span><b id="window">last 3 min</b></div>
+      <div class="fig" id="chart"><svg></svg></div>
+    </section>
+    <div style="display:grid;gap:16px;align-content:start">
+      <section class="card"><h2>Rooms <small id="uptime"></small></h2><div id="roomList"><div class="empty">Waiting for the first snapshot…</div></div></section>
+      <section class="card"><h2>Anti-cheat log <small>hits over the damage budget are rejected server-side</small></h2>
+        <div class="scroll"><table><thead><tr><th>Time</th><th>Room</th><th>Player</th><th class="hide-s">Class</th><th>Hit</th><th>Cap / hit</th><th class="hide-s">Total</th></tr></thead><tbody id="ac"></tbody></table></div>
+        <div class="empty" id="acEmpty">No rejected hits yet.</div></section>
+    </div>
+  </div>
+  <p class="note" id="foot"></p>
+</div>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

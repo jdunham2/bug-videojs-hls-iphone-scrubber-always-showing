@@ -8,6 +8,8 @@ import { SETS } from '../public/shared/items.js';
 import { RIFT_TIME, season } from '../public/shared/rifts.js';
 import { REGIONS, QUESTS, CAPTAIN, questDone, ACT1_END } from '../public/shared/regions.js';
 import { FISH, rollFish, nearLake, MIN_REEL, hourAt, isNight } from '../public/shared/life.js';
+import { createSocial } from './social.js';
+const SOCIAL_T = new Set(['social', 'friendAdd', 'friendAccept', 'friendDecline', 'friendRemove', 'whisper', 'guildCreate', 'guildInvite', 'guildAccept', 'guildLeave', 'guildStash', 'bountyClaim', 'seasonClaim', 'cosEquip']);
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 export { TOKEN_RE };
@@ -30,6 +32,9 @@ const DT = 0.05;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const r2 = (v) => Math.round(v * 100) / 100;
 const CHESTS = new Map(townLayout().chests.map((c) => [c.id, c]));
+const social = createSocial({ db, online, send, P });
+const acLog = []; const started = Date.now();
+function logCheat(e) { acLog.push({ at: Date.now(), ...e }); if (acLog.length > 200) acLog.shift(); }
 
 function makeCode() {
   const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -90,6 +95,8 @@ class Room {
     this.joinZone(p, zone);
   }
   dropGem(p, level) { return P.dropGem(p, level); }
+  bounty(p, kind, n = 1, meta = {}) { social.bountyEvent(p, kind, n, meta); }
+  marks(p, n) { social.addMarks(p, n); }
   questEvent(p, kind, n = 1) {
     const q = (p.char.quest ||= { i: 0, n: 0 });
     const Q = QUESTS[q.i]; if (!Q || Q.kind !== kind) return;
@@ -113,7 +120,8 @@ class Room {
       for (let i = 0; i < 2; i++) this.giveLoot(p, zone.level, { minRarity: 3, luck: 3 }, guardian.x + i * 1.5, guardian.z);
       if (Math.random() < 0.5 + zone.k * 0.03) this.giveLoot(p, zone.level, { rarity: 4 }, guardian.x - 1.5, guardian.z);
       p.prof.riftMax = Math.max(p.prof.riftMax || 1, zone.k + bump);
-      this.questEvent(p, 'rift');
+      this.questEvent(p, 'rift'); this.bounty(p, 'rift', 1, { k: zone.k }); this.marks(p, 6 * zone.k);
+      if (ok) social.guildRift(p, zone.k, Math.round(time * 10) / 10);
       if (ok) {
         const list = (S[p.cls] ||= []);
         list.push({ name: p.prof.name, k: zone.k, time: Math.round(time * 10) / 10, party: zone.players().length });
@@ -184,9 +192,9 @@ class Room {
         if (z.emptyT > 120 || (z.emptyT > 3 && key !== this.currentDungeon && key !== this.currentRift)) this.zones.delete(key);
       }
     }
-    for (const p of this.players.values()) if (p.dirty) { p.dirty = false; send(p.ws, P.profileView(p)); db.touch(); }
+    for (const p of this.players.values()) { if (p.dirty) { p.dirty = false; send(p.ws, P.profileView(p)); db.touch(); } if (p.socialDirty && this.tickN % 10 === 0) { p.socialDirty = false; social.push(p); } }
     if (this.tickN % 3 === 0) {
-      const plist = [...this.players.values()].map((p) => ({ id: p.id, name: p.prof.name, color: p.prof.color, cls: p.cls, zone: p.zone, x: r2(p.x), y: r2(p.y), z: r2(p.z), ry: r2(p.ry), anim: p.anim, hp: p.hp, maxHp: p.maxHp, gear: p.gear, level: p.char.level, dead: p.dead, spirit: p.spirit, emote: p.emote, block: p.block, mount: p.mount }));
+      const plist = [...this.players.values()].map((p) => ({ id: p.id, name: p.prof.name, color: p.prof.color, cls: p.cls, zone: p.zone, x: r2(p.x), y: r2(p.y), z: r2(p.z), ry: r2(p.ry), anim: p.anim, hp: p.hp, maxHp: p.maxHp, gear: p.gear, level: p.char.level, dead: p.dead, spirit: p.spirit, emote: p.emote, block: p.block, mount: p.mount, cos: p.prof.cos, gtag: social.guildOf(p.prof)?.tag }));
       this.broadcast({ t: 'players', list: plist });
       for (const z of this.zones.values()) if (z.players().length) z.broadcast(z.snapshot());
     }
@@ -218,11 +226,12 @@ function attach(ws) {
       if (!room) { room = new Room(code); room.public = !!m.public; rooms.set(code, room); }
       if (room.players.size >= 4) { send(ws, { t: 'error', text: 'Party is full (4 players max).' }); room = null; return; }
       p = { dmgWin: 0, dmgSum: 0, msgWin: Date.now(), msgN: 0, id: nextPlayer++, ws, token, prof, cls, char, zone: 'town', x: TOWN.spawn.x, y: 0, z: TOWN.spawn.z, ry: 0, anim: 0, hp: 100, maxHp: 100, gear: {}, dead: false, buffs: {}, loot: new Map(), shop: null, style: 0, spirit: false, trade: null, emote: null, block: false };
+      p.roomCode = code; social.ensure(prof);
       online.set(token, p);
       room.players.set(p.id, p);
       db.touch();
       send(ws, { t: 'welcome', id: p.id, room: code, level: room.level, token });
-      send(ws, P.profileView(p));
+      send(ws, P.profileView(p)); social.push(p); social.notifyFriends(p);
       room.broadcast({ t: 'chat', from: '★', text: `${prof.name} the ${CLASSES[cls].name} has joined the party.` });
       room.enterZone(p, 'town');
       return;
@@ -233,6 +242,7 @@ function attach(ws) {
     if (tnow - p.msgWin > 1000) { if (p.msgN > 400) { ws.close(1008, 'rate limit'); return; } p.msgWin = tnow; p.msgN = 0; }
     if (++p.msgN > 150) return;
     const zone = room.zones.get(p.zone);
+    if (SOCIAL_T.has(m.t)) { const r = social.handle(p, m, { atStash: p.zone === 'town' && near(p, TOWN.stash, 6), atBoard: p.zone === 'town' && near(p, TOWN.board, 7), level: room.level }); if (typeof r === 'string') notice(r); return; }
     switch (m.t) {
       case 'state':
         p.x = +m.x || 0; p.y = +m.y || 0; p.z = +m.z || 0; p.ry = +m.ry || 0; p.anim = m.anim | 0;
@@ -247,7 +257,7 @@ function attach(ws) {
         room.requestDungeon(p, { type: 'rift', k });
         break;
       }
-      case 'leaderboard': { const S = (db.data.leaderboard || {})[season()] || {}; send(ws, { t: 'leaderboard', season: season(), data: S }); break; }
+      case 'leaderboard': { const S = (db.data.leaderboard || {})[season()] || {}; send(ws, { t: 'leaderboard', season: season(), data: S, guilds: social.guildBoard() }); break; }
       case 'socket': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.socket(p, m.src, m.ref, m.idx | 0, String(m.k)), 'Gem socketed!', '#5ab0ff'); break;
       case 'unsocket': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.unsocket(p, m.src, m.ref, m.idx | 0)); break;
       case 'combine': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.combineGem(p, String(m.k)), 'The gems fuse into something finer.', '#ffd34d'); break;
@@ -275,7 +285,7 @@ function attach(ws) {
         if (since < MIN_REEL || since > 40 || !nearLake(p.x, p.z)) { send(ws, { t: 'fishLost', text: 'The line snapped!' }); break; }
         const F = FISH[f.k], pf = (p.prof.fish ||= {});
         pf[f.k] = (pf[f.k] || 0) + 1;
-        room.reward(p, F.gold, 10 + F.gold * 0.5, p.x, p.z, true);
+        room.reward(p, F.gold, 10 + F.gold * 0.5, p.x, p.z, true); room.bounty(p, 'fish');
         let gem = null; if (F.gem) gem = P.dropGem(p, room.level + 4);
         send(ws, { t: 'fishCaught', k: f.k, n: pf[f.k], gem });
         p.dirty = true;
@@ -289,7 +299,7 @@ function attach(ws) {
         if (!e || dist(e, p) >= 24) break;
         const dmg = Math.max(0, +m.dmg || 0), cap = damageCap(p), now = Date.now();
         if (now - p.dmgWin > 1000) { p.dmgWin = now; p.dmgSum = 0; }
-        if (dmg > cap.hit || p.dmgSum + dmg > cap.sec) { p.rejected = (p.rejected || 0) + 1; if (p.rejected % 20 === 1) console.warn(`[anticheat] rejected hit from ${p.prof.name} (${p.cls}): ${Math.round(dmg)} (cap ${Math.round(cap.hit)}/hit, ${Math.round(cap.sec)}/s), total rejected ${p.rejected}`); break; }
+        if (dmg > cap.hit || p.dmgSum + dmg > cap.sec) { p.rejected = (p.rejected || 0) + 1; logCheat({ room: room.code, name: p.prof.name, cls: p.cls, level: p.char.level, dmg: Math.round(dmg), cap: Math.round(cap.hit), capSec: Math.round(cap.sec), total: p.rejected }); if (p.rejected % 20 === 1) console.warn(`[anticheat] rejected hit from ${p.prof.name} (${p.cls}): ${Math.round(dmg)} (cap ${Math.round(cap.hit)}/hit, ${Math.round(cap.sec)}/s), total rejected ${p.rejected}`); break; }
         p.dmgSum += dmg;
         zone.damageEnemy(e, dmg, p.id, m.crit, Math.max(-2, Math.min(4, +m.kb || 0)), Math.min(4, +m.stun || 0), p.x, p.z);
         break;
@@ -302,6 +312,8 @@ function attach(ws) {
       case 'repair': ok(room.defense.repair(p, m.id)); break;
       case 'startNight': if (p.zone === 'town') room.defense.startNight(); break;
       case 'chat':
+        if (/^\/w \S+ ./.test(m.text || '')) { const [, to, ...rest] = m.text.split(' '); const r = social.handle(p, { t: 'whisper', to, text: rest.join(' ') }, {}); if (typeof r === 'string') notice(r); break; }
+        if (/^\/g ./.test(m.text || '')) { const r = social.guildChat(p, m.text.slice(3)); if (typeof r === 'string') notice(r); break; }
         if (dev && zone && /^\/weather (clear|rain|snow|ash)$/.test(m.text || '')) { zone.weather = m.text.split(' ')[1]; zone.weatherT = 600; zone.broadcast({ t: 'weather', kind: zone.weather, zone: zone.key }); break; }
         if (dev && /^\/(depth|gold|xp|wave|loot|gems|quest|hour) \d+$/.test(m.text || '')) {
           const [cmd, n] = m.text.slice(1).split(' ');
@@ -410,6 +422,7 @@ function attach(ws) {
     if (online.get(p.token) === p) online.delete(p.token);
     db.touch();
     room.broadcast({ t: 'left', id: p.id });
+    social.notifyFriends(p);
     room.broadcast({ t: 'chat', from: '★', text: `${p.prof.name} left the party.` });
     if (room.ready) room.readyResp(p, true);
     if (room.players.size === 0) rooms.delete(room.code);
@@ -418,5 +431,14 @@ function attach(ws) {
 
   const timer = setInterval(() => { for (const r of rooms.values()) r.tick(); }, DT * 1000);
   const parties = () => [...rooms.values()].filter((r) => r.public && r.players.size < 4).map((r) => ({ code: r.code, depth: r.level, players: [...r.players.values()].map((p) => ({ name: p.prof.name, cls: p.cls, level: p.char.level })) }));
-  return { attach, rooms, parties, stop: () => clearInterval(timer) };
+  // live-ops snapshot for the admin dashboard
+  const admin = () => ({
+    now: Date.now(), uptime: Math.round((Date.now() - started) / 1000), online: online.size,
+    rooms: [...rooms.values()].map((r) => ({ code: r.code, depth: r.level, public: !!r.public, hour: Math.round(hourAt(r.clock) * 10) / 10, night: r.defense.state.phase !== 'day' ? { phase: r.defense.state.phase, wave: r.defense.state.wave } : null,
+      zones: [...r.zones.values()].filter((z) => z.players().length || z.type === 'town').map((z) => ({ key: z.key, type: z.type, enemies: z.enemies.size, players: z.players().length, weather: z.weather })),
+      players: [...r.players.values()].map((p) => ({ name: p.prof.name, cls: p.cls, level: p.char.level, zone: p.zone, hp: p.hp, maxHp: p.maxHp, dead: p.dead, rejected: p.rejected || 0, guild: social.guildOf(p.prof)?.tag || null })) })),
+    anticheat: acLog.slice(-60).reverse(),
+    guilds: Object.keys(db.data.guilds || {}).length, profiles: Object.keys(db.data.profiles || {}).length,
+  });
+  return { attach, rooms, parties, admin, stop: () => clearInterval(timer) };
 }

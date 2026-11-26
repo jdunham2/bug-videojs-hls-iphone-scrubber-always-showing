@@ -22,6 +22,15 @@ const server = http.createServer((req, res) => {
   const url = decodeURIComponent(rawPath);
   if (url === '/healthz') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ ok: true, rooms: game?.rooms.size || 0, uptime: Math.round(process.uptime()) })); }
   if (url === '/api/parties') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify(game ? game.parties() : [])); }
+  if (url === '/api/admin') {
+    // live-ops dashboard feed; disabled unless EMBERFALL_ADMIN_KEY is set. CORS-enabled so a hosted dashboard can poll it.
+    const key = process.env.EMBERFALL_ADMIN_KEY, given = new URLSearchParams(qs || '').get('key') || req.headers['x-admin-key'];
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'x-admin-key', 'Cache-Control': 'no-store' };
+    if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+    if (!key || given !== key) { res.writeHead(key ? 403 : 404, cors); return res.end(); }
+    res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+    return res.end(JSON.stringify(game.admin()));
+  }
   if (url === '/api/profile') {
     const token = new URLSearchParams(qs || '').get('token') || '';
     const prof = TOKEN_RE.test(token) ? db.get(token) : null;
@@ -31,6 +40,8 @@ const server = http.createServer((req, res) => {
   let base = PUBLIC, rel = url;
   if (url.startsWith('/lib/three/')) { base = THREE_DIR; rel = url.slice('/lib/three'.length); }
   if (rel === '/' || rel === '') rel = '/index.html';
+  if (rel === '/admin') { res.writeHead(302, { Location: '/admin/' }); return res.end(); }
+  if (rel.endsWith('/')) rel += 'index.html';
   const file = path.normalize(path.join(base, rel));
   if (!file.startsWith(base)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {

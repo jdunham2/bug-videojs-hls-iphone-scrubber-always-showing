@@ -16,6 +16,12 @@ import { LocalPlayer, CameraRig, gearOf } from './player.js';
 import { fxPlay, enemiesInRadius } from './skills.js';
 import { Cinematic, introShots, bossShots, storyShots } from './cinematic.js';
 import { Footsteps, decals, recoil, rumble, SPLAT } from './feel.js';
+import { renderSocial } from './socialui.js';
+import { COSMETICS } from '../shared/social.js';
+import { tintSteed } from './models.js';
+const renderSocialPanel = () => renderSocial(ui);
+function auraFx(pos, C) { const a = Math.random() * 6.28; fx.emit({ pos: new THREE.Vector3(pos.x + Math.cos(a) * 0.8, pos.y + 0.2 + Math.random() * 0.4, pos.z + Math.sin(a) * 0.8), count: 1, speed: 0.6, color: C.color2, color2: C.color, size: 0.18, life: 1.1, up: 1.4, drag: 0.5 }); }
+function applyCosmetics() { const c = G.social?.cos || {}; if (player) tintSteed(player.steed, c.steed ? COSMETICS[c.steed].color : null); }
 const footsteps = new Footsteps();
 import { WeatherView } from './weather.js';
 import { Wildlife } from './wildlife.js';
@@ -517,6 +523,9 @@ net.on('tradeState', (m) => ui.tradeState(m));
 net.on('tradeClosed', (m) => { ui.tradeClosed(m.text); if (/complete/i.test(m.text)) sfx.buy(); });
 net.on('plevel', (m) => { const r = G.remotes.get(m.id); if (r && m.id !== G.myId) fx.levelUp(r.pos.clone()); });
 net.on('chat', (m) => ui.chat(m.from, m.text, m.color));
+net.on('social', (m) => { const first = !G.social; G.social = m; if (!document.getElementById('social').classList.contains('hidden')) renderSocialPanel(); if (first && m.requests.length) ui.toast(`${m.requests.length} friend request${m.requests.length > 1 ? 's' : ''} waiting`, '#7ad0ff', 'Press O to open Social'); applyCosmetics(); });
+net.on('whisper', (m) => { ui.chat(m.self ? `To ${m.to}` : `From ${m.from}`, m.text, '#e08aff'); if (!m.self) sfx.pop(); });
+net.on('bountyReady', (m) => { ui.toast(`${m.weekly ? 'Weekly' : 'Daily'} bounty complete!`, '#ffd34d', `${m.text} — claim it at the Bounty Board`); sfx.levelUp(); });
 net.on('error', (m) => { ui.lobbyMsg(m.text); if (G.inGame) ui.bigBanner('DISCONNECTED', m.text, 1e9); });
 net.on('close', () => { if (G.inGame) { ui.bigBanner('DISCONNECTED', 'Lost connection to the server — refresh to rejoin', 1e9); G.inGame = false; } });
 
@@ -545,6 +554,7 @@ function handleInput() {
   if (input.actHit('talents')) { ui._atTrainer = false; ui.togglePanel('talents'); }
   if (input.actHit('help')) ui.togglePanel('help');
   if (input.actHit('quests')) ui.togglePanel('quests');
+  if (input.actHit('social')) ui.togglePanel('social');
   if (input.hit('Escape') || input.pad.pressed.has('menu')) {
     if (G.emoteWheel) ui.closeWheel();
     else if (G.uiOpen) ui.closeAll();
@@ -696,6 +706,8 @@ function frame(now) {
     zone.wildlife?.update(dt, G.time, player ? player.pos : camera.position);
     if (zone === town && town.folk) town.folk.update(dt, player ? player.pos : camera.position, camera);
     if (player) fishing.update(dt, input);
+    { const au = G.social?.cos?.aura && COSMETICS[G.social.cos.aura]; if (au && player && !player.dead && Math.random() < dt * 22) auraFx(player.pos, au); }
+    for (const r of G.remotes.values()) { const au = r.p.cos?.aura && COSMETICS[r.p.cos.aura]; if (au && !r.p.dead && Math.random() < dt * 22) auraFx(r.pos, au); }
     { const hh = Math.floor(G.hour), mm = Math.floor((G.hour % 1) * 60), W = weatherFx(G.weather), outdoors = zone.type === 'region' || zone.type === 'dark' || zone === town;
       const txt = outdoors ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} ${G.hour >= 20 || G.hour < 6 ? '☾' : '☀'}${zone.type !== 'town' && G.weather !== 'clear' ? ` · ${W.icon} ${W.name}<br><small>${W.desc}</small>` : ''}` : '';
       if (txt !== weatherChip._t) { weatherChip.innerHTML = txt; weatherChip._t = txt; } }
