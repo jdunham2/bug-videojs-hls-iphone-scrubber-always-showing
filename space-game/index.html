@@ -14301,6 +14301,12 @@ const GX121 = { t: 0, d: 1.6, p: new V3(), q: new THREE.Quaternion(), fov: 68 };
 const GX122 = { list: [], life: 0.11 };
 { const _fb122 = fireBolt; fireBolt = function (from, quat, baseVel, owner, dmg, offset, frost) { const b = _fb122.apply(this, arguments); if (GFX.hd && owner === 'player' && from === player.position && renderScene === scene && offset) { const col = frost ? 0xd8f8ff : 0x8fe4ff; const s = glowSprite(col, 7 + rand(0, 3)); s.position.copy(offset).add(new V3(0, 0, -1.5)); player.add(s); const c = glowSprite(0xffffff, 2.6); c.position.copy(s.position); player.add(c); GX122.list.push({ s, c, t: 0 }); } return b; }; }
 { const _ub122 = updateBoss; updateBoss = function (dt) { _ub122(dt); for (let i = GX122.list.length - 1; i >= 0; i--) { const q = GX122.list[i]; q.t += dt; const k = Math.max(0, 1 - q.t / GX122.life); q.s.material.opacity = k; q.c.material.opacity = k; if (q.t >= GX122.life) { player.remove(q.s); player.remove(q.c); GX122.list.splice(i, 1); } } }; }
+/* ============ feel round 123: enemy ships flash and jolt when your shots land ============ */
+const GX123 = { life: 0.16, white: new THREE.Color(0xffffff) };
+{ const _ub123 = updateBoss; updateBoss = function (dt) { _ub123(dt); for (const e of enemies) { if (!e.obj) continue; const u = e.obj.userData; if (u.gx123hp === undefined) { u.gx123hp = e.hp; continue; }
+  if (e.hp < u.gx123hp && e.hp > 0 && GFX.hd && renderScene === scene) { if (!u.gx123s) u.gx123s = e.obj.scale.clone(); if (!u.gx123m) { u.gx123m = []; e.obj.traverse(o => { if (o.isMesh && o.material && o.material.emissive && !o.material.transparent) { o.material = o.material.clone(); u.gx123m.push({ m: o.material, e: o.material.emissive.clone(), i: o.material.emissiveIntensity }); } }); } u.gx123t = GX123.life; }
+  u.gx123hp = e.hp;
+  if (u.gx123t > 0) { u.gx123t -= dt; const k = Math.max(0, u.gx123t / GX123.life); e.obj.scale.copy(u.gx123s).multiplyScalar(1 + 0.14 * k); u.gx123m.forEach(q => { q.m.emissive.copy(q.e).lerp(GX123.white, k); q.m.emissiveIntensity = q.i + (1.6 - q.i) * k; }); if (k <= 0) e.obj.scale.copy(u.gx123s); } } }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
