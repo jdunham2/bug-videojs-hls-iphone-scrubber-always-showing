@@ -14230,6 +14230,14 @@ function gx101Build() { GX101.done = true; const g = new THREE.Group(); GX101.gr
     for (let k = 0; k < 7; k++) { const gz = z - 3.3 + k * 1.1, col = goods[(i + k) % goods.length], kind = k % 3; const m = new THREE.MeshStandardMaterial({ color: col, roughness: 0.35, emissive: col, emissiveIntensity: 0.15 }); const o = new THREE.Mesh(kind === 0 ? new THREE.BoxGeometry(0.35, 0.3, 0.35) : kind === 1 ? new THREE.CylinderGeometry(0.14, 0.14, 0.38, 10) : new THREE.SphereGeometry(0.18, 10, 8), m); o.position.set(x + rand(-0.3, 0.3), 1.32 + (kind === 2 ? 0.18 : 0.17), gz); g.add(o); } }); }
 { const _usc60 = updateSurfCamera; updateSurfCamera = function (dt) { _usc60(dt); if (W !== HAVEN_W || !S.built) return; if (!GX101.done) gx101Build(); GX101.grp.visible = GFX.hd; }; }
 
+/* ============ graphics round 105: Ferros's mountains swap the metal floor pattern for layered rock ============ */
+const GX105 = { on: { value: 1 }, doneW: null };
+function gx105Rock() { let m = null; surf.traverse(o => { if (!m && o.isMesh && o.geometry.type === 'PlaneGeometry' && o.geometry.parameters.width === 2400 && o.material.map) m = o.material; }); if (!m || m.userData.gx105) return; m.userData.gx105 = true; const prev = m.onBeforeCompile;
+  m.onBeforeCompile = function (sh, r) { if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r); sh.uniforms.frOn = GX105.on; sh.vertexShader = 'varying vec3 vFrW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vFrW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform float frOn; varying vec3 vFrW;\nfloat frH(float p){ return fract(sin(p * 127.1) * 43758.5); }\nfloat frN(float p){ float i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(frH(i), frH(i + 1.0), f); }\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n { float up = smoothstep(2.0, 12.0, vFrW.y); float band = frN(vFrW.y * 0.45 + sin(vFrW.x * 0.01) * 2.0) * 0.6 + frN(vFrW.y * 1.7) * 0.4; vec3 rock = mix(vec3(0.42, 0.36, 0.34), vec3(0.62, 0.5, 0.42), band); diffuseColor.rgb = mix(diffuseColor.rgb, rock, up * frOn); }'); };
+  m.customProgramCacheKey = () => 'frrock'; m.needsUpdate = true; }
+{ const _usc61 = updateSurfCamera; updateSurfCamera = function (dt) { _usc61(dt); if (W !== FERRO_W || !S.built) return; if (GX105.doneW !== W) { GX105.doneW = W; gx105Rock(); } GX105.on.value = GFX.hd ? 1 : 0; }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
