@@ -711,6 +711,11 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 @keyframes gx125g { 0%, 40% { color: #7dff9a; text-shadow: 0 0 12px rgba(125,255,154,.7); } }
 @keyframes gx125r { 0%, 30% { color: #ff7a6a; } }
 @media (prefers-reduced-motion: reduce) { #hCredits.gx125up, #hCredits.gx125down { animation: none; } }
+/* feel round 126: damage ghost on shield/hull bars */
+.gx126ghost { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(255,255,255,.75); border-radius: 4px; pointer-events: none; }
+.track.gx126hit { animation: gx126hit .35s ease-out; }
+@keyframes gx126hit { 0% { box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 14px rgba(255,120,90,.8); } 100% { box-shadow: inset 0 1px 2px rgba(0,0,0,.5); } }
+@media (prefers-reduced-motion: reduce) { .track.gx126hit { animation: none; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -14330,6 +14335,12 @@ const GX125 = { shown: null, last: null };
   if (c !== GX125.last) { el.classList.remove('gx125up', 'gx125down'); void el.offsetWidth; el.classList.add(c > GX125.last ? 'gx125up' : 'gx125down'); GX125.last = c; }
   if (GX125.shown !== c) { const d = c - GX125.shown; GX125.shown += Math.abs(d) < 2 ? d : Math.sign(d) * Math.max(1, Math.abs(d) * 0.12); if (Math.abs(c - GX125.shown) < 1) GX125.shown = c; }
   el.textContent = Math.round(GX125.shown).toLocaleString(); })();
+/* ============ feel round 126: shield and hull bars leave a white "damage ghost" that drains after a hit, and the bar flashes ============ */
+const GX126 = { bars: [] };
+['bShield', 'bHull'].forEach(id => { const f = document.getElementById(id); if (!f) return; const tr = f.parentElement; tr.style.position = 'relative'; const g = document.createElement('div'); g.className = 'gx126ghost'; tr.insertBefore(g, f); f.style.position = 'relative'; GX126.bars.push({ f, g, tr, w: null, hold: 0 }); });
+(function gx126Loop(ts) { requestAnimationFrame(gx126Loop); const now = performance.now(); GX126.bars.forEach(b => { const w = parseFloat(b.f.style.width) || 0; if (b.w === null) b.w = w; if (w < b.w - 0.5 && !b.hold) { b.tr.classList.remove('gx126hit'); void b.tr.offsetWidth; b.tr.classList.add('gx126hit'); }
+  if (w < b.w) { if (!b.hold) b.hold = now + 450; if (now > b.hold) { b.w = Math.max(w, b.w - (b.w - w) * 0.08 - 0.2); if (b.w <= w + 0.05) { b.w = w; b.hold = 0; } } } else { b.w = w; b.hold = 0; }
+  b.g.style.width = b.w + '%'; }); })();
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
