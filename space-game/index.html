@@ -14120,6 +14120,14 @@ function gx68Peaks() { surf.traverse(o => { if (!o.isMesh || o.userData.gx68 || 
   m.customProgramCacheKey = () => 'peak'; m.needsUpdate = true; }); }
 { const _usc45 = updateSurfCamera; updateSurfCamera = function (dt) { _usc45(dt); if (W.id !== 'verdance' || !S.built) return; if (GX68.doneW !== W) { GX68.doneW = W; gx68Peaks(); } GX68.on.value = GFX.hd ? 1 : 0; }; }
 
+/* ============ graphics round 70: Hoarfrost's pine trees wear patchy snow on their branches ============ */
+const GX70 = { on: { value: 1 }, doneW: null };
+function gx70Pines() { const seen = new Set(); surf.traverse(o => { const m = o.material; if (!o.isMesh || !m || Array.isArray(m) || !m.isMeshStandardMaterial || seen.has(m) || m.userData.gx70 || o.geometry.type !== 'ConeGeometry') return; const hs = {}; m.color.getHSL(hs); if (!(o.isInstancedMesh && o.instanceColor) && (!(hs.h > 0.2 && hs.h < 0.55) || hs.l > 0.5)) return; seen.add(m); m.userData.gx70 = true; const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey;
+  m.onBeforeCompile = function (sh, r) { if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r); sh.uniforms.snOn = GX70.on; sh.vertexShader = 'varying vec3 vSnN; varying vec3 vSnW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vSnW = (modelMatrix * vec4(transformed, 1.0)).xyz; vSnN = normalize(mat3(modelMatrix) * objectNormal);');
+    sh.fragmentShader = 'uniform float snOn; varying vec3 vSnN; varying vec3 vSnW;\nfloat snH(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5); }\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n { float n = snH(floor(vSnW * 2.2)) * 0.6 + snH(floor(vSnW * 5.0)) * 0.4; float up = smoothstep(0.2, 0.55, vSnN.y); float s = up * smoothstep(0.35, 0.6, n); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 1.0), s * 0.9 * snOn); }'); };
+  m.customProgramCacheKey = () => 'pinesnow|' + (prevKey && prevKey !== THREE.Material.prototype.customProgramCacheKey ? prevKey.call(m) : ''); m.needsUpdate = true; }); }
+{ const _usc46 = updateSurfCamera; updateSurfCamera = function (dt) { _usc46(dt); if (W !== RIME_W || !S.built) return; if (GX70.doneW !== W) { GX70.doneW = W; gx70Pines(); } GX70.on.value = GFX.hd ? 1 : 0; }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
