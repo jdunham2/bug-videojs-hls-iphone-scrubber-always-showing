@@ -4,6 +4,7 @@ import { ENEMIES, AFFIX_KEYS, levelMul } from '../public/shared/enemies.js';
 import { DARK } from '../public/shared/world.js';
 import { SHRINES } from '../public/shared/dungeon.js';
 import { RNG } from '../public/shared/rng.js';
+import { RIFT_MOD_KEYS, riftEnemyLevel, riftHpMul, RIFT_TIME } from '../public/shared/rifts.js';
 
 const rng = new RNG(Date.now() & 0xffffffff);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -15,23 +16,39 @@ export class Zone {
     this.room = room; this.key = key; this.type = type; this.level = level;
     this.enemies = new Map(); this.projectiles = new Map(); this.hazards = new Map();
     this.cleared = false; this.emptyT = 0; this.respawnT = 0;
-    if (type === 'dungeon') {
+    if (type === 'dungeon' || type === 'rift') {
       this.seed = (Math.random() * 1e9) | 0;
-      this.dungeon = generateDungeon(this.seed, level);
+      if (type === 'rift') {
+        this.k = level; this.level = riftEnemyLevel(level, room.level);
+        const mods = RIFT_MOD_KEYS.slice().sort(() => Math.random() - 0.5).slice(0, 2);
+        this.rift = { mods, progress: 0, need: 0, start: Date.now(), guardian: false, done: false };
+      }
+      this.dungeon = generateDungeon(this.seed, this.level);
       this.pulled = []; this.shrinesUsed = [];
-      for (const s of this.dungeon.spawns) this.spawn(s.type, s.x, s.z, s.elite ? { elite: s.elite } : {});
+      if (this.rift) {
+        this.dungeon.gateOpen = true;
+        const emp = this.rift.mods.includes('empowered');
+        for (const s of this.dungeon.spawns) {
+          if (s.type === 'boss' || s.type === 'matriarch') continue;
+          const n = s.type === 'goblin' ? 1 : rng.chance(0.45) ? 2 : 1;
+          for (let k = 0; k < n; k++) this.spawn(s.type, s.x + k * 1.2, s.z + k * 0.8, { elite: s.elite || (emp && s.type !== 'goblin' && rng.chance(0.28) ? rng.pick(AFFIX_KEYS) : undefined) });
+        }
+        for (const e of this.enemies.values()) this.rift.need += this.riftValue(e);
+        this.rift.need = Math.round(this.rift.need * 0.7);
+      } else for (const s of this.dungeon.spawns) this.spawn(s.type, s.x, s.z, s.elite ? { elite: s.elite } : {});
     }
   }
   players() { return [...this.room.players.values()].filter((p) => p.zone === this.key); }
   alive() { return this.players().filter((p) => !p.dead); }
   broadcast(msg) { const s = JSON.stringify(msg); for (const p of this.players()) if (p.ws.readyState === 1) p.ws.send(s); }
-  get lvl() { return this.type === 'dungeon' ? this.level : this.room.level; }
+  get lvl() { return this.dungeon ? this.level : this.room.level; }
+  riftValue(e) { return e.def.flee ? 0 : (e.type === 'brute' ? 3 : 1) * (e.affix ? 4 : 1); }
 
   spawn(type, x, z, extra = {}) {
     const def = ENEMIES[type];
     const lvl = this.lvl, m = levelMul(lvl);
     const elite = extra.elite || (this.type === 'dark' && rng.chance(0.1) ? rng.pick(AFFIX_KEYS) : null);
-    const k = elite ? 2.6 : 1;
+    const k = (elite ? 2.6 : 1) * (this.rift ? riftHpMul(this.k) : 1);
     const e = {
       id: this.room.nextId++, type, def, x, z, ry: rng.range(0, 6.28), level: lvl,
       hp: Math.round(def.hp * m.hp * k), maxHp: Math.round(def.hp * m.hp * k), dmg: Math.round(def.dmg * m.dmg * (elite ? 1.35 : 1)), gold: def.gold * m.gold * (elite ? 3 : 1),
@@ -39,6 +56,7 @@ export class Zone {
       cd: rng.range(0.3, 1.2), windT: 0, slamT: 0, slamCd: 6, geyserCd: 4, abilityCd: 3, abi: 0, phase: 1, stunT: 0, staggerImm: 0, introT: 0,
       aggro: false, home: { x, z }, slow: 0, wp: 0, summoned: 0, state: 0, wanderT: 0, wx: x, wz: z, tauntT: 0, tauntBy: 0, shieldCd: 4, shieldUp: false, leapT: 0,
       ...extra, affix: elite,
+      speedMul: this.rift?.mods.includes('swift') ? 1.3 : 1, cdMul: this.rift?.mods.includes('frenzy') ? 0.7 : 1,
     };
     this.enemies.set(e.id, e);
     return e;
@@ -147,12 +165,12 @@ export class Zone {
     const enr = e.enraged ? 1.35 : 1;
     let moving = false;
     if (d > reach) {
-      const sp = def.speed * enr * (e.slow > 0 ? 0.5 : 1) * (target || defense ? 1 : 0.45);
+      const sp = def.speed * enr * (e.speedMul || 1) * (e.slow > 0 ? 0.5 : 1) * (target || defense ? 1 : 0.45);
       const step = Math.min(pathing ? d : d - reach * 0.8, sp * dt);
       e.x += (dx / d) * step; e.z += (dz / d) * step;
       moving = true;
     } else if (target && e.cd <= 0) {
-      e.windT = def.windup / (e.enraged ? 1.2 : 1); e.cd = def.cd / enr; e.atk = target;
+      e.windT = def.windup / (e.enraged ? 1.2 : 1); e.cd = (def.cd / enr) * (e.cdMul || 1); e.atk = target;
       this.broadcast({ t: 'eatk', id: e.id });
     }
     for (const o of this.enemies.values()) {
@@ -330,7 +348,22 @@ export class Zone {
     this.enemies.delete(e.id);
     this.broadcast({ t: 'edie', id: e.id, x: r2(e.x), z: r2(e.z), type: e.type, affix: e.affix });
     const def = e.def;
-    if (e.affix === 'molten') this.addHazard('fire', e.x, e.z, 2.4, 10 * levelMul(this.lvl).dmg, 5, 0);
+    if (e.affix === 'molten' || (this.rift?.mods.includes('volatile') && !e.def.boss)) this.addHazard('fire', e.x, e.z, 2.4, 10 * levelMul(this.lvl).dmg, e.affix === 'molten' ? 5 : 3, 0.6);
+    if (this.rift && !this.rift.done) {
+      if (e.guardian) { this.rift.done = true; this.room.riftComplete(this, e); }
+      else if (!this.rift.guardian) {
+        this.rift.progress += this.riftValue(e);
+        const f = Math.min(1, this.rift.progress / this.rift.need);
+        this.broadcast({ t: 'riftProgress', p: f });
+        if (f >= 1) {
+          this.rift.guardian = true;
+          for (const o of [...this.enemies.values()]) this.remove(o);
+          const g = this.spawn(this.k % 2 ? 'boss' : 'matriarch', e.x, e.z, { guardian: true, introDone: false });
+          this.collide(g, g.radius);
+          this.broadcast({ t: 'guardian', id: g.id });
+        }
+      }
+    }
     for (const p of this.players()) {
       let gold = e.gold * rng.range(0.8, 1.25);
       if (def.flee) gold *= 2.5;
@@ -379,6 +412,8 @@ export class Zone {
     this.broadcast({ t: 'shrine', i, kind: s.kind, by: p.name });
     this.broadcast(this.dstate());
   }
+
+  riftState() { const r = this.rift; return r && { k: this.k, mods: r.mods, p: Math.min(1, r.progress / r.need), elapsed: (Date.now() - r.start) / 1000, limit: RIFT_TIME, guardian: r.guardian, done: r.done }; }
 
   snapshot() {
     const list = [];

@@ -1,6 +1,7 @@
 // Derived hero stats from class + level + gear + talents + temporary buffs. Shared by server and client.
 import { WEAPONS, LEGENDARIES, SETS } from './items.js';
 import { CLASSES, talentTotals } from './classes.js';
+import { PARAGON } from './rifts.js';
 
 export const xpForLevel = (l) => Math.round(100 * Math.pow(l, 1.5));
 
@@ -14,6 +15,12 @@ export function computeStats(char, cls, buffs = {}) {
     if (!it) continue;
     if (it.leg && LEGENDARIES[it.leg]) { T.flags[it.leg] = true; for (const [k, v] of Object.entries(LEGENDARIES[it.leg].stats || {})) T[k] = (T[k] || 0) + v; }
     if (it.set) setCount[it.set] = (setCount[it.set] || 0) + 1;
+  }
+  for (const [k, n] of Object.entries(char.paragon?.alloc || {})) {
+    const D = PARAGON[k]; if (!D) continue;
+    const v = Math.min(n, D.max ?? 1e9) * D.per;
+    const key = { dmg: 'dmgPct', hp: 'hpPct', armor: 'armor', crit: 'crit', cdr: 'cdr', gold: 'goldFind' }[k];
+    T[key] = (T[key] || 0) + v;
   }
   const sets = [];
   for (const [id, n] of Object.entries(setCount)) {

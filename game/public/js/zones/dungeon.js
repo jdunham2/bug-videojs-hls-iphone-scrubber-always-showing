@@ -12,15 +12,17 @@ const BIOME = {
 };
 
 export class DungeonZone {
-  constructor(renderer, seed, level, cleared) {
+  constructor(renderer, seed, level, cleared, rift) {
     this.type = 'dungeon';
+    this.rift = rift || null;
     this.d = generateDungeon(seed, level);
+    if (rift) { this.d.gateOpen = true; this.d.levers = []; this.d.leverOrder = []; }
     this.level = level;
     this.scene = new THREE.Scene();
     this.spawn = { x: this.d.start.x, z: this.d.start.z };
     this.spawnYaw = 0;
     this.biome = this.d.biome; this.B = BIOME[this.biome];
-    this.name = BIOME_INFO[this.biome].name;
+    this.name = this.rift ? `Ember Rift · Level ${this.rift.k}` : BIOME_INFO[this.biome].name;
     this.bloom = { strength: 0.7, radius: 0.5, threshold: 0.65 };
     this.exposure = 1.25;
     this.build();
@@ -44,7 +46,9 @@ export class DungeonZone {
     const s = this.scene, d = this.d;
     const B = this.B;
     s.background = new THREE.Color(B.bg);
-    s.fog = new THREE.FogExp2(B.fog, B.fogD);
+    const dark = this.rift?.mods.includes('darkness');
+    s.fog = new THREE.FogExp2(dark ? '#000000' : B.fog, B.fogD * (dark ? 2.1 : 1));
+    if (this.rift) s.background = new THREE.Color(dark ? '#000000' : '#0a0410');
     s.add(new THREE.HemisphereLight(B.hemi, B.ground, 0.6));
     this.moon = makeSun(B.moon, 0.6, 30); s.add(this.moon, this.moon.target);
     this.playerLight = new THREE.PointLight('#ffcf9a', 14, 22, 1.4); s.add(this.playerLight);
@@ -185,6 +189,7 @@ export class DungeonZone {
       s.add(g); this.gates.push(g);
     }
     this.gateOpen = d.gateOpen;
+    if (this.rift) this.gates.forEach((g) => (g.visible = false));
     if (this.gateOpen) this.gates.forEach((g) => (g.position.y = WH));
     if (d.gateTiles.length && d.levers.length) {
       const t = d.gateTiles[Math.floor(d.gateTiles.length / 2)];

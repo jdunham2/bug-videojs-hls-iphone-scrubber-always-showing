@@ -10,6 +10,8 @@ export const TOWN = {
   trainer: { x: -7, z: 6 },
   stash: { x: 7.5, z: 6.5 },
   smith: { x: -9, z: -4 },
+  obelisk: { x: -13, z: 4 },
+  board: { x: 13, z: 5 },
   spawn: { x: 0, z: 13 },
   dungeonPortal: { x: -23, z: -25 },
   darkPortal: { x: 23, z: -25 },
@@ -142,7 +144,7 @@ export function townLayout() {
   }
   colliders.push({ x: TOWN.core.x, z: TOWN.core.z, r: TOWN.core.r });
   colliders.push({ x: TOWN.bell.x, z: TOWN.bell.z, r: 1.3 });
-  colliders.push({ x: TOWN.stash.x, z: TOWN.stash.z, r: 0.9 }, { x: TOWN.smith.x - 1.2, z: TOWN.smith.z, r: 1.1 });
+  colliders.push({ x: TOWN.stash.x, z: TOWN.stash.z, r: 0.9 }, { x: TOWN.smith.x - 1.2, z: TOWN.smith.z, r: 1.1 }, { x: TOWN.obelisk.x, z: TOWN.obelisk.z, r: 1.2 }, { x: TOWN.board.x, z: TOWN.board.z, r: 1 });
   for (const p of [TOWN.dungeonPortal, TOWN.darkPortal]) {
     const l = Math.hypot(p.x, p.z), fx = -p.x / l, fz = -p.z / l; // portal faces the town centre
     colliders.push({ x: p.x + fz * 2.8, z: p.z - fx * 2.8, r: 0.9 }, { x: p.x - fz * 2.8, z: p.z + fx * 2.8, r: 0.9 });

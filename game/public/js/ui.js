@@ -7,6 +7,7 @@ import { CLASSES, TIER_REQ, talentPoints, spentPoints, canLearn } from '../share
 import { xpForLevel, computeStats } from '../shared/stats.js';
 import { SHRINES } from '../shared/dungeon.js';
 import { AFFIXES } from '../shared/enemies.js';
+import { RIFT_MODS, RIFT_TIME, PARAGON, LEVEL_CAP, paragonXp } from '../shared/rifts.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
 import { STYLE_RANKS, ROLL_CD } from './player.js';
 import { ACTION_LABELS, DEFAULT_BINDINGS, keyName } from './input.js';
@@ -156,7 +157,7 @@ class UI {
     let boss = null;
     for (const e of G.enemies.values()) if (e.boss && !e.dead) boss = e;
     const bb = $('bossBar');
-    bb.style.top = G.zone?.type === 'town' && G.defense.phase !== 'day' ? '150px' : '';
+    bb.style.top = G.zone?.type === 'town' && G.defense.phase !== 'day' ? '150px' : G.rift ? '104px' : '';
     if (boss && boss.pos.distanceTo(p.pos) < 40) {
       bb.classList.remove('hidden');
       const ph = boss.flags & 16 ? ' · ENRAGED' : '';
@@ -164,6 +165,18 @@ class UI {
       bb.querySelector('.bb-fill').style.width = (boss.hp / boss.maxHp) * 100 + '%';
       bb.classList.toggle('enraged', !!(boss.flags & 16));
     } else bb.classList.add('hidden');
+    // rift HUD
+    const rh = $('riftHud');
+    if (G.rift && G.zone?.type === 'dungeon') {
+      rh.classList.remove('hidden');
+      const el = G.rift.done ? G.rift.final ?? (G.rift.final = performance.now() / 1000 - G.rift.t0) : performance.now() / 1000 - G.rift.t0;
+      const left = RIFT_TIME - el, mm = Math.floor(Math.abs(left) / 60), ss = String(Math.floor(Math.abs(left) % 60)).padStart(2, '0');
+      rh.querySelector('.rh-title').textContent = `EMBER RIFT · LEVEL ${G.rift.k}`;
+      rh.querySelector('.rh-time').textContent = (left < 0 ? '+' : '') + `${mm}:${ss}`;
+      rh.querySelector('.rh-time').classList.toggle('late', left < 0);
+      rh.querySelector('.rh-fill').style.width = G.rift.p * 100 + '%';
+      rh.querySelector('.rh-sub').innerHTML = G.rift.done ? 'Rift complete — step through the portal' : G.rift.guardian ? 'Slay the Guardian!' : `${Math.round(G.rift.p * 100)}% · ` + G.rift.mods.map((k) => `<span style="color:${RIFT_MODS[k].color}">${RIFT_MODS[k].name}</span>`).join(' · ');
+    } else rh.classList.add('hidden');
     // defense
     const d = G.defense, dh = $('defenseHud');
     if (G.zone?.type === 'town' && d.phase !== 'day') {
@@ -240,7 +253,7 @@ class UI {
   }
 
   // ---------- panels ----------
-  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith'].some((id) => !$(id).classList.contains('hidden')); }
+  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board'].some((id) => !$(id).classList.contains('hidden')); }
   togglePanel(id) { if ($(id).classList.contains('hidden')) this.openPanel(id); else this.closePanel(id); }
   openPanel(id) {
     $(id).classList.remove('hidden');
@@ -251,6 +264,7 @@ class UI {
     if (id === 'talents') this.renderTalents();
     if (id === 'settings') this.renderSettings();
     if (id === 'smith') { this.smithSel = null; this.renderSmith(); }
+    if (id === 'riftPanel') this.renderRiftPanel();
   }
   closePanel(id) {
     $(id).classList.add('hidden');
@@ -259,7 +273,7 @@ class UI {
     this.hideTip();
     G.uiOpen = this.anyPanel;
   }
-  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
+  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
   sideBySide(id, on) {
     const inv = $('inventory'), other = $(id);
     if (on && innerWidth > 1400) { other.style.left = 'calc(50% - 400px)'; inv.style.left = 'calc(50% + 330px)'; }
@@ -351,6 +365,22 @@ class UI {
     this.bagCells($('stashBag'), pr.char.bag, BAG, (i) => G.net.send({ t: 'stash', op: 'put', i }), null, false);
   }
 
+  // ---------- rifts & leaderboard ----------
+  renderRiftPanel() {
+    const max = G.prof.riftMax || 1;
+    const sel = $('riftLevel'); sel.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">Level ${i + 1}${i + 1 === max ? ' (highest)' : ''}</option>`).join(''); sel.value = max;
+    $('riftInfo').innerHTML = `Monster level ${Math.max(G.roomLevel, Math.ceil(max * 0.8))}+, +${Math.round(8 * max)}% health. Two random modifiers: ${Object.values(RIFT_MODS).map((m) => `<span style="color:${m.color}">${m.name}</span>`).join(', ')}.<br>Fill the bar by slaying enemies, then kill the Guardian. Finish within <b>${RIFT_TIME / 60} minutes</b> to raise your keystone (+2 if under ${Math.round(RIFT_TIME * 0.6 / 60)} min) and enter the Hall of Embers.`;
+    $('riftGo').onclick = () => { G.net.send({ t: 'rift', k: +sel.value }); this.closePanel('riftPanel'); };
+  }
+  renderBoard(m) {
+    this.boardData = m; this.boardCls ||= G.prof?.cls || 'warden';
+    $('boardSeason').textContent = `Season ${m.season}`;
+    $('boardTabs').innerHTML = Object.entries(CLASSES).map(([k, C]) => `<button class="stab ${k === this.boardCls ? 'on' : ''}" data-k="${k}" style="color:${C.color}">${C.name}</button>`).join('');
+    $('boardTabs').querySelectorAll('button').forEach((b) => (b.onclick = () => { this.boardCls = b.dataset.k; this.renderBoard(this.boardData); }));
+    const rows = (m.data[this.boardCls] || []).slice(0, 10);
+    $('boardRows').innerHTML = rows.length ? `<table class="lb"><thead><tr><th>#</th><th>Hero</th><th>Rift</th><th>Time</th><th>Party</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${r.k}</td><td>${Math.floor(r.time / 60)}:${String(Math.floor(r.time % 60)).padStart(2, '0')}</td><td>${r.party}</td></tr>`).join('')}</tbody></table>` : '<div class="muted" style="padding:12px">No champions yet this season. Be the first.</div>';
+  }
+
   // ---------- blacksmith ----------
   renderSmith() {
     const pr = G.prof, ch = pr.char, m = pr.mats || { shards: 0, cores: 0 };
@@ -405,6 +435,13 @@ class UI {
         row.appendChild(n);
       }
       tree.appendChild(row);
+    }
+    const pg = ch.paragon || { pts: 0, xp: 0, alloc: {} }, pspent = Object.values(pg.alloc || {}).reduce((a, b) => a + b, 0);
+    if (ch.level >= LEVEL_CAP || pg.pts) {
+      const row = document.createElement('div'); row.className = 'paragon';
+      row.innerHTML = `<div class="sub-h">Paragon ${pg.pts} <span class="muted small">${pg.pts - pspent} unspent · next in ${paragonXp(pg.pts) - pg.xp} XP</span></div><div class="pgrid">${Object.entries(PARAGON).map(([k, D]) => `<button class="btn pbtn" data-k="${k}" ${pg.pts - pspent <= 0 ? 'disabled' : ''}><b>${D.name}</b><br><span class="small">${D.fmt((pg.alloc?.[k] || 0) * D.per)}</span></button>`).join('')}</div>`;
+      tree.appendChild(row);
+      row.querySelectorAll('.pbtn').forEach((b) => (b.onclick = () => G.net.send({ t: 'paragon', key: b.dataset.k })));
     }
     $('talentReset').classList.toggle('hidden', !this._atTrainer);
     $('talentReset').textContent = `Reset talents (${25 * ch.level}g)`;
@@ -466,7 +503,7 @@ class UI {
   closeDialog() { this._dialog?.close(); }
   readyCheck(m) {
     if (m.byId === G.myId) { this.toast('Ready check sent to your party…', '#ffd98a'); return; }
-    this.dialog(`<b>${escapeHtml(m.by)}</b> wants to enter the <b>Dungeon (Depth ${G.roomLevel})</b>.<br>Are you ready?`, [['Ready', () => G.net.send({ t: 'readyResp', yes: true })], ['Not yet', () => G.net.send({ t: 'readyResp', yes: false })]], m.timeout);
+    this.dialog(`<b>${escapeHtml(m.by)}</b> wants to enter ${m.target?.type === 'rift' ? `an <b>Ember Rift (Level ${m.target.k})</b>` : `the <b>Dungeon (Depth ${G.roomLevel})</b>`}.<br>Are you ready?`, [['Ready', () => G.net.send({ t: 'readyResp', yes: true })], ['Not yet', () => G.net.send({ t: 'readyResp', yes: false })]], m.timeout);
   }
 
   // ---------- emote wheel ----------

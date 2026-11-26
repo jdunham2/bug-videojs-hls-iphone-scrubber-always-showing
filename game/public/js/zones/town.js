@@ -318,6 +318,28 @@ export class TownZone {
       this.smith.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
       s.add(this.smith.root);
     }
+    // Rift Obelisk + Hall of Embers leaderboard board
+    {
+      const O = TOWN.obelisk, y0 = townHeight(O.x, O.z);
+      const g = new THREE.Group(); g.position.set(O.x, y0, O.z);
+      const obs = new THREE.MeshStandardMaterial({ color: '#16101e', roughness: 0.25, metalness: 0.6, flatShading: true });
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.7, 0.6, 6), darkStone); base.position.y = 0.3; base.receiveShadow = true; g.add(base);
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.85, 3.0, 5), obs); pillar.position.y = 2.0; pillar.castShadow = true; g.add(pillar);
+      this.riftMat = new THREE.MeshStandardMaterial({ color: '#ff7a2a', emissive: '#c43aff', emissiveIntensity: 2.4, flatShading: true });
+      this.riftGem = new THREE.Mesh(new THREE.OctahedronGeometry(0.7, 0), this.riftMat); this.riftGem.position.y = 4.4; this.riftGem.scale.y = 1.5; g.add(this.riftGem);
+      this.riftRings = [0, 1].map((i) => { const r = new THREE.Mesh(new THREE.TorusGeometry(1.1 + i * 0.4, 0.04, 6, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(i ? '#c77dff' : '#ff9a3c').multiplyScalar(2) })); r.position.y = 4.4; g.add(r); return r; });
+      s.add(g); this.obelisk = g;
+      const B = TOWN.board, yb = townHeight(B.x, B.z);
+      const bg = new THREE.Group(); bg.position.set(B.x, yb, B.z); bg.rotation.y = Math.atan2(-B.x, -B.z);
+      for (const sx of [-1.2, 1.2]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3, 0.2), timber); post.position.set(sx, 1.5, 0); post.castShadow = true; bg.add(post); }
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.6, 0.12), woodMat); panel.position.y = 2; panel.castShadow = true; bg.add(panel);
+      const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const cx = cv.getContext('2d');
+      cx.fillStyle = '#2a1a10'; cx.fillRect(0, 0, 256, 128); cx.fillStyle = '#ffd98a'; cx.font = 'bold 26px serif'; cx.textAlign = 'center'; cx.fillText('HALL OF EMBERS', 128, 44);
+      cx.fillStyle = '#e8dcc4'; cx.font = '18px serif'; cx.fillText('Rift champions of the season', 128, 80); cx.fillText('★ ★ ★', 128, 108);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshStandardMaterial({ map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.35 })); face.position.set(0, 2, 0.07); bg.add(face);
+      s.add(bg);
+    }
     this.buildMinimap();
     this.setupInteractables();
   }
@@ -328,6 +350,8 @@ export class TownZone {
       { x: TOWN.darkPortal.x, z: TOWN.darkPortal.z, r: 4, mark: 'DARK WORLD', label: () => 'Enter the Dark World', action: () => G.actions.travel('dark') },
       { x: TOWN.trainer.x, z: TOWN.trainer.z, r: 3, mark: 'TRAINER', label: () => 'Talk to the Trainer (talents)', action: () => G.actions.openTalents(true) },
       { x: TOWN.smith.x, z: TOWN.smith.z, r: 3.4, mark: 'BLACKSMITH', label: () => 'Visit the Blacksmith (salvage, reroll, upgrade)', action: () => G.actions.openSmith() },
+      { x: TOWN.obelisk.x, z: TOWN.obelisk.z, r: 3.4, mark: 'EMBER RIFTS', label: () => 'Open an Ember Rift (timed endgame)', action: () => G.actions.openRift() },
+      { x: TOWN.board.x, z: TOWN.board.z, r: 3, mark: 'HALL OF EMBERS', label: () => 'Read the Hall of Embers (leaderboard)', action: () => G.actions.openBoard() },
       { x: TOWN.stash.x, z: TOWN.stash.z, r: 3, mark: 'STASH', label: () => 'Open the shared stash', action: () => G.actions.openStash() },
       { x: TOWN.bell.x, z: TOWN.bell.z, r: 3.2, mark: 'NIGHT BELL', label: () => (G.defense.phase === 'day' ? 'Ring the Night Bell — Defend the City' : null), action: () => G.actions.startNight() },
       ...this.chests.map((ch) => ({ x: ch.x, z: ch.z, r: 2.6, mark: null, label: () => (ch.open ? null : 'Open Ancient Chest'), action: () => G.actions.openChest(ch) })),
@@ -372,6 +396,7 @@ export class TownZone {
       { x: TOWN.trainer.x, z: TOWN.trainer.z, color: '#5ab0ff', icon: 'npc' },
       { x: TOWN.stash.x, z: TOWN.stash.z, color: '#8fd0ff', icon: 'stash' },
       { x: TOWN.smith.x, z: TOWN.smith.z, color: '#ff8a3a', icon: 'npc' },
+      { x: TOWN.obelisk.x, z: TOWN.obelisk.z, color: '#c77dff', icon: 'portal' },
     ];
   }
 
@@ -440,6 +465,8 @@ export class TownZone {
     const hm = (t * 0.9) % 1; animateRig(this.smith, { t, move: 0, atk: hm < 0.6 ? hm / 0.6 : -1, combo: 2, slam: -1 });
     if (hm > 0.32 && hm < 0.36 && Math.random() < 0.7) G.fx.emit({ pos: this.smith.root.position.clone().add(new THREE.Vector3(0, 1, 0)), count: 10, speed: 4, color: '#ffe0a0', color2: '#ff4a00', size: 0.18, life: 0.4, gravity: 10 });
     this.forgeLight.intensity = 9 + Math.sin(t * 9) * 2;
+    this.riftGem.rotation.y = t * 1.2; this.riftGem.position.y = 4.4 + Math.sin(t * 1.6) * 0.2; this.riftRings[0].rotation.set(t, t * 0.7, 0); this.riftRings[1].rotation.set(-t * 0.6, 0, t * 0.9);
+    if (Math.random() < dt * 10) G.fx.emit({ pos: this.riftGem.getWorldPosition(new THREE.Vector3()), count: 1, speed: 1.2, color: Math.random() < 0.5 ? '#ff9a3c' : '#c77dff', color2: '#200040', size: 0.3, life: 1.2 });
     if (Math.random() < dt * 14) G.fx.emit({ pos: this.forgeCoals, count: 1, speed: 1, color: '#ffc060', color2: '#ff2000', size: 0.3, life: 0.8, up: 2, radius: 0.5 });
     this.trainer.root.rotation.y = Math.atan2(playerPos.x - TOWN.trainer.x, playerPos.z - TOWN.trainer.z);
     for (const ch of this.chests) if (ch.open && ch.lidP.rotation.x > -1.9) ch.lidP.rotation.x -= dt * 4;

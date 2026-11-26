@@ -23,6 +23,7 @@ import { STRUCTURES, TOWN } from '../shared/world.js';
 import { RARITIES } from '../shared/items.js';
 import { CLASSES } from '../shared/classes.js';
 import { SHRINES, LEVER_NAMES } from '../shared/dungeon.js';
+import { RIFT_MODS, RIFT_TIME } from '../shared/rifts.js';
 
 // ---------- renderer ----------
 const settings = loadSettings();
@@ -110,6 +111,7 @@ let zoneQueue = Promise.resolve();
 
 function musicFor() {
   if (!G.zone) return 'town';
+  if (G.rift && !G.rift.done) return G.rift.guardian ? 'boss' : 'night';
   for (const e of G.enemies.values()) if (e.boss && !e.dead && player && e.pos.distanceTo(player.pos) < 35 && (e.type !== 'ogre' || G.zone.type === 'town')) return 'boss';
   if (G.zone.type === 'town') return G.defense.phase === 'day' || G.defense.phase === 'dawn' ? 'town' : 'night';
   return G.zone.type;
@@ -126,12 +128,14 @@ async function switchZone(m) {
   let zone, oldDungeon = null;
   if (m.type === 'town') zone = town;
   else if (m.type === 'dark') zone = dark ||= new DarkZone(renderer);
+  else if (m.type === 'rift') { if (dungeon) oldDungeon = dungeon; dungeon = new DungeonZone(renderer, m.seed, m.level, m.cleared, m.rift); dungeon.key = m.zone; zone = dungeon; applySettings(); }
   else {
     if (dungeon && dungeon.key !== m.zone) { oldDungeon = dungeon; dungeon = null; }
-    if (!dungeon) { dungeon = new DungeonZone(renderer, m.seed, m.level, m.cleared); dungeon.key = m.zone; applySettings(); }
+    if (!dungeon) { dungeon = new DungeonZone(renderer, m.seed, m.level, m.cleared, m.rift); dungeon.key = m.zone; applySettings(); }
     zone = dungeon;
   }
   G.zoneKey = m.zone;
+  G.rift = m.rift ? { ...m.rift, t0: performance.now() / 1000 - m.rift.elapsed } : null;
   setActiveZone(zone);
   if (oldDungeon) oldDungeon.dispose();
   let sx = zone.spawn.x, sz = zone.spawn.z, face = { x: 0, z: -1 };
@@ -146,9 +150,10 @@ async function switchZone(m) {
   player.ry = Math.atan2(face.x, face.z);
   camRig.yaw = Math.atan2(-face.x, -face.z);
   camRig.snap(player);
-  const banners = { town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, zone.name || 'The Depths'] };
+  const banners = { town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, zone.name || 'The Depths'], rift: [`EMBER RIFT ${m.rift?.k}`, (m.rift?.mods || []).map((k) => RIFT_MODS[k].name).join(' · ')] };
   if (prevKey || !settings.intro) ui.zoneBanner(...banners[m.type]);
   if (prevKey) sfx.portal();
+  if (m.type === 'rift') setTimeout(() => ui.toast('Slay enemies to fill the rift — then face its Guardian', '#c77dff', `Beat ${Math.round(RIFT_TIME / 60)} minutes to raise your keystone`), 1200);
   if (m.type === 'dungeon' && !m.cleared) setTimeout(() => ui.toast(`Pull the levers in the order shown on the gate, then slay ${zone.d.bossType === 'matriarch' ? 'the Ash Matriarch' : 'the Bone Tyrant'}`, '#ff9a7a', 'Clearing the dungeon raises the depth for the whole party'), 1500);
   traveling = false;
   ui.fade(false);
@@ -203,6 +208,8 @@ G.actions = {
   openTalents(atTrainer) { ui._atTrainer = !!atTrainer; ui.openPanel('talents'); },
   openStash() { ui.openPanel('stash'); },
   openSmith() { ui.openPanel('smith'); },
+  openRift() { ui.openPanel('riftPanel'); },
+  openBoard() { ui.openPanel('board'); net.send({ t: 'leaderboard' }); },
   openChest(ch) { if (!ch.open) net.send({ t: 'chest', id: ch.id }); },
   applySettings, playIntro: () => { if (player) playIntro(); },
   respawn() {
@@ -363,6 +370,18 @@ net.on('dstate', (m) => { if (dungeon && G.zone === dungeon) dungeon.setDState(m
 net.on('lever', (m) => { sfx.lever(m.ok); ui.toast(m.ok ? `${m.by} pulled the ${LEVER_NAMES[m.i]} lever` : `Wrong order! The levers reset and the dead stir…`, m.ok ? '#5eea8a' : '#ff6a5a'); });
 net.on('gateOpen', () => { ui.bigBanner('THE GATE OPENS', 'The boss chamber awaits', 3000); sfx.gate(); G.shake = 0.4; });
 net.on('shrine', (m) => { const S = SHRINES[m.kind]; ui.toast(`${S.name} activated by ${m.by}`, S.color, S.desc + ' for the whole party'); sfx.shrine(); if (player) fx.emit({ pos: player.pos.clone().setY(player.pos.y + 1), count: 50, speed: 3, color: S.color, color2: '#ffffff', size: 0.3, life: 1, up: 1 }); });
+net.on('riftProgress', (m) => { if (G.rift) G.rift.p = m.p; });
+net.on('guardian', () => { if (G.rift) { G.rift.p = 1; G.rift.guardian = true; } ui.bigBanner('THE GUARDIAN AWAKENS', 'The rift collapses around its master', 3000); sfx.roar(); });
+net.on('riftDone', (m) => {
+  if (G.rift) G.rift.done = true;
+  if (dungeon && G.zone === dungeon) { dungeon.exitPortal.position.set(m.x, 0, m.z); dungeon.interactables[1].x = m.x; dungeon.interactables[1].z = m.z; dungeon.setCleared(); }
+  const mm = Math.floor(m.time / 60), ss = String(Math.floor(m.time % 60)).padStart(2, '0');
+  ui.bigBanner(m.ok ? 'RIFT CONQUERED' : 'RIFT CLOSED', m.ok ? `${mm}:${ss} — keystone +${m.bump}. Your name joins the Hall of Embers.` : `${mm}:${ss} — too slow for a keystone upgrade`, 6000);
+  sfx.victory();
+});
+net.on('leaderboard', (m) => ui.renderBoard(m));
+let lastPgToast = 0;
+net.on('paragonUp', (m) => { if (performance.now() - lastPgToast < 1500) return; lastPgToast = performance.now(); ui.toast(`Paragon point earned! (${m.pts})`, '#ffd98a', 'Spend it in the Talents panel (K)'); sfx.levelUp(); });
 net.on('structs', applyStructs);
 net.on('defense', (m) => applyDefense(m, false));
 net.on('wave', (m) => { if (G.zone === town) { ui.bigBanner(`WAVE ${m.wave}`, m.wave === 5 ? 'The final wave — the siege begins!' : 'Defend the Ember Heart!', 3000); sfx.horn(); } });

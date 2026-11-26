@@ -1,6 +1,7 @@
 // Server-authoritative hero profiles: characters per class, gold, bag, stash, talents, shop, trades.
 import { CLASSES, canLearn } from '../public/shared/classes.js';
 import { computeStats, xpForLevel } from '../public/shared/stats.js';
+import { LEVEL_CAP, PARAGON, paragonXp } from '../public/shared/rifts.js';
 import { generateItem, WEAPONS, SALVAGE, levelUpItem, rerollAffix } from '../public/shared/items.js';
 import { RNG } from '../public/shared/rng.js';
 
@@ -22,7 +23,7 @@ export const getChar = (prof, cls) => (prof.chars[cls] ||= starterChar(cls));
 export function profileView(p) {
   const pr = p.prof;
   pr.mats ||= { shards: 0, cores: 0 };
-  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
+  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, riftMax: pr.riftMax || 1, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
 }
 
 export function activeBuffs(p) {
@@ -41,10 +42,17 @@ export function rollItem(p, level, opts = {}) {
 
 export function addXp(p, n, send) {
   const c = p.char;
+  c.paragon ||= { pts: 0, xp: 0, alloc: {} };
+  if (c.level >= LEVEL_CAP) {
+    c.paragon.xp += n;
+    while (c.paragon.xp >= paragonXp(c.paragon.pts)) { c.paragon.xp -= paragonXp(c.paragon.pts); c.paragon.pts++; send({ t: 'paragonUp', pts: c.paragon.pts }); }
+    p.dirty = true; return;
+  }
   c.xp += n;
   let up = false;
-  while (c.xp >= xpForLevel(c.level)) { c.xp -= xpForLevel(c.level); c.level++; up = true; }
+  while (c.level < LEVEL_CAP && c.xp >= xpForLevel(c.level)) { c.xp -= xpForLevel(c.level); c.level++; up = true; }
   if (up) send({ t: 'levelUp', level: c.level });
+  if (c.level >= LEVEL_CAP && c.xp > 0) { const left = c.xp; c.xp = 0; addXp(p, left, send); }
   p.dirty = true;
 }
 
@@ -156,4 +164,12 @@ export function upgradeItem(p, src, ref) {
   const c = smithCosts(it, 0).upgrade, m = (p.prof.mats ||= { shards: 0, cores: 0 });
   if (m.shards < c.shards || m.cores < c.cores) return `Upgrading costs ${c.shards} shards${c.cores ? ' and 1 Ember Core' : ''}.`;
   m.shards -= c.shards; m.cores -= c.cores; levelUpItem(it); p.dirty = true; return null;
+}
+
+export function spendParagon(p, key) {
+  const c = p.char; c.paragon ||= { pts: 0, xp: 0, alloc: {} };
+  const spent = Object.values(c.paragon.alloc).reduce((a, b) => a + b, 0);
+  if (!PARAGON[key] || spent >= c.paragon.pts) return 'No Paragon points available.';
+  if (PARAGON[key].max && (c.paragon.alloc[key] || 0) >= PARAGON[key].max) return 'That stat is maxed.';
+  c.paragon.alloc[key] = (c.paragon.alloc[key] || 0) + 1; p.dirty = true; return null;
 }

@@ -5,6 +5,7 @@ import { Zone, send } from './zone.js';
 import { Defense } from './defense.js';
 import * as P from './profile.js';
 import { SETS } from '../public/shared/items.js';
+import { RIFT_TIME, season } from '../public/shared/rifts.js';
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 export { TOKEN_RE };
@@ -60,11 +61,44 @@ class Room {
       }
       zone = this.zones.get(this.currentDungeon);
     } else zone = this.zones.get(type === 'dark' ? 'dark' : 'town');
+    this.joinZone(p, zone);
+  }
+  enterRift(p, k) {
+    let zone = this.currentRift && this.zones.get(this.currentRift);
+    if (!zone || zone.k !== k || zone.rift.done || !zone.players().length) {
+      const key = 'rift:' + this.nextId++;
+      zone = new Zone(this, key, 'rift', k);
+      this.zones.set(key, zone); this.currentRift = key;
+    }
+    this.joinZone(p, zone);
+  }
+  riftComplete(zone, guardian) {
+    const r = zone.rift, time = (Date.now() - r.start) / 1000, ok = time <= RIFT_TIME;
+    const bump = ok ? (time < RIFT_TIME * 0.6 ? 2 : 1) : 0;
+    const lb = (db.data.leaderboard ||= {}), S = (lb[season()] ||= {});
+    for (const p of zone.players()) {
+      this.reward(p, 120 * zone.k, 250 * zone.k, guardian.x, guardian.z, true);
+      for (let i = 0; i < 2; i++) this.giveLoot(p, zone.level, { minRarity: 3, luck: 3 }, guardian.x + i * 1.5, guardian.z);
+      if (Math.random() < 0.5 + zone.k * 0.03) this.giveLoot(p, zone.level, { rarity: 4 }, guardian.x - 1.5, guardian.z);
+      p.prof.riftMax = Math.max(p.prof.riftMax || 1, zone.k + bump);
+      if (ok) {
+        const list = (S[p.cls] ||= []);
+        list.push({ name: p.prof.name, k: zone.k, time: Math.round(time * 10) / 10, party: zone.players().length });
+        list.sort((a, b) => b.k - a.k || a.time - b.time); list.length = Math.min(list.length, 20);
+      }
+      p.dirty = true;
+    }
+    db.touch();
+    zone.cleared = true;
+    zone.broadcast({ t: 'riftDone', time: Math.round(time * 10) / 10, ok, bump, k: zone.k, x: guardian.x, z: guardian.z });
+  }
+  joinZone(p, zone) {
     if (p.trade) this.closeTrade(p.trade, 'Trade cancelled.');
     p.zone = zone.key;
     p.loot.clear();
-    const msg = { t: 'enterZone', zone: zone.key, type: zone.type, level: zone.type === 'dungeon' ? zone.level : this.level };
+    const msg = { t: 'enterZone', zone: zone.key, type: zone.type, level: zone.dungeon ? zone.level : this.level };
     if (zone.dungeon) { msg.seed = zone.seed; msg.cleared = zone.cleared; }
+    if (zone.rift) msg.rift = zone.riftState();
     if (zone.type === 'town') { msg.structs = this.defense.list(); msg.defense = this.defense.view(); }
     send(p.ws, msg);
     send(p.ws, zone.snapshot());
@@ -72,12 +106,13 @@ class Room {
     if (zone.dungeon) send(p.ws, zone.dstate());
   }
 
-  requestDungeon(p) {
-    const cur = this.currentDungeon && this.zones.get(this.currentDungeon);
-    if (this.players.size === 1 || (cur && cur.players().length)) return this.enterZone(p, 'dungeon');
+  enterTarget(p, target) { if (target.type === 'rift') this.enterRift(p, target.k); else this.enterZone(p, 'dungeon'); }
+  requestDungeon(p, target = { type: 'dungeon' }) {
+    const cur = target.type === 'rift' ? this.currentRift && this.zones.get(this.currentRift) : this.currentDungeon && this.zones.get(this.currentDungeon);
+    if (this.players.size === 1 || (cur && cur.players().length && (target.type !== 'rift' || cur.k === target.k))) return this.enterTarget(p, target);
     if (this.ready) return;
-    this.ready = { by: p.id, yes: new Set([p.id]), t: 20 };
-    this.broadcast({ t: 'readyCheck', by: p.name, byId: p.id, timeout: 20 });
+    this.ready = { by: p.id, yes: new Set([p.id]), t: 20, target };
+    this.broadcast({ t: 'readyCheck', by: p.prof.name, byId: p.id, timeout: 20, target });
   }
   readyResp(p, yes) {
     const r = this.ready; if (!r) return;
@@ -87,7 +122,7 @@ class Room {
     if ([...this.players.keys()].every((id) => r.yes.has(id))) {
       this.ready = null;
       this.broadcast({ t: 'readyGo' });
-      for (const q of this.players.values()) this.enterZone(q, 'dungeon');
+      for (const q of this.players.values()) this.enterTarget(q, r.target);
     }
   }
 
@@ -109,9 +144,9 @@ class Room {
     for (const [key, z] of this.zones) {
       const n = z.players().length;
       if (n || z.type === 'town') z.tick(DT);
-      if (z.type === 'dungeon') {
+      if (z.type === 'dungeon' || z.type === 'rift') {
         z.emptyT = n ? 0 : z.emptyT + DT;
-        if (z.emptyT > 120 || (z.emptyT > 3 && key !== this.currentDungeon)) this.zones.delete(key);
+        if (z.emptyT > 120 || (z.emptyT > 3 && key !== this.currentDungeon && key !== this.currentRift)) this.zones.delete(key);
       }
     }
     for (const p of this.players.values()) if (p.dirty) { p.dirty = false; send(p.ws, P.profileView(p)); db.touch(); }
@@ -166,6 +201,15 @@ function attach(ws) {
         p.style = Math.max(0, Math.min(4, m.style | 0)); p.spirit = m.spirit | 0; p.emote = m.emote || null; p.block = !!m.block;
         break;
       case 'zone': if (m.to === 'dungeon') room.requestDungeon(p); else room.enterZone(p, m.to); break;
+      case 'rift': {
+        const k = Math.max(1, m.k | 0);
+        if (p.zone !== 'town' || !near(p, TOWN.obelisk, 7)) break;
+        if (k > (p.prof.riftMax || 1)) { notice(`Your highest unlocked rift is level ${p.prof.riftMax || 1}.`); break; }
+        room.requestDungeon(p, { type: 'rift', k });
+        break;
+      }
+      case 'leaderboard': { const S = (db.data.leaderboard || {})[season()] || {}; send(ws, { t: 'leaderboard', season: season(), data: S }); break; }
+      case 'paragon': ok(P.spendParagon(p, String(m.key))); break;
       case 'readyResp': room.readyResp(p, !!m.yes); break;
       case 'hit': {
         const e = zone?.enemies.get(m.id);
