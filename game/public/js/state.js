@@ -8,6 +8,7 @@ export const G = {
   zoneKey: '',
   player: null,
   enemies: new Map(),
+  allies: new Map(),
   remotes: new Map(),
   loots: new Map(),
   projectiles: new Map(),

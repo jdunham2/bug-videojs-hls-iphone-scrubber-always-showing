@@ -5,7 +5,8 @@ import { DARK } from '../public/shared/world.js';
 import { SHRINES } from '../public/shared/dungeon.js';
 import { RNG } from '../public/shared/rng.js';
 import { RIFT_MOD_KEYS, riftEnemyLevel, riftHpMul, RIFT_TIME } from '../public/shared/rifts.js';
-import { REGIONS, EVENTS } from '../public/shared/regions.js';
+import { REGIONS, EVENTS, QUESTS, ACT1_END } from '../public/shared/regions.js';
+const HERALD_Q = QUESTS.findIndex((q) => q.kind === 'herald');
 
 const rng = new RNG(Date.now() & 0xffffffff);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -15,7 +16,7 @@ export const send = (ws, msg) => { if (ws.readyState === 1) ws.send(JSON.stringi
 export class Zone {
   constructor(room, key, type, level) {
     this.room = room; this.key = key; this.type = type; this.level = level;
-    this.enemies = new Map(); this.projectiles = new Map(); this.hazards = new Map();
+    this.enemies = new Map(); this.projectiles = new Map(); this.hazards = new Map(); this.allies = new Map();
     this.cleared = false; this.emptyT = 0; this.respawnT = 0;
     if (type === 'region') { this.region = REGIONS[key]; this.eventT = 25; this.event = null; }
     if (type === 'dungeon' || type === 'rift') {
@@ -85,6 +86,7 @@ export class Zone {
     const alive = this.alive();
     for (const e of [...this.enemies.values()]) if (this.enemies.has(e.id)) this.tickEnemy(e, dt, alive);
     this.tickProjectiles(dt, alive);
+    if (this.allies.size) this.tickAllies(dt);
     for (const h of [...this.hazards.values()]) {
       if (h.delay > 0) { h.delay -= dt; continue; }
       h.life -= dt;
@@ -112,6 +114,7 @@ export class Zone {
         bd = d; best = p;
       }
     }
+    for (const a of this.allies.values()) { if (a.dead) continue; const d = dist(e, a) * 1.25; if (d < range && d < bd) { bd = d; best = a; } }
     return best;
   }
 
@@ -171,6 +174,7 @@ export class Zone {
       if ((e.type === 'boss' || def.ai === 'tyrant') && this.tyrant(e, dt, alive, d)) return;
       if (e.type === 'matriarch' && this.matriarch(e, dt, alive, target.p, d)) return;
       if (e.type === 'drake' && this.drake(e, dt, alive, target.p, d)) return;
+      if (e.type === 'herald' && this.herald(e, dt, alive, target.p, d)) return;
       if (e.type === 'hollowking' && this.hollowKing(e, dt, alive, target.p, d)) return;
       if (def.healer) { e.healCd = (e.healCd ?? 2) - dt; if (e.healCd <= 0) this.healPulse(e); if (d < 6.5) { tx = e.x - dx; tz = e.z - dz; reach = 0.1; } else reach = 9; }
       if (def.burrow) {
@@ -343,6 +347,158 @@ export class Zone {
     return false;
   }
 
+  // ---- Act II companion (server-simulated ally that follows its owner) ----
+  addAlly(p) {
+    for (const a of this.allies.values()) if (a.owner === p.id) return a;
+    const lv = p.char.level || 1, maxHp = 140 + 34 * lv;
+    const a = { ally: true, id: this.room.nextId++, owner: p.id, zone: this.key, x: p.x - 1.5, z: p.z - 1.5, ry: 0, hp: maxHp, maxHp, dmg: 7 + 3.2 * lv, dead: false, revive: 0, downT: 0, atkCd: 1, volleyCd: 5, mendCd: 8, atkT: 0, moving: false, radius: 0.5 };
+    this.allies.set(a.id, a);
+    return a;
+  }
+  removeAllies(pid) { for (const a of [...this.allies.values()]) if (a.owner === pid) this.allies.delete(a.id); }
+  hurtAlly(a, dmg) {
+    if (a.dead) return;
+    a.hp -= dmg;
+    if (a.hp <= 0) { a.hp = 0; a.dead = true; a.revive = 0; a.downT = 40; this.broadcast({ t: 'allyDown', id: a.id }); }
+  }
+  allyShoot(a, tgt, dmg) {
+    const id = this.room.nextId++;
+    this.projectiles.set(id, { id, kind: 'arrow', x: a.x, z: a.z, target: tgt.id, dmg: Math.round(dmg), life: 1.5 });
+    this.broadcast({ t: 'proj', id, kind: 'arrow', x: r2(a.x), z: r2(a.z), target: tgt.id, ally: 1 });
+  }
+  tickAllies(dt) {
+    for (const a of [...this.allies.values()]) {
+      const o = this.room.players.get(a.owner);
+      if (!o || o.zone !== this.key) { this.allies.delete(a.id); continue; }
+      a.atkT -= dt;
+      for (const h of this.hazards.values()) if (h.delay <= 0 && h.dps > 0 && !a.dead && dist(h, a) < h.r) this.hurtAlly(a, h.dps * dt);
+      if (a.dead) {
+        // revive by standing next to her, or she gets back up on her own after a while
+        const helper = this.alive().find((p) => dist(p, a) < 2.6);
+        a.revive = helper ? a.revive + dt : Math.max(0, a.revive - dt * 0.5);
+        a.downT -= dt;
+        if (a.revive >= 2.5 || a.downT <= 0) { a.dead = false; a.hp = a.maxHp * 0.5; a.revive = 0; this.broadcast({ t: 'allyUp', id: a.id, by: helper ? helper.prof.name : null }); }
+        a.moving = false; continue;
+      }
+      a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.01 * dt);
+      // follow: stay at the owner's flank
+      const side = Math.sin(o.ry + 2.3), back = Math.cos(o.ry + 2.3);
+      const fx = o.x + side * 2.4, fz = o.z + back * 2.4, fd = Math.hypot(fx - a.x, fz - a.z);
+      if (fd > 35) { a.x = fx; a.z = fz; }
+      a.moving = fd > 1.2;
+      if (a.moving) { const sp = Math.min(fd, (fd > 8 ? 9.5 : 6.2) * dt); a.x += ((fx - a.x) / fd) * sp; a.z += ((fz - a.z) / fd) * sp; a.ry = Math.atan2(fx - a.x, fz - a.z); }
+      this.collide(a, a.radius);
+      // pick targets: what's near her owner first, then near her
+      let tgt = null, bd = 15;
+      for (const e of this.enemies.values()) { if (e.burrowed || e.flying || e.invuln || e.def.flee && !e.aggro) continue; const d = Math.min(dist(e, a), dist(e, o) + 2); if (d < bd && (!this.dungeon || dungeonLOS(this.dungeon, a.x, a.z, e.x, e.z))) { bd = d; tgt = e; } }
+      a.atkCd -= dt; a.volleyCd -= dt; a.mendCd -= dt;
+      // ability 2: Mending Wind — heals the party when someone is hurt
+      const hurt = this.alive().filter((p) => dist(p, a) < 10 && p.hp < p.maxHp * 0.6);
+      if (a.mendCd <= 0 && (hurt.length || a.hp < a.maxHp * 0.4)) {
+        a.mendCd = 16; a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.3);
+        for (const p of this.alive()) if (dist(p, a) < 10) send(p.ws, { t: 'mend', amt: Math.round(p.maxHp * 0.25), from: a.id });
+        this.broadcast({ t: 'allyFx', id: a.id, kind: 'mend', x: r2(a.x), z: r2(a.z) });
+      }
+      if (!tgt) continue;
+      a.ry = Math.atan2(tgt.x - a.x, tgt.z - a.z);
+      // ability 1: Piercing Volley — arrows at up to 5 targets
+      if (a.volleyCd <= 0) {
+        a.volleyCd = 9; a.atkT = 0.6;
+        const near = [...this.enemies.values()].filter((e) => !e.burrowed && !e.flying && !e.invuln && dist(e, a) < 14).sort((x, y) => dist(x, a) - dist(y, a)).slice(0, 5);
+        for (const e of near) this.allyShoot(a, e, a.dmg * 1.8);
+        this.broadcast({ t: 'allyFx', id: a.id, kind: 'volley', x: r2(a.x), z: r2(a.z) });
+      } else if (a.atkCd <= 0) { a.atkCd = 1.15; a.atkT = 0.35; this.allyShoot(a, tgt, a.dmg); }
+    }
+  }
+
+  // ---- Act II boss: the Storm Herald (4 phases, binds the Storm Drake in phase 2) ----
+  herald(e, dt, alive, target, d) {
+    if (this.phaseCheck(e, [0.75, 0.5, 0.25])) {
+      if (e.phase === 2) {
+        e.invuln = true; e.flying = true;
+        const dr = this.spawn('drake', e.x + 6, e.z + 6, { bound: e.id, herald: e.id, introDone: true, aggro: true });
+        dr.hp = dr.maxHp = Math.round(dr.maxHp * 0.6);
+        this.broadcast({ t: 'heraldCall', id: e.id, drake: dr.id });
+        return true;
+      }
+      if (e.phase === 4) this.summon(e, 'imp', 3);
+    }
+    e.geyserCd -= dt; e.abilityCd -= dt; e.slamCd -= dt;
+    // storm strikes on every hero; faster each phase
+    if (e.geyserCd <= 0) {
+      e.geyserCd = [0, 5.5, 4.5, 3.6, 2.2][e.phase];
+      for (const p of alive.slice(0, 4)) this.addHazard('storm', p.x + rng.range(-1, 1), p.z + rng.range(-1, 1), 2.2, 34 * levelMul(this.lvl).dmg, 0.5, 1.0);
+    }
+    if (e.phase === 2) {
+      // floats above the Drake's fight, raining lightning orbs
+      const dr = [...this.enemies.values()].find((o) => o.bound === e.id);
+      if (!dr) { e.invuln = false; e.flying = false; }
+      if (e.abilityCd <= 0) { e.abilityCd = 3; this.heraldOrbs(e, target, 3, 0.25); }
+      return true;
+    }
+    if (e.phase >= 3) {
+      // absorbed the Drake's power: lightning breath strafes + radial bolt novas
+      e.strafeCd = (e.strafeCd ?? 4) - dt;
+      if (e.strafeCd <= 0) {
+        e.strafeCd = e.phase === 4 ? 6 : 8;
+        const a = Math.atan2(target.x - e.x, target.z - e.z) + rng.range(-0.3, 0.3);
+        const A = { x: target.x - Math.sin(a) * 13, z: target.z - Math.cos(a) * 13 }, B = { x: target.x + Math.sin(a) * 13, z: target.z + Math.cos(a) * 13 };
+        this.collide(A, 1); this.collide(B, 1);
+        e.strafe = { ax: A.x, az: A.z, bx: B.x, bz: B.z, t: -1.2, dur: 1.2, w: 3.6, hit: new Set() }; e.flying = true;
+        this.broadcast({ t: 'strafe', id: e.id, ax: r2(A.x), az: r2(A.z), bx: r2(B.x), bz: r2(B.z), delay: 1.2, dur: 1.2, w: 3.6 });
+        return true;
+      }
+      if (e.slamCd <= 0) {
+        e.slamCd = e.phase === 4 ? 4.5 : 6.5;
+        for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2 + rng.range(0, 0.3); this.heraldBolt(e, a, 11, 0.6); }
+        this.broadcast({ t: 'eatk', id: e.id });
+      }
+    }
+    if (e.phase === 4) {
+      // eye of the storm: a ring of lightning closes in around the summit
+      e.ringCd = (e.ringCd ?? 0) - dt;
+      if (e.ringCd <= 0) {
+        e.ringCd = 7; const c = this.region?.summit || e;
+        for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; this.addHazard('storm', c.x + Math.cos(a) * 15, c.z + Math.sin(a) * 15, 2.6, 30 * levelMul(this.lvl).dmg, 3.5, 1.2); }
+      }
+    }
+    if (e.abilityCd <= 0 && d < 18) { e.abilityCd = e.phase >= 3 ? 2.2 : 2.8; this.heraldOrbs(e, target, e.phase >= 3 ? 5 : 3, 0.22); return true; }
+    if (d < 12) { // keep range: drift away from melee
+      const dx = e.x - target.x, dz = e.z - target.z, l = Math.hypot(dx, dz) || 1;
+      e.x += (dx / l) * e.def.speed * dt * 0.8; e.z += (dz / l) * e.def.speed * dt * 0.8; this.collide(e, e.radius); e.state = 1;
+      return true;
+    }
+    return false;
+  }
+  heraldBolt(e, a, speed, mul) {
+    const id = this.room.nextId++;
+    const pr = { id, kind: 'bolt', x: e.x + Math.sin(a) * 1.6, z: e.z + Math.cos(a) * 1.6, vx: Math.sin(a) * speed, vz: Math.cos(a) * speed, dmg: Math.round(e.dmg * mul), life: 2.6, affix: 'frozen' };
+    this.projectiles.set(id, pr);
+    this.broadcast({ t: 'proj', id, kind: 'bolt', x: r2(pr.x), z: r2(pr.z), vx: r2(pr.vx), vz: r2(pr.vz), color: '#8ad8ff' });
+  }
+  heraldOrbs(e, target, n, spread) {
+    const base = Math.atan2(target.x - e.x, target.z - e.z);
+    for (let i = 0; i < n; i++) this.heraldBolt(e, base + (i - (n - 1) / 2) * spread, 15, 0.75);
+    this.broadcast({ t: 'eatk', id: e.id });
+  }
+  summonHerald(p) {
+    if ([...this.enemies.values()].some((e) => e.def.boss)) return;
+    const S = this.region.summit;
+    if (!S || dist(p, S) > 10) return;
+    if ((p.char.quest?.i || 0) < HERALD_Q) return;
+    const h = this.spawn('herald', S.x, S.z - 5);
+    h.maxHp = h.hp = Math.round(h.maxHp * (1 + 0.6 * (this.players().length - 1)));
+    this.broadcast({ t: 'chat', from: '★', text: 'The sky tears open — the Storm Herald descends upon the summit!' });
+  }
+  takeRelic(p, i) {
+    const R = this.region.relics?.[i], q = p.char.quest || {};
+    if (!R || dist(p, R) > 3.5 || QUESTS[q.i]?.kind !== 'relic' || ((q.r || 0) & (1 << i))) return;
+    q.r = (q.r || 0) | (1 << i);
+    send(p.ws, { t: 'relic', i, r: q.r });
+    for (let k = 0; k < 3; k++) { const a = rng.range(0, 6.28); this.spawn(rng.weighted(this.region.spawns), R.x + Math.cos(a) * 6, R.z + Math.sin(a) * 6, { aggro: true }); }
+    this.room.questEvent(p, 'relic');
+  }
+
   goblin(e, dt, alive) {
     let near = null, nd = 14;
     for (const p of alive) { const dd = dist(p, e); if (dd < nd) { nd = dd; near = p; } }
@@ -386,7 +542,8 @@ export class Zone {
     }
     const reach = def.range * 1.5 + 0.6;
     if (t.kind === 'player') {
-      if (!t.p.dead && t.p.zone === this.key && dist(t.p, e) < reach) {
+      if (t.p.ally) { if (!t.p.dead && this.allies.has(t.p.id) && dist(t.p, e) < reach) this.hurtAlly(t.p, e.dmg); }
+      else if (!t.p.dead && t.p.zone === this.key && dist(t.p, e) < reach) {
         send(t.p.ws, { t: 'hurt', dmg: e.dmg, from: e.id, affix: e.affix, kb: def.siege ? 1 : 0 });
         if (e.affix === 'vampiric') e.hp = Math.min(e.maxHp, e.hp + e.dmg * 0.6);
       }
@@ -409,6 +566,7 @@ export class Zone {
       } else {
         pr.x += pr.vx * dt; pr.z += pr.vz * dt;
         for (const p of alive) if (Math.hypot(p.x - pr.x, p.z - pr.z) < 0.9) { send(p.ws, { t: 'hurt', dmg: pr.dmg, from: -1, affix: pr.affix }); hit = true; break; }
+        if (!hit) for (const a of this.allies.values()) if (!a.dead && Math.hypot(a.x - pr.x, a.z - pr.z) < 0.9) { this.hurtAlly(a, pr.dmg); hit = true; break; }
         if (!hit && this.type === 'town') {
           for (const s of this.room.defense.structures.values()) if (dist(s, pr) < 1.2) { this.room.defense.damageStruct(s, pr.dmg); hit = true; break; }
           if (!hit && Math.hypot(pr.x, pr.z) < 2.6) { this.room.defense.damageCore(pr.dmg); hit = true; }
@@ -421,6 +579,7 @@ export class Zone {
 
   damageEnemy(e, dmg, by, crit, kb = 0, stun = 0, fx, fz) {
     if (!this.enemies.has(e.id) || e.introT > 0 || e.burrowed || e.flying) return;
+    if (e.invuln) { if (by) this.broadcast({ t: 'ehit', id: e.id, dmg: 0, by, shield: true, immune: true }); return; }
     if (e.shieldUp) dmg *= 0.25;
     let blocked = false;
     if (e.def.frontal && fx !== undefined && e.stunT <= 0) {
@@ -428,6 +587,7 @@ export class Zone {
       if ((ax / l) * Math.sin(e.ry) + (az / l) * Math.cos(e.ry) > 0.35) { dmg *= 0.2; blocked = true; stun = 0; kb = 0; }
     }
     e.hp -= dmg; e.aggro = true;
+    if (e.type === 'herald' && e.phase < 4) e.hp = Math.max(e.hp, e.maxHp * [0.75, 0.5, 0.25][e.phase - 1] - 1); // every phase plays out
     const poise = e.def.poise * (e.affix ? 0.5 : 1);
     if (poise > 0) {
       if (kb !== 0 && fx !== undefined) {
@@ -483,6 +643,13 @@ export class Zone {
     }
     if (def.boss && this.type === 'dungeon') for (const p of this.players()) this.room.questEvent(p, 'dungeon');
     if (e.type === 'colossus') for (const p of this.players()) this.room.questEvent(p, 'actboss');
+    if (this.key === 'peaks') for (const p of this.players()) {
+      if (e.type === 'drake') this.room.questEvent(p, 'drake');
+      else if (e.type === 'herald') { this.room.questEvent(p, 'herald'); this.room.giveLoot(p, e.level + 1, { rarity: 4 }, e.x + 1.5, e.z); }
+      else if (!def.boss && !e.bound) this.room.questEvent(p, 'kill_peaks');
+    }
+    if (e.bound) { const h = this.enemies.get(e.bound); if (h) { h.invuln = false; h.flying = false; h.hp = Math.min(h.hp, h.maxHp * 0.5 - 1); this.collide(h, h.radius); this.broadcast({ t: 'heraldBond', id: h.id }); } }
+    if (e.type === 'herald') { for (const o of [...this.enemies.values()]) if (o.herald === e.id) this.remove(o); this.broadcast({ t: 'actComplete', act: 2, x: r2(e.x), z: r2(e.z) }); }
     if (def.boss && this.type === 'dungeon' && !this.cleared) {
       this.cleared = true;
       for (const o of [...this.enemies.values()]) this.remove(o);
@@ -544,6 +711,7 @@ export class Zone {
     }
   }
   summonColossus(p) {
+    if (this.region.summit && dist(p, this.region.summit) < 10) return this.summonHerald(p);
     if ([...this.enemies.values()].some((e) => e.def.boss)) return;
     if (dist(p, this.region.altar) > 8) return;
     this.spawn(this.key === 'marsh' ? 'colossus' : 'drake', this.region.altar.x, this.region.altar.z - 4);
@@ -590,9 +758,11 @@ export class Zone {
   snapshot() {
     const list = [];
     for (const e of this.enemies.values()) {
-      const flags = e.state | (e.slow > 0 ? 2 : 0) | (e.shieldUp ? 4 : 0) | (e.stunT > 0 ? 8 : 0) | (e.enraged ? 16 : 0) | (e.introT > 0 ? 32 : 0) | (e.leapT > 0 ? 64 : 0) | (e.burrowed ? 128 : 0) | (e.flying ? 256 : 0);
+      const flags = e.state | (e.slow > 0 ? 2 : 0) | (e.shieldUp ? 4 : 0) | (e.stunT > 0 ? 8 : 0) | (e.enraged ? 16 : 0) | (e.introT > 0 ? 32 : 0) | (e.leapT > 0 ? 64 : 0) | (e.burrowed ? 128 : 0) | (e.flying ? 256 : 0) | (e.invuln ? 512 : 0);
       list.push([e.id, e.type, r2(e.x), r2(e.z), r2(e.ry), Math.max(0, Math.round(e.hp)), e.maxHp, e.level, flags, e.affix ? AFFIX_KEYS.indexOf(e.affix) : -1]);
     }
-    return { t: 'ents', zone: this.key, list };
+    const out = { t: 'ents', zone: this.key, list };
+    if (this.allies.size) out.allies = [...this.allies.values()].map((a) => [a.id, a.owner, r2(a.x), r2(a.z), r2(a.ry), Math.max(0, Math.round(a.hp)), a.maxHp, (a.dead ? 1 : 0) | (a.atkT > 0 ? 2 : 0) | (a.moving ? 4 : 0), r2(a.revive / 2.5)]);
+    return out;
   }
 }

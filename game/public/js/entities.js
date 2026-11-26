@@ -37,7 +37,7 @@ class HpBar {
   set(frac, camera) { this.fill.scale.x = Math.max(0.001, frac); this.g.quaternion.copy(camera.quaternion); }
 }
 
-const HEIGHT = { boss: 5.2, brute: 3, imp: 1.3, ogre: 4.8, matriarch: 3.6, spiderling: 1, goblin: 1.5, drake: 5, hollowking: 5.4, burrower: 1.3, bomber: 1.4, shieldbearer: 2.3 };
+const HEIGHT = { herald: 4.6, boss: 5.2, brute: 3, imp: 1.3, ogre: 4.8, matriarch: 3.6, spiderling: 1, goblin: 1.5, drake: 5, hollowking: 5.4, burrower: 1.3, bomber: 1.4, shieldbearer: 2.3 };
 
 export class EnemyView {
   constructor(a) {
@@ -127,6 +127,14 @@ export class EnemyView {
     if (this.flags & 256) { this.airY = Math.min(7, (this.airY || 0) + dt * 12); } else this.airY = Math.max(0, (this.airY || 0) - dt * 12);
     this.root.position.y += this.airY || 0;
     if (this.rig.P.bomb) { const pulse = this.atkT >= 0 ? 4 + Math.sin(this.t * 40) * 3 : 1.5 + Math.sin(this.t * 6) * 0.5; this.rig.P.bomb.material.emissiveIntensity = pulse; }
+    if (this.type === 'herald') {
+      this.root.position.y += 0.8 + Math.sin(this.t * 1.8) * 0.3;
+      for (let i = 0; i < 3; i++) { const o = this.rig.P['orb' + i], a = this.t * 2.2 + (i / 3) * Math.PI * 2; o.position.set(Math.cos(a) * 0.9, 1.3 + Math.sin(a * 2) * 0.2, Math.sin(a) * 0.9); }
+      this.rig.P.halo.rotation.z = this.t;
+      if (!this.bubble) { this.bubble = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), additive('#6ad0ff', 0.18)); this.root.add(this.bubble); this.bubble.position.y = 2.6; this.bubble.scale.setScalar(2.6); }
+      this.bubble.visible = !!(this.flags & 512) && !this.dead; this.bubble.material.opacity = 0.14 + Math.sin(this.t * 6) * 0.05;
+      if (!this.dead && Math.random() < dt * 14) G.fx.emit({ pos: this.pos.clone().setY(this.root.position.y + 2 + Math.random() * 2), count: 1, speed: 3, color: '#e0f6ff', color2: '#2a6aff', size: 0.3, life: 0.3, radius: 1.2 });
+    }
     if (this.type === 'healer' && Math.random() < dt * 6) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1.4), count: 1, speed: 0.6, color: '#8affb0', color2: '#0a4020', size: 0.25, life: 0.8, up: 1 });
     if (this.flags & 32 && !this.dead) { // boss intro roar pose
       if (!this.rig.kind) { this.rig.P.armL.rotation.x = this.rig.P.armR.rotation.x = -2.6; this.rig.P.spine.rotation.x = -0.3; this.rig.P.head.rotation.x = -0.5; }
@@ -229,6 +237,48 @@ export class RemoteView {
   dispose() { entityRoot.remove(this.root); this.tag.remove(); this.bubble.remove(); for (const m of this.spirits) entityRoot.remove(m); }
 }
 
+// Act II companion (server-simulated ally). Revive her by standing next to her while she's down.
+export class AllyView {
+  constructor(a) {
+    this.id = a[0]; this.owner = a[1];
+    this.rig = buildEnemy('ilsa'); this.root = this.rig.root; entityRoot.add(this.root);
+    this.pos = new THREE.Vector3(a[2], 0, a[3]); this.target = this.pos.clone(); this.ry = a[4];
+    this.t = 0; this.move = 0; this.atkT = -1; this.deadT = 0;
+    this.tag = document.createElement('div'); this.tag.className = 'nametag'; labelsEl.appendChild(this.tag);
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(2.3, 2.6, 48, 1, 0, Math.PI * 2), additive('#5eea8a', 0.6)); this.ring.rotation.x = -Math.PI / 2; this.ring.visible = false; entityRoot.add(this.ring);
+    this.prog = new THREE.Mesh(new THREE.RingGeometry(1.9, 2.25, 48, 1, 0, 0.01), additive('#c8ffd8', 0.9)); this.prog.rotation.x = -Math.PI / 2; this.prog.visible = false; entityRoot.add(this.prog);
+    this.apply(a); this.pos.copy(this.target);
+  }
+  apply(a) {
+    this.target.set(a[2], 0, a[3]); this.ry = a[4]; this.hp = a[5]; this.maxHp = a[6]; this.flags = a[7]; this.revive = a[8];
+    this.dead = !!(this.flags & 1);
+    if (this.flags & 2 && this.atkT < 0) this.atkT = 0;
+    const html = `<span style="color:#7affb0">Scout Ilsa</span> <span style="color:#aaa;font-size:11px">Companion</span><div class="hpm"><i style="width:${Math.max(0, (this.hp / this.maxHp) * 100)}%;background:#5eea8a"></i></div>${this.dead ? '<div style="color:#ff9a7a;font-size:11px">DOWN — stand close to revive</div>' : ''}`;
+    if (html !== this._html) { this.tag.innerHTML = html; this._html = html; }
+  }
+  update(dt, camera, zone) {
+    this.t += dt;
+    const prev = this.pos.clone();
+    this.pos.lerp(this.target, 1 - Math.exp(-10 * dt));
+    this.pos.y = zone.groundHeight(this.pos.x, this.pos.z);
+    const sp = Math.hypot(this.pos.x - prev.x, this.pos.z - prev.z) / Math.max(dt, 1e-4);
+    this.move = damp(this.move, Math.min(1, sp / 6), 10, dt);
+    this.root.position.copy(this.pos);
+    this.root.rotation.y = angleLerp(this.root.rotation.y, this.ry, Math.min(1, dt * 12));
+    let atk = -1; if (this.atkT >= 0) { this.atkT += dt / 0.5; if (this.atkT >= 1) this.atkT = -1; else atk = this.atkT; }
+    this.deadT = this.dead ? Math.min(1, this.deadT + dt) : Math.max(0, this.deadT - dt * 2);
+    animateRig(this.rig, { t: this.t, move: this.move, atk, combo: 0, cast: atk >= 0 ? 0.8 : 0, dead: this.deadT });
+    this.ring.visible = this.prog.visible = this.dead;
+    if (this.dead) {
+      this.ring.position.set(this.pos.x, this.pos.y + 0.08, this.pos.z); this.prog.position.copy(this.ring.position).setY(this.pos.y + 0.1);
+      const k = Math.max(0.01, Math.min(1, this.revive)); this.prog.geometry.dispose(); this.prog.geometry = new THREE.RingGeometry(1.9, 2.25, 48, 1, Math.PI / 2, -k * Math.PI * 2);
+      this.ring.material.opacity = 0.35 + Math.sin(this.t * 5) * 0.2;
+    }
+    placeLabel(this.tag, _v.set(this.pos.x, this.pos.y + 2.5, this.pos.z), camera, 50);
+  }
+  dispose() { entityRoot.remove(this.root); entityRoot.remove(this.ring); entityRoot.remove(this.prog); this.tag.remove(); }
+}
+
 const beamMats = {};
 function beamMat(color) {
   return beamMats[color] ||= new THREE.ShaderMaterial({
@@ -289,14 +339,14 @@ export class ProjView {
     this.vel = new THREE.Vector3(m.vx || 0, 0, m.vz || 0);
     this.zone = zone;
     if (m.kind === 'bolt' || m.kind === 'venom') {
-      const col = m.kind === 'venom' ? '#7dff4a' : '#ff5cf0';
+      const col = m.color || (m.kind === 'venom' ? '#7dff4a' : '#ff5cf0');
       this.color = col;
       this.mesh = new THREE.Mesh(new THREE.SphereGeometry(m.kind === 'venom' ? 0.3 : 0.22, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(2.5) }));
       this.h = 1.3;
     } else {
-      this.mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 5), new THREE.MeshBasicMaterial({ color: new THREE.Color(m.tier >= 3 ? '#9fe0ff' : '#ffe6a0').multiplyScalar(2) }));
+      this.mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 5), new THREE.MeshBasicMaterial({ color: new THREE.Color(m.ally ? '#7affb0' : m.tier >= 3 ? '#9fe0ff' : '#ffe6a0').multiplyScalar(2) }));
       this.mesh.rotation.order = 'YXZ';
-      this.h = 4;
+      this.h = m.ally ? 1.4 : 4;
       G.audio.arrow();
     }
     this.pos.y = zone.groundHeight(m.x, m.z) + this.h;

@@ -1,6 +1,9 @@
 // Open-world regions: Ashen Marsh and Stormspire Peaks (shared RegionZone driven by a style table).
 import * as THREE from 'three';
-import { REGIONS } from '../../shared/regions.js';
+import { REGIONS, QUESTS, ACT1_END } from '../../shared/regions.js';
+import { buildEnemy, animateRig } from '../models.js';
+const qi = () => G.prof?.char?.quest?.i || 0, qk = () => QUESTS[qi()]?.kind;
+const HERALD_Q = QUESTS.findIndex((q) => q.kind === 'herald');
 import { RNG, fbm, smoothstep } from '../../shared/rng.js';
 import { G } from '../state.js';
 import { makeSky, textures, mtx, makeSun, followSun, heightTerrain, envFromSky, Batcher } from './common.js';
@@ -46,7 +49,7 @@ export class RegionZone {
     s.add(heightTerrain(190, 170, H, S.ground));
     const rock = new THREE.MeshStandardMaterial({ map: textures.rock, color: this.key === 'marsh' ? '#5a5a48' : '#8a8a92', roughness: 0.95, flatShading: true });
     const B = new Batcher();
-    const spot = (minR, maxR) => { const a = rng.range(0, 6.28), r = rng.range(minR, maxR); const x = Math.cos(a) * r, z = Math.sin(a) * r; return Math.hypot(x - R.spawn.x, z - R.spawn.z) < 10 || Math.hypot(x - R.altar.x, z - R.altar.z) < 12 ? null : { x, z }; };
+    const spot = (minR, maxR) => { const a = rng.range(0, 6.28), r = rng.range(minR, maxR); const x = Math.cos(a) * r, z = Math.sin(a) * r; const clear = [[R.spawn, 10], [R.altar, 12], [R.summit, 15], [R.camp, 7], ...(R.relics || []).map((q) => [q, 3])]; return clear.some(([q, d]) => q && Math.hypot(x - q.x, z - q.z) < d) ? null : { x, z }; };
     if (this.key === 'marsh') {
       const water = new THREE.Mesh(new THREE.PlaneGeometry(190, 190), new THREE.MeshStandardMaterial({ color: '#2c3a28', roughness: 0.15, metalness: 0.25, transparent: true, opacity: 0.85 }));
       water.rotation.x = -Math.PI / 2; water.position.y = R.water; s.add(water);
@@ -86,12 +89,53 @@ export class RegionZone {
     this.altarRune = new THREE.Mesh(new THREE.RingGeometry(2.4, 2.7, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(2), side: THREE.DoubleSide, transparent: true, opacity: 0.85 })); this.altarRune.rotation.x = -Math.PI / 2; this.altarRune.position.y = 0.62; al.add(this.altarRune);
     const l = new THREE.PointLight(col, 18, 16, 2); l.position.y = 3; al.add(l);
     s.add(al);
+    if (this.key === 'peaks') this.buildAct2(rock);
     const bossName = this.key === 'marsh' ? 'Bog Colossus' : 'Storm Drake';
     this.interactables = [
       { x: W.x, z: W.z, r: 3.2, mark: 'WAYPOINT', label: () => 'Use the waypoint', action: () => G.actions.openWaypoint() },
       { x: A.x, z: A.z, r: 5, mark: this.key === 'marsh' ? 'DROWNED ALTAR' : 'STORM ALTAR', label: () => ([...G.enemies.values()].some((e) => e.boss && !e.dead) ? null : `Summon the ${bossName} (boss)`), action: () => G.actions.challengeKing() },
+      ...(this.act2Interact || []),
     ];
     this.buildMinimap();
+  }
+  // Act II: Scout Ilsa's camp, the three Storm Relics and the Stormspire summit arena.
+  buildAct2(rock) {
+    const s = this.scene, R = this.R, H = (x, z) => R.height(x, z);
+    const C = R.camp, cy = H(C.x, C.z);
+    const camp = new THREE.Group(); camp.position.set(C.x, cy, C.z); s.add(camp);
+    const canvas = new THREE.MeshStandardMaterial({ color: '#5a4c38', roughness: 1, side: THREE.DoubleSide });
+    const tent = new THREE.Mesh(new THREE.ConeGeometry(1.8, 2.4, 4, 1, true), canvas); tent.position.set(-2.4, 1.2, -1.2); tent.rotation.y = 0.6; tent.castShadow = true; camp.add(tent);
+    const logs = new THREE.MeshStandardMaterial({ color: '#3a2618', roughness: 1 });
+    for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.9, 5), logs); l.rotation.set(Math.PI / 2, (i / 4) * Math.PI, 0.3); l.position.y = 0.12; camp.add(l); }
+    this.campFire = new THREE.PointLight('#ff9a4a', 14, 12, 2); this.campFire.position.y = 0.8; camp.add(this.campFire);
+    this.colliders.push({ x: C.x - 2.4, z: C.z - 1.2, r: 1.5 });
+    this.ilsa = buildEnemy('ilsa'); this.ilsa.root.position.set(C.x + 1.2, cy, C.z + 0.6); s.add(this.ilsa.root);
+    this.ilsaMark = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd34d').multiplyScalar(2.5) })); this.ilsaMark.scale.y = 1.8; s.add(this.ilsaMark);
+    // relics
+    const relicMat = new THREE.MeshStandardMaterial({ color: '#bfeaff', emissive: '#3aa8ff', emissiveIntensity: 3, flatShading: true });
+    this.relics = R.relics.map((p, i) => {
+      const g = new THREE.Group(); g.position.set(p.x, H(p.x, p.z), p.z);
+      const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 0.9, 6), rock); ped.position.y = 0.45; g.add(ped);
+      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), relicMat); gem.position.y = 1.6; gem.scale.y = 1.6; g.add(gem);
+      const l = new THREE.PointLight('#5ab8ff', 10, 9, 2); l.position.y = 1.6; g.add(l);
+      s.add(g); this.colliders.push({ x: p.x, z: p.z, r: 0.7 });
+      return { g, gem, l, i };
+    });
+    // summit arena: rune ring, broken spire and a storm vortex overhead
+    const S = R.summit, sy = H(S.x, S.z);
+    const sum = new THREE.Group(); sum.position.set(S.x, sy, S.z); s.add(sum);
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(9, 9.6, 0.5, 24), rock); floor.position.y = 0.05; floor.receiveShadow = true; sum.add(floor);
+    this.summitRune = new THREE.Mesh(new THREE.RingGeometry(6.6, 7, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color('#6ad0ff').multiplyScalar(2), side: THREE.DoubleSide, transparent: true, opacity: 0.8 })); this.summitRune.rotation.x = -Math.PI / 2; this.summitRune.position.y = 0.32; sum.add(this.summitRune);
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + 0.3, h = 4 + (i % 3) * 1.6; const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.75, h, 5), rock); sp.position.set(Math.cos(a) * 10.5, h / 2, Math.sin(a) * 10.5); sp.rotation.z = Math.cos(a) * 0.12; sp.castShadow = true; sum.add(sp); this.colliders.push({ x: S.x + Math.cos(a) * 10.5, z: S.z + Math.sin(a) * 10.5, r: 0.8 }); }
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(1.6, 16, 6), rock); spire.position.set(0, 8, -12); spire.castShadow = true; sum.add(spire); this.colliders.push({ x: S.x, z: S.z - 12, r: 1.6 });
+    this.vortex = new THREE.Mesh(new THREE.TorusGeometry(12, 3.5, 8, 40), new THREE.MeshBasicMaterial({ color: '#2a3a5a', transparent: true, opacity: 0.55, depthWrite: false })); this.vortex.rotation.x = Math.PI / 2; this.vortex.position.y = 26; sum.add(this.vortex);
+    this.vortexCore = new THREE.Mesh(new THREE.CircleGeometry(8.5, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color('#6ad0ff').multiplyScalar(1.4), transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })); this.vortexCore.rotation.x = Math.PI / 2; this.vortexCore.position.y = 25.5; sum.add(this.vortexCore);
+    this.summitPos = new THREE.Vector3(S.x, sy, S.z);
+    this.act2Interact = [
+      { x: C.x + 1.2, z: C.z + 0.6, r: 3.2, mark: 'SCOUT ILSA', showMark: () => qi() <= ACT1_END, label: () => (qi() === ACT1_END ? 'Talk to Scout Ilsa' : null), action: () => G.actions.talk() },
+      ...R.relics.map((p, i) => ({ x: p.x, z: p.z, r: 3, mark: 'STORM RELIC', showMark: () => qk() === 'relic' && !((G.prof?.char?.quest?.r || 0) & (1 << i)), label: () => (qk() === 'relic' && !((G.prof.char.quest.r || 0) & (1 << i)) ? 'Take the Storm Relic' : null), action: () => G.actions.relic(i) })),
+      { x: S.x, z: S.z, r: 6, mark: 'STORMSPIRE SUMMIT', label: () => (qi() < HERALD_Q || [...G.enemies.values()].some((e) => e.boss && !e.dead) ? null : 'Challenge the Storm Herald (Act II boss)'), action: () => G.actions.challengeKing() },
+    ];
   }
   buildMinimap() {
     const N = 192, W = 190, c = document.createElement('canvas'); c.width = c.height = N;
@@ -105,6 +149,11 @@ export class RegionZone {
     ctx.putImageData(img, 0, 0);
     this.map = { canvas: c, worldSize: W, center: { x: 0, z: 0 }, view: 60 };
     this.mapIcons = [{ x: this.R.waypoint.x, z: this.R.waypoint.z, color: '#5ab0ff', icon: 'portal' }, { x: this.R.altar.x, z: this.R.altar.z, color: this.key === 'marsh' ? '#9aff3a' : '#6ad0ff', icon: 'portal' }];
+    if (this.key === 'peaks') {
+      const R = this.R;
+      this.mapIcons.push({ x: R.camp.x, z: R.camp.z, color: '#7affb0', icon: 'portal' }, { x: R.summit.x, z: R.summit.z, color: '#c8ecff', icon: 'portal' });
+      R.relics.forEach((p, i) => this.mapIcons.push({ x: p.x, z: p.z, color: '#5ab8ff', icon: 'portal', show: () => qk() === 'relic' && !((G.prof?.char?.quest?.r || 0) & (1 << i)) }));
+    }
   }
   update(dt, t, playerPos) {
     this.sky.position.copy(G.camera.position);
@@ -112,6 +161,18 @@ export class RegionZone {
     followSun(this.sun, playerPos, { x: 30, y: 50, z: -30 });
     this.wpRune.rotation.y = t; this.wpRune.rotation.x = Math.sin(t) * 0.3;
     this.altarRune.rotation.z = t * 0.4;
+    if (this.ilsa) {
+      const here = qi() <= ACT1_END; this.ilsa.root.visible = here; this.ilsaMark.visible = qi() === ACT1_END;
+      if (here) { animateRig(this.ilsa, { t, move: 0 }); this.ilsa.root.rotation.y = Math.atan2(playerPos.x - this.ilsa.root.position.x, playerPos.z - this.ilsa.root.position.z); }
+      this.ilsaMark.position.set(this.ilsa.root.position.x, this.ilsa.root.position.y + 2.75 + Math.sin(t * 3) * 0.1, this.ilsa.root.position.z); this.ilsaMark.rotation.y = t * 2;
+      this.campFire.intensity = 12 + Math.sin(t * 13) * 2 + Math.sin(t * 7.3) * 2;
+      if (Math.random() < dt * 30) G.fx.emit({ pos: new THREE.Vector3(this.R.camp.x, this.R.height(this.R.camp.x, this.R.camp.z) + 0.3, this.R.camp.z), count: 1, speed: 1.2, color: '#ffd080', color2: '#ff3000', size: 0.35, life: 0.6, up: 1, radius: 0.25 });
+      const r = G.prof?.char?.quest?.r || 0, active = qk() === 'relic';
+      for (const o of this.relics) { const taken = !active || (r & (1 << o.i)); o.gem.visible = !taken; o.l.intensity = taken ? 0 : 8 + Math.sin(t * 4 + o.i) * 3; o.gem.rotation.y = t * 1.5; o.gem.position.y = 1.6 + Math.sin(t * 2 + o.i) * 0.15; }
+      this.summitRune.rotation.z = -t * 0.3; this.vortex.rotation.z = t * 0.25; this.vortexCore.rotation.z = -t * 0.5;
+      const ready = qi() >= HERALD_Q; this.summitRune.material.opacity = ready ? 0.6 + Math.sin(t * 3) * 0.25 : 0.25;
+      if (ready && Math.random() < dt * 0.5 && playerPos.distanceTo(this.summitPos) < 60) { this.flash = 0.8; G.fx.emit({ pos: this.summitPos.clone().setY(this.summitPos.y + 22), count: 30, speed: 14, dir: new THREE.Vector3(0, -1, 0), spread: 0.15, color: '#e8f6ff', color2: '#3a7aff', size: 0.5, life: 0.5 }); }
+    }
     if (this.key === 'marsh') {
       if (Math.random() < dt * 20) { const a = Math.random() * 6.28, r = Math.random() * 22; const x = playerPos.x + Math.cos(a) * r, z = playerPos.z + Math.sin(a) * r; G.fx.emit({ pos: new THREE.Vector3(x, this.groundHeight(x, z) + 0.6 + Math.random() * 2, z), count: 1, speed: 0.3, color: '#c8ff6a', color2: '#2aff6a', size: 0.16, life: 3, drag: 0.2 }); }
     } else {

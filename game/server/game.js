@@ -6,7 +6,7 @@ import { Defense, research } from './defense.js';
 import * as P from './profile.js';
 import { SETS } from '../public/shared/items.js';
 import { RIFT_TIME, season } from '../public/shared/rifts.js';
-import { REGIONS, QUESTS, CAPTAIN, questDone } from '../public/shared/regions.js';
+import { REGIONS, QUESTS, CAPTAIN, questDone, ACT1_END } from '../public/shared/regions.js';
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 export { TOKEN_RE };
@@ -95,7 +95,9 @@ class Room {
     if (q.n >= Q.need) {
       q.i++; q.n = 0;
       this.reward(p, 60 + 40 * q.i, 120 * q.i, p.x, p.z, true);
-      if (q.i >= QUESTS.length) { p.prof.peaks = true; this.giveLoot(p, Math.max(this.level, p.char.level), { rarity: 4 }, p.x + 1.5, p.z); }
+      if (q.i === ACT1_END) { p.prof.peaks = true; this.giveLoot(p, Math.max(this.level, p.char.level), { rarity: 4 }, p.x + 1.5, p.z); }
+      if (q.i === ACT1_END + 1) { const z = this.zones.get(p.zone); if (z && z.type !== 'town') z.addAlly(p); }
+      if (q.i >= QUESTS.length) { p.prof.act2 = true; p.prof.gold += 1500; }
       send(p.ws, { t: 'questDone', i: q.i - 1 });
     }
     p.dirty = true;
@@ -123,6 +125,8 @@ class Room {
   }
   joinZone(p, zone) {
     if (p.trade) this.closeTrade(p.trade, 'Trade cancelled.');
+    for (const z of this.zones.values()) z.removeAllies(p.id);
+    if (zone.type !== 'town' && (p.char.quest?.i || 0) > ACT1_END && p.companion !== false) zone.addAlly(p);
     p.zone = zone.key;
     p.loot.clear();
     const msg = { t: 'enterZone', zone: zone.key, type: zone.type, level: zone.dungeon ? zone.level : this.level };
@@ -249,7 +253,12 @@ function attach(ws) {
       case 'saveLook': ok(P.saveLook(p, m.slot | 0), 'Look saved.', '#5eea8a'); break;
       case 'research': if (p.zone === 'town' && near(p, TOWN.wartable, 7)) ok(research(p, String(m.key)), 'Research complete!', '#5ab0ff'); break;
       case 'challenge': if (zone?.type === 'dark') zone.challengeKing(p); else if (zone?.region) zone.summonColossus(p); break;
-      case 'talk': if (p.zone === 'town' && near(p, CAPTAIN, 6)) { send(ws, { t: 'dialog', who: 'Captain Bryn', i: (p.char.quest?.i || 0) }); room.questEvent(p, 'talk'); } break;
+      case 'talk':
+        if (p.zone === 'town' && near(p, CAPTAIN, 6)) { send(ws, { t: 'dialog', who: 'Captain Bryn', i: (p.char.quest?.i || 0) }); room.questEvent(p, 'talk'); }
+        else if (p.zone === 'peaks' && near(p, REGIONS.peaks.camp, 6) && (p.char.quest?.i || 0) === ACT1_END) { send(ws, { t: 'dialog', who: 'Scout Ilsa', i: ACT1_END }); room.questEvent(p, 'talk2'); }
+        break;
+      case 'relic': if (p.zone === 'peaks') zone.takeRelic(p, m.i | 0); break;
+      case 'companion': p.companion = !!m.on; if (zone && zone.type !== 'town') { zone.removeAllies(p.id); if (p.companion && (p.char.quest?.i || 0) > ACT1_END) zone.addAlly(p); } break;
       case 'paragon': ok(P.spendParagon(p, String(m.key))); break;
       case 'readyResp': room.readyResp(p, !!m.yes); break;
       case 'hit': {
@@ -270,7 +279,7 @@ function attach(ws) {
       case 'repair': ok(room.defense.repair(p, m.id)); break;
       case 'startNight': if (p.zone === 'town') room.defense.startNight(); break;
       case 'chat':
-        if (dev && /^\/(depth|gold|xp|wave|loot|gems) \d+$/.test(m.text || '')) {
+        if (dev && /^\/(depth|gold|xp|wave|loot|gems|quest) \d+$/.test(m.text || '')) {
           const [cmd, n] = m.text.slice(1).split(' ');
           if (cmd === 'depth') { room.level = Math.max(1, +n); room.currentDungeon = null; room.broadcast({ t: 'roomLevel', level: room.level }); }
           if (cmd === 'gold') { p.prof.gold += +n; p.dirty = true; }
@@ -281,6 +290,7 @@ function attach(ws) {
             for (let k = 0; k < +n; k++) p.char.bag.push(P.rollItem(p, room.level, { rarity: 4 }));
             p.dirty = true;
           }
+          if (cmd === 'quest') { p.char.quest = { i: Math.min(+n, QUESTS.length), n: 0 }; if (+n >= ACT1_END) p.prof.peaks = true; p.dirty = true; }
           if (cmd === 'gems') for (let k = 0; k < +n; k++) P.dropGem(p, room.level + 8);
           if (cmd === 'wave') { const d = room.defense.state; if (d.phase === 'day') room.defense.startNight(); d.wave = Math.max(0, +n - 1); d.phase = 'intermission'; d.timer = 2; }
           break;

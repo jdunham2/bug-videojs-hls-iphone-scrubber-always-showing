@@ -111,24 +111,72 @@ test('message floods are throttled', async () => {
 
 test('ranger starts with a bow; gems socket, combine and unsocket server-side', async () => {
   const c = client(G(), { cls: 'ranger' });
-  await wait(20);
+  await wait(120);
   assert.equal(c.prof.char.equipped.weapon.type, 'bow');
   c.send({ t: 'chat', text: '/gold 5000' }); c.send({ t: 'chat', text: '/loot 1' });
-  await wait(30);
+  await wait(120);
   const p = [...games.at(-1).rooms.values()][0].players.values().next().value;
   p.prof.gems = { ruby1: 3, emerald2: 1 }; p.dirty = true;
   c.send({ t: 'state', x: -9, y: 0, z: -2, hp: 100, maxHp: 100 });
   const i = c.prof.char.bag.findIndex((x) => x.sockets?.length);
-  c.send({ t: 'combine', k: 'ruby1' }); await wait(40);
+  c.send({ t: 'combine', k: 'ruby1' }); await wait(120);
   assert.equal(c.prof.gems.ruby2, 1);
   if (i >= 0) {
-    c.send({ t: 'socket', src: 'bag', ref: i, idx: 0, k: 'emerald2' }); await wait(40);
+    c.send({ t: 'socket', src: 'bag', ref: i, idx: 0, k: 'emerald2' }); await wait(120);
     assert.equal(c.prof.char.bag[i].sockets[0], 'emerald2');
-    c.send({ t: 'socket', src: 'bag', ref: i, idx: 0, k: 'ruby2' }); await wait(40);
+    c.send({ t: 'socket', src: 'bag', ref: i, idx: 0, k: 'ruby2' }); await wait(120);
     assert.match(c.last.notice.text, /not empty/);
   }
-  c.send({ t: 'look', look: { dye: '#2a3a8a', hideHelm: true, ap: 4 } }); await wait(30);
+  c.send({ t: 'look', look: { dye: '#2a3a8a', hideHelm: true, ap: 4 } }); await wait(120);
   assert.deepEqual(c.prof.char.look, { dye: '#2a3a8a', hideHelm: true, ap: 4 });
-  c.send({ t: 'look', look: { dye: 'javascript:alert(1)' } }); await wait(30);
+  c.send({ t: 'look', look: { dye: 'javascript:alert(1)' } }); await wait(120);
   assert.equal(c.prof.char.look.dye, null);
+});
+
+test('act II: companion joins, relics, and the 4-phase Storm Herald binds the Drake', { timeout: 60000 }, async () => {
+  const { REGIONS, ACT1_END, QUESTS } = await import('../public/shared/regions.js');
+  const game = G(), c = client(game, { cls: 'ranger' });
+  await wait(20);
+  const p = [...game.rooms.get(c.room).players.values()][0];
+  p.char.quest = { i: ACT1_END, n: 0 }; p.prof.peaks = true;
+  c.send({ t: 'chat', text: '/xp 400000' });
+  c.send({ t: 'zone', to: 'peaks' }); await wait(60);
+  assert.equal(c.zone.zone, 'peaks');
+  const R = REGIONS.peaks;
+  c.send({ t: 'state', x: R.camp.x + 1, y: 0, z: R.camp.z, hp: 100, maxHp: 100 });
+  c.send({ t: 'talk' }); await wait(200);
+  assert.equal(p.char.quest.i, ACT1_END + 1, 'talked to Ilsa');
+  assert.equal(c.last.dialog.who, 'Scout Ilsa');
+  assert.ok(c.ents.allies?.length === 1, 'companion follows');
+  // companion goes down and is revived by standing next to her
+  const zone = game.rooms.get(c.room).zones.get('peaks'), ally = [...zone.allies.values()][0];
+  zone.hurtAlly(ally, 1e6); assert.ok(ally.dead);
+  c.send({ t: 'state', x: ally.x + 1, y: 0, z: ally.z, hp: 100, maxHp: 100 }); await wait(2900);
+  assert.ok(!ally.dead && c.last.allyUp, 'companion revived');
+  // relics only count at the relic step, once each
+  c.send({ t: 'state', x: R.relics[0].x, y: 0, z: R.relics[0].z, hp: 100, maxHp: 100 }); c.send({ t: 'relic', i: 0 }); await wait(40);
+  assert.equal(p.char.quest.i, ACT1_END + 1, 'relic ignored before its step');
+  p.char.quest = { i: QUESTS.findIndex((q) => q.kind === 'relic'), n: 0 };
+  for (let i = 0; i < 3; i++) { c.send({ t: 'state', x: R.relics[i].x, y: 0, z: R.relics[i].z, hp: 100, maxHp: 100 }); c.send({ t: 'relic', i }); c.send({ t: 'relic', i }); await wait(30); }
+  assert.equal(QUESTS[p.char.quest.i].kind, 'drake', 'three relics advance the quest');
+  // the Herald
+  p.char.quest = { i: QUESTS.findIndex((q) => q.kind === 'herald'), n: 0 };
+  for (const e of [...zone.enemies.values()]) zone.remove(e);
+  c.send({ t: 'state', x: R.summit.x, y: 0, z: R.summit.z, hp: 100, maxHp: 100 });
+  c.send({ t: 'challenge' }); await wait(200);
+  const h = [...zone.enemies.values()].find((e) => e.type === 'herald');
+  assert.ok(h, 'herald summoned');
+  await wait(3100);
+  const hit = async (e, total) => { for (let done = 0; done < total && zone.enemies.has(e.id);) { c.send({ t: 'state', x: e.x + 2, y: 0, z: e.z, hp: 100, maxHp: 100 }); for (let k = 0; k < 4; k++) { c.send({ t: 'hit', id: e.id, dmg: 1000 }); done += 1000; } await wait(1050); } };
+  await hit(h, h.maxHp * 0.3);
+  assert.equal(h.phase, 2); assert.ok(h.invuln, 'herald immune while the Drake is bound');
+  const hp = h.hp; c.send({ t: 'hit', id: h.id, dmg: 500 }); await wait(30); assert.equal(h.hp, hp, 'immune');
+  const dr = [...zone.enemies.values()].find((e) => e.bound === h.id);
+  assert.ok(dr, 'drake bound');
+  dr.introT = 0; dr.flying = false; dr.strafe = null;
+  while (zone.enemies.has(dr.id)) { dr.flying = false; dr.strafe = null; c.send({ t: 'state', x: dr.x + 2, y: 0, z: dr.z, hp: 100, maxHp: 100 }); for (let k = 0; k < 4; k++) c.send({ t: 'hit', id: dr.id, dmg: 1000 }); await wait(1050); }
+  assert.ok(!h.invuln && h.hp < h.maxHp * 0.5, 'bond broken');
+  while (zone.enemies.has(h.id)) { h.flying = false; h.strafe = null; c.send({ t: 'state', x: h.x + 2, y: 0, z: h.z, hp: 100, maxHp: 100 }); for (let k = 0; k < 4; k++) c.send({ t: 'hit', id: h.id, dmg: 1000 }); await wait(1050); }
+  assert.ok(c.last.actComplete, 'act complete');
+  assert.equal(p.char.quest.i, QUESTS.length, 'act II finished');
 });

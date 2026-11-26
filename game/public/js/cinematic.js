@@ -1,6 +1,7 @@
 // Letterboxed camera cinematics: the Emberhold intro flyover and boss introductions.
 import * as THREE from 'three';
 import { G } from './state.js';
+import { buildEnemy, animateRig } from './models.js';
 
 const easeIO = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const $ = (id) => document.getElementById(id);
@@ -19,7 +20,14 @@ export class Cinematic {
     $('letterbox').classList.add('on');
     $('skipHint').style.display = skippable ? '' : 'none';
     this.caption(shots[0]);
+    this.enter(shots[0]);
   }
+  enter(s) {
+    s.onStart?.();
+    if (s.herald && !this.prop) { this.prop = buildEnemy('herald'); const S = G.zone.R.summit; this.prop.root.position.set(S.x, G.zone.groundHeight(S.x, S.z) + 3, S.z - 3); G.zone.scene.add(this.prop.root); }
+    if (!s.herald && this.prop) this.dropProp();
+  }
+  dropProp() { if (this.prop) { this.prop.root.parent?.remove(this.prop.root); this.prop = null; } }
   caption(s) {
     const t = $('cineTitle'), sub = $('cineSub');
     t.textContent = s.title || ''; sub.textContent = s.sub || '';
@@ -30,7 +38,7 @@ export class Cinematic {
   }
   stop() {
     if (!this.shots) return;
-    this.shots = null; G.cinematic = false;
+    this.shots = null; G.cinematic = false; this.dropProp();
     document.body.classList.remove('cine');
     $('letterbox').classList.remove('on');
     $('cineTitle').classList.remove('show'); $('cineSub').classList.remove('show');
@@ -40,6 +48,7 @@ export class Cinematic {
     if (!this.shots) return false;
     const s = this.shots[this.i];
     this.t += dt;
+    if (this.prop) { this.prop.root.position.y += Math.sin(this.t * 2) * dt * 0.4; animateRig(this.prop, { t: this.t, move: 0, cast: 0.6 + Math.sin(this.t * 3) * 0.3 }); this.prop.root.rotation.y = Math.atan2(this.camera.position.x - this.prop.root.position.x, this.camera.position.z - this.prop.root.position.z); }
     const k = easeIO(Math.min(1, this.t / s.dur));
     const from = typeof s.from === 'function' ? s.from() : s.from, to = typeof s.to === 'function' ? s.to() : s.to;
     const lf = typeof s.lookFrom === 'function' ? s.lookFrom() : s.lookFrom, lt = typeof s.lookTo === 'function' ? s.lookTo() : (s.lookTo || lf);
@@ -49,6 +58,7 @@ export class Cinematic {
       this.i++; this.t = 0;
       if (this.i >= this.shots.length) { this.stop(); return false; }
       this.caption(this.shots[this.i]);
+      this.enter(this.shots[this.i]);
     }
     return true;
   }
@@ -70,5 +80,34 @@ export function bossShots(boss, name, sub) {
   const h = boss.height;
   return [
     { from: () => c().add(V(Math.sin(a) * h * 2.2, h * 0.35, Math.cos(a) * h * 2.2)), to: () => c().add(V(Math.sin(a + 0.8) * h * 1.5, h * 0.75, Math.cos(a + 0.8) * h * 1.5)), lookFrom: () => c().add(V(0, h * 0.7, 0)), dur: 2.6, title: name, sub, boss: true },
+  ];
+}
+
+// Act II story cutscenes, made from camera shots plus captioned dialogue.
+export function storyShots(kind, zone, player) {
+  const R = zone.R, H = (x, z) => zone.groundHeight(x, z);
+  const camp = V(R.camp.x, H(R.camp.x, R.camp.z), R.camp.z), sum = V(R.summit.x, H(R.summit.x, R.summit.z), R.summit.z);
+  const back = { from: () => player.pos.clone().add(V(0, 10, 12)), to: () => player.pos.clone().add(V(0, 5, 9)), lookFrom: () => player.pos.clone().add(V(0, 1.6, 0)), dur: 1.8 };
+  const flash = (s) => ({ ...s, onStart: () => { zone.flash = 1; G.audio.slam(); } });
+  if (kind === 'intro') {
+    const ilsa = camp.clone().add(V(1.2, 1.6, 0.6));
+    return [
+      { from: camp.clone().add(V(4.5, 2.2, 5)), to: camp.clone().add(V(2.6, 1.9, 3.4)), lookFrom: ilsa, dur: 3.6, sub: '“So you’re the one who felled the Colossus.” — Scout Ilsa' },
+      { from: camp.clone().add(V(0, 9, 4)), to: sum.clone().add(V(10, 16, 34)), lookFrom: camp.clone().add(V(0, 4, -10)), lookTo: sum.clone().add(V(0, 12, 0)), dur: 4.4, title: 'ACT II', sub: 'The Storm Crown' },
+      flash({ from: sum.clone().add(V(18, 7, 16)), to: sum.clone().add(V(-16, 10, 16)), lookFrom: sum.clone().add(V(0, 20, 0)), lookTo: sum.clone().add(V(0, 24, 0)), dur: 4, sub: '“Something on that summit wears a crown made of lightning.” — Scout Ilsa' }),
+      back,
+    ];
+  }
+  if (kind === 'herald') {
+    return [
+      flash({ from: sum.clone().add(V(20, 2.5, 4)), to: sum.clone().add(V(12, 4, 12)), lookFrom: sum.clone().add(V(0, 6, 0)), lookTo: sum.clone().add(V(0, 8, 0)), dur: 4, title: 'THE STORM HERALD', sub: '“Little embers… you climb so far, only to be snuffed out.”', boss: true, herald: true }),
+      flash({ from: sum.clone().add(V(0, 42, 8)), to: sum.clone().add(V(0, 30, 3)), lookFrom: sum.clone(), dur: 3.6, sub: '“Hear that? It’s waiting for us on the summit. We end this — together.” — Scout Ilsa', herald: true }),
+      back,
+    ];
+  }
+  return [ // outro
+    { from: sum.clone().add(V(14, 4, 14)), to: sum.clone().add(V(-6, 9, 18)), lookFrom: sum.clone().add(V(0, 2, 0)), lookTo: sum.clone().add(V(0, 14, 0)), dur: 4.2, sub: '“The storms are breaking. I can see the stars from the summit.” — Scout Ilsa' },
+    { from: sum.clone().add(V(0, 20, 30)), to: sum.clone().add(V(0, 60, 60)), lookFrom: sum.clone().add(V(0, 20, 0)), lookTo: sum.clone().add(V(0, 50, -40)), dur: 4.4, title: 'ACT II COMPLETE', sub: 'Emberhold will sing of this' },
+    back,
   ];
 }

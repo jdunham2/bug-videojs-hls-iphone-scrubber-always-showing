@@ -354,6 +354,20 @@ export function buildEnemy(type) {
     case 'drake': return buildDrake();
     case 'colossus': return buildHumanoid({ scale: 2.7, bulk: 1.8, skin: '#4a5a34', cloth: '#2a3418', armor: '#3a4228', eyes: '#9aff3a', horns: true, hornColor: '#2a2418', weapon: 'club', chestPlate: true, noHair: true, pauldrons: true });
     case 'hollowking': return buildHumanoid({ scale: 2.3, bulk: 1.3, legs: 'none', head: 'skull', skin: '#c8bce0', cloth: '#14081e', eyes: '#c86bff', crown: true, weapon: 'claws', offhand: 'claws', armor: '#2a1440', cape: '#0a0412', pauldrons: true });
+    case 'herald': {
+      const rig = buildHumanoid({ scale: 2.1, bulk: 1.1, legs: 'none', head: 'hood', skin: '#cfe6ff', cloth: '#1a2a4a', eyes: '#8ae8ff', crown: true, weapon: 'staff', armor: '#3a5a8a', cape: '#0e1a34', pauldrons: true });
+      const glow = std('#bfeaff', { emissive: '#4ab8ff', ei: 3 }); rig.mats.push(glow);
+      for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; const sp = mesh(cone(0.05, 0.42, 4), glow, Math.cos(a) * 0.3, 0.48, Math.sin(a) * 0.3, rig.P.head); sp.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4); }
+      const halo = mesh(new THREE.TorusGeometry(0.55, 0.035, 6, 32), glow, 0, 0.35, -0.25, rig.P.head); halo.rotation.x = 0.2; rig.P.halo = halo;
+      for (let i = 0; i < 3; i++) { const orb = mesh(sphere(0.12, 10, 8), glow, 0, 0, 0, rig.body); rig.P['orb' + i] = orb; }
+      rig.baseEmissive = rig.mats.map((x) => x.emissive.clone());
+      return rig;
+    }
+    case 'ilsa': {
+      const rig = buildHero('#3a9a6a', 'ranger');
+      rig.P.hood.material = std('#3a5a3a', { rough: 0.9 });
+      return rig;
+    }
     case 'merchant': return buildHumanoid({ legs: 'robe', head: 'hood', cloth: '#251a3a', eyes: '#9cf', skin: '#7a6a60', armor: '#3a2a50', weapon: 'orb' });
   }
   return buildHumanoid({});

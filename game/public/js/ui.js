@@ -8,7 +8,7 @@ import { xpForLevel, computeStats } from '../shared/stats.js';
 import { SHRINES } from '../shared/dungeon.js';
 import { AFFIXES } from '../shared/enemies.js';
 import { RIFT_MODS, RIFT_TIME, PARAGON, LEVEL_CAP, paragonXp } from '../shared/rifts.js';
-import { QUESTS, EVENTS, REGIONS } from '../shared/regions.js';
+import { QUESTS, EVENTS, REGIONS, ACT1_END } from '../shared/regions.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
 import { STYLE_RANKS, ROLL_CD } from './player.js';
 import { ACTION_LABELS, DEFAULT_BINDINGS, keyName } from './input.js';
@@ -214,10 +214,10 @@ class UI {
     this.marks = (zone.interactables || []).filter((i) => i.mark).map((i) => {
       const el = document.createElement('div'); el.className = 'mark'; el.textContent = i.mark;
       $('labels').appendChild(el);
-      return { el, pos: new THREE.Vector3(i.x, zone.groundHeight(i.x, i.z) + (zone.type === 'dungeon' ? 5 : i.mark === 'TRAINER' || i.mark === 'STASH' ? 3.6 : 10.5), i.z) };
+      return { el, show: i.showMark, pos: new THREE.Vector3(i.x, zone.groundHeight(i.x, i.z) + (zone.type === 'dungeon' ? 5 : i.mark === 'TRAINER' || i.mark === 'STASH' || i.showMark ? 3.6 : 10.5), i.z) };
     });
   }
-  updateMarks(camera) { for (const m of this.marks) placeLabel(m.el, m.pos, camera, 90); }
+  updateMarks(camera) { for (const m of this.marks) { if (m.show && !m.show()) { m.el.style.display = 'none'; continue; } placeLabel(m.el, m.pos, camera, 90); } }
 
   // ---------- minimap ----------
   drawMinimap(zone, player, yaw) {
@@ -234,7 +234,7 @@ class UI {
     ctx.drawImage(map.canvas, (map.center.x - map.worldSize / 2 - px) * sc, (map.center.z - map.worldSize / 2 - pz) * sc, map.worldSize * sc, map.worldSize * sc);
     ctx.globalAlpha = 1;
     const dot = (x, z, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc((x - px) * sc, (z - pz) * sc, r, 0, 7); ctx.fill(); };
-    for (const ic of zone.mapIcons || []) { dot(ic.x, ic.z, ic.icon === 'lever' || ic.icon === 'shrine' ? 4 : 5, ic.color); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    for (const ic of zone.mapIcons || []) { if (ic.show && !ic.show()) continue; dot(ic.x, ic.z, ic.icon === 'lever' || ic.icon === 'shrine' ? 4 : 5, ic.color); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (zone.type === 'town') for (const ch of zone.chests) if (!ch.open) dot(ch.x, ch.z, 3.5, '#ffd34d');
     if (G.event) { const pulse = 4 + Math.sin(performance.now() / 120) * 2; dot(G.event.x, G.event.z, pulse + 2, '#ffd34d'); dot(G.event.x, G.event.z, 3, '#000'); }
     for (const s of G.structures.values()) { ctx.fillStyle = '#5ab0ff'; ctx.fillRect((s.s.x - px) * sc - 2, (s.s.z - pz) * sc - 2, 4, 4); }
@@ -382,15 +382,16 @@ class UI {
 
   npcDialog(who, text, then) {
     const el = $('npcDialog');
+    if (!el.classList.contains('hidden')) { (this._dq ||= []).push([who, text, then]); return; }
     el.querySelector('.nd-name').textContent = who; el.querySelector('.nd-portrait').textContent = who[0];
     const body = el.querySelector('.nd-text'); body.textContent = '';
     el.classList.remove('hidden'); G.uiOpen = true; G.input.unlock();
     let i = 0; clearInterval(this._typer);
     this._typer = setInterval(() => { body.textContent = text.slice(0, ++i); if (i % 3 === 0) G.audio.click(); if (i >= text.length) clearInterval(this._typer); }, 18);
-    el.querySelector('.nd-next').onclick = () => { if (i < text.length) { i = text.length; body.textContent = text; return; } el.classList.add('hidden'); clearInterval(this._typer); G.uiOpen = this.anyPanel; then?.(); };
+    el.querySelector('.nd-next').onclick = () => { if (i < text.length) { i = text.length; body.textContent = text; return; } el.classList.add('hidden'); clearInterval(this._typer); G.uiOpen = this.anyPanel; then?.(); const nx = this._dq?.shift(); if (nx) this.npcDialog(...nx); };
   }
   renderWaypoint() {
-    const pr = G.prof, peaksOpen = pr.peaks || (pr.char.quest?.i || 0) >= QUESTS.length;
+    const pr = G.prof, peaksOpen = pr.peaks || (pr.char.quest?.i || 0) >= ACT1_END;
     const dests = [['town', 'Emberhold', 'The last city'], ['marsh', REGIONS.marsh.name, REGIONS.marsh.sub], ['peaks', REGIONS.peaks.name, peaksOpen ? REGIONS.peaks.sub : 'Sealed — complete Act I']];
     $('wpList').innerHTML = dests.map(([k, n, s]) => `<button class="btn wpb" data-k="${k}" ${(k === 'peaks' && !peaksOpen) || k === G.zoneKey ? 'disabled' : ''}><b>${n}</b><br><span class="small muted">${k === G.zoneKey ? 'You are here' : s}</span></button>`).join('');
     $('wpList').querySelectorAll('button').forEach((b) => (b.onclick = () => { this.closePanel('waypoint'); G.actions.travel(b.dataset.k); }));
@@ -412,7 +413,9 @@ class UI {
   }
   renderQuests() {
     const q = G.prof.char.quest || { i: 0, n: 0 };
-    $('questList').innerHTML = QUESTS.map((Q, i) => `<div class="qrow ${i < q.i ? 'done' : i === q.i ? 'cur' : 'locked'}"><b>${i < q.i ? '✔' : i === q.i ? '➤' : '•'} ${Q.title}</b><div class="small muted">${i <= q.i ? Q.goal : '???'}${i === q.i && Q.need > 1 ? ` (${q.n}/${Q.need})` : ''}</div></div>`).join('');
+    const hdr = (i) => (i === 0 ? '<div class="qact">ACT I · The Ashen Marsh</div>' : i === ACT1_END ? `<div class="qact">ACT II · The Storm Crown${q.i > ACT1_END ? ` <button class="btn small" id="compBtn">${this._comp === false ? 'Summon Ilsa' : 'Dismiss Ilsa'}</button>` : ''}</div>` : '');
+    $('questList').innerHTML = QUESTS.map((Q, i) => hdr(i) + `<div class="qrow ${i < q.i ? 'done' : i === q.i ? 'cur' : 'locked'}"><b>${i < q.i ? '✔' : i === q.i ? '➤' : '•'} ${Q.title}</b><div class="small muted">${i <= q.i ? Q.goal : '???'}${i === q.i && Q.need > 1 ? ` (${q.n}/${Q.need})` : ''}</div></div>`).join('');
+    const cb = $('compBtn'); if (cb) cb.onclick = () => { this._comp = this._comp === false; G.net?.send({ t: 'companion', on: this._comp }); this.renderQuests(); };
   }
 
   renderResearch() {
