@@ -13698,7 +13698,7 @@ const GX9 = { t: 0 };
 const gx9Skip = o => { for (let p = o; p; p = p.parent) { const u = p.userData || {}; if (u.legs || u.wings || u.kit || u.prop || u.isAtmo || p === (S.astro && S.astro.g) || p === PET.obj) return true; } return false; };
 function gx9Fix() { const hsl = {}; surf.traverse(o => { if (!o.isMesh || o.userData.gx9) return; o.userData.gx9 = true; const m = o.material; if (!m || !m.isMeshStandardMaterial || m.map || m.vertexColors || m.transparent || m.userData.gx9) return; const t = o.geometry && o.geometry.type; if (!t) return; if (gx9Skip(o)) return; m.color.getHSL(hsl);
   if (/Icosahedron|Dodecahedron|Sphere|Cone/.test(t) && m.roughness >= 0.7 && hsl.s > 0.22 && (m.emissiveIntensity || 0) < 0.4) { m.userData.gx9 = true; if (!GX9.leafR) { GX9.leafR = GX9.leaf.clone(); GX9.leafR.wrapS = GX9.leafR.wrapT = THREE.RepeatWrapping; GX9.leafR.repeat.set(3, 3); GX9.leafR.needsUpdate = true; GX9.leafNR = GX9.leafN.clone(); GX9.leafNR.wrapS = GX9.leafNR.wrapT = THREE.RepeatWrapping; GX9.leafNR.repeat.set(3, 3); GX9.leafNR.needsUpdate = true; } m.map = GX9.leafR; m.normalMap = GX9.leafNR; m.normalScale = new THREE.Vector2(0.55, 0.55); m.needsUpdate = true; return; }
-  if (o.isInstancedMesh && o.instanceColor && /Icosahedron|Dodecahedron|Sphere/.test(t)) { m.userData.gx9 = true; m.map = GX9.leafR || GX9.leaf; m.normalMap = GX9.leafNR || GX9.leafN; m.normalScale = new THREE.Vector2(0.55, 0.55); m.needsUpdate = true; return; }
+  if (o.isInstancedMesh && o.instanceColor && /Icosahedron|Sphere/.test(t)) { m.userData.gx9 = true; m.map = GX9.leafR || GX9.leaf; m.normalMap = GX9.leafNR || GX9.leafN; m.normalScale = new THREE.Vector2(0.55, 0.55); m.needsUpdate = true; return; }
   if (/Dodecahedron|Icosahedron/.test(t) && hsl.s < 0.2 && m.roughness >= 0.7) { m.userData.gx9 = true; const rm = ROCK_MATS[0]; m.map = rm.map; m.normalMap = rm.normalMap; m.normalScale = new THREE.Vector2(0.9, 0.9); m.needsUpdate = true; return; }
   if (t === 'CylinderGeometry' && hsl.h > 0.02 && hsl.h < 0.13 && hsl.s > 0.15 && hsl.l < 0.45 && m.roughness >= 0.7) { m.userData.gx9 = true; m.map = GX9.bark; m.normalMap = GX9.barkN; m.normalScale = new THREE.Vector2(0.8, 0.8); m.needsUpdate = true; } }); }
 { const _usc18 = updateSurfCamera; updateSurfCamera = function (dt) { _usc18(dt); GX9.t -= dt; if (GX9.t <= 0) { GX9.t = 3; if (GFX.hd) gx9Fix(); } }; }
@@ -14072,6 +14072,13 @@ function gx54Build() { GX54.done = true; const g = new THREE.Group(); GX54.grp =
     if (i % 3 === 0) { const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 2.2, 12), trim); tank.position.set(b.position.x + rand(-10, 10), h + 2.4, z); g.add(tank); const legs = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), dark); legs.position.set(tank.position.x, h + 0.9, z); g.add(legs); }
     if (i % 2 === 0) { const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 4, 5), dark); ant.position.set(b.position.x + rand(-12, 12), h + 2.6, z); g.add(ant); const bl = glowSprite(0xff3a3a, 1.2); bl.position.set(ant.position.x, h + 4.7, z); g.add(bl); } }); }
 { const _usc42 = updateSurfCamera; updateSurfCamera = function (dt) { _usc42(dt); if (W !== ARK_W || !S.built) return; if (!GX54.done) gx54Build(); GX54.grp.visible = GFX.hd; }; }
+
+/* ============ feel round 56: the hoverbike kicks up a dust, sand or snow trail behind it ============ */
+const GX56 = { t: 0 };
+{ const _usc43 = updateSurfCamera; updateSurfCamera = function (dt) { _usc43(dt); if (!GFX.hd || !S.bike || G.state !== 'surface' || BK.air || W.interior) return; const sp = Math.abs(BK.speed); if (sp < 8) return; GX56.t -= dt; if (GX56.t > 0) return; GX56.t = clamp(0.09 - sp / 1200, 0.025, 0.09);
+  const col = (typeof gx26Sandy === 'function' && gx26Sandy()) ? 0xfff4dc : (typeof atCold === 'function' && atCold()) ? 0xffffff : W.hot ? 0x8a7a70 : 0xe8e4d4;
+  const back = new V3(-Math.sin(S.heading || 0), 0, -Math.cos(S.heading || 0)); const p = BK.pos.clone().addScaledVector(back, -1.6); p.y = Math.max(hgt(p.x, p.z), (S.water && S.water.visible) ? S.water.position.y : -999);
+  gx7Puff(p, sp > 40 ? 4 : 3, 1.2 + Math.min(2.2, sp / 25), col); GX56.n = (GX56.n || 0) + 1; }; }
 
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
