@@ -20,7 +20,7 @@ copyDir(path.join(root, 'public/js'), path.join(out, 'js'));
 copyDir(path.join(root, 'public/shared'), path.join(out, 'shared'));
 fs.copyFileSync(path.join(root, 'public/style.css'), path.join(out, 'style.css'));
 fs.mkdirSync(path.join(out, 'server'));
-for (const f of ['game.js', 'zone.js', 'defense.js', 'profile.js', 'social.js']) {
+for (const f of ['game.js', 'zone.js', 'defense.js', 'profile.js', 'social.js', 'crowd.js']) {
   fs.writeFileSync(path.join(out, 'server', f), fs.readFileSync(path.join(root, 'server', f), 'utf8').replaceAll("'../public/shared/", "'../shared/"));
 }
 let html = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
@@ -41,7 +41,7 @@ const outA = path.join(root, 'dist-admin');
 fs.rmSync(outA, { recursive: true, force: true });
 copyDir(path.join(root, 'public/shared'), path.join(outA, 'shared'));
 fs.mkdirSync(path.join(outA, 'server'));
-for (const f of ['game.js', 'zone.js', 'defense.js', 'profile.js', 'social.js']) fs.writeFileSync(path.join(outA, 'server', f), fs.readFileSync(path.join(root, 'server', f), 'utf8').replaceAll("'../public/shared/", "'../shared/"));
+for (const f of ['game.js', 'zone.js', 'defense.js', 'profile.js', 'social.js', 'crowd.js']) fs.writeFileSync(path.join(outA, 'server', f), fs.readFileSync(path.join(root, 'server', f), 'utf8').replaceAll("'../public/shared/", "'../shared/"));
 fs.copyFileSync(path.join(root, 'public/admin/admin.js'), path.join(outA, 'admin.js'));
 let ah = fs.readFileSync(path.join(root, 'public/admin/index.html'), 'utf8');
 ah = ah.replace(/<!doctype html>\s*/i, '').replace(/<\/?html[^>]*>\s*/g, '').replace(/<\/?head>\s*/g, '').replace(/<\/?body>\s*/g, '').replace(/<meta charset="utf-8" \/>\s*/, '').replace(/<meta name="viewport"[^>]*>\s*/, '');

@@ -53,16 +53,41 @@ Up to 4 players per party.
 | **Launch readiness** | Server-side damage budgets (per hit and per second, derived from your real stats; rejected hits are logged). Per-connection rate limits and a 32 KB payload cap. A public party browser. `/healthz`. A SQLite store (`EMBERFALL_SQLITE=1`). Graceful shutdown. A Dockerfile, plus a GitHub Actions CI workflow that runs syntax checks, `npm test` (9 server-simulation tests), a load test and the static build. |
 | **Client** | F3 performance overlay, dynamic resolution, touch controls (auto-enabled on phones and tablets), colour-blind-safe rarity palette, interface scale, and an account recovery code (Settings → Graphics) to carry your hero to another device. |
 
+### Act II, depth, feel, living world, social and scale (milestone 4)
+| Feature | Details |
+|---|---|
+| **Act II: The Storm Crown** | Six Stormspire quests with **Scout Ilsa**, a companion simulated on the server who follows you and uses **Piercing Volley** and **Mending Wind** (heals the party). When she goes down, stand next to her to revive her. Recover three **Storm Relics**, slay the Drake, then climb to the summit arena for the **Storm Herald**, a 4-phase act boss. In phase 2 it binds the Storm Drake and is immune until the Drake dies. In phase 3 it takes over the Drake's breath strafes and radial bolt novas. In phase 4 a ring of storm closes in. There are two story cutscenes plus an outro, made from camera shots and captioned dialogue. Toggle Ilsa from the quest log (J). |
+| **Stormcaller Ranger** | Fourth class: a bow and the resource **Wind**. Skills: Volley, Snare Trap, Storm Hawk, Arrow Rain. It has its own talents, 4 legendaries and 3 sets. |
+| **Gems, sockets and wardrobe** | 3 gem types × 5 tiers drop from elites and bosses. Socket, unsocket and combine them at the Blacksmith (all server-side). The **Wardrobe** has dyes, armour appearance override, a hide-helmet option and 3 saved looks. |
+| **Animation and feel** | Keyframed clips blended by a small state machine with a synced locomotion phase, crossfades and an additive hit-reaction layer. Clips: idle, run, sprint, 3 attack chains, slam, roll, death, block, cast, mount and 7 emotes. Out-of-combat **sprint**. Footsteps for 7 surfaces with dust, splash and snow puffs. Ground **decals** (scorch marks, cracks, splats). Spring **camera recoil** on heavy hits. **Controller rumble** (toggle in Settings). |
+| **Living world** | A shared world clock (8-minute days) drives a full **day/night cycle** in the regions: sun arc, moon, stars, dusk tint. Nights bring more elites and +25% XP. Server-driven **weather** with gameplay effects: **rain** (enemies notice you 30% later), **blizzard** (everyone 15% slower), **ash storm** (+15% enemy damage, +25% gold). Ambient **wildlife** (bird flocks, rabbits, deer, hares, frogs that flee). **Eight townsfolk** on daily schedules who greet you and run home when the night bell rings. A **fishing** mini-game at the Emberhold lake: 6 fish, rare night catches, server-validated reel times. |
+| **Social and live-ops** | Social panel (O). **Friend codes**, a friends list with online status and one-click party join, **whispers** (`/w Name message`). **Guilds** (1000 gold to found): invites, guild chat (`/g`), a shared 24-slot **guild stash** at the stash chest, and a seasonal **guild rift leaderboard**. **Daily and weekly bounties**, generated from the date, that progress from real play (kills, elites, bosses, dungeons, rifts, events, fishing, waves). Claim them at the Bounty Board. **Seasons**: Season Marks unlock a 7-tier cosmetic track (nameplate titles, auras, steed colours). Marks reset monthly; cosmetics stay. |
+| **Admin dashboard** | `/api/admin` (enabled by `EMBERFALL_ADMIN_KEY`) reports live rooms, zones, players and an anti-cheat log covering both damage and movement rejections. `/admin/` is a dashboard for it. The same page, published as a static Artifact, runs the real server simulation in the page with bot parties and a cheater as a demo. |
+| **Performance and scale** | Crowd separation uses a spatial hash, and big waves can move it to a **worker thread** (`EMBERFALL_WORKERS=1`). **Delta-compressed snapshots** use quantized positions with keyframes, about 49% less bandwidth in a 150-enemy wave. **Server movement validation** (a speed budget plus a burst allowance for rolls and blinks) works with **client prediction and reconciliation** (sequenced states, corrections replayed). **Experimental WebGPU renderer** (Settings → Renderer): the WebGPU build of three, TSL versions of every custom shader, instanced sprite particles and TSL bloom (`?gpu=gl` runs the same node renderer on its WebGL2 backend). |
+
 ### Static solo build
 `npm run build:artifact` writes `dist-artifact/`, a static solo build. It runs the server simulation inside the page and saves to localStorage. This is the version published as a claude.ai Artifact.
 
 ### Tests
-`npm test` runs the server-simulation suite in about 25 seconds. `npm run load` simulates 4 players fighting about 60 enemies and prints the per-tick server cost (about 0.4 ms average against a 50 ms budget).
+`npm test` runs the server-simulation suite (14 tests: combat, anti-cheat, levers, economy, trading, rifts, quests, rate limits, gems, Act II and the Herald, clock, weather and fishing, social, delta snapshots and movement validation).
+
+`npm run load` defends Emberhold with 4 players against a 150-enemy wave in three configurations:
+
+| config | avg tick | p95 | per-client bandwidth |
+|---|---|---|---|
+| main thread · full snapshots | 1.03 ms | 1.9 ms | 55 KB/s |
+| main thread · delta snapshots | 0.75 ms | 1.3 ms | 28 KB/s |
+| worker thread · delta snapshots | 0.77 ms | 1.3 ms | 28 KB/s |
+
+The tick budget is 50 ms (20 Hz). At this size the worker gives no measurable win: the spatial hash already makes separation cheap. It is there for far larger waves.
+
+### Server options
+`PORT`, `EMBERFALL_DB` (JSON file), `EMBERFALL_SQLITE=1` (SQLite store), `EMBERFALL_DEV=1` (dev chat commands, movement checks off), `EMBERFALL_WORKERS=1` (crowd worker thread), `EMBERFALL_ADMIN_KEY=<secret>` (enables `/api/admin` and the `/admin/` dashboard).
 
 ### Dev mode
-Start with `EMBERFALL_DEV=1` to enable `/depth N`, `/gold N`, `/xp N`, `/wave N` and `/loot N` in chat.
+Start with `EMBERFALL_DEV=1` to enable `/depth N`, `/gold N`, `/xp N`, `/wave N`, `/loot N`, `/gems N`, `/quest N`, `/hour N` and `/weather clear|rain|snow|ash` in chat.
 ## Controls
-WASD move · Mouse look (click to lock) · LMB basic attack · 1–4 (and RMB) class skills · Shift dodge roll · Space jump · R potion · E interact / trade · V or MMB lock-on · hold T emote wheel · I inventory · K talents · B build (U upgrade, R repair) · Enter chat · Esc settings · H help. Every key can be rebound in Settings.
+WASD move (keep running out of combat to sprint) · Mouse look (click to lock) · LMB basic attack · 1–4 (and RMB) class skills · Shift dodge roll · Space jump · R potion · E interact / trade / fish · V or MMB lock-on · hold T emote wheel · M mount · I inventory · K talents · J quest log · O social · B build (U upgrade, R repair) · Enter chat (`/w name`, `/g`) · Esc settings · H help. Every key can be rebound in Settings.
 
 Gamepad: left stick move · right stick camera · A jump · B dodge · X attack · Y interact · LB/RB/LT/RT skills 1–4 · R3 lock-on · L3 emotes · D-pad ↑ potion · Start settings · Back inventory.
 
@@ -86,8 +111,17 @@ game/
   public/js/zones/       town.js, dungeon.js, dark.js, common.js (sky, portals, textures, batching)
   public/js/fx.js        GPU particles, slashes, shockwaves, telegraphs, damage text
   public/js/ui.js        HUD, minimap, inventory, shop, chat, build bar
+  public/js/anim.js      keyframed clips + blending animation state machine
+  public/js/feel.js      footsteps per surface, decals, camera recoil, rumble
+  public/js/weather.js   rain / snow / ash rendering; wildlife.js, townsfolk.js, fishing.js
+  public/js/socialui.js  friends, guild, bounties, season panel
+  public/js/gpu.js       experimental WebGPU path (TSL materials, sprite particles, bloom)
+  public/admin/          live-ops dashboard (/admin/)
+  server/social.js       friends, whispers, guilds, bounties, seasons, cosmetics
+  server/crowd*.js       spatial-hash crowd separation + optional worker thread
+  public/shared/life.js  world clock, weather, fish; social.js bounties/seasons; snapshot.js delta applier
   public/js/audio.js     synthesized SFX + procedural adaptive music sequencer (WebAudio)
   public/js/input.js     rebindable actions, pointer lock, gamepad
 ```
 
-Networking model: the server owns enemies, loot rolls, waves, structures and every economy action (gold, items, shop, stash, talents, trades). Clients own their own movement and HP, and send hit events that the server range-checks. That's fine for friendly co-op. A competitive mode would also need server-side damage validation.
+Networking model: the server owns enemies, the companion, loot rolls, waves, structures, weather, the clock and every economy and social action. Clients predict their own movement (the server validates speed and sends corrections) and own their HP. They send hit events that the server checks against range and a per-hit/per-second damage budget derived from the hero's real stats.
