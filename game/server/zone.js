@@ -24,6 +24,7 @@ export class Zone {
     this.enemies = new Map(); this.projectiles = new Map(); this.hazards = new Map(); this.allies = new Map();
     this.cleared = false; this.emptyT = 0; this.respawnT = 0; this.recN = 0;
     if (type === 'region') { this.region = REGIONS[key]; this.eventT = 25; this.event = null; }
+    if (type === 'training') for (let i = 0; i < 3; i++) this.spawn('dummy', -6 + i * 6, -6, { introDone: true, ry: 0 });
     this.weather = 'clear'; this.weatherT = WEATHER_TABLE[key] ? rng.range(40, 90) : 1e9;
     if (type === 'dungeon' || type === 'rift') {
       this.seed = (Math.random() * 1e9) | 0;
@@ -157,6 +158,8 @@ export class Zone {
   tickEnemy(e, dt, alive) {
     const def = e.def;
     e.cd -= dt; e.slow = Math.max(0, e.slow - dt); e.tauntT -= dt; e.stunT -= dt; e.staggerImm -= dt;
+    this.tickStatus(e, dt);
+    if (!this.enemies.has(e.id)) return;
     if (e.affix === 'shielded') { e.shieldCd -= dt; if (e.shieldCd <= 0) { e.shieldUp = !e.shieldUp; e.shieldCd = e.shieldUp ? 3 : 6; } }
     if (def.static) { e.state = 0; return; }
     if (e.introT > 0) { e.introT -= dt; e.state = 0; return; }
@@ -230,7 +233,10 @@ export class Zone {
       moving = true;
     } else if (target && e.cd <= 0) {
       e.windT = def.windup / (e.enraged ? 1.2 : 1); e.cd = (def.cd / enr) * (e.cdMul || 1); e.atk = target;
-      this.broadcast({ t: 'eatk', id: e.id });
+      // heavy blows (bosses, brutes, elites) can be countered with a perfect dodge or block
+      const heavy = !def.ranged && (def.boss || e.affix || ['brute', 'ogre', 'shieldbearer', 'drowned'].includes(e.type));
+      e.lastAtk = Date.now(); e.parryable = heavy;
+      this.broadcast(heavy ? { t: 'eatk', id: e.id, parry: true, win: r2(e.windT) } : { t: 'eatk', id: e.id });
     }
     const pp = this.push?.get(e.id); if (pp) { e.x += pp[0]; e.z += pp[1]; }
     this.collide(e, e.radius);
@@ -683,7 +689,7 @@ export class Zone {
     if (t.kind === 'player') {
       if (t.p.ally) { if (!t.p.dead && this.allies.has(t.p.id) && dist(t.p, e) < reach) this.hurtAlly(t.p, e.dmg); }
       else if (!t.p.dead && t.p.zone === this.key && dist(t.p, e) < reach) {
-        send(t.p.ws, { t: 'hurt', dmg: Math.round(e.dmg * (this.W.dmg || 1)), from: e.id, affix: e.affix, kb: def.siege ? 1 : 0 });
+        send(t.p.ws, { t: 'hurt', dmg: Math.round(e.dmg * (this.W.dmg || 1) * (e.blindT > 0 ? 0.6 : 1)), from: e.id, affix: e.affix, kb: def.siege ? 1 : 0, parry: e.parryable ? 1 : 0 });
         if (e.affix === 'vampiric') e.hp = Math.min(e.maxHp, e.hp + e.dmg * 0.6);
       }
     } else if (t.kind === 'struct') this.room.defense.damageStruct(t.s, e.dmg * (def.siege ? 4 : 1.5));
@@ -716,8 +722,49 @@ export class Zone {
     }
   }
 
-  damageEnemy(e, dmg, by, crit, kb = 0, stun = 0, fx, fz) {
+  // ---- elemental statuses and combos ----
+  tickStatus(e, dt) {
+    const st = (e.st ||= { wet: 0, burn: 0, oil: 0 });
+    if ((this.weather === 'rain') || (this.region?.tidal && tideAt(this.room.clock) > this.region.height(e.x, e.z) + 0.2) || (this.region && this.region.water > -50 && this.region.height(e.x, e.z) < this.region.water)) st.wet = Math.max(st.wet, 1);
+    st.wet = Math.max(0, st.wet - dt); st.oil = Math.max(0, st.oil - dt); e.blindT = Math.max(0, (e.blindT || 0) - dt); e.exposedT = Math.max(0, (e.exposedT || 0) - dt);
+    if (st.burn > 0) {
+      st.burn -= dt; st.burnAcc = (st.burnAcc || 0) + dt;
+      if (st.burnAcc >= 0.5) { st.burnAcc = 0; const d = Math.max(1, Math.round(st.burnDps * 0.5)); e.hp -= e.def.static ? 0 : d; this.broadcast({ t: 'ehit', id: e.id, dmg: d, by: null, dot: 'burn' }); if (e.hp <= 0) this.kill(e, st.burnBy); }
+    }
+  }
+  combo(e, dmg, by, el) {
+    const st = (e.st ||= { wet: 0, burn: 0, oil: 0 }), out = { dmg, stun: 0 };
+    if (el === 'storm' && st.wet > 0) { // SHOCK: stun, bonus damage, arcs to nearby wet enemies
+      out.dmg *= 1.5; out.stun = 1.2; st.wet = 0; e.stunT = Math.max(e.stunT, e.def.boss ? 0.5 : 1.2); e.windT = 0; // shock ignores poise
+      const arc = [...this.enemies.values()].filter((o) => o !== e && o.st?.wet > 0 && dist(o, e) < 6).slice(0, 2);
+      this.broadcast({ t: 'combo', kind: 'shock', id: e.id, x: r2(e.x), z: r2(e.z), arcs: arc.map((o) => [r2(o.x), r2(o.z)]), by });
+      for (const o of arc) { o.st.wet = 0; this.damageEnemy(o, dmg * 0.6, by, false, 0, 0.8); }
+    } else if (el === 'fire' && st.oil > 0) { // EXPLOSION: oil ignites
+      st.oil = 0;
+      this.broadcast({ t: 'combo', kind: 'explode', id: e.id, x: r2(e.x), z: r2(e.z), r: 3.5, by });
+      for (const o of [...this.enemies.values()]) if (o !== e && dist(o, e) < 3.5) this.damageEnemy(o, dmg * 2.2, by, false, 1.5, 0, e.x, e.z);
+      out.dmg *= 2.2;
+    } else if (el === 'fire' && st.wet > 0) { // STEAM: blinds everything nearby (they hit 40% softer)
+      st.wet = 0;
+      for (const o of this.enemies.values()) if (dist(o, e) < 3.5) o.blindT = 4;
+      this.broadcast({ t: 'combo', kind: 'steam', id: e.id, x: r2(e.x), z: r2(e.z), r: 3.5, by });
+    } else if (el === 'fire') { st.burn = 3; st.burnDps = Math.max(st.burnDps && st.burn > 0 ? st.burnDps : 0, dmg * 0.18); st.burnBy = by; }
+    else if (el === 'oil') st.oil = 7;
+    else if (el === 'water') st.wet = 7;
+    return out;
+  }
+  counter(p, id) {
+    const e = this.enemies.get(id), now = Date.now();
+    if (!e || !e.parryable || now - (e.lastAtk || 0) > 1600 || e.lastCounter === e.lastAtk || dist(e, p) > 9) return false;
+    e.lastCounter = e.lastAtk; e.windT = 0; e.stunT = Math.max(e.stunT, e.def.boss ? 1.2 : 2.2); e.exposedT = 4;
+    this.broadcast({ t: 'countered', id, by: p.id, name: p.prof.name });
+    return true;
+  }
+
+  damageEnemy(e, dmg, by, crit, kb = 0, stun = 0, fx, fz, el) {
     if (!this.enemies.has(e.id) || e.introT > 0 || e.burrowed || e.flying) return;
+    if (el && el !== 'phys') { const c = this.combo(e, dmg, by, el); dmg = c.dmg; stun = Math.max(stun, c.stun); if (!this.enemies.has(e.id)) return; }
+    if (e.exposedT > 0) dmg *= 1.5;
     if (e.invuln) { if (by) this.broadcast({ t: 'ehit', id: e.id, dmg: 0, by, shield: true, immune: true }); return; }
     if (e.shieldUp) dmg *= 0.25;
     let blocked = false;
@@ -725,7 +772,7 @@ export class Zone {
       const ax = fx - e.x, az = fz - e.z, l = Math.hypot(ax, az) || 1;
       if ((ax / l) * Math.sin(e.ry) + (az / l) * Math.cos(e.ry) > 0.35) { dmg *= 0.2; blocked = true; stun = 0; kb = 0; }
     }
-    if (e.def.static) { if (e.sigil !== undefined) this.hitSigil(e, by); return; }
+    if (e.def.static) { if (e.sigil !== undefined) this.hitSigil(e, by); else if (e.type === 'dummy') this.broadcast({ t: 'ehit', id: e.id, dmg: Math.round(dmg), crit: !!crit, by, el: el || null }); return; }
     e.hp -= dmg; e.aggro = true;
     if (e.type === 'kingreborn' && e.phase < 5) e.hp = Math.max(e.hp, e.maxHp * [0.8, 0.6, 0.4, 0.2][e.phase - 1] - 1);
     if (e.type === 'herald' && e.phase < 4) e.hp = Math.max(e.hp, e.maxHp * [0.75, 0.5, 0.25][e.phase - 1] - 1); // every phase plays out
@@ -941,7 +988,7 @@ export class Zone {
   snapshot() {
     const list = [];
     for (const e of this.enemies.values()) {
-      const flags = e.state | (e.slow > 0 ? 2 : 0) | (e.shieldUp ? 4 : 0) | (e.stunT > 0 ? 8 : 0) | (e.enraged ? 16 : 0) | (e.introT > 0 ? 32 : 0) | (e.leapT > 0 ? 64 : 0) | (e.burrowed ? 128 : 0) | (e.flying ? 256 : 0) | (e.invuln ? 512 : 0);
+      const flags = e.state | (e.slow > 0 ? 2 : 0) | (e.shieldUp ? 4 : 0) | (e.stunT > 0 ? 8 : 0) | (e.enraged ? 16 : 0) | (e.introT > 0 ? 32 : 0) | (e.leapT > 0 ? 64 : 0) | (e.burrowed ? 128 : 0) | (e.flying ? 256 : 0) | (e.invuln ? 512 : 0) | (e.st?.wet > 0 ? 1024 : 0) | (e.st?.burn > 0 ? 2048 : 0) | (e.st?.oil > 0 ? 4096 : 0) | (e.blindT > 0 ? 8192 : 0) | (e.exposedT > 0 ? 16384 : 0);
       list.push([e.id, e.type, r2(e.x), r2(e.z), r2(e.ry), Math.max(0, Math.round(e.hp)), e.maxHp, e.level, flags, e.affix ? AFFIX_KEYS.indexOf(e.affix) : -1]);
     }
     const out = { t: 'ents', zone: this.key, list };

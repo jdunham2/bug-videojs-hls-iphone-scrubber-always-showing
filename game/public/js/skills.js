@@ -226,7 +226,7 @@ export class SkillKit {
   // ===== Hexcaller =====
   firebolt(yaw) {
     const p = this.p; p.ry = p.aimDir(yaw); p.castT = 0.35;
-    const o = { speed: 22, mul: 2.2 * this.mods('s0'), aoe: 2.6 + (p.stats.T.boltR || 0), big: true, kb: 1.5 };
+    const o = { speed: 22, mul: 2.2 * this.mods('s0'), aoe: 2.6 + (p.stats.T.boltR || 0), big: true, kb: 1.5, el: 'fire' };
     if (this.has('h_trinity')) { const r0 = p.ry; for (const d of [-0.28, 0, 0.28]) { p.ry = r0 + d; this.shoot(o); } p.ry = r0; } else this.shoot(o);
     G.audio.fire();
   }
@@ -239,7 +239,7 @@ export class SkillKit {
     let mul = 1.5, n = 5 + (p.stats.T.chains || 0);
     while (cur && n-- > 0) {
       hit.add(cur); pts.push([cur.pos.x, cur.pos.z]);
-      p.dealDamage(cur, p.stats.dmg * mul, { stun: p.stats.flags.overload ? 1.2 : 0.15 });
+      p.dealDamage(cur, p.stats.dmg * mul, { el: 'storm', stun: p.stats.flags.overload ? 1.2 : 0.15 });
       mul *= 0.85;
       const prev = cur;
       cur = nearestEnemy(prev.pos, 7, hit);
@@ -262,17 +262,17 @@ export class SkillKit {
     p.castT = 0.6; p.ry = Math.atan2(pt.x - p.pos.x, pt.z - p.pos.z);
     const R = 4.2;
     this.send('meteor', { x: pt.x, z: pt.z, r: R, delay: 1.1 });
-    this.pending.push({ t: 1.1, fn: () => { for (const e of enemiesInRadius(V(pt.x, 0, pt.z), R)) p.dealDamage(e, p.stats.dmg * 3.5 * this.mods('s3'), { kb: 2.5, stun: 0.8 }); } });
+    this.pending.push({ t: 1.1, fn: () => { for (const e of enemiesInRadius(V(pt.x, 0, pt.z), R)) p.dealDamage(e, p.stats.dmg * 3.5 * this.mods('s3'), { el: 'fire', kb: 2.5, stun: 0.8 }); } });
     if (this.has('h_shower')) for (let k = 0; k < 3; k++) {
       const a = k * 2.1 + Math.random(), q = { x: pt.x + Math.cos(a) * 4, z: pt.z + Math.sin(a) * 4 }, delay = 1.3 + k * 0.2;
       this.send('meteor', { x: q.x, z: q.z, r: 2.6, delay });
-      this.pending.push({ t: delay, fn: () => { for (const e of enemiesInRadius(V(q.x, 0, q.z), 2.6)) p.dealDamage(e, p.stats.dmg * 1.5 * this.mods('s3'), { kb: 1.5 }); } });
+      this.pending.push({ t: delay, fn: () => { for (const e of enemiesInRadius(V(q.x, 0, q.z), 2.6)) p.dealDamage(e, p.stats.dmg * 1.5 * this.mods('s3'), { el: 'fire', kb: 1.5 }); } });
     }
   }
   // ===== Ranger =====
   basicArrow() {
     const p = this.p; p.castT = 0.2;
-    this.shoot({ speed: 36, mul: 1, aoe: 0, arrow: true, pierce: p.stats.flags.pierce, range: 20 });
+    this.shoot({ speed: 36, mul: 1, aoe: 0, arrow: true, pierce: p.stats.flags.pierce, range: 20, basic: true });
     G.audio.arrow();
   }
   volley(yaw) {
@@ -303,12 +303,12 @@ export class SkillKit {
     const R = 4.5 + (p.stats.T.rainR || 0), dur = 2.5 + (this.has('r_deluge') ? 2 : 0);
     p.castT = 0.5; p.ry = Math.atan2(pt.x - p.pos.x, pt.z - p.pos.z);
     this.send('rain', { x: pt.x, z: pt.z, r: R, dur });
-    for (let k = 0.3; k < dur; k += 0.3) this.pending.push({ t: k, fn: () => { for (const e of enemiesInRadius(V(pt.x, 0, pt.z), R)) p.dealDamage(e, p.stats.dmg * 0.42 * this.mods('s3'), { stun: this.has('r_deluge') ? 0.15 : 0 }, true); } });
+    for (let k = 0.3; k < dur; k += 0.3) this.pending.push({ t: k, fn: () => { for (const e of enemiesInRadius(V(pt.x, 0, pt.z), R)) p.dealDamage(e, p.stats.dmg * 0.42 * this.mods('s3'), { el: 'storm', stun: this.has('r_deluge') ? 0.15 : 0 }, true); } });
     G.audio.arrow();
   }
   basicBolt(yaw) {
     const p = this.p; p.ry = p.aimDir(yaw); p.castT = 0.25;
-    this.shoot({ speed: 28, mul: 1, aoe: 0 });
+    this.shoot({ speed: 28, mul: 1, aoe: 0, el: 'water', basic: true }); // frost-water bolt: soaks targets for Fire Bolt / Chain Lightning combos
     G.audio.bolt();
   }
   shoot(o) {
@@ -321,10 +321,10 @@ export class SkillKit {
   boltHit(e, at, o) {
     const p = this.p;
     if (o.aoe) {
-      for (const x of enemiesInRadius(at, o.aoe)) p.dealDamage(x, p.stats.dmg * o.mul, { kb: o.kb || 0 });
+      for (const x of enemiesInRadius(at, o.aoe)) p.dealDamage(x, p.stats.dmg * o.mul, { kb: o.kb || 0, el: o.el });
       this.send('explode', { x: at.x, z: at.z, r: o.aoe });
     } else if (e) {
-      p.dealDamage(e, p.stats.dmg * o.mul, { kb: 0.3 });
+      p.dealDamage(e, p.stats.dmg * o.mul, { kb: 0.3, el: o.el, basic: o.basic });
       if (o.split) { const base = Math.atan2(at.x - p.pos.x, at.z - p.pos.z); for (const d of [-0.6, 0.6]) { const dir = V(Math.sin(base + d), 0, Math.cos(base + d)); const so = { speed: 30, mul: o.mul * 0.5, aoe: 0, arrow: true, range: 8, ignore: e }; this.projectiles.push(new Bolt(at.clone().add(dir.clone().multiplyScalar(e.radius + 0.4)), dir, so, (h, a2) => this.boltHit(h, a2, so))); } }
     }
   }
@@ -350,7 +350,7 @@ export class SkillKit {
       this.whirlT -= dt; this.whirlTick -= dt;
       if (this.whirlTick <= 0) {
         this.whirlTick = 0.25;
-        for (const e of enemiesInRadius(p.pos, this.has('e_vortex') ? 6 : 3.2)) p.dealDamage(e, p.stats.dmg * 0.55 * this.mods('s1'), { kb: this.has('e_vortex') ? -1.2 : 0.6 }, true);
+        for (const e of enemiesInRadius(p.pos, this.has('e_vortex') ? 6 : 3.2)) p.dealDamage(e, p.stats.dmg * 0.55 * this.mods('s1'), { el: 'fire', kb: this.has('e_vortex') ? -1.2 : 0.6 }, true);
         this.send('whirl', { x: p.pos.x, z: p.pos.z });
       }
     }
@@ -369,7 +369,7 @@ export class SkillKit {
       this.exec.t += dt;
       if (this.exec.t >= 0.33 && !this.exec.done) {
         this.exec.done = true;
-        for (const e of enemiesInArc(p.pos, p.ry, 3.1, 1.7)) { const d = p.dealDamage(e, p.stats.dmg * 4 * this.mods('s3') * (e.hp / e.maxHp < 0.35 ? 2 : 1), { kb: 3, stun: 0.8 }); if (this.has('e_reaper') && d >= e.hp) { this.cds[3] = 0; G.ui.toast('Reaper! Execution ready', '#ff3a1a'); } }
+        for (const e of enemiesInArc(p.pos, p.ry, 3.1, 1.7)) { const d = p.dealDamage(e, p.stats.dmg * 4 * this.mods('s3') * (e.hp / e.maxHp < 0.35 ? 2 : 1), { el: 'fire', kb: 3, stun: 0.8 }); if (this.has('e_reaper') && d >= e.hp) { this.cds[3] = 0; G.ui.toast('Reaper! Execution ready', '#ff3a1a'); } }
         this.send('execute', { x: p.pos.x, z: p.pos.z, ry: p.ry });
         G.hitstop = 0.1; G.shake = Math.max(G.shake, 0.55);
       }
@@ -450,7 +450,7 @@ class Trap {
     this.glow.material.opacity = 0.3 + Math.sin(performance.now() / 150) * 0.2;
     if (this.armT <= 0 && enemiesInRadius(this.pos, 2.2).length) {
       const p = this.kit.p;
-      for (const e of enemiesInRadius(this.pos, 3)) p.dealDamage(e, p.stats.dmg * 2.5 * this.mul * this.kit.mods('s1'), { stun: 2 + (p.stats.T.stun || 0), kb: 0.5 });
+      for (const e of enemiesInRadius(this.pos, 3)) p.dealDamage(e, p.stats.dmg * 2.5 * this.mul * this.kit.mods('s1'), { el: 'oil', stun: 2 + (p.stats.T.stun || 0), kb: 0.5 });
       this.kit.send('explode', { x: this.pos.x, z: this.pos.z, r: 3 });
       this.dispose(); return false;
     }
@@ -491,7 +491,7 @@ class Spirit {
       this.pos.lerp(tp, 1 - Math.exp(-14 * dt));
       if (d.t > 0.25 && !d.hit) {
         d.hit = true;
-        if (!d.e.dead) { const raptor = !!p.stats.flags.r_raptor; p.dealDamage(d.e, p.stats.dmg * 0.9 * (1 + (p.stats.T.s2 || 0) + p.stats.skillDmg), { stun: raptor ? 0.8 : 0, kb: 0.5 }, true); if (raptor) fxPlay('chain', { x: d.e.pos.x, z: d.e.pos.z, pts: [[d.e.pos.x, d.e.pos.z - 3], [d.e.pos.x, d.e.pos.z]] }); }
+        if (!d.e.dead) { const raptor = !!p.stats.flags.r_raptor; p.dealDamage(d.e, p.stats.dmg * 0.9 * (1 + (p.stats.T.s2 || 0) + p.stats.skillDmg), { el: 'storm', stun: raptor ? 0.8 : 0, kb: 0.5 }, true); if (raptor) fxPlay('chain', { x: d.e.pos.x, z: d.e.pos.z, pts: [[d.e.pos.x, d.e.pos.z - 3], [d.e.pos.x, d.e.pos.z]] }); }
         G.fx.emit({ pos: tp, count: 14, speed: 4, color: '#dffcff', color2: '#3a8aff', size: 0.25, life: 0.4 });
       }
       if (d.t > 0.45) this.dive = null;

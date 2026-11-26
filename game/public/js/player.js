@@ -9,7 +9,9 @@ import { tileAt } from '../shared/dungeon.js';
 import { recoil, rumble, decals } from './feel.js';
 import { weatherFx } from '../shared/life.js';
 import { levelMul } from '../shared/enemies.js';
-import { SkillKit, enemiesInArc, enemiesInRadius, fxPlay } from './skills.js';
+import { SkillKit, enemiesInArc, enemiesInRadius, fxPlay, nearestEnemy } from './skills.js';
+const BASIC_EL = { emberblade: 'fire' }; // basic-attack elements (Hexcaller bolts carry their own)
+export const FINISHERS = { warden: { name: 'Shield Slam', icon: '🛡' }, emberblade: { name: 'Ember Execution', icon: '🔥' }, hexcaller: { name: 'Arcane Overload', icon: '✴' }, ranger: { name: 'Storm Arrow', icon: '⚡' } };
 
 const angDiff = (a, b) => Math.abs(((a - b + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
 export const ROLL_CD = 0.9, POT_CD = 1.0;
@@ -107,6 +109,7 @@ export class LocalPlayer {
   update(dt, input, cam, zone) {
     this.t += dt;
     const S = this.stats, R = this.R;
+    this.cpT = (this.cpT || 0) - dt; if (this.cpT <= 0) this.cp = 0;
     this.rollCd -= dt; this.slamT >= 0 || (this.slamT = -1); this.potCd -= dt; this.invuln -= dt; this.comboT -= dt; this.lastHurt += dt; this.combatT += dt;
     this.castT = Math.max(0, this.castT - dt); this.tauntBuffT -= dt; this.furyT -= dt; this.tailT -= dt; this.phoenixCd -= dt; this.slowT -= dt; this.burnT -= dt; this.unbreakCd -= dt; this.trapCd -= dt;
     this.hurtT = Math.max(0, this.hurtT - dt * 4);
@@ -143,6 +146,7 @@ export class LocalPlayer {
         else if (this.atk.t < 0) this.startAttack(yaw);
         else if (this.atk.t > 0.4) this.atk.queued = true;
       }
+      if (input.actHit('finisher')) this.finisher();
       for (let i = 0; i < 4; i++) if (input.actHit('skill' + (i + 1)) || (i === 0 && input.click(2) && !input.lockFailed)) { if (kit.tryCast(i, yaw)) { this.atk.t = -1; } }
     }
     if (active && input.actHit('dodge') && this.rollCd <= 0 && !this.roll && this.slamT < 0) this.startRoll(moving ? dir : null);
@@ -298,17 +302,50 @@ export class LocalPlayer {
     const range = S.range + (c === 2 ? 0.5 : 0), arc = S.arc + (c === 2 ? 0.7 : 0) + (S.cleave ? 0.4 : 0);
     const mul = [1, 1.15, 1.7][c];
     const hit = enemiesInArc(this.pos, this.ry, range, arc);
-    for (const e of hit) this.dealDamage(e, S.dmg * mul, { kb: c === 2 ? 1.6 : 0.5, stun: c === 2 ? 0.3 : 0 });
+    for (const e of hit) this.dealDamage(e, S.dmg * mul, { kb: c === 2 ? 1.6 : 0.5, stun: c === 2 ? 0.3 : 0, basic: true });
     const sp = this.pos.clone(); sp.y += 1.15;
     G.fx.slash(sp, this.ry, this.weaponColor, range + 0.3, c, arc);
     if (hit.length) { G.hitstop = c === 2 ? 0.08 : 0.045; G.shake = Math.max(G.shake, c === 2 ? 0.35 : 0.15); if (c === 2) { recoil.kick(-0.025); rumble(0.45, 0.2, 90); } else rumble(0.15, 0.25, 50); }
   }
 
+  // ---- counters: a perfect dodge or block against a telegraphed heavy blow staggers and exposes the enemy ----
+  tryCounter(src) {
+    if (!src || !src.parryAt || G.time - src.parryAt > 1.6) return;
+    src.parryAt = 0; G.net.send({ t: 'counter', id: src.id });
+    this.addCombo(2);
+  }
+  // ---- combo points (from basic attacks) fuel the class finisher (F) ----
+  addCombo(n) { const was = this.cp || 0; this.cp = Math.min(5, was + n); this.cpT = 6; if (this.cp === 5 && was < 5) G.audio.style?.(3); }
+  finisher() {
+    const cp = this.cp || 0; if (cp < 2 || this.dead || this.roll) { if (cp < 2) G.ui.toast('Build combo points with basic attacks first', '#c8b890'); return; }
+    const S = this.stats, P = this.pos; this.cp = 0; this.castT = 0.35; this.atk.t = -1;
+    if (this.cls === 'warden') {
+      for (const e of enemiesInArc(P, this.ry, 4.5, 1.6)) this.dealDamage(e, S.dmg * (1.2 + 0.6 * cp), { kb: 2.5, stun: 1 + 0.25 * cp });
+      fxPlay('quake', { x: P.x + Math.sin(this.ry) * 2, z: P.z + Math.cos(this.ry) * 2, r: 4.5, mine: true }); this.slamT = 0;
+    } else if (this.cls === 'emberblade') {
+      const t = (G.lock && !G.lock.dead && G.lock.pos.distanceTo(P) < 6) ? G.lock : nearestEnemy(P, 5);
+      if (t) { this.ry = Math.atan2(t.pos.x - P.x, t.pos.z - P.z); this.dealDamage(t, S.dmg * (1.6 + 1.0 * cp), { crit: true, el: 'fire', kb: 1.5, stun: 0.6 }); fxPlay('explode', { x: t.pos.x, z: t.pos.z, r: 2.4 }); }
+      this.atk.combo = 2; this.atk.t = 0;
+    } else if (this.cls === 'hexcaller') {
+      for (const e of enemiesInRadius(P, 5.5)) this.dealDamage(e, S.dmg * (1 + 0.5 * cp), { el: 'storm', kb: 2 });
+      fxPlay('cry', { x: P.x, z: P.z }); G.fx.shockwave(P.clone().setY(P.y + 0.2), 5.5, '#9adfff', 0.5);
+    } else {
+      const dir = new THREE.Vector3(Math.sin(this.ry), 0, Math.cos(this.ry));
+      for (const e of [...G.enemies.values()]) { if (e.dead) continue; const v = e.pos.clone().sub(P), along = v.dot(dir); if (along > 0 && along < 16 && v.clone().addScaledVector(dir, -along).length() < 1.6) this.dealDamage(e, S.dmg * (1.3 + 0.7 * cp), { el: 'storm', kb: 1 }); }
+      for (let k = 0; k <= 16; k += 0.8) G.fx.emit({ pos: P.clone().addScaledVector(dir, k).setY(P.y + 1.3), count: 3, speed: 2, color: '#e8fbff', color2: '#3a8aff', size: 0.4, life: 0.4 });
+      G.audio.zap();
+    }
+    G.ui.bigBanner?.(FINISHERS[this.cls].name.toUpperCase(), `${cp} combo points`, 900);
+    G.shake = Math.max(G.shake, 0.5); recoil.kick(0.03); rumble(0.6, 0.6, 200);
+  }
   dealDamage(e, base, o = {}, quiet = false) {
     const S = this.stats;
     const crit = o.crit || Math.random() < S.crit;
     const dmg = Math.max(1, Math.round(base * (0.9 + Math.random() * 0.2) * (crit ? S.critDmg : 1) * (1 + 0.04 * this.rank) * (this.furyT > 0 ? 1.3 : 1)));
-    G.net.send({ t: 'hit', id: e.id, dmg, crit, kb: o.kb || 0, stun: o.stun || 0 });
+    const el = o.el || (o.basic ? BASIC_EL[this.cls] : undefined);
+    G.net.send({ t: 'hit', id: e.id, dmg, crit, kb: o.kb || 0, stun: o.stun || 0, el });
+    if (o.basic) this.addCombo(crit ? 2 : 1);
+    G.combatLog?.(e, dmg, crit, el);
     e.hitByMe = G.time;
     if (crit && S.flags.g_bloodcrit) this.hp = Math.min(S.maxHp, this.hp + S.maxHp * 0.015);
     if (S.flags.g_thunder && !o.thunder && ++this.thunderN % 10 === 0) { fxPlay('chain', { x: e.pos.x, z: e.pos.z, pts: [[e.pos.x + 2, e.pos.z - 2], [e.pos.x, e.pos.z]] }); setTimeout(() => !e.dead && this.dealDamage(e, S.dmg * 2.5, { thunder: true, stun: 0.4 }), 80); }
@@ -335,8 +372,9 @@ export class LocalPlayer {
     G.audio.potion();
   }
 
-  perfectDodge() {
+  perfectDodge(src) {
     G.slowmo = 1.1; rumble(0.2, 0.9, 160);
+    this.tryCounter(src);
     this.resource = Math.min(this.stats.resMax, this.resource + this.stats.resMax * 0.4);
     this.addStyle(25, 'perfect');
     G.audio.perfect();
@@ -348,13 +386,14 @@ export class LocalPlayer {
 
   hurt(dmg, from, o = {}) {
     if (this.dead) return;
-    if (!o.dot && !o.trap && this.roll && this.rollT < 0.32) { this.perfectDodge(); return; }
+    if (!o.dot && !o.trap && this.roll && this.rollT < 0.32) { this.perfectDodge(from != null ? G.enemies.get(from) : null); return; }
     if (this.invuln > 0 && !o.dot) return;
     const src = from != null ? G.enemies.get(from) : null;
     if (this.blocking && src && !o.dot) {
       const a = Math.atan2(src.pos.x - this.pos.x, src.pos.z - this.pos.z);
       if (angDiff(a, this.ry) < 1.3) {
         if (this.blockT < 0.3) {
+          this.tryCounter(src);
           G.net.send({ t: 'hit', id: src.id, dmg: Math.round(this.stats.dmg * 0.5), crit: false, kb: 1.5, stun: 1.6 });
           this.resource = Math.min(this.stats.resMax, this.resource + 15);
           G.audio.block(true); G.ui.perfect('PERFECT BLOCK');

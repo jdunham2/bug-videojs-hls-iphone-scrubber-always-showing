@@ -381,6 +381,17 @@ export function buildEnemy(type) {
       rig.baseEmissive = rig.mats.map((x) => x.emissive.clone());
       return rig;
     }
+    case 'dummy': {
+      const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+      const wood = std('#6a4a2a'), straw = std('#d8b86a', { rough: 1 }), cloth = std('#a83a2a', { rough: 0.9 });
+      mesh(cyl(0.08, 0.1, 2.2, 6), wood, 0, 1.1, 0, body);
+      const sack = mesh(cyl(0.38, 0.32, 0.9, 10), straw, 0, 1.45, 0, body);
+      mesh(cyl(0.4, 0.4, 0.18, 10), cloth, 0, 1.55, 0, body);
+      mesh(sphere(0.26, 10, 8), straw, 0, 2.15, 0, body);
+      const arm = mesh(cyl(0.05, 0.05, 1.5, 5), wood, 0, 1.7, 0, body); arm.rotation.z = Math.PI / 2;
+      const ring = mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 20), std('#ff3a2a', { emissive: '#ff2a1a', ei: 1.2 }), 0, 1.45, 0.34, body);
+      return { root, body, P: { sack, ring }, mats: [wood, straw, cloth], baseEmissive: [wood.emissive.clone(), straw.emissive.clone(), cloth.emissive.clone()], opts: {}, kind: 'static', weapon: null, offhand: null };
+    }
     case 'sigil': {
       const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
       const stone = std('#2a3a44', { rough: 0.9 }), rune = std('#bff6ff', { emissive: '#2ad0ff', ei: 2.4 });

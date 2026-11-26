@@ -10,6 +10,7 @@ import { AFFIXES } from '../shared/enemies.js';
 import { RIFT_MODS, RIFT_TIME, PARAGON, LEVEL_CAP, paragonXp } from '../shared/rifts.js';
 import { QUESTS, EVENTS, REGIONS, ACT1_END, ACT2_END, COMPANIONS } from '../shared/regions.js';
 import { renderSocial } from './socialui.js';
+const FINISH_ICON = { warden: '🛡', emberblade: '🔥', hexcaller: '✴', ranger: '⚡' }, FINISH_NAME = { warden: 'Shield Slam', emberblade: 'Ember Execution', hexcaller: 'Arcane Overload', ranger: 'Storm Arrow' };
 import { renderForge, renderTrial } from './endgameui.js';
 import { compareItem, DIFFICULTY } from '../shared/endgame.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
@@ -114,10 +115,13 @@ class UI {
     const skill = (id, ico, key, extra = '') => `<div class="skill" id="${id}"><div class="ico">${ico}</div><div class="key">${key}</div>${extra}<div class="cd"></div><div class="cdt"></div></div>`;
     let html = skill('skLMB', cls === 'hexcaller' ? '🔥' : cls === 'ranger' ? '➶' : '⚔️', 'LMB');
     if (C) C.skills.forEach((s, i) => { html += skill('sk' + (i + 1), s.icon, keyName(b['skill' + (i + 1)]), s.cost ? `<div class="cost">${s.cost}</div>` : ''); });
+    if (cls) html += skill('skFin', FINISH_ICON[cls], keyName(b.finisher || 'KeyF'), '<div class="pips" id="cpPips"><i></i><i></i><i></i><i></i><i></i></div>');
     html += skill('skDodge', '🌀', keyName(b.dodge)) + skill('skPot', '🧪', keyName(b.potion), '<div class="cnt" id="potCount">3</div>');
     $('skills').innerHTML = html;
     if (C) C.skills.forEach((s, i) => { const el = $('sk' + (i + 1)); el.onmouseenter = (e) => this.showText(`<div class="tn" style="color:${C.color}">${s.name}</div><div class="tm">${s.cost ? `${s.cost} ${C.resource.name} · ` : ''}${s.cd ? `${s.cd}s cooldown` : s.hold ? 'Hold' : ''}</div><div>${s.desc}</div>`, C.color, e); el.onmouseleave = () => this.hideTip(); });
     $('resFill').style.background = C ? C.resource.color : '#4a8cff';
+    if (cls) $('skFin').onmouseenter = (e) => this.showText(`<div class="tn">${FINISH_NAME[cls]}</div><div class="tm">Combo finisher · spend 2-5 combo points</div><div class="ta">Basic attacks build combo points (crits build two, counters build two). Finishers hit harder the more points you spend.</div>`, '#ffd34d', e);
+    if (cls) $('skFin').onmouseleave = () => this.hideTip();
   }
 
   // ---------- HUD ----------
@@ -126,6 +130,7 @@ class UI {
     if (!p || !pr) return;
     const S = p.stats, c = pr.char, C = CLASSES[p.cls];
     $('hpFill').style.width = (Math.max(0, p.hp) / S.maxHp) * 100 + '%';
+    { const pe = $('cpPips'); if (pe) { const n = p.cp || 0; if (pe._n !== n) { pe._n = n; [...pe.children].forEach((x, k) => x.classList.toggle('on', k < n)); $('skFin').classList.toggle('ready', n >= 2); } } }
     $('hpText').textContent = `${Math.ceil(Math.max(0, p.hp))} / ${S.maxHp}`;
     $('resFill').style.width = (p.resource / S.resMax) * 100 + '%';
     $('resText').textContent = `${Math.floor(p.resource)} ${C.resource.name}`;

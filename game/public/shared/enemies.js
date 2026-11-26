@@ -18,6 +18,7 @@ export const ENEMIES = {
   siren: { name: 'Tide Siren', hp: 55, dmg: 12, speed: 2.8, range: 12, cd: 2.2, windup: 0.6, gold: 9, xp: 18, radius: 0.5, aggro: 16, ranged: true, poise: 1 },
   warden: { name: 'The Drowned Warden', hp: 2600, dmg: 30, speed: 2.6, range: 3.8, cd: 2.2, windup: 0.85, gold: 300, xp: 700, radius: 2.0, aggro: 26, boss: true, poise: 0, ai: 'tyrant' },
   kingreborn: { name: 'The Hollow King Reborn', hp: 4200, dmg: 30, speed: 3.2, range: 3.4, cd: 1.9, windup: 0.65, gold: 500, xp: 1400, radius: 1.6, aggro: 32, boss: true, poise: 0 },
+  dummy: { name: 'Training Dummy', hp: 100000, dmg: 0, speed: 0, range: 0, cd: 99, windup: 1, gold: 0, xp: 0, radius: 0.7, aggro: 0, poise: 0, static: true },
   sigil: { name: 'Tide Sigil', hp: 60, dmg: 0, speed: 0, range: 0, cd: 99, windup: 1, gold: 0, xp: 0, radius: 0.9, aggro: 0, poise: 0, static: true },
   herald: { name: 'The Storm Herald', hp: 2400, dmg: 26, speed: 3.2, range: 14, cd: 1.8, windup: 0.6, gold: 320, xp: 800, radius: 1.5, aggro: 30, boss: true, poise: 0, ranged: true },
   drake: { name: 'The Storm Drake', hp: 1250, dmg: 22, speed: 3.4, range: 3.6, cd: 2.0, windup: 0.7, gold: 170, xp: 360, radius: 2.3, aggro: 24, boss: true, poise: 0 },

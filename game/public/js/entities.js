@@ -121,7 +121,7 @@ export class EnemyView {
     const stun = this.stunned && !this.dead;
     const st = { t: this.t, move: this.dead || stun ? 0 : this.move, atk, combo: this.boss || this.type === 'ogre' ? 2 : 0, slam: -1, cast, dead: this.dead ? Math.min(1, this.deathT * 1.4) : 0, hurt: Math.max(this.hurt, stun ? 0.5 + Math.sin(this.t * 14) * 0.3 : 0), float: this.type === 'wraith', air: !!this.leap };
     const k = this.rig.kind;
-    if (k === 'static') { if (this.rig.P.cry) { this.rig.P.cry.rotation.y = this.t * 1.4; this.rig.P.cry.position.y = 1.6 + Math.sin(this.t * 2) * 0.12; } } else if (k === 'spider') animateSpider(this.rig, st); else if (k === 'worm') animateWorm(this.rig, st); else if (k === 'drake') animateDrake(this.rig, { ...st, air: !!(this.flags & 256) }); else animateRig(this.rig, st);
+    if (k === 'static') { if (this.rig.P.sack) { this.rig.body.rotation.z = Math.sin(this.t * 14) * this.hurt * 0.12; } if (this.rig.P.cry) { this.rig.P.cry.rotation.y = this.t * 1.4; this.rig.P.cry.position.y = 1.6 + Math.sin(this.t * 2) * 0.12; } } else if (k === 'spider') animateSpider(this.rig, st); else if (k === 'worm') animateWorm(this.rig, st); else if (k === 'drake') animateDrake(this.rig, { ...st, air: !!(this.flags & 256) }); else animateRig(this.rig, st);
     const hidden = !!(this.flags & 128) && !this.dead;
     this.root.visible = !hidden;
     if (hidden && Math.random() < dt * 25) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 0.1), count: 1, speed: 1.5, color: '#8a7058', color2: '#3a2a1a', size: 0.45, life: 0.6, up: 1, radius: 0.5 });
@@ -136,6 +136,16 @@ export class EnemyView {
       this.bubble.visible = !!(this.flags & 512) && !this.dead; this.bubble.material.opacity = 0.14 + Math.sin(this.t * 6) * 0.05;
       if (!this.dead && Math.random() < dt * 14) G.fx.emit({ pos: this.pos.clone().setY(this.root.position.y + 2 + Math.random() * 2), count: 1, speed: 3, color: '#e0f6ff', color2: '#2a6aff', size: 0.3, life: 0.3, radius: 1.2 });
     }
+    // elemental statuses: wet (drips), burning (flames), oiled (black sheen), blinded (steam), exposed (red pulse)
+    if (!this.dead && this.flags >= 1024) {
+      const top = () => this.pos.clone().setY(this.pos.y + this.height * (0.4 + Math.random() * 0.5));
+      if (this.flags & 1024 && Math.random() < dt * 10) G.fx.emit({ pos: top(), count: 1, speed: 0.4, color: '#bfe6ff', color2: '#3a7aff', size: 0.12, life: 0.6, gravity: 8, radius: this.radius * 0.7 });
+      if (this.flags & 2048 && Math.random() < dt * 22) G.fx.emit({ pos: top(), count: 1, speed: 1.2, color: '#ffd080', color2: '#ff2a00', size: 0.32, life: 0.45, up: 1.4, radius: this.radius * 0.6 });
+      if (this.flags & 4096 && Math.random() < dt * 8) G.fx.emit({ pos: top(), count: 1, speed: 0.3, color: '#3a3020', color2: '#0a0806', size: 0.16, life: 0.8, gravity: 6, radius: this.radius * 0.7 });
+      if (this.flags & 8192 && Math.random() < dt * 10) G.fx.emit({ pos: top().setY(this.pos.y + this.height), count: 1, speed: 0.5, color: '#ffffff', color2: '#b8c0c8', size: 0.5, life: 1, up: 0.6, drag: 1 });
+      if (this.flags & 16384) this.flash = Math.max(this.flash, 0.35 + Math.sin(this.t * 12) * 0.25);
+    }
+    if (this.parryT > 0) { this.parryT -= dt; if (Math.random() < dt * 40) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + this.height * 0.8), count: 1, speed: 2.5, color: '#fff6c0', color2: '#ffb020', size: 0.3, life: 0.3, radius: this.radius }); }
     if (this.type === 'healer' && Math.random() < dt * 6) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1.4), count: 1, speed: 0.6, color: '#8affb0', color2: '#0a4020', size: 0.25, life: 0.8, up: 1 });
     if (this.flags & 32 && !this.dead) { // boss intro roar pose
       if (!this.rig.kind) { this.rig.P.armL.rotation.x = this.rig.P.armR.rotation.x = -2.6; this.rig.P.spine.rotation.x = -0.3; this.rig.P.head.rotation.x = -0.5; }

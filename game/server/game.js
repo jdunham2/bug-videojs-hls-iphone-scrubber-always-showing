@@ -90,7 +90,8 @@ class Room {
       if (type === 'citadel' && (p.char.quest?.i || 0) < ACT2_END && !p.prof.citadel) { send(p.ws, { t: 'notice', text: 'The Sunken Citadel lies beyond the storm. Finish Act II first.', color: '#ff9a7a' }); return; }
       if (type === 'peaks' && !questDone(p.char.quest) && !p.prof.peaks) { send(p.ws, { t: 'notice', text: 'The pass to Stormspire is sealed. Finish Act I first.', color: '#ff9a7a' }); return; }
       zone = this.zones.get(type) || this.zones.set(type, new Zone(this, type, 'region', this.level)).get(type);
-    } else zone = this.zones.get(type === 'dark' ? 'dark' : 'town');
+    } else if (type === 'training') zone = this.zones.get('training') || this.zones.set('training', new Zone(this, 'training', 'training', 1)).get('training');
+    else zone = this.zones.get(type === 'dark' ? 'dark' : 'town');
     this.joinZone(p, zone);
   }
   enterRift(p, k) {
@@ -329,6 +330,7 @@ function attach(ws) {
         else if (p.zone === 'citadel' && near(p, REGIONS.citadel.gate, 6) && (p.char.quest?.i || 0) === ACT2_END) { send(ws, { t: 'dialog', who: 'Sir Corvin', i: ACT2_END }); room.questEvent(p, 'talk3'); }
         break;
       case 'relic': if (p.zone === 'peaks') zone.takeRelic(p, m.i | 0); break;
+      case 'counter': if (zone && zone.counter(p, m.id)) p.counters = (p.counters || 0) + 1; break;
       // ---- endgame: Nightmare difficulty, weekly Rift Trials, crafting 2.0 ----
       case 'difficulty': {
         const d = Math.max(0, Math.min(DIFFICULTY.length - 1, m.d | 0)), low = [...room.players.values()].find((q) => q.char.level < DIFFICULTY[d].minLevel);
@@ -375,7 +377,7 @@ function attach(ws) {
         if (now - p.dmgWin > 1000) { p.dmgWin = now; p.dmgSum = 0; }
         if (dmg > cap.hit || p.dmgSum + dmg > cap.sec) { p.rejected = (p.rejected || 0) + 1; logCheat({ room: room.code, name: p.prof.name, cls: p.cls, level: p.char.level, dmg: Math.round(dmg), cap: Math.round(cap.hit), capSec: Math.round(cap.sec), total: p.rejected }); if (p.rejected % 20 === 1) console.warn(`[anticheat] rejected hit from ${p.prof.name} (${p.cls}): ${Math.round(dmg)} (cap ${Math.round(cap.hit)}/hit, ${Math.round(cap.sec)}/s), total rejected ${p.rejected}`); break; }
         p.dmgSum += dmg;
-        zone.damageEnemy(e, dmg, p.id, m.crit, Math.max(-2, Math.min(4, +m.kb || 0)), Math.min(4, +m.stun || 0), p.x, p.z);
+        zone.damageEnemy(e, dmg, p.id, m.crit, Math.max(-2, Math.min(4, +m.kb || 0)), Math.min(4, +m.stun || 0), p.x, p.z, ['fire', 'storm', 'oil', 'water', 'phys'].includes(m.el) ? m.el : undefined);
         break;
       }
       case 'taunt': zone?.taunt(p, Math.min(14, +m.r || 10), Math.min(8, +m.dur || 6)); break;

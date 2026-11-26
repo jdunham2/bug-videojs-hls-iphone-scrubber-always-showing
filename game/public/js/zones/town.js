@@ -378,6 +378,7 @@ export class TownZone {
       { x: TOWN.dungeonPortal.x, z: TOWN.dungeonPortal.z, r: 4, mark: 'DUNGEON', label: () => `Enter the Dungeon — Depth ${G.roomLevel}`, action: () => G.actions.travel('dungeon') },
       { x: TOWN.darkPortal.x, z: TOWN.darkPortal.z, r: 4, mark: 'DARK WORLD', label: () => 'Enter the Dark World', action: () => G.actions.travel('dark') },
       { x: TOWN.trainer.x, z: TOWN.trainer.z, r: 3, mark: 'TRAINER', label: () => 'Talk to the Trainer (talents)', action: () => G.actions.openTalents(true) },
+      { x: TOWN.trainer.x - 2.2, z: TOWN.trainer.z + 1.2, r: 1.6, label: () => 'Enter the Training Grounds (dummies + DPS meter)', action: () => G.actions.travel('training') },
       { x: TOWN.smith.x, z: TOWN.smith.z, r: 3.4, mark: 'BLACKSMITH', label: () => 'Visit the Blacksmith (salvage, reroll, upgrade)', action: () => G.actions.openSmith() },
       { x: TOWN.obelisk.x, z: TOWN.obelisk.z, r: 3.4, mark: 'EMBER RIFTS', label: () => 'Open an Ember Rift (timed endgame)', action: () => G.actions.openRift() },
       { x: TOWN.board.x, z: TOWN.board.z, r: 3, mark: 'HALL OF EMBERS', label: () => 'Read the Hall of Embers (leaderboard)', action: () => G.actions.openBoard() },

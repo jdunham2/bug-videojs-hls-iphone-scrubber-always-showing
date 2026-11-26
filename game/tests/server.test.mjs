@@ -416,3 +416,46 @@ test('endgame: Nightmare scaling, weekly Rift Trial with ranks and a replay, cra
   const better = { ...p.char.equipped.weapon, dmg: p.char.equipped.weapon.dmg * 3, id: 'x' };
   assert.ok(compareItem(p.char, p.cls, better).dpsPct > 1);
 });
+
+test('combat depth: elemental combos, counters on heavy blows, training dummies', { timeout: 30000 }, async () => {
+  const game = G(), c = client(game);
+  await wait(20);
+  c.send({ t: 'chat', text: '/xp 400000' });
+  c.send({ t: 'zone', to: 'marsh' }); await wait(80);
+  const room = game.rooms.get(c.room), z = room.zones.get('marsh');
+  for (const e of [...z.enemies.values()]) z.remove(e);
+  const mk = (x) => { const e = z.spawn('brute', x, 30, { introDone: true }); e.st = { wet: 0, burn: 0, oil: 0 }; return e; };
+  const hit = (e, el, dmg = 20) => { c.send({ t: 'state', x: e.x + 1, y: 0, z: e.z, hp: 100, maxHp: 100 }); c.send({ t: 'hit', id: e.id, dmg, el }); };
+  // shock: wet + storm stuns, adds damage and arcs to a wet neighbour
+  const a = mk(0), b = mk(2); a.st.wet = 5; b.st.wet = 5;
+  const ha = a.hp, hb = b.hp; hit(a, 'storm'); await wait(30);
+  assert.equal(c.last.combo.kind, 'shock'); assert.ok(a.stunT > 0.5); assert.ok(ha - a.hp >= 28, 'bonus damage'); assert.ok(b.hp < hb, 'arc'); assert.equal(a.st.wet, 0);
+  // explosion: oil + fire hits everything nearby
+  const o = mk(20), n = mk(21.5); a.stunT = 0;
+  hit(o, 'oil'); await wait(20); assert.ok(o.st.oil > 0);
+  const hn = n.hp; hit(o, 'fire'); await wait(30);
+  assert.equal(c.last.combo.kind, 'explode'); assert.ok(n.hp < hn, 'explosion splash');
+  // steam: wet + fire blinds (enemies deal 40% less)
+  const s = mk(40); s.st.wet = 5; hit(s, 'fire'); await wait(30);
+  assert.equal(c.last.combo.kind, 'steam'); assert.ok(s.blindT > 3);
+  // plain fire burns over time
+  const f = mk(60); const hf = f.hp; hit(f, 'fire', 40); await wait(1200);
+  assert.ok(hf - f.hp > 40, 'burn ticks'); assert.ok(c.msgs.some((m) => m.t === 'ehit' && m.dot === 'burn'));
+  // counters: only right after a heavy windup, once per attack
+  const h = mk(80);
+  c.send({ t: 'counter', id: h.id }); await wait(20);
+  assert.ok(!c.last.countered, 'no counter without an attack');
+  h.parryable = true; h.lastAtk = Date.now();
+  c.send({ t: 'state', x: h.x + 1, y: 0, z: h.z, hp: 100, maxHp: 100 }); c.send({ t: 'counter', id: h.id }); c.send({ t: 'counter', id: h.id }); await wait(30);
+  assert.equal(c.count('countered'), 1); assert.ok(h.stunT > 1.5 && h.exposedT > 3);
+  const he = h.hp; c.send({ t: 'hit', id: h.id, dmg: 100 }); await wait(20); assert.ok(he - h.hp >= 149, 'exposed: +50% damage');
+  // training grounds: dummies take hits forever and pay nothing
+  c.send({ t: 'zone', to: 'training' }); await wait(80);
+  assert.equal(c.ents.list.filter((r) => r[1] === 'dummy').length, 3);
+  const d = c.ents.list.find((r) => r[1] === 'dummy'), g0 = c.prof.gold;
+  c.send({ t: 'state', x: d[2] + 1, y: 0, z: d[3], hp: 100, maxHp: 100 });
+  for (let i = 0; i < 5; i++) c.send({ t: 'hit', id: d[0], dmg: 300 }); await wait(120);
+  assert.ok(c.msgs.filter((m) => m.t === 'ehit' && m.id === d[0]).length >= 1);
+  assert.equal(c.count('edie'), c.msgs.filter((m) => m.t === 'edie').length); assert.ok(room.zones.get('training').enemies.has(d[0]), 'dummy survives');
+  assert.equal(c.prof.gold, g0);
+});

@@ -40,6 +40,8 @@ import { TownZone } from './zones/town.js';
 import { DungeonZone } from './zones/dungeon.js';
 import { DarkZone } from './zones/dark.js';
 import { RegionZone } from './zones/region.js';
+import { TrainingZone } from './zones/training.js';
+let training = null;
 import { setupTouch } from './touch.js';
 import { REGIONS, QUESTS, EVENTS, ACT1_END, ACT2_END } from '../shared/regions.js';
 import { applySnapshot } from '../shared/snapshot.js';
@@ -193,6 +195,7 @@ async function switchZone(m) {
   let zone, oldDungeon = null;
   if (m.type === 'town') zone = town;
   else if (m.type === 'dark') zone = dark ||= new DarkZone(renderer);
+  else if (m.type === 'training') zone = training ||= new TrainingZone(renderer);
   else if (m.type === 'region') { zone = regions[m.zone] ||= new RegionZone(renderer, m.zone); applySettings(); }
   else if (m.type === 'rift') { if (dungeon) oldDungeon = dungeon; dungeon = new DungeonZone(renderer, m.seed, m.level, m.cleared, m.rift); dungeon.key = m.zone; zone = dungeon; applySettings(); }
   else {
@@ -219,7 +222,7 @@ async function switchZone(m) {
   player.ry = Math.atan2(face.x, face.z);
   camRig.yaw = Math.atan2(-face.x, -face.z);
   camRig.snap(player);
-  const banners = { town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, zone.name || 'The Depths'], region: [REGIONS[m.zone]?.name.toUpperCase() || '', REGIONS[m.zone]?.sub || ''], rift: [`EMBER RIFT ${m.rift?.k}`, (m.rift?.mods || []).map((k) => RIFT_MODS[k].name).join(' · ')] };
+  const banners = { training: ['TRAINING GROUNDS', 'Test your build against the dummies'], town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, zone.name || 'The Depths'], region: [REGIONS[m.zone]?.name.toUpperCase() || '', REGIONS[m.zone]?.sub || ''], rift: [`EMBER RIFT ${m.rift?.k}`, (m.rift?.mods || []).map((k) => RIFT_MODS[k].name).join(' · ')] };
   if (prevKey || !settings.intro) ui.zoneBanner(...banners[m.type]);
   if (prevKey) sfx.portal();
   if (m.type === 'rift') setTimeout(() => ui.toast('Slay enemies to fill the rift — then face its Guardian', '#c77dff', `Beat ${Math.round(RIFT_TIME / 60)} minutes to raise your keystone`), 1200);
@@ -410,7 +413,38 @@ function act2Cutscene(kind, then) {
   player.invuln = 30;
   cine.play(storyShots(kind, G.zone, player), { onEnd: () => { player.invuln = 0.5; then?.(); while (afterCine.length) afterCine.shift()(); } });
 }
-net.on('eatk', (m) => G.enemies.get(m.id)?.attack());
+net.on('eatk', (m) => {
+  const e = G.enemies.get(m.id); if (!e) return; e.attack();
+  if (m.parry) { e.parryAt = G.time; e.parryT = (m.win || 0.5) + 0.3; if (player && e.pos.distanceTo(player.pos) < 12) { sfx.block(true); fx.emit({ pos: e.pos.clone().setY(e.pos.y + e.height * 0.9), count: 1, speed: 0, color: '#ffffff', color2: '#ffd34d', size: 2.4, life: 0.2, shrink: 2 }); } }
+});
+net.on('combo', (m) => {
+  const y = G.zone.groundHeight(m.x, m.z), p = new THREE.Vector3(m.x, y + 1.2, m.z), mine = m.by === G.myId;
+  if (m.kind === 'shock') { for (const a of [[m.x, m.z], ...m.arcs]) fx.emit({ pos: new THREE.Vector3(a[0], y + 1.2, a[1]), count: 30, speed: 6, color: '#ffffff', color2: '#3a8aff', size: 0.3, life: 0.35 }); if (m.arcs.length) fxPlay('chain', { x: m.x, z: m.z, pts: m.arcs }); sfx.zap(); fx.text(p.clone().setY(p.y + 1.2), 'SHOCK!', 'crit', 1); }
+  else if (m.kind === 'explode') { fxPlay('explode', { x: m.x, z: m.z, r: m.r }); decals.add('scorch', m.x, m.z, m.r * 1.4); fx.text(p.clone().setY(p.y + 1.2), 'EXPLOSION!', 'crit', 1); G.shake = Math.max(G.shake, 0.5); }
+  else if (m.kind === 'steam') { fx.emit({ pos: p, count: 80, speed: 3, color: '#ffffff', color2: '#c8d8e0', size: 0.9, life: 1.6, up: 0.8, drag: 1.2, radius: 1.5 }); sfx.fire(); fx.text(p.clone().setY(p.y + 1.2), 'STEAM — BLINDED', 'xp', 1); }
+  if (mine) { player?.addStyle(14, 'combo'); combatLog(null, 0, false, null, m.kind); }
+});
+net.on('countered', (m) => {
+  const e = G.enemies.get(m.id); if (!e) return; e.parryT = 0;
+  fx.text(e.pos.clone().setY(e.pos.y + e.height + 0.4), 'COUNTER!', 'crit', 1.3); fx.shockwave(e.pos.clone().setY(e.pos.y + 0.2), 4, '#ffd34d', 0.4);
+  if (m.by === G.myId) { G.slowmo = Math.max(G.slowmo, 0.5); sfx.perfect(); ui.perfect('COUNTER — EXPOSED'); rumble(0.4, 0.9, 200); combatLog(null, 0, false, null, 'counter'); }
+});
+// ---- DPS meter + combat log (shown in the Training Grounds) ----
+const dpsEl = document.createElement('div'); dpsEl.id = 'dpsMeter'; dpsEl.hidden = true; document.getElementById('hud')?.appendChild(dpsEl);
+const dpsLog = [], dpsLines = []; let dpsStart = 0, dpsTotal = 0, dpsHits = 0, dpsCrits = 0, dpsMax = 0, dpsCombos = 0;
+function combatLog(e, dmg, crit, el, combo) {
+  const now = performance.now() / 1000;
+  if (!dpsLog.length || now - dpsLog[dpsLog.length - 1].t > 6) { dpsStart = now; dpsTotal = dpsHits = dpsCrits = dpsMax = dpsCombos = 0; dpsLog.length = 0; }
+  if (combo) { dpsCombos++; dpsLines.unshift(`<span class="cmb">${combo.toUpperCase()}</span>`); }
+  else { dpsLog.push({ t: now, dmg }); dpsTotal += dmg; dpsHits++; if (crit) dpsCrits++; dpsMax = Math.max(dpsMax, dmg); dpsLines.unshift(`${crit ? '<b>' : ''}${dmg}${crit ? '!</b>' : ''} ${el ? `<span class="el-${el}">${el}</span>` : ''} → ${e?.def?.name || 'target'}`); }
+  dpsLines.length = Math.min(dpsLines.length, 12);
+}
+G.combatLog = (e, dmg, crit, el) => combatLog(e, dmg, crit, el);
+function drawDps() {
+  const show = G.zoneKey === 'training'; dpsEl.hidden = !show; if (!show) return;
+  const now = performance.now() / 1000, w5 = dpsLog.filter((x) => now - x.t < 5).reduce((a, x) => a + x.dmg, 0) / 5, el = Math.max(1, (dpsLog.at(-1)?.t || now) - dpsStart);
+  dpsEl.innerHTML = `<div class="dps-h">DPS <b>${Math.round(w5)}</b> <span>(last 5 s)</span></div><div class="dps-s">Fight ${el.toFixed(1)} s · avg ${Math.round(dpsTotal / el)} · total ${dpsTotal} · ${dpsHits} hits · ${dpsHits ? Math.round((dpsCrits / dpsHits) * 100) : 0}% crit · max ${dpsMax} · ${dpsCombos} combos/counters</div><div class="dps-log">${dpsLines.join('<br>') || 'Hit a dummy to start the meter. Try elemental combos: water + storm, oil + fire, water + fire.'}</div>`;
+}
 net.on('ehit', (m) => {
   const e = G.enemies.get(m.id);
   if (!e) return;
@@ -776,7 +810,7 @@ function frame(now) {
     for (const [id, e] of G.enemies) if (!e.update(dt, zone, camera)) { e.dispose(); G.enemies.delete(id); }
     for (const r of G.remotes.values()) r.update(dt, camera);
     for (const a of G.allies.values()) a.update(dt, camera, zone);
-    decals.update(dt); updateSigilTags();
+    decals.update(dt); updateSigilTags(); if ((G.time * 4 | 0) !== (G._dpsT | 0)) { G._dpsT = G.time * 4; drawDps(); }
     G.clock = performance.now() / 1000 - clockStart; G.hour = hourAt(G.clock);
     weather.update(dt, zone, camera);
     zone.wildlife?.update(dt, G.time, player ? player.pos : camera.position);
