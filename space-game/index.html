@@ -14276,6 +14276,16 @@ const GX115 = { t: 0, g: 0 };
   if (GX115.t <= 0) { GX115.t = 0.09; const p = S.pos.clone().add(new V3(rand(-0.15, 0.15), 0.55, rand(-0.15, 0.15))); gx7Puff(p, 1, 0.55, 0xd8d8e0); }
   const gy = Math.max(hgt(S.pos.x, S.pos.z), S.water && S.water.visible ? S.water.position.y : -999), h = S.pos.y - gy; if (h < 5 && GX115.g <= 0) { GX115.g = 0.14; const col = (typeof gx26Sandy === 'function' && gx26Sandy()) ? 0xfff0d8 : (typeof atCold === 'function' && atCold()) ? 0xffffff : W.hot ? 0x8a7a70 : 0xe8e4d4; for (let i = 0; i < 3; i++) { const a = rand(0, TAU), r = rand(0.6, 1.8); gx7Puff(new V3(S.pos.x + Math.cos(a) * r, gy + 0.2, S.pos.z + Math.sin(a) * r), 1, 1.1 - h * 0.15, col); } } }; }
 
+/* ============ feel round 116: footprints press into snow and sand and slowly fade away ============ */
+const GX116 = { list: [], t: 0, side: 1, tex: null, geo: null };
+function gx116Tex() { if (GX116.tex) return GX116.tex; GX116.tex = canvasTex(64, 128, (c) => { const g = c.createRadialGradient(32, 40, 2, 32, 40, 26); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(32, 40, 18, 28, 0, 0, Math.PI * 2); c.fill(); const g2 = c.createRadialGradient(32, 98, 2, 32, 98, 18); g2.addColorStop(0, 'rgba(255,255,255,1)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g2; c.beginPath(); c.ellipse(32, 98, 14, 18, 0, 0, Math.PI * 2); c.fill(); }); GX116.geo = new THREE.PlaneGeometry(0.32, 0.6); GX116.geo.rotateX(-Math.PI / 2); return GX116.tex; }
+{ const _usc66 = updateSurfCamera; updateSurfCamera = function (dt) { _usc66(dt);
+  for (let i = GX116.list.length - 1; i >= 0; i--) { const f = GX116.list[i]; f.t += dt; const k = f.t / 14; if (k >= 1 || f.m.parent !== surf) { if (f.m.parent) f.m.parent.remove(f.m); f.m.material.dispose(); GX116.list.splice(i, 1); continue; } f.m.material.opacity = f.op * (1 - k); }
+  if (!GFX.hd || G.state !== 'surface' || S.bike || S.mech || W.interior) return; const snow = typeof atCold === 'function' && atCold(), sand = typeof gx26Sandy === 'function' && gx26Sandy(); if (!snow && !sand) return;
+  const hv = Math.hypot(S.vel.x, S.vel.z); const gy = hgt(S.pos.x, S.pos.z); if (hv < 1.5 || S.pos.y - gy > 0.35) return; GX116.t -= dt * hv; if (GX116.t > 0) return; GX116.t = 1.5;
+  gx116Tex(); const ang = Math.atan2(S.vel.x, S.vel.z); GX116.side = -GX116.side; const ox = Math.cos(ang) * 0.16 * GX116.side, oz = -Math.sin(ang) * 0.16 * GX116.side;
+  const op = snow ? 0.55 : 0.45; const m = new THREE.Mesh(GX116.geo, new THREE.MeshBasicMaterial({ map: GX116.tex, color: snow ? 0x5a7090 : 0x6a4a28, transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 })); const x = S.pos.x + ox, z = S.pos.z + oz; m.position.set(x, hgt(x, z) + 0.04, z); m.rotation.y = ang; surf.add(m); GX116.list.push({ m, t: 0, op }); if (GX116.list.length > 80) { const o = GX116.list.shift(); if (o.m.parent) o.m.parent.remove(o.m); o.m.material.dispose(); } }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
