@@ -704,6 +704,13 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 #hOre.gx124pop { display: inline-block; animation: gx124pop .4s cubic-bezier(.2,.9,.3,1.4); color: #ffd25a; }
 @keyframes gx124pop { 0% { transform: scale(1); } 35% { transform: scale(1.45); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { #hOre.gx124pop { animation: none; } }
+/* feel round 125: credits bounce */
+#hCredits { display: inline-block; }
+#hCredits.gx125up { animation: gx124pop .45s cubic-bezier(.2,.9,.3,1.4), gx125g 1.2s ease-out; }
+#hCredits.gx125down { animation: gx125r 0.9s ease-out; }
+@keyframes gx125g { 0%, 40% { color: #7dff9a; text-shadow: 0 0 12px rgba(125,255,154,.7); } }
+@keyframes gx125r { 0%, 30% { color: #ff7a6a; } }
+@media (prefers-reduced-motion: reduce) { #hCredits.gx125up, #hCredits.gx125down { animation: none; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -14317,6 +14324,12 @@ const GX124 = { ore: null, rings: [], life: 0.45, geo: new THREE.RingGeometry(0.
   if (n > GX124.ore && GFX.hd && renderScene === scene && player.visible) { const m = new THREE.Mesh(GX124.geo, new THREE.MeshBasicMaterial({ color: 0xffd25a, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); scene.add(m); GX124.rings.push({ m, t: 0 }); const el = document.getElementById('hOre'); if (el) { el.classList.remove('gx124pop'); void el.offsetWidth; el.classList.add('gx124pop'); } }
   GX124.ore = n;
   for (let i = GX124.rings.length - 1; i >= 0; i--) { const q = GX124.rings[i]; q.t += dt; const k = q.t / GX124.life; q.m.position.copy(player.position); q.m.quaternion.copy(camera.quaternion); q.m.scale.setScalar(P.r * (0.8 + k * 1.6)); q.m.material.opacity = 0.9 * Math.max(0, 1 - k); if (k >= 1) { scene.remove(q.m); q.m.material.dispose(); GX124.rings.splice(i, 1); } } }; }
+/* ============ feel round 125: credits count up with a bounce when you earn (and dip red when you spend) ============ */
+const GX125 = { shown: null, last: null };
+(function gx125Loop() { requestAnimationFrame(gx125Loop); const el = document.getElementById('hCredits'); if (!el) return; const c = G.credits; if (GX125.shown === null) { GX125.shown = GX125.last = c; return; }
+  if (c !== GX125.last) { el.classList.remove('gx125up', 'gx125down'); void el.offsetWidth; el.classList.add(c > GX125.last ? 'gx125up' : 'gx125down'); GX125.last = c; }
+  if (GX125.shown !== c) { const d = c - GX125.shown; GX125.shown += Math.abs(d) < 2 ? d : Math.sign(d) * Math.max(1, Math.abs(d) * 0.12); if (Math.abs(c - GX125.shown) < 1) GX125.shown = c; }
+  el.textContent = Math.round(GX125.shown).toLocaleString(); })();
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
