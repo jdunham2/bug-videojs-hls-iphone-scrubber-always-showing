@@ -8,6 +8,7 @@ export const TOWN = {
   core: { x: 0, z: 0, r: 2.6 },
   bell: { x: 6.5, z: -5 },
   trainer: { x: -7, z: 6 },
+  wartable: { x: 9.5, z: -2 },
   stash: { x: 7.5, z: 6.5 },
   smith: { x: -9, z: -4 },
   obelisk: { x: -13, z: 4 },
@@ -25,7 +26,23 @@ export const DARK = {
   spawn: { x: 0, z: 18 },
   portal: { x: 0, z: 33 },
   merchant: { x: 0, z: -4 },
+  throne: { x: 0, z: -44 },
+  arenas: [{ x: 0, z: -36 }, { x: 38, z: 14 }, { x: -38, z: 14 }],
 };
+
+export const MUTATORS = {
+  bloodmoon: { name: 'Blood Moon', desc: 'Enemies hit 30% harder and move 25% faster', color: '#ff3a3a' },
+  fog: { name: 'Choking Fog', desc: 'Thick fog hides the approaching horde', color: '#9aa8b8' },
+  siege: { name: 'Siege Night', desc: 'Ogres arrive on waves 3 and 5 (two on wave 5)', color: '#ff9a3c' },
+};
+export const RESEARCH = {
+  arrows: { name: 'Sharpened Arrows', desc: '+20% tower damage per rank', icon: '🏹' },
+  masonry: { name: 'Stonemasonry', desc: '+25% wall & barricade health per rank', icon: '🧱' },
+  hellfire: { name: 'Hellfire Coals', desc: '+25% brazier damage per rank', icon: '🔥' },
+  deepfrost: { name: 'Deep Frost', desc: '+1 frost radius and stronger slow per rank', icon: '❄' },
+  heartstone: { name: 'Heartstone', desc: '+20% Ember Heart health per rank', icon: '💠' },
+};
+export const researchCost = (r) => ({ shards: 15 * (r + 1), gold: 120 * (r + 1) });
 
 export const STRUCTURES = {
   barricade: { name: 'Barricade', cost: 20, hp: 380, key: '1', icon: '🛡', desc: 'Blocks the horde. Enemies must smash through.' },

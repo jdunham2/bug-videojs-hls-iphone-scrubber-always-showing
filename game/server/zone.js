@@ -93,7 +93,7 @@ export class Zone {
       if (this.respawnT <= 0 && this.enemies.size < 9 && this.players().length) {
         this.respawnT = 7;
         const a = rng.range(0, Math.PI * 2), r = rng.range(26, 62);
-        this.spawn(rng.chance(0.75) ? 'wraith' : 'imp', Math.cos(a) * r, Math.sin(a) * r);
+        this.spawn(rng.weighted([['wraith', 6], ['imp', 2], ['healer', 1], ['bomber', 1]]), Math.cos(a) * r, Math.sin(a) * r);
       }
     }
   }
@@ -126,6 +126,12 @@ export class Zone {
       }
       return;
     }
+    if (e.eruptT > 0) {
+      e.eruptT -= dt;
+      if (e.eruptT <= 0) { e.burrowed = false; e.surfaceT = 3.5; for (const p of alive) if (dist(p, e) < 2.8) send(p.ws, { t: 'hurt', dmg: Math.round(e.dmg * 1.3), from: e.id, kb: 1 }); }
+      return;
+    }
+    if (e.strafe) { if (this.drakeStrafe(e, dt, alive)) return; }
     if (e.windT > 0) { e.windT -= dt; if (e.windT <= 0) this.resolveAttack(e); return; }
     if (e.slamT > 0) {
       e.slamT -= dt;
@@ -161,11 +167,19 @@ export class Zone {
     if (target && target.kind === 'player') {
       if (e.type === 'boss' && this.tyrant(e, dt, alive, d)) return;
       if (e.type === 'matriarch' && this.matriarch(e, dt, alive, target.p, d)) return;
+      if (e.type === 'drake' && this.drake(e, dt, alive, target.p, d)) return;
+      if (e.type === 'hollowking' && this.hollowKing(e, dt, alive, target.p, d)) return;
+      if (def.healer) { e.healCd = (e.healCd ?? 2) - dt; if (e.healCd <= 0) this.healPulse(e); if (d < 6.5) { tx = e.x - dx; tz = e.z - dz; reach = 0.1; } else reach = 9; }
+      if (def.burrow) {
+        e.surfaceT = (e.surfaceT || 0) - dt;
+        if (e.surfaceT <= 0 && d > 3.4) e.burrowed = true;
+        if (e.burrowed && d <= 3.2) { e.eruptT = 0.8; this.broadcast({ t: 'erupt', id: e.id, x: r2(e.x), z: r2(e.z), r: 2.8, delay: 0.8 }); return; }
+      }
     }
     const enr = e.enraged ? 1.35 : 1;
     let moving = false;
     if (d > reach) {
-      const sp = def.speed * enr * (e.speedMul || 1) * (e.slow > 0 ? 0.5 : 1) * (target || defense ? 1 : 0.45);
+      const sp = def.speed * enr * (e.speedMul || 1) * (e.burrowed ? 1.5 : 1) * (e.slow > 0 ? 0.5 : 1) * (target || defense ? 1 : 0.45);
       const step = Math.min(pathing ? d : d - reach * 0.8, sp * dt);
       e.x += (dx / d) * step; e.z += (dz / d) * step;
       moving = true;
@@ -253,6 +267,79 @@ export class Zone {
     return false;
   }
 
+  healPulse(e) {
+    let best = null, bf = 0.95;
+    for (const o of this.enemies.values()) { if (o === e || dist(o, e) > 12) continue; const f = o.hp / o.maxHp; if (f < bf) { bf = f; best = o; } }
+    e.healCd = best ? 4 : 1.2;
+    if (!best) return;
+    const amt = Math.round(best.maxHp * 0.22);
+    best.hp = Math.min(best.maxHp, best.hp + amt);
+    this.broadcast({ t: 'heal', from: e.id, to: best.id, amt });
+  }
+
+  // Storm Drake: ground bites; takes to the air for breath strafes; storm strikes in phase 2+.
+  drake(e, dt, alive, target, d) {
+    if (this.phaseCheck(e, [0.66, 0.33])) this.summon(e, 'imp', 4);
+    e.strafeCd = (e.strafeCd ?? 7) - dt;
+    if (e.strafeCd <= 0) {
+      e.strafeCd = e.phase >= 3 ? 5 : e.phase === 2 ? 6.5 : 9;
+      const a = Math.atan2(target.x - e.x, target.z - e.z) + rng.range(-0.3, 0.3);
+      const ax = target.x - Math.sin(a) * 13, az = target.z - Math.cos(a) * 13, bx = target.x + Math.sin(a) * 13, bz = target.z + Math.cos(a) * 13;
+      const A = { x: ax, z: az }, B = { x: bx, z: bz }; this.collide(A, 1); this.collide(B, 1);
+      e.strafe = { ax: A.x, az: A.z, bx: B.x, bz: B.z, t: -1.2, dur: 1.4, w: 3.4, hit: new Set() };
+      e.flying = true;
+      this.broadcast({ t: 'strafe', id: e.id, ax: r2(A.x), az: r2(A.z), bx: r2(B.x), bz: r2(B.z), delay: 1.2, dur: 1.4, w: 3.4 });
+      return true;
+    }
+    if (e.phase >= 2) {
+      e.geyserCd -= dt;
+      if (e.geyserCd <= 0) { e.geyserCd = e.phase === 3 ? 2.6 : 3.8; for (const p of alive.slice(0, 4)) this.addHazard('storm', p.x + rng.range(-1.5, 1.5), p.z + rng.range(-1.5, 1.5), 2.2, 40 * levelMul(this.lvl).dmg, 0.5, 1.0); }
+    }
+    return false;
+  }
+  drakeStrafe(e, dt, alive) {
+    const s = e.strafe; s.t += dt;
+    if (s.t < 0) { e.x += (s.ax - e.x) * Math.min(1, dt * 4); e.z += (s.az - e.z) * Math.min(1, dt * 4); e.ry = Math.atan2(s.bx - s.ax, s.bz - s.az); return true; }
+    const k = Math.min(1, s.t / s.dur);
+    e.x = s.ax + (s.bx - s.ax) * k; e.z = s.az + (s.bz - s.az) * k;
+    for (const p of alive) {
+      if (s.hit.has(p.id)) continue;
+      const vx = s.bx - s.ax, vz = s.bz - s.az, L2 = vx * vx + vz * vz || 1;
+      const u = Math.max(0, Math.min(k, ((p.x - s.ax) * vx + (p.z - s.az) * vz) / L2));
+      if (Math.hypot(p.x - (s.ax + vx * u), p.z - (s.az + vz * u)) < s.w / 2 && u <= k && u >= k - 0.15) { s.hit.add(p.id); send(p.ws, { t: 'hurt', dmg: Math.round(e.dmg * 1.6), from: e.id, affix: 'frozen' }); }
+    }
+    if (k >= 1) { e.strafe = null; e.flying = false; e.cd = 1; this.collide(e, e.radius); }
+    return true;
+  }
+
+  // Hollow King: void slams, shadow bolts, wraith summons; shifts the fight to a new arena each phase.
+  hollowKing(e, dt, alive, target, d) {
+    if (this.phaseCheck(e, [0.66, 0.33])) {
+      const A = DARK.arenas[(e.phase - 1) % DARK.arenas.length];
+      e.x = A.x; e.z = A.z - 4;
+      for (const p of this.players()) send(p.ws, { t: 'teleport', x: A.x + rng.range(-2, 2), z: A.z + 5 + rng.range(-1, 1) });
+      for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; this.addHazard('fire', A.x + Math.cos(a) * 15, A.z + Math.sin(a) * 15, 2.6, 18 * levelMul(this.lvl).dmg, 60, 1.5); }
+      this.broadcast({ t: 'arenaShift', x: A.x, z: A.z, phase: e.phase });
+      this.summon(e, 'wraith', e.phase === 3 ? 4 : 3);
+      e.introT = 1.6;
+      return true;
+    }
+    e.slamCd -= dt; e.abilityCd -= dt;
+    if (e.slamCd <= 0 && d < 8) { e.slamCd = e.enraged ? 4 : 6.5; e.slamT = 1.2; this.broadcast({ t: 'slam', id: e.id, x: r2(e.x), z: r2(e.z), r: 6.5, delay: 1.2, kind: 'void' }); return true; }
+    if (e.abilityCd <= 0) {
+      e.abilityCd = e.enraged ? 2.2 : 3.4;
+      const base = Math.atan2(target.x - e.x, target.z - e.z);
+      for (const off of [-0.35, -0.12, 0.12, 0.35]) {
+        const a = base + off, id = this.room.nextId++;
+        const pr = { id, kind: 'bolt', x: e.x + Math.sin(a) * 1.6, z: e.z + Math.cos(a) * 1.6, vx: Math.sin(a) * 14, vz: Math.cos(a) * 14, dmg: Math.round(e.dmg * 0.7), life: 2.2, affix: 'frozen' };
+        this.projectiles.set(id, pr);
+        this.broadcast({ t: 'proj', id, kind: 'bolt', x: r2(pr.x), z: r2(pr.z), vx: r2(pr.vx), vz: r2(pr.vz) });
+      }
+      this.broadcast({ t: 'eatk', id: e.id });
+    }
+    return false;
+  }
+
   goblin(e, dt, alive) {
     let near = null, nd = 14;
     for (const p of alive) { const dd = dist(p, e); if (dd < nd) { nd = dd; near = p; } }
@@ -276,6 +363,14 @@ export class Zone {
   resolveAttack(e) {
     const t = e.atk; if (!t) return;
     const def = e.def;
+    if (def.bomber) {
+      for (const p of this.alive()) if (dist(p, e) < 3.4) send(p.ws, { t: 'hurt', dmg: e.dmg, from: -1, kb: 1 });
+      if (this.type === 'town') for (const s of [...this.room.defense.structures.values()]) if (dist(s, e) < 3.6) this.room.defense.damageStruct(s, e.dmg * 4);
+      if (t.kind === 'core') this.room.defense.damageCore(e.dmg * 2);
+      this.broadcast({ t: 'boom', x: r2(e.x), z: r2(e.z), r: 3.4 });
+      e.noLoot = true; this.kill(e, null);
+      return;
+    }
     if (def.ranged) {
       let tx = 0, tz = 0;
       if (t.kind === 'player') { tx = t.p.x; tz = t.p.z; } else if (t.kind === 'struct') { tx = t.s.x; tz = t.s.z; }
@@ -322,8 +417,13 @@ export class Zone {
   }
 
   damageEnemy(e, dmg, by, crit, kb = 0, stun = 0, fx, fz) {
-    if (!this.enemies.has(e.id) || e.introT > 0) return;
+    if (!this.enemies.has(e.id) || e.introT > 0 || e.burrowed || e.flying) return;
     if (e.shieldUp) dmg *= 0.25;
+    let blocked = false;
+    if (e.def.frontal && fx !== undefined && e.stunT <= 0) {
+      const ax = fx - e.x, az = fz - e.z, l = Math.hypot(ax, az) || 1;
+      if ((ax / l) * Math.sin(e.ry) + (az / l) * Math.cos(e.ry) > 0.35) { dmg *= 0.2; blocked = true; stun = 0; kb = 0; }
+    }
     e.hp -= dmg; e.aggro = true;
     const poise = e.def.poise * (e.affix ? 0.5 : 1);
     if (poise > 0) {
@@ -336,7 +436,7 @@ export class Zone {
       if (stun > 0) { e.stunT = Math.max(e.stunT, stun * Math.min(1, poise)); e.windT = 0; }
       else if (dmg > e.maxHp * 0.12 && e.staggerImm <= 0) { e.stunT = Math.max(e.stunT, 0.22 * Math.min(1, poise)); e.staggerImm = 1.2; if (e.windT > 0.15) e.windT = 0; }
     } else if (e.def.boss && stun >= 1.4 && e.staggerImm <= 0) { e.stunT = 0.6; e.staggerImm = 5; e.windT = 0; }
-    this.broadcast({ t: 'ehit', id: e.id, dmg: Math.round(dmg), crit: !!crit, by, stun: e.stunT > 0.35, shield: !!e.shieldUp });
+    this.broadcast({ t: 'ehit', id: e.id, dmg: Math.round(dmg), crit: !!crit, by, stun: e.stunT > 0.35, shield: !!e.shieldUp || blocked, blocked });
     if (e.hp <= 0) this.kill(e, by);
   }
 
@@ -358,7 +458,7 @@ export class Zone {
         if (f >= 1) {
           this.rift.guardian = true;
           for (const o of [...this.enemies.values()]) this.remove(o);
-          const g = this.spawn(this.k % 2 ? 'boss' : 'matriarch', e.x, e.z, { guardian: true, introDone: false });
+          const g = this.spawn(['boss', 'matriarch', 'drake'][(this.k - 1) % 3], e.x, e.z, { guardian: true, introDone: false });
           this.collide(g, g.radius);
           this.broadcast({ t: 'guardian', id: g.id });
         }
@@ -368,7 +468,7 @@ export class Zone {
       let gold = e.gold * rng.range(0.8, 1.25);
       if (def.flee) gold *= 2.5;
       this.room.reward(p, gold, def.xp * (1 + 0.15 * (e.level - 1)) * e.xpMul, e.x, e.z);
-      const chance = def.boss || def.flee ? 1 : e.affix ? 0.6 : this.type === 'town' ? 0.05 : e.type === 'brute' ? 0.4 : e.type === 'wraith' ? 0.22 : 0.13;
+      const chance = e.noLoot ? 0 : def.boss || def.flee ? 1 : e.affix ? 0.6 : this.type === 'town' ? 0.05 : e.type === 'brute' ? 0.4 : e.type === 'wraith' ? 0.22 : 0.13;
       if (rng.chance(chance)) {
         const n = def.boss ? 3 : def.flee ? 3 : 1;
         for (let k = 0; k < n; k++) {
@@ -385,6 +485,15 @@ export class Zone {
       this.broadcast({ t: 'cleared', level: this.room.level, x: r2(e.x), z: r2(e.z) });
       this.room.broadcast({ t: 'roomLevel', level: this.room.level });
     }
+  }
+
+  challengeKing(p) {
+    if (this.type !== 'dark' || [...this.enemies.values()].some((e) => e.type === 'hollowking')) return;
+    if (dist(p, DARK.throne) > 8) return;
+    const A = DARK.arenas[0];
+    const k = this.spawn('hollowking', A.x, A.z - 3, { aggro: false });
+    this.broadcast({ t: 'chat', from: '★', text: `${p.prof.name} has challenged the Hollow King!` });
+    return k;
   }
 
   // ---- dungeon events ----
@@ -418,7 +527,7 @@ export class Zone {
   snapshot() {
     const list = [];
     for (const e of this.enemies.values()) {
-      const flags = e.state | (e.slow > 0 ? 2 : 0) | (e.shieldUp ? 4 : 0) | (e.stunT > 0 ? 8 : 0) | (e.enraged ? 16 : 0) | (e.introT > 0 ? 32 : 0) | (e.leapT > 0 ? 64 : 0);
+      const flags = e.state | (e.slow > 0 ? 2 : 0) | (e.shieldUp ? 4 : 0) | (e.stunT > 0 ? 8 : 0) | (e.enraged ? 16 : 0) | (e.introT > 0 ? 32 : 0) | (e.leapT > 0 ? 64 : 0) | (e.burrowed ? 128 : 0) | (e.flying ? 256 : 0);
       list.push([e.id, e.type, r2(e.x), r2(e.z), r2(e.ry), Math.max(0, Math.round(e.hp)), e.maxHp, e.level, flags, e.affix ? AFFIX_KEYS.indexOf(e.affix) : -1]);
     }
     return { t: 'ents', zone: this.key, list };

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { G } from './state.js';
 import { RARITIES, affixLines, WEAPONS, LEGENDARIES, SETS, SALVAGE } from '../shared/items.js';
-import { STRUCTURES, TOWN, upgradeCost, repairCost } from '../shared/world.js';
+import { STRUCTURES, TOWN, upgradeCost, repairCost, MUTATORS, RESEARCH, researchCost } from '../shared/world.js';
 import { CLASSES, TIER_REQ, talentPoints, spentPoints, canLearn } from '../shared/classes.js';
 import { xpForLevel, computeStats } from '../shared/stats.js';
 import { SHRINES } from '../shared/dungeon.js';
@@ -186,6 +186,7 @@ class UI {
       else if (d.phase === 'wave') { title = `WAVE ${d.wave} / ${d.waves}`; sub = `${[...G.enemies.values()].filter((e) => !e.dead).length} enemies in the field`; }
       else if (d.phase === 'intermission') { title = `WAVE ${d.wave} REPELLED`; sub = `Next wave in ${d.timer}s — repair and upgrade!`; }
       else if (d.phase === 'dawn') { title = d.result === 'victory' ? 'DAWN BREAKS' : 'THE HEART DIMS'; sub = d.result === 'victory' ? 'Emberhold stands. The city rewards you.' : 'The Ember Heart was overwhelmed…'; }
+      if (d.mutator && MUTATORS[d.mutator]) sub += ` · ${MUTATORS[d.mutator].name}`;
       dh.querySelector('.dh-title').textContent = title; dh.querySelector('.dh-sub').textContent = sub;
       dh.querySelector('.dh-fill').style.width = (Math.max(0, d.coreHp) / d.coreMax) * 100 + '%';
     } else dh.classList.add('hidden');
@@ -253,7 +254,7 @@ class UI {
   }
 
   // ---------- panels ----------
-  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board'].some((id) => !$(id).classList.contains('hidden')); }
+  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research'].some((id) => !$(id).classList.contains('hidden')); }
   togglePanel(id) { if ($(id).classList.contains('hidden')) this.openPanel(id); else this.closePanel(id); }
   openPanel(id) {
     $(id).classList.remove('hidden');
@@ -265,6 +266,7 @@ class UI {
     if (id === 'settings') this.renderSettings();
     if (id === 'smith') { this.smithSel = null; this.renderSmith(); }
     if (id === 'riftPanel') this.renderRiftPanel();
+    if (id === 'research') this.renderResearch();
   }
   closePanel(id) {
     $(id).classList.add('hidden');
@@ -273,7 +275,7 @@ class UI {
     this.hideTip();
     G.uiOpen = this.anyPanel;
   }
-  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
+  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
   sideBySide(id, on) {
     const inv = $('inventory'), other = $(id);
     if (on && innerWidth > 1400) { other.style.left = 'calc(50% - 400px)'; inv.style.left = 'calc(50% + 330px)'; }
@@ -288,6 +290,7 @@ class UI {
     if (this.shopOpen()) this.renderShop();
     if (this.trade) this.renderTradeBag();
     if (!$('smith').classList.contains('hidden')) this.renderSmith();
+    if (!$('research').classList.contains('hidden')) this.renderResearch();
   }
 
   bagCells(container, items, size, onClick, onRight, cmp = true) {
@@ -363,6 +366,13 @@ class UI {
     $('stashGold').textContent = `◉ ${pr.gold.toLocaleString()} (shared by all your heroes)`;
     this.bagCells($('stashGrid'), pr.stash, STASH, (i) => G.net.send({ t: 'stash', op: 'take', i }), null, false);
     this.bagCells($('stashBag'), pr.char.bag, BAG, (i) => G.net.send({ t: 'stash', op: 'put', i }), null, false);
+  }
+
+  renderResearch() {
+    const pr = G.prof, r = pr.research || {}, m = pr.mats || { shards: 0 };
+    $('researchMats').textContent = `${m.shards} Ember Shards · ◉ ${pr.gold}`;
+    $('researchList').innerHTML = Object.entries(RESEARCH).map(([k, R]) => { const lv = r[k] || 0, c = researchCost(lv); return `<div class="rrow"><div class="ri">${R.icon}</div><div class="rt"><b>${R.name}</b> <span class="muted small">rank ${lv}/3</span><div class="small muted">${R.desc}</div><div class="rpips">${[0, 1, 2].map((i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div></div><button class="btn" data-k="${k}" ${lv >= 3 ? 'disabled' : ''}>${lv >= 3 ? 'Done' : `${c.shards} shards · ${c.gold}g`}</button></div>`; }).join('');
+    $('researchList').querySelectorAll('button').forEach((b) => (b.onclick = () => G.net.send({ t: 'research', key: b.dataset.k })));
   }
 
   // ---------- rifts & leaderboard ----------

@@ -6,9 +6,15 @@ export const ENEMIES = {
   imp: { name: 'Ember Imp', hp: 26, dmg: 5, speed: 5.4, range: 1.4, cd: 0.9, windup: 0.3, gold: 3, xp: 7, radius: 0.4, aggro: 16, poise: 1.3 },
   wraith: { name: 'Hollow Wraith', hp: 85, dmg: 12, speed: 4.0, range: 1.9, cd: 1.4, windup: 0.5, gold: 11, xp: 22, radius: 0.6, aggro: 18, poise: 0.8 },
   spiderling: { name: 'Ashling', hp: 22, dmg: 5, speed: 5.0, range: 1.3, cd: 0.8, windup: 0.25, gold: 2, xp: 5, radius: 0.45, aggro: 18, poise: 1.4 },
+  shieldbearer: { name: 'Shield-bearer', hp: 120, dmg: 12, speed: 2.6, range: 1.9, cd: 1.6, windup: 0.55, gold: 9, xp: 20, radius: 0.75, aggro: 13, poise: 0.3, frontal: true },
+  burrower: { name: 'Ash Burrower', hp: 75, dmg: 16, speed: 4.4, range: 2.4, cd: 2.4, windup: 0.8, gold: 9, xp: 18, radius: 0.65, aggro: 16, poise: 0.8, burrow: true },
+  healer: { name: 'Cinder Mender', hp: 55, dmg: 7, speed: 3.2, range: 12, cd: 2.6, windup: 0.6, gold: 11, xp: 22, radius: 0.5, aggro: 16, poise: 1, ranged: true, healer: true },
+  bomber: { name: 'Blast Imp', hp: 30, dmg: 30, speed: 5.8, range: 1.7, cd: 99, windup: 0.75, gold: 5, xp: 10, radius: 0.45, aggro: 18, poise: 1.2, bomber: true },
   goblin: { name: 'Treasure Goblin', hp: 220, dmg: 0, speed: 5.6, range: 0, cd: 99, windup: 0, gold: 90, xp: 60, radius: 0.5, aggro: 13, poise: 1, flee: true },
   ogre: { name: 'Siege Ogre', hp: 2600, dmg: 38, speed: 1.9, range: 3.4, cd: 2.6, windup: 0.9, gold: 200, xp: 400, radius: 1.8, aggro: 7, poise: 0, boss: true, siege: true },
   boss: { name: 'The Bone Tyrant', hp: 1300, dmg: 24, speed: 2.7, range: 3.3, cd: 2.2, windup: 0.8, gold: 150, xp: 320, radius: 1.6, aggro: 22, boss: true, poise: 0 },
+  drake: { name: 'The Storm Drake', hp: 1250, dmg: 22, speed: 3.4, range: 3.6, cd: 2.0, windup: 0.7, gold: 170, xp: 360, radius: 2.3, aggro: 24, boss: true, poise: 0 },
+  hollowking: { name: 'The Hollow King', hp: 1700, dmg: 26, speed: 3.0, range: 3.2, cd: 2.0, windup: 0.7, gold: 220, xp: 450, radius: 1.5, aggro: 30, boss: true, poise: 0 },
   matriarch: { name: 'The Ash Matriarch', hp: 1150, dmg: 20, speed: 3.6, range: 3.0, cd: 1.8, windup: 0.6, gold: 160, xp: 340, radius: 2.0, aggro: 22, boss: true, poise: 0 },
 };
 

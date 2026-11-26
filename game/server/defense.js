@@ -1,5 +1,5 @@
 // Defend the City: flow-field pathfinding around player structures, waves, tiers, the Siege Ogre.
-import { TOWN, STRUCTURES, townLayout, inGate, tierHp, tierDmg, MAX_TIER, upgradeCost, repairCost } from '../public/shared/world.js';
+import { TOWN, STRUCTURES, townLayout, inGate, tierHp, tierDmg, MAX_TIER, upgradeCost, repairCost, MUTATORS, RESEARCH, researchCost } from '../public/shared/world.js';
 import { levelMul } from '../public/shared/enemies.js';
 import { RNG } from '../public/shared/rng.js';
 
@@ -93,8 +93,9 @@ export class Defense {
     if (p.prof.gold < S.cost) return `Need ${S.cost} gold.`;
     p.prof.gold -= S.cost; p.dirty = true;
     const id = this.room.nextId++;
-    const hp = S.hp * levelMul(this.room.level).hp;
-    this.structures.set(id, { id, kind, x, z, hp, maxHp: hp, tier: 1, cd: 0 });
+    const res = { ...(p.prof.research || {}) };
+    const hp = S.hp * levelMul(this.room.level).hp * (kind === 'wall' || kind === 'barricade' ? 1 + 0.25 * (res.masonry || 0) : 1);
+    this.structures.set(id, { id, kind, x, z, hp, maxHp: hp, tier: 1, cd: 0, res });
     this.changed({ built: id, by: p.id });
     return null;
   }
@@ -104,7 +105,7 @@ export class Defense {
     const cost = upgradeCost(s.kind, s.tier);
     if (p.prof.gold < cost) return `Upgrading costs ${cost} gold.`;
     p.prof.gold -= cost; p.dirty = true;
-    const base = STRUCTURES[s.kind].hp * levelMul(this.room.level).hp;
+    const base = STRUCTURES[s.kind].hp * levelMul(this.room.level).hp * (s.kind === 'wall' || s.kind === 'barricade' ? 1 + 0.25 * (s.res?.masonry || 0) : 1);
     s.tier++; s.maxHp = base * tierHp(s.tier); s.hp = s.maxHp;
     this.changed({ upgraded: id });
     return null;
@@ -131,13 +132,17 @@ export class Defense {
   }
   view() {
     const d = this.state;
-    return { t: 'defense', phase: d.phase, wave: d.wave, waves: 5, timer: Math.ceil(d.timer), coreHp: Math.max(0, Math.round(d.coreHp)), coreMax: d.coreMax, result: d.result, structHp: [...this.structures.values()].map((s) => [s.id, Math.round(s.hp)]) };
+    return { t: 'defense', mutator: d.mutator || null, phase: d.phase, wave: d.wave, waves: 5, timer: Math.ceil(d.timer), coreHp: Math.max(0, Math.round(d.coreHp)), coreMax: d.coreMax, result: d.result, structHp: [...this.structures.values()].map((s) => [s.id, Math.round(s.hp)]) };
   }
   startNight() {
     const d = this.state;
     if (d.phase !== 'day') return;
     const m = levelMul(this.room.level);
-    Object.assign(d, { phase: 'build', wave: 0, timer: 30, coreMax: Math.round(1500 * m.hp), coreHp: Math.round(1500 * m.hp), result: null });
+    const heart = Math.max(0, ...this.town.players().map((p) => p.prof.research?.heartstone || 0));
+    const mutator = Math.random() < 0.7 ? rng.pick(Object.keys(MUTATORS)) : null;
+    const core = Math.round(1500 * m.hp * (1 + 0.2 * heart));
+    Object.assign(d, { phase: 'build', wave: 0, timer: 30, coreMax: core, coreHp: core, result: null, mutator });
+    if (mutator) this.room.broadcast({ t: 'chat', from: '★', text: `Tonight: ${MUTATORS[mutator].name} — ${MUTATORS[mutator].desc}.` });
     this.room.broadcast({ t: 'chat', from: '★', text: 'The night bell tolls! Prepare the defenses of Emberhold!' });
     this.town.broadcast(this.view());
   }
@@ -153,8 +158,9 @@ export class Defense {
   makeWave(n) {
     const q = [];
     const count = 6 + n * 4;
-    for (let i = 0; i < count; i++) q.push(rng.weighted([['imp', 4], ['skeleton', 5], ['brute', n >= 2 ? 1 + n * 0.4 : 0], ['cultist', n >= 3 ? 1.5 : 0]]));
+    for (let i = 0; i < count; i++) q.push(rng.weighted([['imp', 4], ['skeleton', 5], ['brute', n >= 2 ? 1 + n * 0.4 : 0], ['cultist', n >= 3 ? 1.5 : 0], ['bomber', n >= 2 ? 1.4 : 0], ['shieldbearer', n >= 3 ? 1.2 : 0], ['healer', n >= 4 ? 1 : 0], ['burrower', n >= 3 ? 0.8 : 0]]));
     if (n === 5) q.push('brute', 'brute', 'wraith', 'wraith', 'ogre');
+    if (this.state.mutator === 'siege') { if (n === 3) q.push('ogre'); if (n === 5) q.push('ogre'); }
     return q;
   }
   tick(dt) {
@@ -171,6 +177,7 @@ export class Defense {
         const lane = type === 'ogre' ? Math.PI / 2 : rng.pick(TOWN.lanes);
         const c = Math.cos(lane), s = Math.sin(lane), j = type === 'ogre' ? 0 : rng.range(-4, 4);
         const e = town.spawn(type, c * rng.range(80, 88) - s * j, s * rng.range(80, 88) + c * j, { aggro: true, lane: TOWN.lanes.indexOf(lane) });
+        if (d.mutator === 'bloodmoon') { e.dmg = Math.round(e.dmg * 1.3); e.speedMul = 1.25; }
         if (type === 'ogre') { town.broadcast({ t: 'siege', id: e.id }); }
       }
       if (!d.queue.length && town.enemies.size === 0) {
@@ -193,19 +200,19 @@ export class Defense {
           if (best) {
             st.cd = S.rate / (1 + (st.tier - 1) * 0.25);
             const id = this.room.nextId++;
-            town.projectiles.set(id, { id, kind: 'arrow', x: st.x, z: st.z, target: best.id, dmg: S.dmg * lvl * tm, life: 3 });
+            town.projectiles.set(id, { id, kind: 'arrow', x: st.x, z: st.z, target: best.id, dmg: S.dmg * lvl * tm * (1 + 0.2 * (st.res?.arrows || 0)), life: 3 });
             town.broadcast({ t: 'proj', id, kind: 'arrow', x: st.x, z: st.z, target: best.id, tier: st.tier });
           }
         }
       } else if (st.kind === 'brazier') {
         const R = S.radius + (st.tier - 1) * 0.6;
         for (const e of [...town.enemies.values()]) if (dist(e, st) < R) {
-          e.burn = (e.burn || 0) + S.dps * lvl * tm * dt;
+          e.burn = (e.burn || 0) + S.dps * lvl * tm * (1 + 0.25 * (st.res?.hellfire || 0)) * dt;
           if (e.burn >= 8) { const b = e.burn; e.burn = 0; town.damageEnemy(e, b, null, false); }
         }
       } else if (st.kind === 'frost') {
-        const R = S.radius + (st.tier - 1);
-        for (const e of town.enemies.values()) if (dist(e, st) < R) e.slow = 0.3;
+        const R = S.radius + (st.tier - 1) + (st.res?.deepfrost || 0);
+        for (const e of town.enemies.values()) if (dist(e, st) < R) e.slow = 0.3 + 0.1 * (st.res?.deepfrost || 0);
       }
     }
   }
@@ -218,7 +225,7 @@ export class Defense {
     if (!p) { let bd = def.siege ? 4 : 7; for (const q of alive) { const dd = dist(q, e); if (dd < bd) { bd = dd; p = q; } } }
     if (p) return { tx: p.x, tz: p.z, reach: def.range + 0.4, target: { kind: 'player', p } };
     const structs = [...this.structures.values()];
-    if (def.siege) {
+    if (def.siege || def.bomber) {
       let best = null, bd = 30;
       for (const s of structs) { const dd = dist(s, e); if (dd < bd) { bd = dd; best = s; } }
       if (best) return { tx: best.x, tz: best.z, reach: def.range + 1.0, target: { kind: 'struct', s: best } };
@@ -243,4 +250,13 @@ export class Defense {
       if (l < r && l > 1e-4) { e.x = s.x + (dx / l) * r; e.z = s.z + (dz / l) * r; }
     }
   }
+}
+
+export function research(p, key) {
+  if (!RESEARCH[key]) return 'Unknown research.';
+  const r = (p.prof.research ||= {}), lv = r[key] || 0;
+  if (lv >= 3) return 'Already fully researched.';
+  const c = researchCost(lv), m = (p.prof.mats ||= { shards: 0, cores: 0 });
+  if (m.shards < c.shards || p.prof.gold < c.gold) return `Research costs ${c.shards} shards and ${c.gold} gold.`;
+  m.shards -= c.shards; p.prof.gold -= c.gold; r[key] = lv + 1; p.dirty = true; return null;
 }

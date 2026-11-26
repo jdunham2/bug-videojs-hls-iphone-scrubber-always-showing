@@ -6,10 +6,12 @@ import { AFFIX_KEYS } from './enemies.js';
 export const TILE = 3;
 export const BIOMES = ['crypt', 'forge', 'frozen'];
 export const BIOME_INFO = {
-  crypt: { name: 'The Bone Crypts', weights: [['skeleton', 6], ['cultist', 2], ['brute', 1.4], ['imp', 1.2]] },
-  forge: { name: 'The Molten Forge', weights: [['imp', 4], ['brute', 2.4], ['cultist', 2], ['skeleton', 2]] },
-  frozen: { name: 'The Frozen Catacombs', weights: [['skeleton', 5], ['wraith', 3], ['brute', 1.4], ['cultist', 1]] },
+  crypt: { name: 'The Bone Crypts', weights: [['skeleton', 6], ['cultist', 2], ['brute', 1.4], ['imp', 1.2], ['shieldbearer', 1.2], ['healer', 0.8]] },
+  forge: { name: 'The Molten Forge', weights: [['imp', 4], ['brute', 2.4], ['cultist', 2], ['skeleton', 2], ['bomber', 1.6], ['burrower', 0.9]] },
+  frozen: { name: 'The Frozen Catacombs', weights: [['skeleton', 5], ['wraith', 3], ['brute', 1.4], ['cultist', 1], ['burrower', 1.2], ['healer', 1], ['shieldbearer', 1]] },
 };
+export const BOSS_ROTATION = ['boss', 'matriarch', 'drake'];
+const MINION = { boss: 'skeleton', matriarch: 'spiderling', drake: 'imp' };
 export const LEVER_COLORS = ['#ff5a3a', '#5ab0ff', '#5eea8a'];
 export const LEVER_NAMES = ['Ember', 'Frost', 'Verdant'];
 export const SHRINES = {
@@ -99,8 +101,9 @@ export function generateDungeon(seed, level) {
   order.forEach((r, idx) => {
     if (idx === 0) return;
     if (r === boss) {
-      spawns.push({ type: level % 2 === 0 ? 'matriarch' : 'boss', ...tc(r) });
-      for (let k = 0; k < 2; k++) spawns.push({ type: level % 2 === 0 ? 'spiderling' : 'skeleton', ...randIn(r) });
+      const bt = BOSS_ROTATION[(level - 1) % 3];
+      spawns.push({ type: bt, ...tc(r) });
+      for (let k = 0; k < 2; k++) spawns.push({ type: MINION[bt], ...randIn(r) });
       return;
     }
     const n = Math.min(8, rng.int(2, 4) + Math.floor(level / 2));
@@ -152,7 +155,7 @@ export function generateDungeon(seed, level) {
       for (let k = 0; k < n; k++) props.push({ kind: rng.pick(['barrel', 'crate', 'bones', 'urn']), x: rng.range(r.x + 0.6, r.x + r.w - 0.6), y: rng.chance(0.5) ? r.y + 0.6 : r.y + r.h - 0.6, rot: rng.range(0, 6.28) });
     }
   }
-  return { w: W, h: H, grid, rooms: order, start: tc(start), boss: tc(boss), bossRoom: boss, spawns, torches, pillars, props, level, seed, biome, gateTiles, gateOpen: levers.length === 0, levers, leverOrder, shrines, traps, lava, ice, bossType: level % 2 === 0 ? 'matriarch' : 'boss' };
+  return { w: W, h: H, grid, rooms: order, start: tc(start), boss: tc(boss), bossRoom: boss, spawns, torches, pillars, props, level, seed, biome, gateTiles, gateOpen: levers.length === 0, levers, leverOrder, shrines, traps, lava, ice, bossType: BOSS_ROTATION[(level - 1) % 3] };
 }
 
 export function tileAt(d, x, z) {

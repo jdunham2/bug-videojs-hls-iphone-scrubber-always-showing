@@ -208,6 +208,8 @@ G.actions = {
   openTalents(atTrainer) { ui._atTrainer = !!atTrainer; ui.openPanel('talents'); },
   openStash() { ui.openPanel('stash'); },
   openSmith() { ui.openPanel('smith'); },
+  openResearch() { ui.openPanel('research'); },
+  challengeKing() { net.send({ t: 'challenge' }); },
   openRift() { ui.openPanel('riftPanel'); },
   openBoard() { ui.openPanel('board'); net.send({ t: 'leaderboard' }); },
   openChest(ch) { if (!ch.open) net.send({ t: 'chest', id: ch.id }); },
@@ -274,7 +276,8 @@ net.on('ehit', (m) => {
   const e = G.enemies.get(m.id);
   if (!e) return;
   if (m.stun) e.stunFx = 1;
-  if (m.shield && m.by === G.myId && Math.random() < 0.3) fx.text(e.pos.clone().setY(e.pos.y + e.height), 'SHIELDED', 'xp', 0.6);
+  if (m.blocked && m.by === G.myId) { fx.text(e.pos.clone().setY(e.pos.y + e.height), 'BLOCKED — FLANK IT!', 'xp', 0.8); fx.emit({ pos: e.pos.clone().setY(e.pos.y + 1.2), count: 10, speed: 4, color: '#ffffff', color2: '#ffd34d', size: 0.2, life: 0.3 }); }
+  else if (m.shield && m.by === G.myId && Math.random() < 0.3) fx.text(e.pos.clone().setY(e.pos.y + e.height), 'SHIELDED', 'xp', 0.6);
   if (m.by === G.myId) return;
   e.hit(m.crit);
   const p = e.pos.clone(); p.y += e.height * 0.6;
@@ -296,7 +299,7 @@ net.on('edie', (m) => {
   if (m.type === 'goblin') { ui.toast('Treasure Goblin slain!', '#ffd34d', 'It spilled its hoard'); fx.goldBurst(pos); fx.emit({ pos, count: 120, speed: 8, color: '#ffe066', color2: '#ffaa00', size: 0.3, life: 1.5, gravity: 12, up: 1.5 }); sfx.coin(); sfx.coin(); }
   if (ENEMY_BOSS.has(m.type)) { G.shake = 1; fx.shockwave(pos, 10, '#ff6a3a', 1); fx.emit({ pos, count: 200, speed: 10, color: '#ffcf6a', color2: '#ff2000', size: 0.5, life: 1.6, up: 1 }); }
 });
-const ENEMY_BOSS = new Set(['boss', 'matriarch', 'ogre']);
+const ENEMY_BOSS = new Set(['boss', 'matriarch', 'ogre', 'drake', 'hollowking']);
 net.on('hurt', (m) => { if (player) player.hurt(m.dmg, m.from >= 0 ? m.from : null, { affix: m.affix, kb: m.kb }); });
 net.on('reward', (m) => {
   if (player && !m.big) {
@@ -349,7 +352,7 @@ net.on('phase', (m) => { ui.bigBanner(m.enraged ? 'ENRAGED!' : `PHASE ${m.n}`, m
 net.on('bossIntro', (m) => {
   const e = G.enemies.get(m.id);
   if (!e || !player || e.pos.distanceTo(player.pos) > 45) return;
-  const names = { boss: ['THE BONE TYRANT', 'Lord of the Crypts'], matriarch: ['THE ASH MATRIARCH', 'Mother of the Ashlings'] };
+  const names = { boss: ['THE BONE TYRANT', 'Lord of the Crypts'], matriarch: ['THE ASH MATRIARCH', 'Mother of the Ashlings'], drake: ['THE STORM DRAKE', 'Terror of Stormspire'], hollowking: ['THE HOLLOW KING', 'Sovereign of the Dark World'] };
   const [n, s] = names[m.type] || [e.def.name.toUpperCase(), ''];
   player.invuln = 3.2;
   cine.play(bossShots(e, n, s), { skippable: false });
@@ -370,6 +373,32 @@ net.on('dstate', (m) => { if (dungeon && G.zone === dungeon) dungeon.setDState(m
 net.on('lever', (m) => { sfx.lever(m.ok); ui.toast(m.ok ? `${m.by} pulled the ${LEVER_NAMES[m.i]} lever` : `Wrong order! The levers reset and the dead stir…`, m.ok ? '#5eea8a' : '#ff6a5a'); });
 net.on('gateOpen', () => { ui.bigBanner('THE GATE OPENS', 'The boss chamber awaits', 3000); sfx.gate(); G.shake = 0.4; });
 net.on('shrine', (m) => { const S = SHRINES[m.kind]; ui.toast(`${S.name} activated by ${m.by}`, S.color, S.desc + ' for the whole party'); sfx.shrine(); if (player) fx.emit({ pos: player.pos.clone().setY(player.pos.y + 1), count: 50, speed: 3, color: S.color, color2: '#ffffff', size: 0.3, life: 1, up: 1 }); });
+net.on('erupt', (m) => { fx.telegraph(new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z), m.z), m.r, m.delay, '#c87a3a'); setTimeout(() => { if (!G.zone) return; const p = new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z), m.z); fx.emit({ pos: p, count: 50, speed: 7, color: '#b89070', color2: '#3a2a1a', size: 0.5, life: 0.8, up: 2 }); fx.shockwave(p, m.r, '#c87a3a', 0.35); sfx.slam(); }, m.delay * 1000); });
+net.on('heal', (m) => {
+  const a = G.enemies.get(m.from), b = G.enemies.get(m.to); if (!a || !b) return;
+  const pa = a.pos.clone().setY(a.pos.y + 1.5), pb = b.pos.clone().setY(b.pos.y + b.height * 0.6);
+  for (let i = 0; i <= 12; i++) fx.emit({ pos: pa.clone().lerp(pb, i / 12), count: 2, speed: 0.4, color: '#a0ffc0', color2: '#10a040', size: 0.35, life: 0.6 });
+  fx.text(pb, `+${m.amt}`, 'heal', 0.8);
+});
+net.on('boom', (m) => { const p = new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z) + 0.5, m.z); fx.shockwave(p, m.r, '#ff6a1a', 0.4); fx.emit({ pos: p, count: 90, speed: 9, color: '#ffe0a0', color2: '#ff1000', size: 0.55, life: 0.8, up: 1 }); sfx.explode(); G.shake = Math.max(G.shake, 0.4); });
+net.on('strafe', (m) => {
+  const y = (x, z) => G.zone.groundHeight(x, z);
+  const A = new THREE.Vector3(m.ax, y(m.ax, m.az) + 0.06, m.az), B = new THREE.Vector3(m.bx, y(m.bx, m.bz) + 0.06, m.bz);
+  const len = A.distanceTo(B), mid = A.clone().lerp(B, 0.5);
+  const rect = new THREE.Mesh(new THREE.PlaneGeometry(m.w, len), new THREE.MeshBasicMaterial({ color: '#6ad0ff', transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  rect.rotation.x = -Math.PI / 2; rect.rotation.z = -Math.atan2(m.bx - m.ax, m.bz - m.az); rect.position.copy(mid);
+  fx.root.add(rect); sfx.roar();
+  const t0 = performance.now();
+  const tick = () => {
+    const k = (performance.now() - t0) / 1000;
+    rect.material.opacity = k < m.delay ? 0.25 + 0.2 * Math.sin(k * 20) : Math.max(0, 0.5 - (k - m.delay) * 0.4);
+    if (k > m.delay && k < m.delay + m.dur) { const f = (k - m.delay) / m.dur, p = A.clone().lerp(B, f); fx.emit({ pos: p.setY(p.y + 0.5), count: 10, speed: 5, color: '#e0f6ff', color2: '#2a6aff', size: 0.6, life: 0.6, radius: m.w / 2 }); }
+    if (k < m.delay + m.dur + 1) requestAnimationFrame(tick); else { rect.parent?.remove(rect); rect.geometry.dispose(); rect.material.dispose(); }
+  };
+  tick();
+});
+net.on('teleport', (m) => { if (!player) return; ui.fade(true); setTimeout(() => { player.teleport(m.x, m.z, G.zone); camRig.snap(player); ui.fade(false); }, 300); });
+net.on('arenaShift', (m) => { ui.bigBanner('THE HOLLOW KING SHIFTS THE WORLD', `Phase ${m.phase} — a new arena`, 3000); sfx.portal(); sfx.roar(); });
 net.on('riftProgress', (m) => { if (G.rift) G.rift.p = m.p; });
 net.on('guardian', () => { if (G.rift) { G.rift.p = 1; G.rift.guardian = true; } ui.bigBanner('THE GUARDIAN AWAKENS', 'The rift collapses around its master', 3000); sfx.roar(); });
 net.on('riftDone', (m) => {

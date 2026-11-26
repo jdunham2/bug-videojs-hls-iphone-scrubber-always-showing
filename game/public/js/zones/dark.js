@@ -136,7 +136,22 @@ export class DarkZone {
     s.add(this.portal);
     this.colliders.push({ x: DARK.portal.x - 2.8, z: DARK.portal.z, r: 0.9 }, { x: DARK.portal.x + 2.8, z: DARK.portal.z, r: 0.9 });
 
+    // the Hollow King's throne
+    {
+      const T = DARK.throne, ty = darkHeight(T.x, T.z);
+      const g = new THREE.Group(); g.position.set(T.x, ty, T.z);
+      const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+      add(new THREE.CylinderGeometry(4, 4.6, 0.8, 8), ruin, 0, 0.4, 0);
+      add(new THREE.BoxGeometry(2.4, 1.0, 1.6), obs, 0, 1.3, 0);
+      add(new THREE.BoxGeometry(2.4, 4.2, 0.5), obs, 0, 3.2, -0.6);
+      for (const s of [-1, 1]) { add(new THREE.BoxGeometry(0.4, 1.6, 1.6), obs, 1.2 * s, 1.9, 0); add(new THREE.ConeGeometry(0.25, 1.4, 4), crystalMat, 1.1 * s, 5.8, -0.6); }
+      add(new THREE.OctahedronGeometry(0.5, 0), crystalMat, 0, 5.8, -0.6);
+      const l = new THREE.PointLight('#c86bff', 18, 14, 2); l.position.set(0, 4, 2); g.add(l);
+      s.add(g);
+      this.colliders.push({ x: T.x, z: T.z, r: 2.4 });
+    }
     this.interactables = [
+      { x: DARK.throne.x, z: DARK.throne.z + 3.5, r: 4, mark: 'HOLLOW THRONE', label: () => ([...G.enemies.values()].some((e) => e.type === 'hollowking' && !e.dead) ? null : 'Challenge the Hollow King (boss)'), action: () => G.actions.challengeKing() },
       { x: m.x, z: m.z + 1.2, r: 3.6, mark: 'MERCHANT', label: () => 'Trade with the Hollow Merchant', action: () => G.actions.openShop() },
       { x: DARK.portal.x, z: DARK.portal.z, r: 3.5, mark: 'EMBERHOLD', label: () => 'Return to Emberhold', action: () => G.actions.travel('town') },
     ];
@@ -155,7 +170,7 @@ export class DarkZone {
     }
     ctx.putImageData(img, 0, 0);
     this.map = { canvas: c, worldSize: W, center: { x: 0, z: 0 }, view: 60 };
-    this.mapIcons = [{ x: DARK.merchant.x, z: DARK.merchant.z, color: '#c77dff', icon: 'shop' }, { x: DARK.portal.x, z: DARK.portal.z, color: '#ff8a2a', icon: 'portal' }];
+    this.mapIcons = [{ x: DARK.throne.x, z: DARK.throne.z, color: '#c86bff', icon: 'portal' }, { x: DARK.merchant.x, z: DARK.merchant.z, color: '#c77dff', icon: 'shop' }, { x: DARK.portal.x, z: DARK.portal.z, color: '#ff8a2a', icon: 'portal' }];
   }
 
   update(dt, t, playerPos) {

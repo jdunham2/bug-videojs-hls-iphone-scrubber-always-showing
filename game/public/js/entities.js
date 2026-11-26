@@ -4,7 +4,7 @@ import { G, angleLerp, damp } from './state.js';
 import { ENEMIES, AFFIXES, AFFIX_KEYS } from '../shared/enemies.js';
 import { RARITIES } from '../shared/items.js';
 import { STRUCTURES } from '../shared/world.js';
-import { buildEnemy, buildHero, animateRig, animateSpider, flashRig, fadeRig, applyGear, buildWeapon, RARITY_TINT, RARITY_GLOW } from './models.js';
+import { buildEnemy, buildHero, animateRig, animateSpider, animateWorm, animateDrake, flashRig, fadeRig, applyGear, buildWeapon, RARITY_TINT, RARITY_GLOW } from './models.js';
 import { buildSpiritMesh } from './skills.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
@@ -37,7 +37,7 @@ class HpBar {
   set(frac, camera) { this.fill.scale.x = Math.max(0.001, frac); this.g.quaternion.copy(camera.quaternion); }
 }
 
-const HEIGHT = { boss: 5.2, brute: 3, imp: 1.3, ogre: 4.8, matriarch: 3.6, spiderling: 1, goblin: 1.5 };
+const HEIGHT = { boss: 5.2, brute: 3, imp: 1.3, ogre: 4.8, matriarch: 3.6, spiderling: 1, goblin: 1.5, drake: 5, hollowking: 5.4, burrower: 1.3, bomber: 1.4, shieldbearer: 2.3 };
 
 export class EnemyView {
   constructor(a) {
@@ -119,9 +119,17 @@ export class EnemyView {
     this.hurt = Math.max(0, this.hurt - dt * 5);
     const stun = this.stunned && !this.dead;
     const st = { t: this.t, move: this.dead || stun ? 0 : this.move, atk, combo: this.boss || this.type === 'ogre' ? 2 : 0, slam: -1, cast, dead: this.dead ? Math.min(1, this.deathT * 1.4) : 0, hurt: Math.max(this.hurt, stun ? 0.5 + Math.sin(this.t * 14) * 0.3 : 0), float: this.type === 'wraith', air: !!this.leap };
-    if (this.spider) animateSpider(this.rig, st); else animateRig(this.rig, st);
+    const k = this.rig.kind;
+    if (k === 'spider') animateSpider(this.rig, st); else if (k === 'worm') animateWorm(this.rig, st); else if (k === 'drake') animateDrake(this.rig, { ...st, air: !!(this.flags & 256) }); else animateRig(this.rig, st);
+    const hidden = !!(this.flags & 128) && !this.dead;
+    this.root.visible = !hidden;
+    if (hidden && Math.random() < dt * 25) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 0.1), count: 1, speed: 1.5, color: '#8a7058', color2: '#3a2a1a', size: 0.45, life: 0.6, up: 1, radius: 0.5 });
+    if (this.flags & 256) { this.airY = Math.min(7, (this.airY || 0) + dt * 12); } else this.airY = Math.max(0, (this.airY || 0) - dt * 12);
+    this.root.position.y += this.airY || 0;
+    if (this.rig.P.bomb) { const pulse = this.atkT >= 0 ? 4 + Math.sin(this.t * 40) * 3 : 1.5 + Math.sin(this.t * 6) * 0.5; this.rig.P.bomb.material.emissiveIntensity = pulse; }
+    if (this.type === 'healer' && Math.random() < dt * 6) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1.4), count: 1, speed: 0.6, color: '#8affb0', color2: '#0a4020', size: 0.25, life: 0.8, up: 1 });
     if (this.flags & 32 && !this.dead) { // boss intro roar pose
-      if (!this.spider) { this.rig.P.armL.rotation.x = this.rig.P.armR.rotation.x = -2.6; this.rig.P.spine.rotation.x = -0.3; this.rig.P.head.rotation.x = -0.5; }
+      if (!this.rig.kind) { this.rig.P.armL.rotation.x = this.rig.P.armR.rotation.x = -2.6; this.rig.P.spine.rotation.x = -0.3; this.rig.P.head.rotation.x = -0.5; }
     }
     flashRig(this.rig, this.flash * 0.5 + (this.flags & 2 ? 0.15 : 0) + (this.flags & 16 ? 0.25 + Math.sin(this.t * 8) * 0.1 : 0));
     if (this.dead) {
@@ -130,7 +138,7 @@ export class EnemyView {
       if (this.deathT > 1.75) return false;
     }
     if (this.bar) {
-      const show = !this.dead && (this.hp < this.maxHp || this.affix);
+      const show = !this.dead && !(this.flags & 128) && (this.hp < this.maxHp || this.affix || this.type === 'healer');
       this.bar.g.visible = show;
       if (show) { this.bar.g.position.set(this.pos.x, this.pos.y + this.height + 0.25, this.pos.z); this.bar.set(this.hp / this.maxHp, camera); }
     }
@@ -325,7 +333,7 @@ export class HazardView {
       this.g.add(this.mesh); this.mesh.visible = false;
       G.audio.web();
     } else {
-      this.mesh = new THREE.Mesh(new THREE.CircleGeometry(h.r, 32), additive('#ff4a10', 0.55));
+      this.mesh = new THREE.Mesh(new THREE.CircleGeometry(h.r, 32), additive(h.kind === 'storm' ? '#6ad0ff' : '#ff4a10', 0.55));
       this.mesh.rotation.x = -Math.PI / 2; this.g.add(this.mesh);
       this.mesh.visible = this.delay <= 0;
     }
@@ -338,10 +346,12 @@ export class HazardView {
       this.delay -= dt; this.h.delay = this.delay;
       if (this.delay <= 0) {
         this.mesh.visible = true;
+        if (this.h.kind === 'storm') { const top = this.g.position.clone().setY(this.g.position.y + 16), pts = []; for (let i = 0; i <= 10; i++) { const p = top.clone().lerp(this.g.position, i / 10); if (i && i < 10) p.add(new THREE.Vector3((Math.random() - 0.5) * 1.4, 0, (Math.random() - 0.5) * 1.4)); pts.push(p); } const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: new THREE.Color('#cfefff').multiplyScalar(4) })); entityRoot.add(line); setTimeout(() => { entityRoot.remove(line); line.geometry.dispose(); }, 250); G.fx.emit({ pos: this.g.position.clone().setY(this.g.position.y + 0.3), count: 50, speed: 7, color: '#ffffff', color2: '#3a8aff', size: 0.4, life: 0.5, up: 1 }); G.audio.zap(); G.shake = Math.max(G.shake, 0.25); }
         if (this.h.kind === 'geyser') { G.fx.emit({ pos: this.g.position.clone().setY(this.g.position.y + 0.5), count: 80, speed: 9, color: '#ffd080', color2: '#ff1000', size: 0.55, life: 0.9, up: 3, radius: this.h.r * 0.6 }); G.audio.fire(); G.shake = Math.max(G.shake, 0.2); }
       }
       return;
     }
+    if (this.h.kind === 'storm') { this.mesh.material.opacity = Math.max(0, 0.6 - this.t * 0.8); return; }
     if (this.h.kind !== 'web') {
       this.mesh.material.opacity = 0.4 + Math.sin(this.t * 9) * 0.12;
       if (Math.random() < dt * 30) G.fx.emit({ pos: this.g.position, count: 1, speed: 1.2, color: '#ffc060', color2: '#ff1a00', size: 0.45, life: 0.7, up: 2, radius: this.h.r });

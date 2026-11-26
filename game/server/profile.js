@@ -23,7 +23,7 @@ export const getChar = (prof, cls) => (prof.chars[cls] ||= starterChar(cls));
 export function profileView(p) {
   const pr = p.prof;
   pr.mats ||= { shards: 0, cores: 0 };
-  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, riftMax: pr.riftMax || 1, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
+  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, riftMax: pr.riftMax || 1, research: pr.research || {}, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
 }
 
 export function activeBuffs(p) {

@@ -34,12 +34,17 @@ export class DungeonZone {
 
   cameraClamp(target, cam) {
     // if a wall blocks the view, lift the camera over the wall tops instead of zooming into the hero
-    const steps = 24;
+    const steps = 24, full = target.distanceTo(cam);
+    let free = full;
     for (let i = 1; i <= steps; i++) {
       const p = target.clone().lerp(cam, i / steps);
-      if (!isFloor(this.d, p.x, p.z) && p.y < WH + 0.6) { const up = cam.clone(); up.y = Math.max(cam.y, WH + 2.2); return up; }
+      if (!isFloor(this.d, p.x, p.z) && p.y < WH + 0.6) { free = full * (i - 1) / steps; break; }
     }
-    return cam;
+    if (free >= full) return cam;
+    if (free >= 3.5) return target.clone().lerp(cam, (free * 0.92) / full);
+    // too tight: look straight down from above the hero
+    const back = cam.clone().sub(target).setY(0).normalize().multiplyScalar(1.2);
+    return target.clone().add(back).setY(target.y + 7);
   }
 
   build() {

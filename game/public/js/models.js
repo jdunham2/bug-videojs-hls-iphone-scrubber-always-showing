@@ -93,6 +93,15 @@ export function buildWeapon(type, rarity = 0) {
     mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 24), gold, 0, 0.09, 0.05, g).rotation.x = Math.PI / 2;
     mesh(sphere(0.1, 10, 8), gold, 0, 0.1, 0.05, g);
     g.userData.face = face;
+  } else if (type === 'lifeorb') {
+    mesh(cyl(0.025, 0.03, 0.9), wood, 0, 0.2, 0, g);
+    mesh(sphere(0.14, 14, 10), std('#7dffb0', { emissive: '#2aff7a', ei: 3 }), 0, 0.72, 0, g);
+    mesh(new THREE.TorusGeometry(0.18, 0.015, 6, 20), gold, 0, 0.72, 0, g);
+  } else if (type === 'towershield') {
+    const face = std('#4a4038', { metal: 0.6, rough: 0.4 });
+    mesh(box(0.85, 1.25, 0.08), face, 0, 0.1, 0.06, g);
+    mesh(box(0.12, 1.1, 0.12), gold, 0, 0.1, 0.12, g);
+    g.userData.face = face;
   } else if (type === 'ram') {
     mesh(cyl(0.22, 0.26, 2.8, 10), std('#4b3424', { rough: 1 }), 0, 0.6, 0, g);
     mesh(cyl(0.32, 0.3, 0.5, 10), std('#3a3a40', { metal: 0.9, rough: 0.4 }), 0, 2.0, 0, g);
@@ -312,6 +321,19 @@ export function buildEnemy(type) {
     case 'ogre': return buildHumanoid({ scale: 2.3, bulk: 1.8, skin: '#7f8a62', cloth: '#3b2a1e', armor: '#4a4448', eyes: '#ff5a1a', horns: true, hornColor: '#d8cfb8', weapon: 'ram', chestPlate: true, noHair: true, pauldrons: true });
     case 'spiderling': return buildSpider({ scale: 0.55, body: '#2a1416', mark: '#ff6a1a' });
     case 'matriarch': return buildSpider({ scale: 2.2, body: '#1e1012', mark: '#ff3a10', crown: true });
+    case 'shieldbearer': { const r = buildHumanoid({ bulk: 1.2, cloth: '#3a3530', armor: '#6a6560', skin: '#d8d0bc', bones: true, head: 'skull', eyes: '#ffb020', weapon: 'sword', offhand: 'towershield', chestPlate: true, pauldrons: true }); r.P.helm.visible = true; return r; }
+    case 'healer': return buildHumanoid({ legs: 'robe', head: 'hood', cloth: '#1a3a2a', eyes: '#5effa0', skin: '#8a7a70', weapon: 'lifeorb', armor: '#2a4a3a' });
+    case 'bomber': {
+      const rig = buildHumanoid({ scale: 0.66, skin: '#8a3a1a', cloth: '#3a1a0a', head: 'imp', horns: true, eyes: '#ffe84a', tail: true, weapon: 'claws', noHair: true, armor: '#3a1a0a' });
+      const bm = std('#2a1a1a', { emissive: '#ff3a10', ei: 1.5 }); rig.mats.push(bm);
+      const bomb = mesh(sphere(0.38, 14, 10), bm, 0, 0.55, -0.34, rig.P.spine); rig.P.bomb = bomb;
+      mesh(cyl(0.03, 0.03, 0.25, 5), std('#c8b080'), 0, 0.98, -0.34, rig.P.spine);
+      rig.baseEmissive = rig.mats.map((x) => x.emissive.clone());
+      return rig;
+    }
+    case 'burrower': return buildWorm();
+    case 'drake': return buildDrake();
+    case 'hollowking': return buildHumanoid({ scale: 2.3, bulk: 1.3, legs: 'none', head: 'skull', skin: '#c8bce0', cloth: '#14081e', eyes: '#c86bff', crown: true, weapon: 'claws', offhand: 'claws', armor: '#2a1440', cape: '#0a0412', pauldrons: true });
     case 'merchant': return buildHumanoid({ legs: 'robe', head: 'hood', cloth: '#251a3a', eyes: '#9cf', skin: '#7a6a60', armor: '#3a2a50', weapon: 'orb' });
   }
   return buildHumanoid({});
@@ -478,4 +500,74 @@ export function fadeRig(rig, opacity) {
   const walk = (o) => { o.traverse?.((c) => { if (c.material && !rig.mats.includes(c.material)) { c.material.transparent = opacity < 1; c.material.opacity = opacity; } }); };
   if (rig.weapon) walk(rig.weapon);
   if (rig.offhand) walk(rig.offhand);
+}
+
+// ---------- WORM (Ash Burrower) ----------
+export function buildWorm() {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const mats = [];
+  const shell = std('#5a3a2a', { rough: 0.6, flatShading: true }), glow = std('#2a1004', { emissive: '#ff6a1a', ei: 1.8 }); mats.push(shell, glow);
+  const segs = [];
+  for (let i = 0; i < 6; i++) { const s = mesh(new THREE.DodecahedronGeometry(0.42 - i * 0.04, 0), shell, 0, 0.45, -i * 0.5, body); segs.push(s); if (i % 2 === 0) mesh(sphere(0.12, 6, 5), glow, 0, 0.82 - i * 0.03, -i * 0.5, body); }
+  const head = new THREE.Group(); head.position.set(0, 0.55, 0.45); body.add(head);
+  mesh(new THREE.DodecahedronGeometry(0.45, 0), shell, 0, 0, 0, head);
+  for (const s of [-1, 1]) { const m = mesh(cone(0.07, 0.5, 5), std('#e8dcc0'), 0.18 * s, -0.05, 0.4, head); m.rotation.x = Math.PI / 2; m.rotation.z = -0.4 * s; }
+  for (const s of [-1, 1]) mesh(sphere(0.07, 6, 5), std('#ff3a10', { emissive: '#ff3a10', ei: 3 }), 0.2 * s, 0.18, 0.3, head);
+  const rig = { root, body, P: { segs, head }, mats, opts: { worm: true }, kind: 'worm', weapon: null, offhand: null };
+  rig.baseEmissive = mats.map((m) => m.emissive.clone());
+  return rig;
+}
+export function animateWorm(rig, s) {
+  const t = s.t, mv = Math.min(1, s.move || 0), d = s.dead || 0;
+  rig.P.segs.forEach((g, i) => { g.position.x = Math.sin(t * 8 - i * 0.9) * 0.18 * (0.3 + mv); g.position.y = 0.45 + Math.abs(Math.sin(t * 8 - i * 0.9)) * 0.1 * mv - d * 0.4; });
+  const atk = s.atk >= 0 ? Math.sin(s.atk * Math.PI) : 0;
+  rig.P.head.rotation.x = -atk * 0.8; rig.P.head.position.y = 0.55 + atk * 0.6 - d * 0.4;
+  rig.body.rotation.z = d * 1.4;
+}
+
+// ---------- DRAKE ----------
+export function buildDrake() {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.scale.setScalar(1.6);
+  const mats = [];
+  const M = (c, o) => { const m = std(c, o); mats.push(m); return m; };
+  const hide = M('#2a4a66', { rough: 0.45, metal: 0.25, flatShading: true }), belly = M('#8aa8b8', { rough: 0.6 }), bolt = M('#0a1a2a', { emissive: '#6ad0ff', ei: 2.6 }), horn = M('#d8d8e8');
+  const torso = new THREE.Group(); torso.position.y = 1.6; body.add(torso);
+  mesh(sphere(0.9, 14, 10), hide, 0, 0, 0, torso).scale.set(0.9, 0.8, 1.5);
+  mesh(sphere(0.7, 12, 8), belly, 0, -0.25, 0.1, torso).scale.set(0.8, 0.6, 1.3);
+  for (let i = 0; i < 5; i++) mesh(cone(0.12, 0.4, 4), bolt, 0, 0.72, 0.8 - i * 0.4, torso);
+  const neck = []; let parent = torso;
+  for (let i = 0; i < 4; i++) { const n = new THREE.Group(); n.position.set(0, i ? 0.32 : 0.4, i ? 0.32 : 1.1); parent.add(n); mesh(sphere(0.32 - i * 0.03, 10, 8), hide, 0, 0, 0, n); neck.push(n); parent = n; }
+  const head = new THREE.Group(); head.position.set(0, 0.2, 0.35); parent.add(head);
+  mesh(box(0.5, 0.36, 0.8), hide, 0, 0, 0.2, head);
+  const jaw = new THREE.Group(); jaw.position.set(0, -0.15, 0); head.add(jaw); mesh(box(0.42, 0.12, 0.7), belly, 0, -0.04, 0.25, jaw);
+  for (const s of [-1, 1]) { const h = mesh(cone(0.07, 0.6, 5), horn, 0.18 * s, 0.25, -0.2, head); h.rotation.x = -1.1; mesh(sphere(0.06, 6, 5), bolt, 0.17 * s, 0.1, 0.45, head); }
+  const tail = []; parent = torso;
+  for (let i = 0; i < 6; i++) { const t = new THREE.Group(); t.position.set(0, 0, i ? -0.45 : -1.3); parent.add(t); mesh(sphere(0.3 - i * 0.04, 8, 6), hide, 0, 0, 0, t); tail.push(t); parent = t; }
+  mesh(cone(0.2, 0.5, 4), bolt, 0, 0, -0.3, parent).rotation.x = -Math.PI / 2;
+  const wingMat = M('#1a3a56', { rough: 0.7 }); wingMat.side = THREE.DoubleSide;
+  const wings = [];
+  for (const s of [-1, 1]) {
+    const w = new THREE.Group(); w.position.set(0.5 * s, 0.45, 0.2); torso.add(w);
+    const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(2.6 * s, 0.9); sh.lineTo(3.0 * s, -0.2); sh.lineTo(2.2 * s, -0.5); sh.lineTo(1.4 * s, -0.9); sh.lineTo(0.6 * s, -1.1);
+    const wm = mesh(new THREE.ShapeGeometry(sh), wingMat, 0, 0, 0, w); wm.rotation.x = -Math.PI / 2;
+    wings.push(w);
+  }
+  const legs = [];
+  for (const [x, z] of [[-0.5, 0.6], [0.5, 0.6], [-0.5, -0.6], [0.5, -0.6]]) { const l = new THREE.Group(); l.position.set(x, -0.4, z); torso.add(l); mesh(capsule(0.14, 0.6), hide, 0, -0.45, 0, l); legs.push(l); }
+  const rig = { root, body, P: { torso, neck, head, jaw, tail, wings, legs }, mats, opts: { drake: true }, kind: 'drake', weapon: null, offhand: null };
+  rig.baseEmissive = mats.map((m) => m.emissive.clone());
+  return rig;
+}
+export function animateDrake(rig, s) {
+  const P = rig.P, t = s.t, mv = Math.min(1, s.move || 0), d = s.dead || 0, air = s.air ? 1 : 0;
+  const flap = Math.sin(t * (air ? 9 : 2.4)) * (air ? 0.7 : 0.15);
+  P.wings.forEach((w, i) => { w.rotation.z = (i ? -1 : 1) * (air ? flap : 0.9 + flap * 0.3); });
+  P.neck.forEach((n, i) => { n.rotation.x = Math.sin(t * 1.5 + i) * 0.08 - (air ? 0.15 : 0); n.rotation.y = Math.sin(t * 0.8 + i * 0.5) * 0.12; });
+  P.tail.forEach((n, i) => { n.rotation.y = Math.sin(t * 2.2 - i * 0.6) * 0.18; n.rotation.x = 0.06; });
+  const atk = s.atk >= 0 ? Math.sin(s.atk * Math.PI) : 0;
+  P.jaw.rotation.x = atk * 0.6 + (air ? 0.4 : 0);
+  P.neck[0].rotation.x -= atk * 0.4;
+  P.legs.forEach((l, i) => { l.rotation.x = air ? 0.9 : Math.sin(t * 8 + i * Math.PI * 0.5) * 0.5 * mv; });
+  P.torso.position.y = 1.6 + Math.sin(t * 2) * 0.05 - d * 1.0;
+  rig.body.rotation.z = d > 0.3 ? Math.min(1, (d - 0.3) * 2) * 1.4 : 0;
 }

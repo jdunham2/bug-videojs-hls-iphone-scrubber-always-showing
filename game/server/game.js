@@ -2,7 +2,7 @@
 import { CLASSES } from '../public/shared/classes.js';
 import { TOWN, DARK, townLayout } from '../public/shared/world.js';
 import { Zone, send } from './zone.js';
-import { Defense } from './defense.js';
+import { Defense, research } from './defense.js';
 import * as P from './profile.js';
 import { SETS } from '../public/shared/items.js';
 import { RIFT_TIME, season } from '../public/shared/rifts.js';
@@ -209,6 +209,8 @@ function attach(ws) {
         break;
       }
       case 'leaderboard': { const S = (db.data.leaderboard || {})[season()] || {}; send(ws, { t: 'leaderboard', season: season(), data: S }); break; }
+      case 'research': if (p.zone === 'town' && near(p, TOWN.wartable, 7)) ok(research(p, String(m.key)), 'Research complete!', '#5ab0ff'); break;
+      case 'challenge': if (zone?.type === 'dark') zone.challengeKing(p); break;
       case 'paragon': ok(P.spendParagon(p, String(m.key))); break;
       case 'readyResp': room.readyResp(p, !!m.yes); break;
       case 'hit': {

@@ -340,6 +340,20 @@ export class TownZone {
       const face = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshStandardMaterial({ map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.35 })); face.position.set(0, 2, 0.07); bg.add(face);
       s.add(bg);
     }
+    // war table (defense research)
+    {
+      const W = TOWN.wartable, y0 = townHeight(W.x, W.z);
+      const g = new THREE.Group(); g.position.set(W.x, y0, W.z); g.rotation.y = Math.atan2(-W.x, -W.z);
+      const top = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 1.5), woodMat); top.position.y = 1.0; top.castShadow = true; g.add(top);
+      for (const [x, z] of [[-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1, 0.15), timber); l.position.set(x, 0.5, z); g.add(l); }
+      const cv = document.createElement('canvas'); cv.width = 256; cv.height = 160; const cx = cv.getContext('2d');
+      cx.fillStyle = '#d8c8a0'; cx.fillRect(0, 0, 256, 160); cx.strokeStyle = '#6a4a2a'; cx.lineWidth = 3; cx.beginPath(); cx.arc(128, 80, 55, 0, 7); cx.stroke();
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; cx.beginPath(); cx.moveTo(128, 80); cx.lineTo(128 + Math.cos(a) * 75, 80 + Math.sin(a) * 75); cx.stroke(); }
+      cx.fillStyle = '#c23a1a'; for (let i = 0; i < 9; i++) cx.fillRect(20 + Math.random() * 216, 10 + Math.random() * 140, 6, 6);
+      const map = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(cv) }));
+      map.material.map.colorSpace = THREE.SRGBColorSpace; map.rotation.x = -Math.PI / 2; map.position.y = 1.09; g.add(map);
+      s.add(g);
+    }
     this.buildMinimap();
     this.setupInteractables();
   }
@@ -352,6 +366,7 @@ export class TownZone {
       { x: TOWN.smith.x, z: TOWN.smith.z, r: 3.4, mark: 'BLACKSMITH', label: () => 'Visit the Blacksmith (salvage, reroll, upgrade)', action: () => G.actions.openSmith() },
       { x: TOWN.obelisk.x, z: TOWN.obelisk.z, r: 3.4, mark: 'EMBER RIFTS', label: () => 'Open an Ember Rift (timed endgame)', action: () => G.actions.openRift() },
       { x: TOWN.board.x, z: TOWN.board.z, r: 3, mark: 'HALL OF EMBERS', label: () => 'Read the Hall of Embers (leaderboard)', action: () => G.actions.openBoard() },
+      { x: TOWN.wartable.x, z: TOWN.wartable.z, r: 3, mark: 'WAR TABLE', label: () => 'Plan defenses at the War Table (research)', action: () => G.actions.openResearch() },
       { x: TOWN.stash.x, z: TOWN.stash.z, r: 3, mark: 'STASH', label: () => 'Open the shared stash', action: () => G.actions.openStash() },
       { x: TOWN.bell.x, z: TOWN.bell.z, r: 3.2, mark: 'NIGHT BELL', label: () => (G.defense.phase === 'day' ? 'Ring the Night Bell — Defend the City' : null), action: () => G.actions.startNight() },
       ...this.chests.map((ch) => ({ x: ch.x, z: ch.z, r: 2.6, mark: null, label: () => (ch.open ? null : 'Open Ancient Chest'), action: () => G.actions.openChest(ch) })),
@@ -418,7 +433,8 @@ export class TownZone {
   }
 
   setNight(f) {
-    if (Math.abs(f - this.night) < 0.002) return;
+    if (Math.abs(f - this.night) < 0.002 && this._mut === G.defense.mutator) return;
+    this._mut = G.defense.mutator;
     this.night = f;
     const L = (a, b) => C(a).lerp(C(b), f);
     this.sun.intensity = 3.2 + (0.5 - 3.2) * f;
@@ -426,13 +442,15 @@ export class TownZone {
     this.hemi.intensity = 1.0 + (0.32 - 1.0) * f;
     this.hemi.color.copy(L('#bcd7ff', '#3a4a80'));
     this.hemi.groundColor.copy(L('#5a4a30', '#141420'));
-    this.scene.fog.color.copy(L('#c4d6e6', '#0c1328'));
-    this.scene.fog.density = 0.0065 + 0.006 * f;
+    const mut = G.defense.mutator;
+    this.scene.fog.color.copy(L('#c4d6e6', mut === 'bloodmoon' ? '#2a0606' : mut === 'fog' ? '#4a5260' : '#0c1328'));
+    this.scene.fog.density = 0.0065 + (mut === 'fog' ? 0.03 : 0.006) * f;
     const u = this.sky.material.uniforms;
     u.top.value.copy(L('#3f7fd6', '#02040e'));
     u.horizon.value.copy(L('#cfe3f2', '#16224a'));
     u.bottom.value.copy(L('#8aa0b0', '#05070f'));
-    u.sunColor.value.copy(L('#fff0c8', '#dfe8ff'));
+    u.sunColor.value.copy(L('#fff0c8', mut === 'bloodmoon' ? '#ff4030' : '#dfe8ff'));
+    if (mut === 'bloodmoon') u.horizon.value.lerp(new THREE.Color('#5a0a0a'), f);
     u.stars.value = f;
     u.moon.value = f > 0.5 ? 1 : 0;
     u.sunSize.value = 0.9993 - f * 0.0008;
