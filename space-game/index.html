@@ -700,6 +700,10 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 @media (prefers-reduced-motion: reduce) { #warpFx.on { animation: none; } #warpFlash.go { animation: none; } }
 #entry .streaks { background-image: radial-gradient(1.2px 70px at 30% 40%, rgba(255,230,200,.55), transparent), radial-gradient(1px 110px at 70% 20%, rgba(255,210,170,.4), transparent), radial-gradient(1.6px 50px at 15% 75%, rgba(255,245,225,.5), transparent), radial-gradient(0.8px 140px at 85% 65%, rgba(255,200,150,.3), transparent) !important; background-size: 53px 260px, 89px 410px, 131px 230px, 197px 520px !important; animation: erStreak .3s linear infinite !important; }
 @keyframes erStreak { from { background-position: 0 0, 0 0, 0 0, 0 0; } to { background-position: 0 260px, 0 410px, 0 230px, 0 520px; } }
+/* feel round 124: cargo counter bounce on pickup */
+#hOre.gx124pop { display: inline-block; animation: gx124pop .4s cubic-bezier(.2,.9,.3,1.4); color: #ffd25a; }
+@keyframes gx124pop { 0% { transform: scale(1); } 35% { transform: scale(1.45); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { #hOre.gx124pop { animation: none; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -14307,6 +14311,12 @@ const GX123 = { life: 0.16, white: new THREE.Color(0xffffff) };
   if (e.hp < u.gx123hp && e.hp > 0 && GFX.hd && renderScene === scene) { if (!u.gx123s) u.gx123s = e.obj.scale.clone(); if (!u.gx123m) { u.gx123m = []; e.obj.traverse(o => { if (o.isMesh && o.material && o.material.emissive && !o.material.transparent) { o.material = o.material.clone(); u.gx123m.push({ m: o.material, e: o.material.emissive.clone(), i: o.material.emissiveIntensity }); } }); } u.gx123t = GX123.life; }
   u.gx123hp = e.hp;
   if (u.gx123t > 0) { u.gx123t -= dt; const k = Math.max(0, u.gx123t / GX123.life); e.obj.scale.copy(u.gx123s).multiplyScalar(1 + 0.14 * k); u.gx123m.forEach(q => { q.m.emissive.copy(q.e).lerp(GX123.white, k); q.m.emissiveIntensity = q.i + (1.6 - q.i) * k; }); if (k <= 0) e.obj.scale.copy(u.gx123s); } } }; }
+/* ============ feel round 124: ore pickups pop: a gold ring around the ship and a bouncing cargo counter ============ */
+const GX124 = { ore: null, rings: [], life: 0.45, geo: new THREE.RingGeometry(0.82, 1, 48) };
+{ const _ub124 = updateBoss; updateBoss = function (dt) { _ub124(dt); const n = G.stats.ore; if (GX124.ore === null) GX124.ore = n;
+  if (n > GX124.ore && GFX.hd && renderScene === scene && player.visible) { const m = new THREE.Mesh(GX124.geo, new THREE.MeshBasicMaterial({ color: 0xffd25a, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); scene.add(m); GX124.rings.push({ m, t: 0 }); const el = document.getElementById('hOre'); if (el) { el.classList.remove('gx124pop'); void el.offsetWidth; el.classList.add('gx124pop'); } }
+  GX124.ore = n;
+  for (let i = GX124.rings.length - 1; i >= 0; i--) { const q = GX124.rings[i]; q.t += dt; const k = q.t / GX124.life; q.m.position.copy(player.position); q.m.quaternion.copy(camera.quaternion); q.m.scale.setScalar(P.r * (0.8 + k * 1.6)); q.m.material.opacity = 0.9 * Math.max(0, 1 - k); if (k >= 1) { scene.remove(q.m); q.m.material.dispose(); GX124.rings.splice(i, 1); } } }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
