@@ -13903,6 +13903,22 @@ function gx31Flip(m) { if (m.userData.gx31) return; m.userData.gx31 = true; cons
 function gx31Scan(root) { root.traverse(o => { const m = o.material; if (!o.isMesh || !m || Array.isArray(m) || m.side !== THREE.DoubleSide || !m.map || !GX31.txt.has(m.map)) return; gx31Flip(m); }); root.traverse(o => { const m = o.material; if (!o.isMesh || !m || Array.isArray(m) || !m.userData || m.userData.gx31s || !o.geometry || o.geometry.type !== 'CircleGeometry' || !m.transparent || m.color.getHex() !== 0xf4f8ff) return; m.userData.gx31s = true; m.alphaMap = gx31SnowA(); m.depthWrite = false; m.opacity = 1; m.polygonOffset = true; m.polygonOffsetFactor = -1; m.needsUpdate = true; }); }
 { const _usc29 = updateSurfCamera; updateSurfCamera = function (dt) { _usc29(dt); GX31.scanT -= dt; if (GX31.scanW !== W || GX31.scanT <= 0) { GX31.scanW = W; GX31.scanT = 4; gx31Scan(surf); } }; }
 
+/* ============ graphics round 32: Haven promenade gets shiny floors with light reflections and warm pools of light from every shop ============ */
+const GX32 = { done: false, grp: null };
+function gx32Build() { GX32.done = true; const g = new THREE.Group(); GX32.grp = g; surf.add(g);
+  const soft = canvasTex(128, 128, (c) => { const gr = c.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
+  const streak = canvasTex(64, 256, (c) => { const gx = c.createLinearGradient(0, 0, 64, 0); gx.addColorStop(0, 'rgba(255,255,255,0)'); gx.addColorStop(0.5, 'rgba(255,255,255,1)'); gx.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gx; c.fillRect(0, 0, 64, 256); c.globalCompositeOperation = 'destination-in'; const gy = c.createLinearGradient(0, 0, 0, 256); gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(0.5, 'rgba(0,0,0,1)'); gy.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = gy; c.fillRect(0, 0, 64, 256); });
+  const decal = (tex, col, op, w, d, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex, color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })); m.rotation.x = -Math.PI / 2; if (ry) m.rotation.z = ry; m.position.set(x, 0.03, z); m.renderOrder = 2; g.add(m); return m; };
+  // reflections of the ceiling light bars and the soft light they throw
+  for (let z = -66; z <= 66; z += 12) { decal(streak, 0x9fe8ff, 0.22, 3.2, 26, 0, z, Math.PI / 2); decal(soft, 0x6fd8ff, 0.1, 30, 14, 0, z); }
+  // warm wall-wash from the floor lights along both walls
+  for (const s of [-1, 1]) for (let z = -66; z <= 66; z += 6) decal(soft, 0xffb060, 0.16, 5, 6, s * 14.4, z);
+  // each shop throws a pool of its own colour onto the walkway
+  HV_SHOPS.forEach(sh => { const s = Math.sign(sh.x), col = new THREE.Color(sh.col); decal(soft, col, 0.3, 12, 14, sh.x - s * 1.5, sh.z); decal(streak, col, 0.25, 1.4, 7, sh.x - s * 2.6, sh.z); });
+  // shinier floor tiles
+  surf.traverse(o => { if (o.isMesh && o.material && o.material.map && o.geometry.type === 'PlaneGeometry' && o.geometry.parameters.width === 100 && o.geometry.parameters.height === 260) { GX32.floor = o.material; GX32.r0 = o.material.roughness; } }); surf.traverse(o => { if (o.isPointLight && o.distance === 90 && o.position.z < -90) GX32.hang = o; }); }
+{ const _usc30 = updateSurfCamera; updateSurfCamera = function (dt) { _usc30(dt); if (W !== HAVEN_W || !S.built) return; if (!GX32.done) gx32Build(); GX32.grp.visible = GFX.hd; if (GX32.floor) { GX32.floor.roughness = GFX.hd ? 0.55 : GX32.r0; GX32.floor.metalness = GFX.hd ? 0.36 : 0.3; if (GX32.hang) GX32.hang.intensity = GFX.hd ? 0.8 : 1.2; } }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
