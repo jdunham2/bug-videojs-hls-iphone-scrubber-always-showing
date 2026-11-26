@@ -15,7 +15,34 @@ export const REGIONS = {
     camp: { x: 9, z: 56 }, summit: { x: 26, z: -2 }, relics: [{ x: -42, z: 18 }, { x: 46, z: 30 }, { x: -20, z: -40 }],
     height: (x, z) => { const r = Math.hypot(x, z); return fbm(x * 0.03, z * 0.03 + 11, 5) * 9 + smoothstep(45, 85, r) * Math.pow(Math.max(0, r - 45), 1.25) * 0.55 + Math.abs(fbm(x * 0.08, z * 0.08, 2) - 0.5) * 3; },
   },
+  citadel: {
+    name: 'Sunken Citadel', sub: 'A drowned city that breathes with the tide', bound: 88,
+    spawn: { x: 0, z: 66 }, waypoint: { x: 5, z: 70 }, altar: { x: 0, z: 22 }, water: -99, tidal: true,
+    spawns: [['drowned', 4], ['siren', 2.5], ['shieldbearer', 1.5], ['healer', 1], ['wraith', 1.5]],
+    gate: { x: -7, z: 60 }, throne: { x: 0, z: -48 }, bells: [{ x: -38, z: 14 }, { x: 42, z: -12 }, { x: -14, z: -26 }],
+    height: (x, z) => citadelHeight(x, z),
+  },
 };
+
+// The Sunken Citadel: a grid of drowned streets (low, they flood at high tide) between raised plazas and ruined blocks.
+export const CITY_CELL = 14;
+const cellHash = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+export function cityBlock(x, z) { // 0 street, 1 plaza, 2 ruined block
+  const i = Math.floor(x / CITY_CELL), j = Math.floor(z / CITY_CELL);
+  const lx = x - i * CITY_CELL, lz = z - j * CITY_CELL;
+  if (Math.hypot(x, z - 22) < 16 || Math.hypot(x, z + 48) < 16 || Math.hypot(x, z - 64) < 12) return 1; // cathedral, throne, gate
+  if (lx < 4 || lz < 4) return 0; // streets run along the cell edges
+  return cellHash(i, j) < 0.42 ? 2 : 1;
+}
+export function citadelHeight(x, z) {
+  const r = Math.hypot(x, z), b = cityBlock(x, z);
+  const base = b === 0 ? -0.9 : b === 1 ? 1.3 : 1.6;
+  return base + (fbm(x * 0.05 + 3, z * 0.05, 3) - 0.5) * 0.6 + smoothstep(70, 90, r) * (r - 70) * 0.6;
+}
+/** shared tide level (same on server and client): low -1.7 .. high +0.7 over a 2-minute cycle */
+export const TIDE_PERIOD = 120;
+export const tideAt = (sec) => -0.5 + 1.2 * Math.sin((sec / TIDE_PERIOD) * Math.PI * 2);
+export const LOW_TIDE = -1.15; // the Tide Bells sit in the deepest streets and can only be rung below this
 
 export const TOWN_WAYPOINT = { x: -3.5, z: 20 };
 export const CAPTAIN = { x: 3.5, z: 20.5 };
@@ -51,8 +78,25 @@ QUESTS.push(
   { act: 2, kind: 'herald', need: 1, title: 'The Storm Herald', goal: 'Defeat the Storm Herald atop the Stormspire summit',
     done: "The storms are breaking. For the first time in weeks I can see the stars from the summit. Emberhold will sing of this. Act II complete." },
 );
+export const ACT2_END = QUESTS.length;
+QUESTS.push(
+  { act: 3, kind: 'talk3', need: 1, title: 'The Hollow Crown', goal: 'Meet Sir Corvin at the Sunken Citadel gate',
+    intro: "Stand fast, stranger. I held this gate when the sea came in, and I have held it every night since. The Hollow King did not die in his Dark World — he crawled here, to the Throne of Tides, and he is wearing his crown again.",
+    done: "Then we go together. You strike, I hold. Mind the tide — when it rises, the streets become rivers, and the drowned walk with it." },
+  { act: 3, kind: 'kill_citadel', need: 20, title: 'The Drowned Streets', goal: 'Slay 20 of the drowned in the Sunken Citadel',
+    done: 'Good. The bells — three Tide Bells hang in the deepest streets. Ring them and the old wards wake.' },
+  { act: 3, kind: 'bell', need: 3, title: 'Toll the Tide Bells', goal: 'Ring the 3 Tide Bells — only reachable at low tide',
+    done: 'Three tolls. Hear that? The cathedral doors have opened. Something is waking at the altar.' },
+  { act: 3, kind: 'event', need: 1, title: 'High Water', goal: 'Complete a world event in the Sunken Citadel',
+    done: 'The tide answers to someone. A warden, chained to the cathedral. Free it — or end it.' },
+  { act: 3, kind: 'warden', need: 1, title: 'The Drowned Warden', goal: 'Defeat the Drowned Warden at the cathedral altar',
+    done: "The Warden is at rest. The road to the Throne of Tides is open. This is where it ends, hero — for him or for us." },
+  { act: 3, kind: 'king', need: 1, title: 'The Hollow King Reborn', goal: 'Defeat the Hollow King Reborn at the Throne of Tides',
+    done: "The crown is shattered and the sea is quiet. Emberhold stands, the storm is broken and the tide is ours. Act III complete — rest, hero. You have earned it." },
+);
 export const questDone = (q) => (q?.i || 0) >= ACT1_END;
 export const COMPANION = { name: 'Scout Ilsa', color: '#3a9a6a' };
+export const COMPANIONS = { ilsa: { name: 'Scout Ilsa', role: 'Archer · Piercing Volley, Mending Wind', color: '#3a9a6a', unlock: ACT1_END + 1 }, corvin: { name: 'Sir Corvin', role: 'Shieldknight · Taunt, Shield Wall', color: '#5a7ab8', unlock: ACT2_END + 1 } };
 
 export const EVENTS = {
   meteor: { name: 'Meteor Crash', goal: 'Slay the elites at the crash site' },

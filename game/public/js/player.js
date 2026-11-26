@@ -185,6 +185,8 @@ export class LocalPlayer {
     if (this.tailT > 0) speed *= 1.35;
     if (this.mounted) speed *= 1.8;
     if (G.zone && G.zone.type !== 'town' && G.weather) speed *= weatherFx(G.weather).slow || 1;
+    if (G.zone?.tideWater) { const depth = G.zone.tide - G.zone.groundHeight(this.pos.x, this.pos.z); if (depth > 0.45) speed *= depth > 1.3 ? 0.55 : 0.75; } // wading through the flooded streets
+    this.wallT = Math.max(0, (this.wallT || 0) - dt);
     // out-of-combat sprint ramps in after a moment of uninterrupted running
     const canSprint = moving && !this.mounted && this.onGround && this.combatT > 3 && this.atk.t < 0 && this.castT <= 0 && !this.blocking && !this.roll;
     this.sprintT = canSprint ? (this.sprintT || 0) + dt : 0;
@@ -367,6 +369,7 @@ export class LocalPlayer {
         this.resource = Math.min(this.stats.resMax, this.resource + 6);
       }
     }
+    if (this.wallT > 0 && !o.dot) dmg *= 0.5; // Sir Corvin's Shield Wall
     const armor = this.stats.armor * (this.tauntBuffT > 0 ? 1.4 : 1);
     const final = Math.max(1, Math.round(o.dot ? dmg : dmg * 100 / (100 + armor)));
     this.hp -= final; this.lastHurt = 0; this.combatT = 0;

@@ -6,7 +6,9 @@ import { Defense, research } from './defense.js';
 import * as P from './profile.js';
 import { SETS } from '../public/shared/items.js';
 import { RIFT_TIME, season } from '../public/shared/rifts.js';
-import { REGIONS, QUESTS, CAPTAIN, questDone, ACT1_END } from '../public/shared/regions.js';
+import { REGIONS, QUESTS, CAPTAIN, questDone, ACT1_END, ACT2_END, COMPANIONS } from '../public/shared/regions.js';
+// which companion follows a hero: their choice if unlocked, else the newest one they have
+const companionOf = (p) => { const qi = p.char.quest?.i || 0; if (p.companion === false) return null; if (p.companion && COMPANIONS[p.companion] && qi >= COMPANIONS[p.companion].unlock) return p.companion; return qi >= COMPANIONS.corvin.unlock ? 'corvin' : qi >= COMPANIONS.ilsa.unlock ? 'ilsa' : null; };
 import { FISH, rollFish, nearLake, MIN_REEL, hourAt, isNight } from '../public/shared/life.js';
 import { createSocial } from './social.js';
 const SOCIAL_T = new Set(['social', 'friendAdd', 'friendAccept', 'friendDecline', 'friendRemove', 'whisper', 'guildCreate', 'guildInvite', 'guildAccept', 'guildLeave', 'guildStash', 'bountyClaim', 'seasonClaim', 'cosEquip']);
@@ -81,6 +83,7 @@ class Room {
       }
       zone = this.zones.get(this.currentDungeon);
     } else if (REGIONS[type]) {
+      if (type === 'citadel' && (p.char.quest?.i || 0) < ACT2_END && !p.prof.citadel) { send(p.ws, { t: 'notice', text: 'The Sunken Citadel lies beyond the storm. Finish Act II first.', color: '#ff9a7a' }); return; }
       if (type === 'peaks' && !questDone(p.char.quest) && !p.prof.peaks) { send(p.ws, { t: 'notice', text: 'The pass to Stormspire is sealed. Finish Act I first.', color: '#ff9a7a' }); return; }
       zone = this.zones.get(type) || this.zones.set(type, new Zone(this, type, 'region', this.level)).get(type);
     } else zone = this.zones.get(type === 'dark' ? 'dark' : 'town');
@@ -106,8 +109,9 @@ class Room {
       q.i++; q.n = 0;
       this.reward(p, 60 + 40 * q.i, 120 * q.i, p.x, p.z, true);
       if (q.i === ACT1_END) { p.prof.peaks = true; this.giveLoot(p, Math.max(this.level, p.char.level), { rarity: 4 }, p.x + 1.5, p.z); }
-      if (q.i === ACT1_END + 1) { const z = this.zones.get(p.zone); if (z && z.type !== 'town') z.addAlly(p); }
-      if (q.i >= QUESTS.length) { p.prof.act2 = true; p.prof.gold += 1500; }
+      if (q.i === ACT1_END + 1 || q.i === ACT2_END + 1) { if (q.i === ACT2_END + 1) p.companion = 'corvin'; const z = this.zones.get(p.zone), k = companionOf(p); if (z && z.type !== 'town' && k) z.addAlly(p, k); }
+      if (q.i === ACT2_END) { p.prof.act2 = true; p.prof.citadel = true; p.prof.gold += 1500; }
+      if (q.i >= QUESTS.length) { p.prof.act3 = true; p.prof.gold += 3000; }
       send(p.ws, { t: 'questDone', i: q.i - 1 });
     }
     p.dirty = true;
@@ -138,7 +142,7 @@ class Room {
     if (p.trade) this.closeTrade(p.trade, 'Trade cancelled.');
     p.mvGrace = Date.now() + 3000; // zone travel teleports the hero
     for (const z of this.zones.values()) z.removeAllies(p.id);
-    if (zone.type !== 'town' && (p.char.quest?.i || 0) > ACT1_END && p.companion !== false) zone.addAlly(p);
+    { const k = companionOf(p); if (zone.type !== 'town' && k) zone.addAlly(p, k); }
     p.zone = zone.key;
     p.loot.clear();
     const msg = { t: 'enterZone', zone: zone.key, type: zone.type, level: zone.dungeon ? zone.level : this.level, clock: Math.round(this.clock * 10) / 10, weather: zone.weather };
@@ -292,6 +296,7 @@ function attach(ws) {
       case 'talk':
         if (p.zone === 'town' && near(p, CAPTAIN, 6)) { send(ws, { t: 'dialog', who: 'Captain Bryn', i: (p.char.quest?.i || 0) }); room.questEvent(p, 'talk'); }
         else if (p.zone === 'peaks' && near(p, REGIONS.peaks.camp, 6) && (p.char.quest?.i || 0) === ACT1_END) { send(ws, { t: 'dialog', who: 'Scout Ilsa', i: ACT1_END }); room.questEvent(p, 'talk2'); }
+        else if (p.zone === 'citadel' && near(p, REGIONS.citadel.gate, 6) && (p.char.quest?.i || 0) === ACT2_END) { send(ws, { t: 'dialog', who: 'Sir Corvin', i: ACT2_END }); room.questEvent(p, 'talk3'); }
         break;
       case 'relic': if (p.zone === 'peaks') zone.takeRelic(p, m.i | 0); break;
       // ---- fishing (server rolls the fish and validates the reel time) ----
@@ -315,7 +320,8 @@ function attach(ws) {
         p.dirty = true;
         break;
       }
-      case 'companion': p.companion = !!m.on; if (zone && zone.type !== 'town') { zone.removeAllies(p.id); if (p.companion && (p.char.quest?.i || 0) > ACT1_END) zone.addAlly(p); } break;
+      case 'companion': p.companion = m.kind === 'none' || m.on === false ? false : COMPANIONS[m.kind] ? m.kind : 'ilsa'; if (zone && zone.type !== 'town') { zone.removeAllies(p.id); const k = companionOf(p); if (k) zone.addAlly(p, k); } send(ws, { t: 'companion', kind: companionOf(p) }); break;
+      case 'bell': if (p.zone === 'citadel') zone.ringBell(p, m.i | 0); break;
       case 'paragon': ok(P.spendParagon(p, String(m.key))); break;
       case 'readyResp': room.readyResp(p, !!m.yes); break;
       case 'hit': {
@@ -350,7 +356,7 @@ function attach(ws) {
             for (let k = 0; k < +n; k++) p.char.bag.push(P.rollItem(p, room.level, { rarity: 4 }));
             p.dirty = true;
           }
-          if (cmd === 'quest') { p.char.quest = { i: Math.min(+n, QUESTS.length), n: 0 }; if (+n >= ACT1_END) p.prof.peaks = true; p.dirty = true; }
+          if (cmd === 'quest') { p.char.quest = { i: Math.min(+n, QUESTS.length), n: 0 }; if (+n >= ACT1_END) p.prof.peaks = true; if (+n >= ACT2_END) p.prof.citadel = true; p.dirty = true; }
           if (cmd === 'hour') { room.clockOffset = (room.clockOffset || 0) + ((((+n - hourAt(room.clock)) % 24) + 24) % 24) / 24 * 480; room.broadcast({ t: 'clock', clock: room.clock }); }
           if (cmd === 'gems') for (let k = 0; k < +n; k++) P.dropGem(p, room.level + 8);
           if (cmd === 'wave') { const d = room.defense.state; if (d.phase === 'day') room.defense.startNight(); d.wave = Math.max(0, +n - 1); d.phase = 'intermission'; d.timer = 2; }

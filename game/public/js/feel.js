@@ -13,6 +13,7 @@ export function surfaceAt(zone, x, z) {
   if (zone.type === 'region') {
     const y = zone.R.height(x, z);
     if (zone.key === 'marsh') return y < zone.R.water + 0.25 ? 'water' : 'mud';
+    if (zone.key === 'citadel') return zone.tide > y + 0.05 ? 'water' : 'stone';
     return y > 13 ? 'snow' : 'grass';
   }
   return 'stone';

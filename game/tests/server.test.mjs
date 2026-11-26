@@ -305,3 +305,57 @@ test('delta snapshots reproduce the full state; speed hacks are clamped and corr
   assert.ok(p.x < 30, `clamped to ${p.x}`);
   assert.equal(g2.admin().anticheat[0].kind, 'move');
 });
+
+test('act III: Corvin tanks, tide bells need low water, the 5-phase King and its sigil puzzle', { timeout: 60000 }, async () => {
+  const { REGIONS, ACT2_END, QUESTS, tideAt, LOW_TIDE } = await import('../public/shared/regions.js');
+  const game = G(), c = client(game, { cls: 'warden' });
+  await wait(20);
+  const room = game.rooms.get(c.room), p = [...room.players.values()][0], R = REGIONS.citadel;
+  c.send({ t: 'zone', to: 'citadel' }); await wait(40);
+  assert.match(c.last.notice.text, /Act II/);
+  p.char.quest = { i: ACT2_END, n: 0 }; p.prof.citadel = true;
+  c.send({ t: 'chat', text: '/xp 400000' });
+  c.send({ t: 'zone', to: 'citadel' }); await wait(80);
+  c.send({ t: 'state', x: R.gate.x + 1, y: 0, z: R.gate.z, hp: 100, maxHp: 100 });
+  c.send({ t: 'talk' }); await wait(250);
+  assert.equal(c.last.dialog.who, 'Sir Corvin');
+  assert.equal(c.ents.allies?.[0]?.[9], 1, 'Corvin follows');
+  const zone = room.zones.get('citadel');
+  // Corvin taunts packs onto himself
+  for (const e of [...zone.enemies.values()]) zone.remove(e);
+  const ally = [...zone.allies.values()][0]; ally.tauntCd = 0;
+  const pack = [0, 1, 2].map((k) => zone.spawn('drowned', ally.x + 2 + k * 0.5, ally.z + 1, { aggro: true }));
+  await wait(400);
+  assert.ok(pack.some((e) => e.tauntAlly === ally.id), 'pack taunted');
+  for (const e of [...zone.enemies.values()]) zone.remove(e);
+  // tide bells
+  p.char.quest = { i: QUESTS.findIndex((q) => q.kind === 'bell'), n: 0 };
+  const setTide = (low) => { const now = (Date.now() - room.clock0) / 1000; room.clockOffset = (low ? 90 : 30) - now; };
+  setTide(false); assert.ok(tideAt(room.clock) > LOW_TIDE);
+  c.send({ t: 'state', x: R.bells[0].x, y: 0, z: R.bells[0].z, hp: 100, maxHp: 100 }); c.send({ t: 'bell', i: 0 }); await wait(40);
+  assert.match(c.last.notice.text, /under the tide/);
+  setTide(true);
+  for (let i = 0; i < 3; i++) { c.send({ t: 'state', x: R.bells[i].x, y: 0, z: R.bells[i].z, hp: 100, maxHp: 100 }); c.send({ t: 'bell', i }); await wait(30); }
+  assert.equal(QUESTS[p.char.quest.i].kind, 'event', 'three bells rung');
+  // the Hollow King Reborn
+  for (const e of [...zone.enemies.values()]) zone.remove(e);
+  p.char.quest = { i: QUESTS.findIndex((q) => q.kind === 'king'), n: 0 };
+  c.send({ t: 'state', x: R.throne.x, y: 0, z: R.throne.z + 3, hp: 100, maxHp: 100 }); c.send({ t: 'challenge' }); await wait(200);
+  const k = [...zone.enemies.values()].find((e) => e.type === 'kingreborn'); assert.ok(k);
+  k.introDone = true; k.introT = 0; zone.allies.clear();
+  const smack = async (e, n) => { for (let i = 0; i < n && zone.enemies.has(e.id); i++) { e.introT = 0; c.send({ t: 'state', x: e.x + 2, y: 0, z: e.z, hp: 100, maxHp: 100 }); for (let h = 0; h < 4; h++) c.send({ t: 'hit', id: e.id, dmg: 1000 }); await wait(1050); } };
+  while (k.phase < 3) await smack(k, 1);
+  await wait(100);
+  assert.ok(k.invuln && k.sigils, 'puzzle phase');
+  const sig = () => k.sigils.ids.map((id) => zone.enemies.get(id));
+  const order = k.sigils.order;
+  const wrong = sig().find((s) => s.sigil !== order[0]);
+  c.send({ t: 'state', x: wrong.x + 1, y: 0, z: wrong.z, hp: 100, maxHp: 100 }); c.send({ t: 'hit', id: wrong.id, dmg: 50 }); await wait(40);
+  assert.ok(c.last.sigilFail, 'wrong rune resets');
+  for (const i of order) { const s = sig().find((x) => x && x.sigil === i); c.send({ t: 'state', x: s.x + 1, y: 0, z: s.z, hp: 100, maxHp: 100 }); c.send({ t: 'hit', id: s.id, dmg: 50 }); await wait(40); }
+  assert.ok(!k.invuln && c.last.sigilsDone, 'puzzle solved');
+  for (const e of [...zone.enemies.values()]) if (e !== k) zone.remove(e);
+  while (zone.enemies.has(k.id)) { k.strafe = null; await smack(k, 1); }
+  assert.equal(c.last.actComplete?.act, 3);
+  assert.equal(p.char.quest.i, QUESTS.length, 'act III complete');
+});

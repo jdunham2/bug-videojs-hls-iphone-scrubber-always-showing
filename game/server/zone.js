@@ -5,7 +5,8 @@ import { DARK } from '../public/shared/world.js';
 import { SHRINES } from '../public/shared/dungeon.js';
 import { RNG } from '../public/shared/rng.js';
 import { RIFT_MOD_KEYS, riftEnemyLevel, riftHpMul, RIFT_TIME } from '../public/shared/rifts.js';
-import { REGIONS, EVENTS, QUESTS, ACT1_END } from '../public/shared/regions.js';
+import { REGIONS, EVENTS, QUESTS, ACT1_END, tideAt, LOW_TIDE } from '../public/shared/regions.js';
+const QI = (k) => QUESTS.findIndex((q) => q.kind === k);
 const HERALD_Q = QUESTS.findIndex((q) => q.kind === 'herald');
 import { WEATHER_TABLE, weatherFx, hourAt, isNight } from '../public/shared/life.js';
 import { separate, pack } from './crowd.js';
@@ -125,7 +126,7 @@ export class Zone {
   }
 
   findTarget(e, alive) {
-    if (e.tauntT > 0) { const t = alive.find((p) => p.id === e.tauntBy); if (t) return t; }
+    if (e.tauntT > 0) { if (e.tauntAlly) { const a = this.allies.get(e.tauntAlly); if (a && !a.dead) return a; } const t = alive.find((p) => p.id === e.tauntBy); if (t) return t; }
     let best = null, bd = 1e9;
     const range = (e.aggro ? e.def.aggro * 2.2 : e.def.aggro * (this.W.aggro || 1)) * (this.night && !e.aggro ? 1.1 : 1);
     for (const p of alive) {
@@ -143,6 +144,7 @@ export class Zone {
     const def = e.def;
     e.cd -= dt; e.slow = Math.max(0, e.slow - dt); e.tauntT -= dt; e.stunT -= dt; e.staggerImm -= dt;
     if (e.affix === 'shielded') { e.shieldCd -= dt; if (e.shieldCd <= 0) { e.shieldUp = !e.shieldUp; e.shieldCd = e.shieldUp ? 3 : 6; } }
+    if (def.static) { e.state = 0; return; }
     if (e.introT > 0) { e.introT -= dt; e.state = 0; return; }
     if (e.stunT > 0) { e.state = 0; return; }
     if (e.leapT > 0) {
@@ -197,6 +199,7 @@ export class Zone {
       if (e.type === 'drake' && this.drake(e, dt, alive, target.p, d)) return;
       if (e.type === 'herald' && this.herald(e, dt, alive, target.p, d)) return;
       if (e.type === 'hollowking' && this.hollowKing(e, dt, alive, target.p, d)) return;
+      if (e.type === 'kingreborn' && this.kingReborn(e, dt, alive, target.p, d)) return;
       if (def.healer) { e.healCd = (e.healCd ?? 2) - dt; if (e.healCd <= 0) this.healPulse(e); if (d < 6.5) { tx = e.x - dx; tz = e.z - dz; reach = 0.1; } else reach = 9; }
       if (def.burrow) {
         e.surfaceT = (e.surfaceT || 0) - dt;
@@ -323,17 +326,18 @@ export class Zone {
   }
   drakeStrafe(e, dt, alive) {
     const s = e.strafe; s.t += dt;
-    if (s.t < 0) { e.x += (s.ax - e.x) * Math.min(1, dt * 4); e.z += (s.az - e.z) * Math.min(1, dt * 4); e.ry = Math.atan2(s.bx - s.ax, s.bz - s.az); return true; }
+    if (s.ghost) { if (s.t < 0) return false; } // tidal wave: the boss keeps fighting while the wave sweeps
+    else if (s.t < 0) { e.x += (s.ax - e.x) * Math.min(1, dt * 4); e.z += (s.az - e.z) * Math.min(1, dt * 4); e.ry = Math.atan2(s.bx - s.ax, s.bz - s.az); return true; }
     const k = Math.min(1, s.t / s.dur);
-    e.x = s.ax + (s.bx - s.ax) * k; e.z = s.az + (s.bz - s.az) * k;
+    if (!s.ghost) { e.x = s.ax + (s.bx - s.ax) * k; e.z = s.az + (s.bz - s.az) * k; }
     for (const p of alive) {
       if (s.hit.has(p.id)) continue;
       const vx = s.bx - s.ax, vz = s.bz - s.az, L2 = vx * vx + vz * vz || 1;
       const u = Math.max(0, Math.min(k, ((p.x - s.ax) * vx + (p.z - s.az) * vz) / L2));
       if (Math.hypot(p.x - (s.ax + vx * u), p.z - (s.az + vz * u)) < s.w / 2 && u <= k && u >= k - 0.15) { s.hit.add(p.id); send(p.ws, { t: 'hurt', dmg: Math.round(e.dmg * 1.6), from: e.id, affix: 'frozen' }); }
     }
-    if (k >= 1) { e.strafe = null; e.flying = false; e.cd = 1; this.collide(e, e.radius); }
-    return true;
+    if (k >= 1) { e.strafe = null; if (!s.ghost) { e.flying = false; e.cd = 1; this.collide(e, e.radius); } }
+    return !s.ghost;
   }
 
   // Hollow King: void slams, shadow bolts, wraith summons; shifts the fight to a new arena each phase.
@@ -365,10 +369,10 @@ export class Zone {
   }
 
   // ---- Act II companion (server-simulated ally that follows its owner) ----
-  addAlly(p) {
-    for (const a of this.allies.values()) if (a.owner === p.id) return a;
-    const lv = p.char.level || 1, maxHp = 140 + 34 * lv;
-    const a = { ally: true, id: this.room.nextId++, owner: p.id, zone: this.key, x: p.x - 1.5, z: p.z - 1.5, ry: 0, hp: maxHp, maxHp, dmg: 7 + 3.2 * lv, dead: false, revive: 0, downT: 0, atkCd: 1, volleyCd: 5, mendCd: 8, atkT: 0, moving: false, radius: 0.5 };
+  addAlly(p, kind = 'ilsa') {
+    for (const a of this.allies.values()) if (a.owner === p.id) { if (a.kind === kind) return a; this.allies.delete(a.id); }
+    const lv = p.char.level || 1, tank = kind === 'corvin', maxHp = (tank ? 260 + 60 * lv : 140 + 34 * lv);
+    const a = { ally: true, kind, id: this.room.nextId++, owner: p.id, zone: this.key, x: p.x - 1.5, z: p.z - 1.5, ry: 0, hp: maxHp, maxHp, dmg: (tank ? 9 + 3.6 * lv : 7 + 3.2 * lv), dead: false, revive: 0, downT: 0, atkCd: 1, volleyCd: 5, mendCd: 8, tauntCd: 3, wallCd: 8, atkT: 0, moving: false, radius: tank ? 0.6 : 0.5 };
     this.allies.set(a.id, a);
     return a;
   }
@@ -398,6 +402,7 @@ export class Zone {
         a.moving = false; continue;
       }
       a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.01 * dt);
+      if (a.kind === 'corvin') { this.tickCorvin(a, o, dt); continue; }
       // follow: stay at the owner's flank
       const side = Math.sin(o.ry + 2.3), back = Math.cos(o.ry + 2.3);
       const fx = o.x + side * 2.4, fz = o.z + back * 2.4, fd = Math.hypot(fx - a.x, fz - a.z);
@@ -426,6 +431,109 @@ export class Zone {
         this.broadcast({ t: 'allyFx', id: a.id, kind: 'volley', x: r2(a.x), z: r2(a.z) });
       } else if (a.atkCd <= 0) { a.atkCd = 1.15; a.atkT = 0.35; this.allyShoot(a, tgt, a.dmg); }
     }
+  }
+
+  // Sir Corvin (Act III tank): wades into melee near his owner, taunts packs onto himself and raises a Shield Wall
+  tickCorvin(a, o, dt) {
+    a.atkCd -= dt; a.tauntCd -= dt; a.wallCd -= dt;
+    let tgt = null, bd = 12;
+    for (const e of this.enemies.values()) { if (e.burrowed || e.flying || e.invuln || e.def.static || (e.def.flee && !e.aggro)) continue; const d = dist(e, o); if (d < bd && (!this.dungeon || dungeonLOS(this.dungeon, a.x, a.z, e.x, e.z))) { bd = d; tgt = e; } }
+    let tx, tz, reach;
+    if (tgt) { tx = tgt.x; tz = tgt.z; reach = tgt.radius + 1.3; }
+    else { tx = o.x + Math.sin(o.ry + 1.2) * 2.2; tz = o.z + Math.cos(o.ry + 1.2) * 2.2; reach = 1; }
+    const dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz);
+    if (Math.hypot(o.x - a.x, o.z - a.z) > 35) { a.x = o.x; a.z = o.z; }
+    a.moving = d > reach;
+    if (a.moving) { const sp = Math.min(d - reach * 0.8, (d > 10 ? 9.5 : 6.5) * dt); a.x += (dx / d) * sp; a.z += (dz / d) * sp; }
+    if (d > 0.1) a.ry = Math.atan2(dx, dz);
+    this.collide(a, a.radius);
+    if (!tgt) return;
+    // Taunt: every enemy within 8 m turns on him
+    const near = [...this.enemies.values()].filter((e) => !e.def.boss && !e.def.static && dist(e, a) < 8);
+    if (a.tauntCd <= 0 && near.length >= 2) {
+      a.tauntCd = 10;
+      for (const e of near) { e.tauntAlly = a.id; e.tauntT = 5; e.aggro = true; }
+      this.broadcast({ t: 'allyFx', id: a.id, kind: 'taunt', x: r2(a.x), z: r2(a.z) });
+    }
+    // Shield Wall: party takes half damage for 5 s when the fight turns
+    const hurt = this.alive().filter((p) => dist(p, a) < 11 && p.hp < p.maxHp * 0.65);
+    if (a.wallCd <= 0 && (hurt.length || near.length >= 5 || a.hp < a.maxHp * 0.4)) {
+      a.wallCd = 18; a.wallT = 5;
+      for (const p of this.alive()) if (dist(p, a) < 11) send(p.ws, { t: 'shieldWall', dur: 5, from: a.id });
+      this.broadcast({ t: 'allyFx', id: a.id, kind: 'wall', x: r2(a.x), z: r2(a.z) });
+    }
+    a.wallT = Math.max(0, (a.wallT || 0) - dt);
+    if (d <= reach + 0.3 && a.atkCd <= 0) { a.atkCd = 1.2; a.atkT = 0.4; this.damageEnemy(tgt, a.dmg, null, false, 0.6, 0, a.x, a.z); }
+  }
+
+  // ---- Act III boss: the Hollow King Reborn (5 phases; phase 3 is a party puzzle) ----
+  kingReborn(e, dt, alive, target, d) {
+    const R = this.region, T = R.throne;
+    if (this.phaseCheck(e, [0.8, 0.6, 0.4, 0.2])) {
+      if (e.phase === 2 || e.phase === 5) { // shift the fight: everyone is pulled to a new spot around the throne
+        const a = e.phase === 2 ? 0.9 : -2.2, A = { x: T.x + Math.cos(a) * 16, z: T.z + Math.sin(a) * 16 };
+        e.x = A.x; e.z = A.z - 3;
+        for (const p of this.players()) { p.mvGrace = Date.now() + 2500; send(p.ws, { t: 'teleport', x: A.x + rng.range(-2, 2), z: A.z + 4 + rng.range(-1, 1) }); }
+        this.broadcast({ t: 'arenaShift', x: A.x, z: A.z, phase: e.phase });
+        this.summon(e, e.phase === 5 ? 'drowned' : 'wraith', e.phase === 5 ? 5 : 3);
+        e.introT = 1.6; return true;
+      }
+      if (e.phase === 3) { // the sigil puzzle: break the four Tide Sigils in the order shown on the crown
+        e.invuln = true;
+        const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+        e.sigils = { order, next: 0, ids: [] };
+        for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + 0.4, s = this.spawn('sigil', e.x + Math.cos(a) * 9, e.z + Math.sin(a) * 9, { sigil: i, king: e.id, introDone: true }); this.collide(s, s.radius); e.sigils.ids.push(s.id); }
+        this.broadcast({ t: 'sigils', id: e.id, order, ids: e.sigils.ids });
+        return true;
+      }
+      if (e.phase === 4) this.broadcast({ t: 'kingTide', id: e.id });
+    }
+    if (e.phase === 3) { // immune, raining bolts while the party works the puzzle
+      e.abilityCd -= dt;
+      if (e.abilityCd <= 0) { e.abilityCd = 3.2; for (const off of [-0.3, 0, 0.3]) this.heraldBolt(e, Math.atan2(target.x - e.x, target.z - e.z) + off, 12, 0.6); }
+      return true;
+    }
+    e.slamCd -= dt; e.abilityCd -= dt; e.geyserCd -= dt;
+    if (e.phase >= 4 && e.geyserCd <= 0) { // the sea answers: tidal waves sweep across the arena
+      e.geyserCd = e.phase === 5 ? 4.5 : 6.5;
+      const a = rng.range(0, Math.PI * 2), c = target;
+      const A = { x: c.x - Math.cos(a) * 14, z: c.z - Math.sin(a) * 14 }, B = { x: c.x + Math.cos(a) * 14, z: c.z + Math.sin(a) * 14 };
+      e.strafe = { ax: A.x, az: A.z, bx: B.x, bz: B.z, t: -1.3, dur: 1.4, w: 4.2, hit: new Set(), ghost: true };
+      this.broadcast({ t: 'strafe', id: e.id, ax: r2(A.x), az: r2(A.z), bx: r2(B.x), bz: r2(B.z), delay: 1.3, dur: 1.4, w: 4.2, tide: true });
+    }
+    if (e.slamCd <= 0 && d < 8) { e.slamCd = e.phase >= 4 ? 4 : 6; e.slamT = 1.1; this.broadcast({ t: 'slam', id: e.id, x: r2(e.x), z: r2(e.z), r: 6.5, delay: 1.1, kind: 'void' }); return true; }
+    if (e.abilityCd <= 0) { e.abilityCd = e.phase >= 4 ? 2.2 : 3.2; this.heraldOrbs(e, target, e.phase >= 4 ? 5 : 4, 0.2); }
+    return false;
+  }
+  hitSigil(s, by) {
+    const k = this.enemies.get(s.king); if (!k || !k.sigils) return;
+    const S = k.sigils;
+    if (S.order[S.next] === s.sigil) {
+      S.next++; this.broadcast({ t: 'sigilBreak', i: s.sigil, n: S.next });
+      this.remove(s);
+      if (S.next >= 4) { k.invuln = false; k.sigils = null; k.hp = Math.min(k.hp, k.maxHp * 0.6 - 1); k.stunT = 2.5; this.broadcast({ t: 'sigilsDone', id: k.id }); }
+    } else { // wrong rune: the sigils re-form and the drowned rise
+      S.next = 0;
+      for (const id of S.ids) if (!this.enemies.has(id)) { const i = S.ids.indexOf(id), a = (i / 4) * Math.PI * 2 + 0.4; const n = this.spawn('sigil', k.x + Math.cos(a) * 9, k.z + Math.sin(a) * 9, { sigil: i, king: k.id, introDone: true }); S.ids[i] = n.id; }
+      for (let j = 0; j < 2; j++) this.spawn('drowned', s.x + rng.range(-3, 3), s.z + rng.range(-3, 3), { aggro: true, noLoot: true });
+      this.broadcast({ t: 'sigilFail', ids: S.ids, order: S.order, by });
+    }
+  }
+  summonCitadel(p) {
+    if ([...this.enemies.values()].some((e) => e.def.boss)) return;
+    const R = this.region, qi = p.char.quest?.i || 0;
+    if (dist(p, R.altar) < 10 && qi >= QI('warden')) { this.spawn('warden', R.altar.x, R.altar.z - 5); this.broadcast({ t: 'chat', from: '★', text: 'Chains snap beneath the cathedral — the Drowned Warden rises!' }); }
+    else if (dist(p, R.throne) < 10 && qi >= QI('king')) { const k = this.spawn('kingreborn', R.throne.x, R.throne.z - 5); k.maxHp = k.hp = Math.round(k.maxHp * (1 + 0.6 * (this.players().length - 1))); this.broadcast({ t: 'chat', from: '★', text: 'The Throne of Tides stirs. The Hollow King has returned!' }); }
+  }
+  ringBell(p, i) {
+    const B = this.region.bells?.[i], q = p.char.quest || {};
+    if (!B || dist(p, B) > 3.5) return;
+    if (tideAt(this.room.clock) > LOW_TIDE) { send(p.ws, { t: 'notice', text: 'The bell is under the tide. Wait for low water.', color: '#7ad0ff' }); return; }
+    if (QUESTS[q.i]?.kind !== 'bell' || ((q.b || 0) & (1 << i))) return;
+    q.b = (q.b || 0) | (1 << i);
+    this.broadcast({ t: 'bell', i, by: p.prof.name, b: q.b });
+    for (let k = 0; k < 3; k++) { const a = rng.range(0, 6.28); this.spawn('drowned', B.x + Math.cos(a) * 6, B.z + Math.sin(a) * 6, { aggro: true }); }
+    this.room.questEvent(p, 'bell');
   }
 
   // ---- Act II boss: the Storm Herald (4 phases, binds the Storm Drake in phase 2) ----
@@ -603,7 +711,9 @@ export class Zone {
       const ax = fx - e.x, az = fz - e.z, l = Math.hypot(ax, az) || 1;
       if ((ax / l) * Math.sin(e.ry) + (az / l) * Math.cos(e.ry) > 0.35) { dmg *= 0.2; blocked = true; stun = 0; kb = 0; }
     }
+    if (e.def.static) { if (e.sigil !== undefined) this.hitSigil(e, by); return; }
     e.hp -= dmg; e.aggro = true;
+    if (e.type === 'kingreborn' && e.phase < 5) e.hp = Math.max(e.hp, e.maxHp * [0.8, 0.6, 0.4, 0.2][e.phase - 1] - 1);
     if (e.type === 'herald' && e.phase < 4) e.hp = Math.max(e.hp, e.maxHp * [0.75, 0.5, 0.25][e.phase - 1] - 1); // every phase plays out
     const poise = e.def.poise * (e.affix ? 0.5 : 1);
     if (poise > 0) {
@@ -667,6 +777,12 @@ export class Zone {
     }
     if (def.boss && this.type === 'dungeon') for (const p of this.players()) this.room.questEvent(p, 'dungeon');
     if (e.type === 'colossus') for (const p of this.players()) this.room.questEvent(p, 'actboss');
+    if (this.key === 'citadel') for (const p of this.players()) {
+      if (e.type === 'warden') this.room.questEvent(p, 'warden');
+      else if (e.type === 'kingreborn') { this.room.questEvent(p, 'king'); for (let k = 0; k < 2; k++) this.room.giveLoot(p, e.level + 2, { rarity: 4 }, e.x + 1.5 * k, e.z); }
+      else if (!def.boss && !def.static) this.room.questEvent(p, 'kill_citadel');
+    }
+    if (e.type === 'kingreborn') { for (const o of [...this.enemies.values()]) if (o.king === e.id || o.def.static) this.remove(o); this.broadcast({ t: 'actComplete', act: 3, x: r2(e.x), z: r2(e.z) }); }
     if (this.key === 'peaks') for (const p of this.players()) {
       if (e.type === 'drake') this.room.questEvent(p, 'drake');
       else if (e.type === 'herald') { this.room.questEvent(p, 'herald'); this.room.giveLoot(p, e.level + 1, { rarity: 4 }, e.x + 1.5, e.z); }
@@ -736,6 +852,7 @@ export class Zone {
   }
   summonColossus(p) {
     if (this.region.summit && dist(p, this.region.summit) < 10) return this.summonHerald(p);
+    if (this.key === 'citadel') return this.summonCitadel(p);
     if ([...this.enemies.values()].some((e) => e.def.boss)) return;
     if (dist(p, this.region.altar) > 8) return;
     this.spawn(this.key === 'marsh' ? 'colossus' : 'drake', this.region.altar.x, this.region.altar.z - 4);
@@ -812,7 +929,7 @@ export class Zone {
       list.push([e.id, e.type, r2(e.x), r2(e.z), r2(e.ry), Math.max(0, Math.round(e.hp)), e.maxHp, e.level, flags, e.affix ? AFFIX_KEYS.indexOf(e.affix) : -1]);
     }
     const out = { t: 'ents', zone: this.key, list };
-    if (this.allies.size) out.allies = [...this.allies.values()].map((a) => [a.id, a.owner, r2(a.x), r2(a.z), r2(a.ry), Math.max(0, Math.round(a.hp)), a.maxHp, (a.dead ? 1 : 0) | (a.atkT > 0 ? 2 : 0) | (a.moving ? 4 : 0), r2(a.revive / 2.5)]);
+    if (this.allies.size) out.allies = [...this.allies.values()].map((a) => [a.id, a.owner, r2(a.x), r2(a.z), r2(a.ry), Math.max(0, Math.round(a.hp)), a.maxHp, (a.dead ? 1 : 0) | (a.atkT > 0 ? 2 : 0) | (a.moving ? 4 : 0), r2(a.revive / 2.5), a.kind === 'corvin' ? 1 : 0, (a.wallT || 0) > 0 ? 1 : 0]);
     return out;
   }
 }

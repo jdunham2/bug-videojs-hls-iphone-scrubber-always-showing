@@ -155,7 +155,7 @@ export function buildHumanoid(o = {}) {
   const head = new THREE.Group(); head.position.y = 0.98; spine.add(head); P.head = head;
   if (o.head === 'skull') {
     mesh(sphere(0.21, 12, 10), skin, 0, 0.05, 0, head);
-    const jaw = mesh(box(0.22, 0.08, 0.2), skin, 0, -0.12, 0.04, head); jaw.rotation.x = 0.15;
+    const jaw = mesh(box(0.22, 0.08, 0.2), skin, 0, -0.12, 0.04, head); jaw.rotation.x = 0.15; P.jawBone = jaw;
     if (eyeMat) { mesh(sphere(0.045, 8, 6), eyeMat, -0.08, 0.06, 0.17, head); mesh(sphere(0.045, 8, 6), eyeMat, 0.08, 0.06, 0.17, head); }
   } else if (o.head === 'hood') {
     const hood = mesh(cone(0.3, 0.6, 10), cloth, 0, 0.12, -0.02, head);
@@ -166,6 +166,7 @@ export function buildHumanoid(o = {}) {
     mesh(sphere(0.22), skin, 0, 0.04, 0, head);
     if (eyeMat) { mesh(sphere(0.04, 8, 6), eyeMat, -0.08, 0.06, 0.19, head); mesh(sphere(0.04, 8, 6), eyeMat, 0.08, 0.06, 0.19, head); }
     else { const em = M('#1a1a1a'); mesh(sphere(0.03, 6, 6), em, -0.08, 0.06, 0.2, head); mesh(sphere(0.03, 6, 6), em, 0.08, 0.06, 0.2, head); }
+    if (o.head !== 'imp') P.mouth = mesh(box(0.085, 0.022, 0.03), M('#4a1a14', { rough: 1 }), 0, -0.075, 0.2, head);
     if (o.head === 'imp') {
       mesh(cone(0.08, 0.18, 6), skin, 0, -0.02, 0.22, head).rotation.x = Math.PI / 2;
     } else if (!o.noHair) {
@@ -368,6 +369,29 @@ export function buildEnemy(type) {
     case 'ilsa': {
       const rig = buildHero('#3a9a6a', 'ranger');
       rig.P.hood.material = std('#3a5a3a', { rough: 0.9 });
+      return rig;
+    }
+    case 'drowned': return buildHumanoid({ skin: '#7a9a8a', cloth: '#1e3a3a', armor: '#3a5a5a', eyes: '#7affe0', weapon: 'sword', head: 'skull', bones: true, chestPlate: true });
+    case 'siren': return buildHumanoid({ legs: 'robe', head: 'hood', cloth: '#1a4a5a', eyes: '#9afcff', skin: '#9ab8c0', weapon: 'orb', armor: '#2a6a7a' });
+    case 'warden': return buildHumanoid({ scale: 2.4, bulk: 1.7, skin: '#5a7a72', cloth: '#1a2e2e', armor: '#4a6a6a', eyes: '#7affe0', horns: true, hornColor: '#2a3a3a', weapon: 'club', chestPlate: true, noHair: true, pauldrons: true });
+    case 'kingreborn': {
+      const rig = buildHumanoid({ scale: 2.4, bulk: 1.35, legs: 'none', head: 'skull', skin: '#bfe8f0', cloth: '#06141e', eyes: '#5af0ff', crown: true, weapon: 'claws', offhand: 'claws', armor: '#123a4a', cape: '#04101a', pauldrons: true });
+      const glow = std('#bff6ff', { emissive: '#2ad0ff', ei: 2.5 }); rig.mats.push(glow);
+      for (let i = 0; i < 4; i++) { const r = mesh(new THREE.TorusGeometry(0.42 + i * 0.12, 0.018, 6, 36), glow, 0, -0.2 - i * 0.18, 0, rig.P.hips); r.rotation.x = Math.PI / 2; }
+      rig.baseEmissive = rig.mats.map((x) => x.emissive.clone());
+      return rig;
+    }
+    case 'sigil': {
+      const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+      const stone = std('#2a3a44', { rough: 0.9 }), rune = std('#bff6ff', { emissive: '#2ad0ff', ei: 2.4 });
+      mesh(cyl(0.7, 0.9, 0.6, 6), stone, 0, 0.3, 0, body);
+      const cry = mesh(new THREE.OctahedronGeometry(0.55, 0), rune, 0, 1.6, 0, body); cry.scale.y = 1.7;
+      return { root, body, P: { cry }, mats: [stone, rune], baseEmissive: [stone.emissive.clone(), rune.emissive.clone()], opts: {}, kind: 'static', weapon: null, offhand: null };
+    }
+    case 'corvin': {
+      const rig = buildHumanoid({ cloth: '#2a3a5a', cape: '#5a7ab8', armor: '#b8c0cc', weapon: 'sword', offhand: 'towershield', chestPlate: true, pauldrons: true, hair: '#8a8a8a' });
+      rig.animator = new Animator();
+      rig.baseEmissive = rig.mats.map((x) => x.emissive.clone());
       return rig;
     }
     case 'merchant': return buildHumanoid({ legs: 'robe', head: 'hood', cloth: '#251a3a', eyes: '#9cf', skin: '#7a6a60', armor: '#3a2a50', weapon: 'orb' });

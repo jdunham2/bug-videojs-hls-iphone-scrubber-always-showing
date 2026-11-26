@@ -1,6 +1,6 @@
 // Open-world regions: Ashen Marsh and Stormspire Peaks (shared RegionZone driven by a style table).
 import * as THREE from 'three';
-import { REGIONS, QUESTS, ACT1_END } from '../../shared/regions.js';
+import { REGIONS, QUESTS, ACT1_END, ACT2_END, cityBlock, CITY_CELL, tideAt, LOW_TIDE } from '../../shared/regions.js';
 import { buildEnemy, animateRig } from '../models.js';
 import { nightAmount } from '../../shared/life.js';
 const NIGHT_SKY = { top: new THREE.Color('#04060f'), horizon: new THREE.Color('#141c30'), bottom: new THREE.Color('#080a14') }, DUSK = new THREE.Color('#ff8a4a'), MOON = new THREE.Color('#b8ccff'), _c = new THREE.Color();
@@ -20,6 +20,11 @@ const STYLE = {
     sky: { top: '#2e62a8', horizon: '#d0dcea', bottom: '#8aa0b8', sunDir: [0.5, 0.6, -0.4], sunColor: '#fff6e0', sunSize: 0.9993 },
     fog: ['#b8c8d8', 0.009], hemi: ['#d0e0ff', '#3a4250', 1.1], sun: ['#fff4e0', 3], exposure: 1.0, bloom: { strength: 0.35, radius: 0.5, threshold: 0.85 },
     ground: (x, z, y, c) => { const n = fbm(x * 0.07, z * 0.07, 3); c.set('#5a6a3c').lerp(new THREE.Color('#6e6e74'), smoothstep(6, 12, y) * 0.9 + n * 0.2); c.lerp(new THREE.Color('#eef2f8'), smoothstep(13, 20, y + n * 4)); },
+  },
+  citadel: {
+    sky: { top: '#1a3248', horizon: '#7aa0a8', bottom: '#2a3a40', sunDir: [-0.4, 0.35, -0.8], sunColor: '#e8f0e0', sunSize: 0.999 },
+    fog: ['#5a7a80', 0.014], hemi: ['#b8d8e0', '#20302e', 1.0], sun: ['#e8f4f0', 2.2], exposure: 1.05, bloom: { strength: 0.5, radius: 0.55, threshold: 0.75 },
+    ground: (x, z, y, c) => { const b = cityBlock(x, z), n = fbm(x * 0.2, z * 0.2, 2); if (b === 0) c.set('#2e3a38').lerp(new THREE.Color('#3e4a44'), n); else if (b === 1) c.set('#8a8e84').lerp(new THREE.Color('#a8a898'), n * 0.8); else c.set('#5a5e56').lerp(new THREE.Color('#4a5a4a'), n); },
   },
 };
 
@@ -52,7 +57,7 @@ export class RegionZone {
     const rock = new THREE.MeshStandardMaterial({ map: textures.rock, color: this.key === 'marsh' ? '#5a5a48' : '#8a8a92', roughness: 0.95, flatShading: true });
     const B = new Batcher();
     const spot = (minR, maxR) => { const a = rng.range(0, 6.28), r = rng.range(minR, maxR); const x = Math.cos(a) * r, z = Math.sin(a) * r; const clear = [[R.spawn, 10], [R.altar, 12], [R.summit, 15], [R.camp, 7], ...(R.relics || []).map((q) => [q, 3])]; return clear.some(([q, d]) => q && Math.hypot(x - q.x, z - q.z) < d) ? null : { x, z }; };
-    if (this.key === 'marsh') {
+    if (this.key === 'citadel') { /* built in buildCitadel */ } else if (this.key === 'marsh') {
       const water = new THREE.Mesh(new THREE.PlaneGeometry(190, 190), new THREE.MeshStandardMaterial({ color: '#2c3a28', roughness: 0.15, metalness: 0.25, transparent: true, opacity: 0.85 }));
       water.rotation.x = -Math.PI / 2; water.position.y = R.water; s.add(water);
       const bark = new THREE.MeshStandardMaterial({ color: '#1e1a14', roughness: 1 });
@@ -75,7 +80,7 @@ export class RegionZone {
       cry.count = n; s.add(cry);
       for (let i = 0; i < 8; i++) { const a = (i / 8) * 6.28, x = R.altar.x + Math.cos(a) * 9, z = R.altar.z + Math.sin(a) * 9; B.add(new THREE.CylinderGeometry(0.6, 0.9, 6, 6), rock, mtx(x, H(x, z) + 2.6, z)); this.colliders.push({ x, z, r: 0.9 }); }
     }
-    for (let i = 0; i < 50; i++) { const p = spot(15, 82); if (!p) continue; const sc = rng.range(0.8, 2.6); B.add(new THREE.DodecahedronGeometry(1, 0), rock, mtx(p.x, H(p.x, p.z) - 0.2 * sc, p.z, rng.range(0, 6), rng.range(0, 1), 0, sc, sc * 0.7, sc * 1.1)); if (sc > 1.1) this.colliders.push({ x: p.x, z: p.z, r: sc * 0.8 }); }
+    for (let i = 0; i < (this.key === 'citadel' ? 0 : 50); i++) { const p = spot(15, 82); if (!p) continue; const sc = rng.range(0.8, 2.6); B.add(new THREE.DodecahedronGeometry(1, 0), rock, mtx(p.x, H(p.x, p.z) - 0.2 * sc, p.z, rng.range(0, 6), rng.range(0, 1), 0, sc, sc * 0.7, sc * 1.1)); if (sc > 1.1) this.colliders.push({ x: p.x, z: p.z, r: sc * 0.8 }); }
     B.build(s);
     // waypoint stone
     const W = R.waypoint, wy = H(W.x, W.z);
@@ -92,10 +97,11 @@ export class RegionZone {
     const l = new THREE.PointLight(col, 18, 16, 2); l.position.y = 3; al.add(l);
     s.add(al);
     if (this.key === 'peaks') this.buildAct2(rock);
+    if (this.key === 'citadel') { const CB = new Batcher(); this.buildCitadel(rock, CB); CB.build(s); }
     const bossName = this.key === 'marsh' ? 'Bog Colossus' : 'Storm Drake';
     this.interactables = [
       { x: W.x, z: W.z, r: 3.2, mark: 'WAYPOINT', label: () => 'Use the waypoint', action: () => G.actions.openWaypoint() },
-      { x: A.x, z: A.z, r: 5, mark: this.key === 'marsh' ? 'DROWNED ALTAR' : 'STORM ALTAR', label: () => ([...G.enemies.values()].some((e) => e.boss && !e.dead) ? null : `Summon the ${bossName} (boss)`), action: () => G.actions.challengeKing() },
+      ...(this.key === 'citadel' ? [] : [{ x: A.x, z: A.z, r: 5, mark: this.key === 'marsh' ? 'DROWNED ALTAR' : 'STORM ALTAR', label: () => ([...G.enemies.values()].some((e) => e.boss && !e.dead) ? null : `Summon the ${bossName} (boss)`), action: () => G.actions.challengeKing() }]),
       ...(this.act2Interact || []),
     ];
     this.buildMinimap();
@@ -139,6 +145,65 @@ export class RegionZone {
       { x: S.x, z: S.z, r: 6, mark: 'STORMSPIRE SUMMIT', label: () => (qi() < HERALD_Q || [...G.enemies.values()].some((e) => e.boss && !e.dead) ? null : 'Challenge the Storm Herald (Act II boss)'), action: () => G.actions.challengeKing() },
     ];
   }
+  // Act III: the Sunken Citadel — ruined blocks between drowned streets, the cathedral, the Throne of Tides, the gate and the bells
+  buildCitadel(rock, B) {
+    const s = this.scene, R = this.R, H = (x, z) => R.height(x, z), rng = new RNG(919);
+    const wall = new THREE.MeshStandardMaterial({ color: '#7a8078', roughness: 0.95, flatShading: true }), moss = new THREE.MeshStandardMaterial({ color: '#3a5a40', roughness: 1 });
+    const glow = new THREE.MeshStandardMaterial({ color: '#bff6ff', emissive: '#2ad0ff', emissiveIntensity: 2 });
+    for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) {
+      const cx = i * CITY_CELL + 9, cz = j * CITY_CELL + 9; // centre of the block inside the cell
+      if (Math.hypot(cx, cz) > 78 || cityBlock(cx, cz) !== 2) continue;
+      const y = H(cx, cz), h = rng.range(3, 9), w = rng.range(6, 8.5), rot = rng.int(0, 3) * Math.PI / 2;
+      for (let k = 0; k < 4; k++) { // four ruined walls, some broken short
+        if (rng.chance(0.18)) continue;
+        const a = rot + (k * Math.PI) / 2, wh = h * (rng.chance(0.4) ? rng.range(0.3, 0.7) : 1);
+        B.add(new THREE.BoxGeometry(w, wh, 0.7), wall, mtx(cx + Math.sin(a) * w / 2, y + wh / 2 - 0.2, cz + Math.cos(a) * w / 2, a));
+        if (rng.chance(0.5)) B.add(new THREE.BoxGeometry(w * 0.9, 0.25, 0.8), moss, mtx(cx + Math.sin(a) * w / 2, y + wh - 0.1, cz + Math.cos(a) * w / 2, a));
+      }
+      if (rng.chance(0.3)) { const th = h + rng.range(3, 7); B.add(new THREE.CylinderGeometry(1.2, 1.5, th, 8), wall, mtx(cx + w / 2, y + th / 2, cz + w / 2)); B.add(new THREE.ConeGeometry(1.6, 2.6, 8), moss, mtx(cx + w / 2, y + th + 1.2, cz + w / 2)); }
+      this.colliders.push({ x: cx, z: cz, r: w * 0.62 });
+    }
+    // street lamps with cold witch-light
+    for (let i = 0; i < 26; i++) { const a = rng.range(0, 6.28), d = rng.range(12, 72), x = Math.round((Math.cos(a) * d) / CITY_CELL) * CITY_CELL + 2, z = Math.sin(a) * d; if (cityBlock(x, z) !== 0) continue; const y = H(x, z); B.add(new THREE.CylinderGeometry(0.1, 0.14, 3.4, 6), wall, mtx(x, y + 1.7, z)); B.add(new THREE.SphereGeometry(0.22, 8, 6), glow, mtx(x, y + 3.5, z)); }
+    // cathedral at the altar: broken nave walls, columns and a glowing rose window
+    const A = R.altar, ay = H(A.x, A.z);
+    for (const sx of [-1, 1]) { B.add(new THREE.BoxGeometry(1, 11, 22), wall, mtx(A.x + sx * 10, ay + 5.3, A.z - 4)); for (let k = 0; k < 4; k++) { B.add(new THREE.CylinderGeometry(0.55, 0.65, 9, 10), wall, mtx(A.x + sx * 6, ay + 4.5, A.z - 12 + k * 6)); this.colliders.push({ x: A.x + sx * 6, z: A.z - 12 + k * 6, r: 0.7 }); } this.colliders.push({ x: A.x + sx * 10, z: A.z - 4, r: 1.2 }); }
+    B.add(new THREE.BoxGeometry(21, 13, 1.2), wall, mtx(A.x, ay + 6.3, A.z - 15.5));
+    const rose = new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5af0ff').multiplyScalar(1.6), side: THREE.DoubleSide })); rose.position.set(A.x, ay + 8.5, A.z - 14.8); s.add(rose);
+    // Throne of Tides
+    const T = R.throne, ty = H(T.x, T.z);
+    B.add(new THREE.CylinderGeometry(8, 9, 0.8, 24), rock, mtx(T.x, ty + 0.2, T.z));
+    B.add(new THREE.BoxGeometry(3, 1.2, 2.5), wall, mtx(T.x, ty + 1.2, T.z - 6)); B.add(new THREE.BoxGeometry(3, 5, 0.6), wall, mtx(T.x, ty + 3.6, T.z - 7.2));
+    this.colliders.push({ x: T.x, z: T.z - 6.5, r: 1.8 });
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; B.add(new THREE.CylinderGeometry(0.5, 0.7, 6, 8), wall, mtx(T.x + Math.cos(a) * 17, ty + 2.8, T.z + Math.sin(a) * 17)); this.colliders.push({ x: T.x + Math.cos(a) * 17, z: T.z + Math.sin(a) * 17, r: 0.8 }); }
+    this.throneRune = new THREE.Mesh(new THREE.RingGeometry(6.4, 6.8, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5af0ff').multiplyScalar(2), side: THREE.DoubleSide, transparent: true, opacity: 0.6 })); this.throneRune.rotation.x = -Math.PI / 2; this.throneRune.position.set(T.x, ty + 0.65, T.z); s.add(this.throneRune);
+    // the gate and Sir Corvin
+    const Gt = R.gate, gy = H(Gt.x, Gt.z);
+    for (const sx of [-1, 1]) { B.add(new THREE.BoxGeometry(2.2, 9, 2.2), wall, mtx(Gt.x + 7 + sx * 6, gy + 4.4, Gt.z + 6)); this.colliders.push({ x: Gt.x + 7 + sx * 6, z: Gt.z + 6, r: 1.5 }); }
+    B.add(new THREE.BoxGeometry(14.4, 1.6, 2.4), wall, mtx(Gt.x + 7, gy + 9.4, Gt.z + 6));
+    this.corvin = buildEnemy('corvin'); this.corvin.root.position.set(Gt.x, gy, Gt.z); s.add(this.corvin.root);
+    this.corvinMark = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd34d').multiplyScalar(2.5) })); this.corvinMark.scale.y = 1.8; s.add(this.corvinMark);
+    // Tide Bells
+    const bronze = new THREE.MeshStandardMaterial({ color: '#b08a4a', metalness: 0.8, roughness: 0.35 });
+    this.bells = R.bells.map((p, i) => {
+      const g = new THREE.Group(), y = H(p.x, p.z); g.position.set(p.x, y, p.z);
+      for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4, 0.3), wall); post.position.set(sx * 1.1, 2, 0); g.add(post); }
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.3, 0.35), wall); beam.position.y = 4; g.add(beam);
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.75, 1.1, 14, 1, true), bronze); bell.position.y = 3.2; bell.material.side = THREE.DoubleSide; g.add(bell);
+      s.add(g); this.colliders.push({ x: p.x, z: p.z, r: 0.6 });
+      return { g, bell, i };
+    });
+    // the tide: one water plane that rises and falls with the shared world clock
+    this.tideWater = new THREE.Mesh(new THREE.PlaneGeometry(190, 190), new THREE.MeshStandardMaterial({ color: '#24505a', roughness: 0.08, metalness: 0.35, transparent: true, opacity: 0.8 }));
+    this.tideWater.rotation.x = -Math.PI / 2; s.add(this.tideWater);
+    const qi = () => G.prof?.char?.quest?.i || 0, qk = () => QUESTS[qi()]?.kind;
+    this.act2Interact = [
+      { x: Gt.x, z: Gt.z, r: 3.2, mark: 'SIR CORVIN', showMark: () => qi() <= ACT2_END, label: () => (qi() === ACT2_END ? 'Talk to Sir Corvin' : null), action: () => G.actions.talk() },
+      ...R.bells.map((p, i) => ({ x: p.x, z: p.z, r: 3, mark: 'TIDE BELL', showMark: () => qk() === 'bell' && !((G.prof?.char?.quest?.b || 0) & (1 << i)), label: () => (qk() === 'bell' && !((G.prof.char.quest.b || 0) & (1 << i)) ? (this.tide > LOW_TIDE ? 'The bell is under the tide — wait for low water' : 'Ring the Tide Bell') : null), action: () => G.net.send({ t: 'bell', i }) })),
+      { x: A.x, z: A.z, r: 6, mark: 'DROWNED CATHEDRAL', label: () => (qi() < QUESTS.findIndex((q) => q.kind === 'warden') || [...G.enemies.values()].some((e) => e.boss && !e.dead) ? null : 'Wake the Drowned Warden (boss)'), action: () => G.actions.challengeKing() },
+      { x: T.x, z: T.z, r: 7, mark: 'THRONE OF TIDES', label: () => (qi() < QUESTS.findIndex((q) => q.kind === 'king') || [...G.enemies.values()].some((e) => e.boss && !e.dead) ? null : 'Challenge the Hollow King Reborn (Act III boss)'), action: () => G.actions.challengeKing() },
+    ];
+  }
   buildMinimap() {
     const N = 192, W = 190, c = document.createElement('canvas'); c.width = c.height = N;
     const ctx = c.getContext('2d'), img = ctx.createImageData(N, N), col = new THREE.Color();
@@ -151,6 +216,11 @@ export class RegionZone {
     ctx.putImageData(img, 0, 0);
     this.map = { canvas: c, worldSize: W, center: { x: 0, z: 0 }, view: 60 };
     this.mapIcons = [{ x: this.R.waypoint.x, z: this.R.waypoint.z, color: '#5ab0ff', icon: 'portal' }, { x: this.R.altar.x, z: this.R.altar.z, color: this.key === 'marsh' ? '#9aff3a' : '#6ad0ff', icon: 'portal' }];
+    if (this.key === 'citadel') {
+      const R = this.R;
+      this.mapIcons.push({ x: R.gate.x, z: R.gate.z, color: '#9ac0ff', icon: 'portal' }, { x: R.throne.x, z: R.throne.z, color: '#5af0ff', icon: 'portal' });
+      R.bells.forEach((p, i) => this.mapIcons.push({ x: p.x, z: p.z, color: '#e0b060', icon: 'portal', show: () => QUESTS[G.prof?.char?.quest?.i || 0]?.kind === 'bell' && !((G.prof?.char?.quest?.b || 0) & (1 << i)) }));
+    }
     if (this.key === 'peaks') {
       const R = this.R;
       this.mapIcons.push({ x: R.camp.x, z: R.camp.z, color: '#7affb0', icon: 'portal' }, { x: R.summit.x, z: R.summit.z, color: '#c8ecff', icon: 'portal' });
@@ -185,6 +255,15 @@ export class RegionZone {
     followSun(this.sun, playerPos, this.sunOffset || { x: 30, y: 50, z: -30 });
     this.wpRune.rotation.y = t; this.wpRune.rotation.x = Math.sin(t) * 0.3;
     this.altarRune.rotation.z = t * 0.4;
+    if (this.tideWater) {
+      this.tide = tideAt(G.clock || 0); this.tideWater.position.y = this.tide;
+      const here = (G.prof?.char?.quest?.i || 0) <= ACT2_END || !!G.dlgRigs?.has(this.corvin); this.corvin.root.visible = here; this.corvinMark.visible = (G.prof?.char?.quest?.i || 0) === ACT2_END;
+      if (here) { animateRig(this.corvin, { t, move: 0 }); this.corvin.root.rotation.y = Math.atan2(playerPos.x - this.corvin.root.position.x, playerPos.z - this.corvin.root.position.z); }
+      this.corvinMark.position.set(this.corvin.root.position.x, this.corvin.root.position.y + 2.8 + Math.sin(t * 3) * 0.1, this.corvin.root.position.z); this.corvinMark.rotation.y = t * 2;
+      this.throneRune.rotation.z = t * 0.2;
+      for (const b of this.bells) b.bell.rotation.z = Math.sin(t * 1.3 + b.i) * 0.05 + (b.ring > 0 ? Math.sin(t * 20) * b.ring * 0.4 : 0), b.ring = Math.max(0, (b.ring || 0) - dt);
+      if (Math.random() < dt * 6) { const a = Math.random() * 6.28, r = 4 + Math.random() * 16; G.fx.emit({ pos: new THREE.Vector3(playerPos.x + Math.cos(a) * r, this.tide + 0.05, playerPos.z + Math.sin(a) * r), count: 1, speed: 0.3, color: '#c8f0ff', color2: '#4a8a9a', size: 0.25, life: 1.2, flat: true }); }
+    }
     if (this.ilsa) {
       const here = qi() <= ACT1_END; this.ilsa.root.visible = here; this.ilsaMark.visible = qi() === ACT1_END;
       if (here) { animateRig(this.ilsa, { t, move: 0 }); this.ilsa.root.rotation.y = Math.atan2(playerPos.x - this.ilsa.root.position.x, playerPos.z - this.ilsa.root.position.z); }

@@ -38,7 +38,7 @@ class HpBar {
   set(frac, camera) { this.fill.scale.x = Math.max(0.001, frac); this.g.quaternion.copy(camera.quaternion); }
 }
 
-const HEIGHT = { herald: 4.6, boss: 5.2, brute: 3, imp: 1.3, ogre: 4.8, matriarch: 3.6, spiderling: 1, goblin: 1.5, drake: 5, hollowking: 5.4, burrower: 1.3, bomber: 1.4, shieldbearer: 2.3 };
+const HEIGHT = { warden: 5, kingreborn: 5.6, sigil: 2.6, herald: 4.6, boss: 5.2, brute: 3, imp: 1.3, ogre: 4.8, matriarch: 3.6, spiderling: 1, goblin: 1.5, drake: 5, hollowking: 5.4, burrower: 1.3, bomber: 1.4, shieldbearer: 2.3 };
 
 export class EnemyView {
   constructor(a) {
@@ -121,7 +121,7 @@ export class EnemyView {
     const stun = this.stunned && !this.dead;
     const st = { t: this.t, move: this.dead || stun ? 0 : this.move, atk, combo: this.boss || this.type === 'ogre' ? 2 : 0, slam: -1, cast, dead: this.dead ? Math.min(1, this.deathT * 1.4) : 0, hurt: Math.max(this.hurt, stun ? 0.5 + Math.sin(this.t * 14) * 0.3 : 0), float: this.type === 'wraith', air: !!this.leap };
     const k = this.rig.kind;
-    if (k === 'spider') animateSpider(this.rig, st); else if (k === 'worm') animateWorm(this.rig, st); else if (k === 'drake') animateDrake(this.rig, { ...st, air: !!(this.flags & 256) }); else animateRig(this.rig, st);
+    if (k === 'static') { if (this.rig.P.cry) { this.rig.P.cry.rotation.y = this.t * 1.4; this.rig.P.cry.position.y = 1.6 + Math.sin(this.t * 2) * 0.12; } } else if (k === 'spider') animateSpider(this.rig, st); else if (k === 'worm') animateWorm(this.rig, st); else if (k === 'drake') animateDrake(this.rig, { ...st, air: !!(this.flags & 256) }); else animateRig(this.rig, st);
     const hidden = !!(this.flags & 128) && !this.dead;
     this.root.visible = !hidden;
     if (hidden && Math.random() < dt * 25) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 0.1), count: 1, speed: 1.5, color: '#8a7058', color2: '#3a2a1a', size: 0.45, life: 0.6, up: 1, radius: 0.5 });
@@ -245,20 +245,23 @@ export class RemoteView {
 // Act II companion (server-simulated ally). Revive her by standing next to her while she's down.
 export class AllyView {
   constructor(a) {
-    this.id = a[0]; this.owner = a[1];
-    this.rig = buildEnemy('ilsa'); this.root = this.rig.root; entityRoot.add(this.root);
+    this.id = a[0]; this.owner = a[1]; this.kind = a[9] === 1 ? 'corvin' : 'ilsa';
+    this.rig = buildEnemy(this.kind); this.name = this.kind === 'corvin' ? 'Sir Corvin' : 'Scout Ilsa';
+    this.wall = new THREE.Mesh(new THREE.SphereGeometry(1.5, 20, 14), additive('#7ab0ff', 0.16)); this.wall.visible = false; this.root = this.rig.root; entityRoot.add(this.root);
     this.pos = new THREE.Vector3(a[2], 0, a[3]); this.target = this.pos.clone(); this.ry = a[4];
     this.t = 0; this.move = 0; this.atkT = -1; this.deadT = 0;
     this.tag = document.createElement('div'); this.tag.className = 'nametag'; labelsEl.appendChild(this.tag);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(2.3, 2.6, 48, 1, 0, Math.PI * 2), additive('#5eea8a', 0.6)); this.ring.rotation.x = -Math.PI / 2; this.ring.visible = false; entityRoot.add(this.ring);
     this.prog = new THREE.Mesh(new THREE.RingGeometry(1.9, 2.25, 48, 1, 0, 0.01), additive('#c8ffd8', 0.9)); this.prog.rotation.x = -Math.PI / 2; this.prog.visible = false; entityRoot.add(this.prog);
+    entityRoot.add(this.wall);
     this.apply(a); this.pos.copy(this.target);
   }
   apply(a) {
+    this.walling = !!a[10];
     this.target.set(a[2], 0, a[3]); this.ry = a[4]; this.hp = a[5]; this.maxHp = a[6]; this.flags = a[7]; this.revive = a[8];
     this.dead = !!(this.flags & 1);
     if (this.flags & 2 && this.atkT < 0) this.atkT = 0;
-    const html = `<span style="color:#7affb0">Scout Ilsa</span> <span style="color:#aaa;font-size:11px">Companion</span><div class="hpm"><i style="width:${Math.max(0, (this.hp / this.maxHp) * 100)}%;background:#5eea8a"></i></div>${this.dead ? '<div style="color:#ff9a7a;font-size:11px">DOWN — stand close to revive</div>' : ''}`;
+    const html = `<span style="color:${this.kind === 'corvin' ? '#9ac0ff' : '#7affb0'}">${this.name}</span> <span style="color:#aaa;font-size:11px">Companion</span><div class="hpm"><i style="width:${Math.max(0, (this.hp / this.maxHp) * 100)}%;background:#5eea8a"></i></div>${this.dead ? '<div style="color:#ff9a7a;font-size:11px">DOWN — stand close to revive</div>' : ''}`;
     if (html !== this._html) { this.tag.innerHTML = html; this._html = html; }
   }
   update(dt, camera, zone) {
@@ -272,16 +275,19 @@ export class AllyView {
     this.root.rotation.y = angleLerp(this.root.rotation.y, this.ry, Math.min(1, dt * 12));
     let atk = -1; if (this.atkT >= 0) { this.atkT += dt / 0.5; if (this.atkT >= 1) this.atkT = -1; else atk = this.atkT; }
     this.deadT = this.dead ? Math.min(1, this.deadT + dt) : Math.max(0, this.deadT - dt * 2);
-    animateRig(this.rig, { t: this.t, move: this.move, atk, combo: 0, cast: atk >= 0 ? 0.8 : 0, dead: this.deadT });
+    if (this.kind === 'corvin' && atk >= 0) atk = Math.min(0.999, atk);
+    animateRig(this.rig, { t: this.t, move: this.move, atk, combo: Math.floor(this.t) % 3, cast: atk >= 0 && this.kind === 'ilsa' ? 0.8 : 0, dead: this.deadT, block: this.walling });
     this.ring.visible = this.prog.visible = this.dead;
     if (this.dead) {
       this.ring.position.set(this.pos.x, this.pos.y + 0.08, this.pos.z); this.prog.position.copy(this.ring.position).setY(this.pos.y + 0.1);
       const k = Math.max(0.01, Math.min(1, this.revive)); this.prog.geometry.dispose(); this.prog.geometry = new THREE.RingGeometry(1.9, 2.25, 48, 1, Math.PI / 2, -k * Math.PI * 2);
       this.ring.material.opacity = 0.35 + Math.sin(this.t * 5) * 0.2;
     }
+    const hide = !!G.dlgRigs && !G.dlgRigs.has(this.rig); this.root.visible = !hide; if (hide) { this.tag.style.display = 'none'; this.wall.visible = false; return; }
+    this.wall.visible = this.walling && !this.dead; if (this.wall.visible) { this.wall.position.set(this.pos.x, this.pos.y + 1.1, this.pos.z); this.wall.material.opacity = 0.12 + Math.sin(this.t * 6) * 0.05; }
     placeLabel(this.tag, _v.set(this.pos.x, this.pos.y + 2.5, this.pos.z), camera, 50);
   }
-  dispose() { entityRoot.remove(this.root); entityRoot.remove(this.ring); entityRoot.remove(this.prog); this.tag.remove(); }
+  dispose() { entityRoot.remove(this.root); entityRoot.remove(this.wall); entityRoot.remove(this.ring); entityRoot.remove(this.prog); this.tag.remove(); }
 }
 
 const beamMats = {};

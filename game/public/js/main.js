@@ -35,13 +35,13 @@ function setWeather(kind, announce) {
   else if (announce) ui.toast('☀ The weather clears', '#ffe6a0');
 }
 G.decals = decals;
-import { entityRoot, EnemyView, AllyView, RemoteView, LootView, ProjView, StructView, HazardView, buildStructure, EMOTES } from './entities.js';
+import { placeLabel, entityRoot, EnemyView, AllyView, RemoteView, LootView, ProjView, StructView, HazardView, buildStructure, EMOTES } from './entities.js';
 import { TownZone } from './zones/town.js';
 import { DungeonZone } from './zones/dungeon.js';
 import { DarkZone } from './zones/dark.js';
 import { RegionZone } from './zones/region.js';
 import { setupTouch } from './touch.js';
-import { REGIONS, QUESTS, EVENTS, ACT1_END } from '../shared/regions.js';
+import { REGIONS, QUESTS, EVENTS, ACT1_END, ACT2_END } from '../shared/regions.js';
 import { applySnapshot } from '../shared/snapshot.js';
 import { STRUCTURES, TOWN } from '../shared/world.js';
 import { RARITIES, GEMS, gemName, parseGem } from '../shared/items.js';
@@ -102,6 +102,9 @@ Object.assign(G, { renderer, camera, fx, audio: sfx, ui, net, input, party: new 
 ui.init(settings);
 const lobby = new Lobby();
 const cine = new Cinematic(camera);
+import { DialogueScene } from './dialogue.js';
+const dlg = new DialogueScene(camera);
+Object.defineProperty(cine, 'active', { get() { return !!cine.shots || dlg.active; } });
 
 const town = new TownZone(renderer);
 town.grassMax = town.grass.count;
@@ -356,14 +359,43 @@ net.on('allyUp', (m) => { const p = allyPos(m.id); ui.toast(m.by ? `${m.by} revi
 net.on('allyFx', (m) => {
   const p = allyPos(m.id) || new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z), m.z);
   if (m.kind === 'mend') { fx.shockwave(p.clone().setY(p.y + 0.1), 10, '#5eea8a', 0.6); fx.emit({ pos: p.clone().setY(p.y + 1), count: 70, speed: 5, color: '#d8ffe4', color2: '#20c060', size: 0.35, life: 1.1, up: 1.5, radius: 3 }); sfx.shrine(); if (Math.random() < 0.5) ui.toast('Ilsa: "Mending Wind — hold the line!"', '#7affb0'); }
+  else if (m.kind === 'taunt') { fx.shockwave(p.clone().setY(p.y + 0.1), 8, '#ff6a4a', 0.5); fx.emit({ pos: p.clone().setY(p.y + 1.6), count: 40, speed: 5, color: '#ffb080', color2: '#ff2000', size: 0.3, life: 0.6, flat: true }); sfx.horn(); }
+  else if (m.kind === 'wall') { fx.shockwave(p.clone().setY(p.y + 0.1), 11, '#7ab0ff', 0.7); fx.emit({ pos: p.clone().setY(p.y + 1), count: 60, speed: 4, color: '#e0f0ff', color2: '#3a6aff', size: 0.35, life: 1, up: 1, radius: 2 }); sfx.block(true); ui.toast('Corvin: "Behind the shield!"', '#9ac0ff', 'Shield Wall — half damage for 5 s'); }
   else { fx.emit({ pos: p.clone().setY(p.y + 1.6), count: 24, speed: 6, color: '#e8fff0', color2: '#3a9a6a', size: 0.25, life: 0.4 }); sfx.arrow?.(); }
 });
+net.on('shieldWall', (m) => { if (player) player.wallT = m.dur; });
+net.on('companion', (m) => ui.toast(m.kind ? `${m.kind === 'corvin' ? 'Sir Corvin' : 'Scout Ilsa'} joins you` : 'Your companion waits in Emberhold', '#9ac0ff'));
+net.on('bell', (m) => { const b = G.zone?.bells?.[m.i]; if (b) b.ring = 3; sfx.bell(); G.shake = 0.3; const n = [0, 1, 2].filter((i) => m.b & (1 << i)).length; ui.toast(`${m.by} rang a Tide Bell (${n}/3)`, '#e0b060', 'The drowned answer the toll!'); });
+// ---- the Hollow King Reborn: sigil puzzle HUD ----
+const RUNES = ['ᚠ', 'ᚱ', 'ᛟ', 'ᛉ'], sigilHud = document.createElement('div'); sigilHud.id = 'sigilHud'; sigilHud.hidden = true; document.getElementById('hud')?.appendChild(sigilHud);
+const sigilTags = RUNES.map(() => { const d = document.createElement('div'); d.className = 'sigiltag'; document.getElementById('labels').appendChild(d); d.style.display = 'none'; return d; });
+let sigils = null;
+function drawSigilHud() { if (!sigils) { sigilHud.hidden = true; sigilTags.forEach((d) => (d.style.display = 'none')); return; } sigilHud.hidden = false; sigilHud.innerHTML = `Break the sigils in the crown's order: ${sigils.order.map((i, k) => `<b class="${k < sigils.next ? 'done' : k === sigils.next ? 'next' : ''}">${RUNES[i]}</b>`).join(' → ')}`; }
+net.on('sigils', (m) => { sigils = { order: m.order, ids: m.ids, next: 0 }; drawSigilHud(); ui.bigBanner('THE TIDE SIGILS', 'The King is warded — break the sigils in the order shown on his crown', 4000); sfx.gate(); });
+net.on('sigilBreak', (m) => { if (!sigils) return; sigils.next = m.n; drawSigilHud(); sfx.lever(true); G.shake = 0.3; });
+net.on('sigilFail', (m) => { if (!sigils) return; sigils.ids = m.ids; sigils.next = 0; drawSigilHud(); sfx.lever(false); ui.toast(`Wrong rune${m.by ? '' : ''}! The sigils re-form and the drowned rise.`, '#ff6a5a'); });
+net.on('sigilsDone', () => { sigils = null; drawSigilHud(); ui.bigBanner('THE WARD BREAKS', 'The King staggers — strike now!', 3000); sfx.gate(); G.shake = 1; });
+net.on('kingTide', () => { ui.bigBanner('THE TIDE RISES', 'Tidal waves sweep the throne — watch the water', 3500); sfx.roar(); });
+function updateSigilTags() {
+  if (!sigils) return;
+  sigils.ids.forEach((id, i) => { const e = G.enemies.get(id), d = sigilTags[i]; if (!e || e.dead) { d.style.display = 'none'; return; } const rune = e.rig ? RUNES[i] : ''; d.textContent = rune; d.className = 'sigiltag' + (sigils.order[sigils.next] === i ? ' next' : ''); placeLabel(d, e.pos.clone().setY(e.pos.y + 3.4), camera, 60); });
+}
+// ---- Act III dialogue scenes (close-ups + lip-flap) ----
+function corvinRig() { const n = G.zone?.corvin; if (n && G.prof?.char?.quest?.i <= ACT2_END + 1) return n; const a = [...G.allies.values()].find((x) => x.kind === 'corvin'); return a ? a.rig : n; }
+function act3Scene(lines, then) {
+  const cr = corvinRig();
+  if (!player || !cr) return then?.();
+  player.invuln = 60;
+  const L = lines.map(([who, text]) => ({ rig: who === 'corvin' ? cr : player.rig, name: who === 'corvin' ? 'Sir Corvin' : G.prof.name, color: who === 'corvin' ? '#9ac0ff' : G.prof.color, text }));
+  dlg.play(L, () => { player.invuln = 0.5; then?.(); while (afterCine.length) afterCine.shift()(); });
+}
 net.on('mend', (m) => { if (!player || player.dead) return; player.heal(m.amt); fx.text(player.pos.clone().setY(player.pos.y + 2.2), `+${m.amt}`, 'heal', 0.9); });
 net.on('relic', (m) => { const n = [0, 1, 2].filter((i) => m.r & (1 << i)).length; ui.toast(`Storm Relic recovered (${n}/3)`, '#5ab8ff', 'The storm screams — its guardians close in!'); sfx.loot(4); G.shake = 0.4; if (player) fx.emit({ pos: player.pos.clone().setY(player.pos.y + 1.4), count: 80, speed: 6, color: '#e8f6ff', color2: '#2a7aff', size: 0.4, life: 0.9, up: 1 }); });
 net.on('heraldCall', () => { ui.bigBanner('THE HERALD CALLS', 'The Storm Drake is bound to its will — slay the Drake to break the bond!', 4000); sfx.roar(); G.shake = 0.9; if (G.zone?.flash !== undefined) G.zone.flash = 1; });
 net.on('heraldBond', () => { ui.bigBanner('THE BOND SHATTERS', 'The Herald drinks the Drake\'s storm — it can be harmed again!', 3500); sfx.gate(); G.shake = 1; if (G.zone?.flash !== undefined) G.zone.flash = 1; });
-net.on('actComplete', () => {
+net.on('actComplete', (m) => {
   sfx.victory();
+  if (m.act === 3) { sigils = null; drawSigilHud(); return act3Scene([['corvin', 'It is done. The crown is shattered, and the sea is quiet.'], ['hero', 'Emberhold stands. The storm is broken. And the tide…'], ['corvin', '…is ours. Go home, hero. Tonight the city sings for you.']], () => ui.bigBanner('ACT III COMPLETE', 'The Hollow Crown is shattered — the tide is ours', 6000)); }
   const go = () => ui.bigBanner('ACT II COMPLETE', 'The Storm Crown is broken — Stormspire sees the stars again', 6000);
   if (G.zoneKey === 'peaks' && player) cine.play(storyShots('outro', G.zone, player), { onEnd: go }); else go();
 });
@@ -403,7 +435,7 @@ net.on('edie', (m) => {
   if (m.type === 'goblin') { ui.toast('Treasure Goblin slain!', '#ffd34d', 'It spilled its hoard'); fx.goldBurst(pos); fx.emit({ pos, count: 120, speed: 8, color: '#ffe066', color2: '#ffaa00', size: 0.3, life: 1.5, gravity: 12, up: 1.5 }); sfx.coin(); sfx.coin(); }
   if (ENEMY_BOSS.has(m.type)) { recoil.kick(0.05); rumble(0.9, 0.6, 500); decals.add('scorch', pos.x, pos.z, 7, '#ffffff', 40); G.shake = 1; fx.shockwave(pos, 10, '#ff6a3a', 1); fx.emit({ pos, count: 200, speed: 10, color: '#ffcf6a', color2: '#ff2000', size: 0.5, life: 1.6, up: 1 }); }
 });
-const ENEMY_BOSS = new Set(['boss', 'matriarch', 'ogre', 'drake', 'hollowking', 'herald', 'colossus']);
+const ENEMY_BOSS = new Set(['boss', 'matriarch', 'ogre', 'drake', 'hollowking', 'herald', 'colossus', 'warden', 'kingreborn']);
 net.on('hurt', (m) => { if (player) player.hurt(m.dmg, m.from >= 0 ? m.from : null, { affix: m.affix, kb: m.kb }); });
 net.on('reward', (m) => {
   if (player && !m.big) {
@@ -457,7 +489,7 @@ net.on('phase', (m) => { ui.bigBanner(m.enraged ? 'ENRAGED!' : `PHASE ${m.n}`, m
 net.on('bossIntro', (m) => {
   const e = G.enemies.get(m.id);
   if (!e || !player || e.pos.distanceTo(player.pos) > 45) return;
-  const names = { boss: ['THE BONE TYRANT', 'Lord of the Crypts'], matriarch: ['THE ASH MATRIARCH', 'Mother of the Ashlings'], drake: ['THE STORM DRAKE', 'Terror of Stormspire'], herald: ['THE STORM HERALD', 'Bearer of the Storm Crown'], hollowking: ['THE HOLLOW KING', 'Sovereign of the Dark World'] };
+  const names = { boss: ['THE BONE TYRANT', 'Lord of the Crypts'], matriarch: ['THE ASH MATRIARCH', 'Mother of the Ashlings'], drake: ['THE STORM DRAKE', 'Terror of Stormspire'], warden: ['THE DROWNED WARDEN', 'Jailer of the Sunken Citadel'], kingreborn: ['THE HOLLOW KING REBORN', 'Sovereign of the Throne of Tides'], herald: ['THE STORM HERALD', 'Bearer of the Storm Crown'], hollowking: ['THE HOLLOW KING', 'Sovereign of the Dark World'] };
   const [n, s] = names[m.type] || [e.def.name.toUpperCase(), ''];
   player.invuln = 3.2;
   cine.play(bossShots(e, n, s), { skippable: false });
@@ -522,10 +554,11 @@ net.on('eventLeft', (m) => { if (G.event) G.event.left = m.left; });
 net.on('eventDone', (m) => { G.event = null; ui.bigBanner(m.ok ? 'EVENT COMPLETE' : 'EVENT FAILED', m.ok ? 'The region is safer — rewards granted' : 'The threat faded away…', 3000); if (m.ok) sfx.victory(); });
 net.on('questDone', (m) => {
   const Q = QUESTS[m.i]; sfx.levelUp();
-  const show = () => ui.npcDialog(Q.act === 2 ? 'Scout Ilsa' : 'Captain Bryn', Q.done, () => ui.bigBanner(Q.act === 2 ? 'ACT II · QUEST COMPLETE' : 'QUEST COMPLETE', Q.title, 3000));
-  if (Q.kind === 'drake') act2Cutscene('herald', show); else if (Q.kind === 'herald') setTimeout(show, 9000); else if (cine.active) afterCine.push(show); else show();
+  const show = () => ui.npcDialog(Q.act === 3 ? 'Sir Corvin' : Q.act === 2 ? 'Scout Ilsa' : 'Captain Bryn', Q.done, () => ui.bigBanner(Q.act ? `ACT ${Q.act === 3 ? 'III' : 'II'} · QUEST COMPLETE` : 'QUEST COMPLETE', Q.title, 3000));
+  if (Q.kind === 'warden') act3Scene([['corvin', 'Rest now, old friend. You guarded this city longer than any of us.'], ['hero', 'It was chained. Who chains a warden to its own altar?'], ['corvin', 'A king who fears the tide. The Throne lies south — and he knows we are coming.']], show);
+  else if (Q.kind === 'drake') act2Cutscene('herald', show); else if (Q.kind === 'herald' || Q.kind === 'king') setTimeout(show, Q.kind === 'king' ? 16000 : 9000); else if (cine.active) afterCine.push(show); else show();
 });
-net.on('dialog', (m) => { const Q = QUESTS[m.i]; if (m.i === ACT1_END) { act2Cutscene('intro', () => ui.npcDialog(m.who, Q.intro)); return; } if (m.i === 0) ui.npcDialog(m.who, Q.intro); else if (!Q) ui.npcDialog(m.who, 'The Peaks await, hero. Emberhold owes you its life.'); else ui.npcDialog(m.who, `${Q.title}: ${Q.goal}. Don't keep the dark waiting.`); });
+net.on('dialog', (m) => { const Q = QUESTS[m.i]; if (m.i === ACT2_END) { act3Scene([['corvin', 'Stand fast, stranger. I held this gate when the sea came in, and I have held it every night since.'], ['hero', 'I hear the Hollow King is back.'], ['corvin', 'He did not die in his Dark World. He crawled here, to the Throne of Tides — and he is wearing his crown again.'], ['hero', 'Then we take it from him. Together?'], ['corvin', 'Together. You strike, I hold.']]); return; } if (m.i === ACT1_END) { act2Cutscene('intro', () => ui.npcDialog(m.who, Q.intro)); return; } if (m.i === 0) ui.npcDialog(m.who, Q.intro); else if (!Q) ui.npcDialog(m.who, 'The Peaks await, hero. Emberhold owes you its life.'); else ui.npcDialog(m.who, `${Q.title}: ${Q.goal}. Don't keep the dark waiting.`); });
 net.on('gem', (m) => { ui.toast(`Gem found: ${gemName(m.k)}`, GEMS[parseGem(m.k).type].color, 'Socket it at the Blacksmith'); sfx.loot(2); });
 net.on('riftProgress', (m) => { if (G.rift) G.rift.p = m.p; });
 net.on('guardian', () => { if (G.rift) { G.rift.p = 1; G.rift.guardian = true; } ui.bigBanner('THE GUARDIAN AWAKENS', 'The rift collapses around its master', 3000); sfx.roar(); });
@@ -722,7 +755,7 @@ function frame(now) {
   if (G.inGame && player && zone) {
     handleInput();
     player.update(dt, input, camRig, zone);
-    if (!cine.update(realDt)) camRig.update(realDt, input, player, zone);
+    if (!dlg.update(realDt) && !cine.update(realDt)) camRig.update(realDt, input, player, zone);
     G.camYaw = camRig.yaw;
     const near = !player.dead && !G.uiOpen && !G.buildTarget ? nearestInteractable() : null;
     ui.prompt(near && !cine.active ? near.label : null);
@@ -731,7 +764,7 @@ function frame(now) {
     for (const [id, e] of G.enemies) if (!e.update(dt, zone, camera)) { e.dispose(); G.enemies.delete(id); }
     for (const r of G.remotes.values()) r.update(dt, camera);
     for (const a of G.allies.values()) a.update(dt, camera, zone);
-    decals.update(dt);
+    decals.update(dt); updateSigilTags();
     G.clock = performance.now() / 1000 - clockStart; G.hour = hourAt(G.clock);
     weather.update(dt, zone, camera);
     zone.wildlife?.update(dt, G.time, player ? player.pos : camera.position);

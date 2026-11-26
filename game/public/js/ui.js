@@ -8,7 +8,7 @@ import { xpForLevel, computeStats } from '../shared/stats.js';
 import { SHRINES } from '../shared/dungeon.js';
 import { AFFIXES } from '../shared/enemies.js';
 import { RIFT_MODS, RIFT_TIME, PARAGON, LEVEL_CAP, paragonXp } from '../shared/rifts.js';
-import { QUESTS, EVENTS, REGIONS, ACT1_END } from '../shared/regions.js';
+import { QUESTS, EVENTS, REGIONS, ACT1_END, ACT2_END, COMPANIONS } from '../shared/regions.js';
 import { renderSocial } from './socialui.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
 import { STYLE_RANKS, ROLL_CD } from './player.js';
@@ -394,8 +394,9 @@ class UI {
   }
   renderWaypoint() {
     const pr = G.prof, peaksOpen = pr.peaks || (pr.char.quest?.i || 0) >= ACT1_END;
-    const dests = [['town', 'Emberhold', 'The last city'], ['marsh', REGIONS.marsh.name, REGIONS.marsh.sub], ['peaks', REGIONS.peaks.name, peaksOpen ? REGIONS.peaks.sub : 'Sealed — complete Act I']];
-    $('wpList').innerHTML = dests.map(([k, n, s]) => `<button class="btn wpb" data-k="${k}" ${(k === 'peaks' && !peaksOpen) || k === G.zoneKey ? 'disabled' : ''}><b>${n}</b><br><span class="small muted">${k === G.zoneKey ? 'You are here' : s}</span></button>`).join('');
+    const citOpen = pr.citadel || (pr.char.quest?.i || 0) >= ACT2_END;
+    const dests = [['town', 'Emberhold', 'The last city'], ['marsh', REGIONS.marsh.name, REGIONS.marsh.sub], ['peaks', REGIONS.peaks.name, peaksOpen ? REGIONS.peaks.sub : 'Sealed — complete Act I'], ['citadel', REGIONS.citadel.name, citOpen ? REGIONS.citadel.sub : 'Sealed — complete Act II']];
+    $('wpList').innerHTML = dests.map(([k, n, s]) => `<button class="btn wpb" data-k="${k}" ${(k === 'peaks' && !peaksOpen) || (k === 'citadel' && !citOpen) || k === G.zoneKey ? 'disabled' : ''}><b>${n}</b><br><span class="small muted">${k === G.zoneKey ? 'You are here' : s}</span></button>`).join('');
     $('wpList').querySelectorAll('button').forEach((b) => (b.onclick = () => { this.closePanel('waypoint'); G.actions.travel(b.dataset.k); }));
   }
   renderWardrobe() {
@@ -415,9 +416,11 @@ class UI {
   }
   renderQuests() {
     const q = G.prof.char.quest || { i: 0, n: 0 };
-    const hdr = (i) => (i === 0 ? '<div class="qact">ACT I · The Ashen Marsh</div>' : i === ACT1_END ? `<div class="qact">ACT II · The Storm Crown${q.i > ACT1_END ? ` <button class="btn small" id="compBtn">${this._comp === false ? 'Summon Ilsa' : 'Dismiss Ilsa'}</button>` : ''}</div>` : '');
+    const comps = Object.entries(COMPANIONS).filter(([, C]) => q.i >= C.unlock);
+    const picker = comps.length ? `<div class="qcomp">Companion: ${comps.map(([k, C]) => `<button class="btn small ${this._comp === k ? 'on' : ''}" data-comp="${k}" title="${C.role}">${C.name}</button>`).join('')}<button class="btn small ghost ${this._comp === 'none' ? 'on' : ''}" data-comp="none">None</button></div>` : '';
+    const hdr = (i) => (i === 0 ? picker + '<div class="qact">ACT I · The Ashen Marsh</div>' : i === ACT1_END ? '<div class="qact">ACT II · The Storm Crown</div>' : i === ACT2_END ? '<div class="qact">ACT III · The Hollow Crown</div>' : '');
     $('questList').innerHTML = QUESTS.map((Q, i) => hdr(i) + `<div class="qrow ${i < q.i ? 'done' : i === q.i ? 'cur' : 'locked'}"><b>${i < q.i ? '✔' : i === q.i ? '➤' : '•'} ${Q.title}</b><div class="small muted">${i <= q.i ? Q.goal : '???'}${i === q.i && Q.need > 1 ? ` (${q.n}/${Q.need})` : ''}</div></div>`).join('');
-    const cb = $('compBtn'); if (cb) cb.onclick = () => { this._comp = this._comp === false; G.net?.send({ t: 'companion', on: this._comp }); this.renderQuests(); };
+    $('questList').querySelectorAll('[data-comp]').forEach((b) => (b.onclick = () => { this._comp = b.dataset.comp; G.net?.send({ t: 'companion', kind: b.dataset.comp }); this.renderQuests(); }));
   }
 
   renderResearch() {
