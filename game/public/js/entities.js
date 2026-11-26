@@ -4,7 +4,7 @@ import { G, angleLerp, damp } from './state.js';
 import { ENEMIES, AFFIXES, AFFIX_KEYS } from '../shared/enemies.js';
 import { RARITIES } from '../shared/items.js';
 import { STRUCTURES } from '../shared/world.js';
-import { buildEnemy, buildHero, animateRig, animateSpider, animateWorm, animateDrake, flashRig, fadeRig, applyGear, buildWeapon, RARITY_TINT, RARITY_GLOW } from './models.js';
+import { buildSteed, animateSteed, buildEnemy, buildHero, animateRig, animateSpider, animateWorm, animateDrake, flashRig, fadeRig, applyGear, buildWeapon, RARITY_TINT, RARITY_GLOW } from './models.js';
 import { buildSpiritMesh } from './skills.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
@@ -183,6 +183,7 @@ export class RemoteView {
     labelsEl.appendChild(this.tag);
     this.bubble = document.createElement('div'); this.bubble.className = 'emotebubble'; labelsEl.appendChild(this.bubble); this.bubble.style.display = 'none';
     this.spirits = [];
+    this.steed = buildSteed(p.color); this.steed.visible = false; this.root.add(this.steed);
     this.apply(p);
     this.pos.copy(this.target);
   }
@@ -219,6 +220,8 @@ export class RemoteView {
     if (this.emote) { this.emoteT += dt; if (this.emoteT > 3 || this.move > 0.3) { this.emote = null; this.bubble.style.display = 'none'; } }
     animateRig(this.rig, { t: this.t, move: this.move, atk, combo: this.combo, slam, roll, dash: a === 12, air: a === 8, dead: this.deadT, block: a === 11, channel: a === 9, cast: a === 10 ? 0.8 : 0, emote: this.emote, emoteT: this.emoteT });
     if (a === 9 && Math.random() < dt * 30) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 0.9), count: 1, speed: 6, color: '#ffd080', color2: '#ff2a00', size: 0.4, life: 0.4, flat: true });
+    this.steed.visible = !!this.p.mount;
+    if (this.p.mount) { animateSteed(this.steed, this.t, this.move); this.rig.body.position.y += 0.85 + this.steed.position.y; const P = this.rig.P; if (P.legL) { P.legL.rotation.x = P.legR.rotation.x = -1.3; P.shinL.rotation.x = P.shinR.rotation.x = 1.4; } }
     this.spirits.forEach((m, i) => { const ang = this.t * 1.6 + i * Math.PI; m.position.set(this.pos.x + Math.cos(ang) * 1.4, this.pos.y + 2.3 + Math.sin(this.t * 3) * 0.2, this.pos.z + Math.sin(ang) * 1.4); });
     placeLabel(this.tag, _v.set(this.pos.x, this.pos.y + 2.5, this.pos.z), camera, 50);
     if (this.emote) placeLabel(this.bubble, _v.set(this.pos.x, this.pos.y + 3.3, this.pos.z), camera, 50);

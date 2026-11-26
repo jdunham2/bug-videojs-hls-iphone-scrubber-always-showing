@@ -2,12 +2,12 @@
 export const DEFAULT_BINDINGS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', dodge: 'ShiftLeft',
   skill1: 'Digit1', skill2: 'Digit2', skill3: 'Digit3', skill4: 'Digit4', potion: 'KeyR', interact: 'KeyE',
-  lockon: 'KeyV', emote: 'KeyT', inventory: 'KeyI', talents: 'KeyK', build: 'KeyB', chat: 'Enter', help: 'KeyH', upgrade: 'KeyU',
+  lockon: 'KeyV', emote: 'KeyT', mount: 'KeyM', quests: 'KeyJ', inventory: 'KeyI', talents: 'KeyK', build: 'KeyB', chat: 'Enter', help: 'KeyH', upgrade: 'KeyU',
 };
 export const ACTION_LABELS = {
   forward: 'Move forward', back: 'Move back', left: 'Move left', right: 'Move right', jump: 'Jump', dodge: 'Dodge roll',
   skill1: 'Skill 1', skill2: 'Skill 2', skill3: 'Skill 3', skill4: 'Skill 4', potion: 'Drink potion', interact: 'Interact',
-  lockon: 'Lock-on target', emote: 'Emote wheel (hold)', inventory: 'Inventory', talents: 'Talents', build: 'Build mode', chat: 'Chat', help: 'Help', upgrade: 'Upgrade structure',
+  lockon: 'Lock-on target', emote: 'Emote wheel (hold)', mount: 'Summon mount', quests: 'Quest log', inventory: 'Inventory', talents: 'Talents', build: 'Build mode', chat: 'Chat', help: 'Help', upgrade: 'Upgrade structure',
 };
 // gamepad (standard mapping) -> action
 const PAD = { 0: 'jump', 1: 'dodge', 2: 'attack', 3: 'interact', 4: 'skill1', 5: 'skill2', 6: 'skill3', 7: 'skill4', 8: 'inventory', 9: 'menu', 10: 'emote', 11: 'lockon', 12: 'potion', 13: 'talents', 14: 'build' };

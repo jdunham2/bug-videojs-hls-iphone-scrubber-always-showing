@@ -333,6 +333,7 @@ export function buildEnemy(type) {
     }
     case 'burrower': return buildWorm();
     case 'drake': return buildDrake();
+    case 'colossus': return buildHumanoid({ scale: 2.7, bulk: 1.8, skin: '#4a5a34', cloth: '#2a3418', armor: '#3a4228', eyes: '#9aff3a', horns: true, hornColor: '#2a2418', weapon: 'club', chestPlate: true, noHair: true, pauldrons: true });
     case 'hollowking': return buildHumanoid({ scale: 2.3, bulk: 1.3, legs: 'none', head: 'skull', skin: '#c8bce0', cloth: '#14081e', eyes: '#c86bff', crown: true, weapon: 'claws', offhand: 'claws', armor: '#2a1440', cape: '#0a0412', pauldrons: true });
     case 'merchant': return buildHumanoid({ legs: 'robe', head: 'hood', cloth: '#251a3a', eyes: '#9cf', skin: '#7a6a60', armor: '#3a2a50', weapon: 'orb' });
   }
@@ -570,4 +571,26 @@ export function animateDrake(rig, s) {
   P.legs.forEach((l, i) => { l.rotation.x = air ? 0.9 : Math.sin(t * 8 + i * Math.PI * 0.5) * 0.5 * mv; });
   P.torso.position.y = 1.6 + Math.sin(t * 2) * 0.05 - d * 1.0;
   rig.body.rotation.z = d > 0.3 ? Math.min(1, (d - 0.3) * 2) * 1.4 : 0;
+}
+
+// ---------- EMBER STEED (mount) ----------
+export function buildSteed(color = '#e8a33d') {
+  const g = new THREE.Group();
+  const hide = std('#6a3a24', { rough: 0.55, emissive: '#3a0a00', ei: 0.4 }), ember = std('#ff7a2a', { emissive: color, ei: 2.2 });
+  g.scale.setScalar(1.15);
+  const body = mesh(rbox(0.7, 0.7, 1.7, 0.25), hide, 0, 1.15, 0, g);
+  const neck = new THREE.Group(); neck.position.set(0, 1.4, 0.75); g.add(neck);
+  mesh(rbox(0.36, 0.9, 0.4, 0.12), hide, 0, 0.35, 0.1, neck).rotation.x = 0.5;
+  const head = mesh(rbox(0.3, 0.32, 0.65, 0.1), hide, 0, 0.75, 0.42, neck); head.rotation.x = 0.3;
+  for (let i = 0; i < 5; i++) mesh(cone(0.08, 0.35, 4), ember, 0, 0.55 + i * 0.1, -0.05 - i * 0.04, neck);
+  mesh(cone(0.12, 0.9, 5), ember, 0, 1.25, -1.05, g).rotation.x = -2.2;
+  const legs = [];
+  for (const [x, z] of [[-0.24, 0.6], [0.24, 0.6], [-0.24, -0.6], [0.24, -0.6]]) { const l = new THREE.Group(); l.position.set(x, 0.9, z); g.add(l); mesh(capsule(0.08, 0.7), hide, 0, -0.45, 0, l); mesh(sphere(0.1, 6, 5), ember, 0, -0.85, 0, l); legs.push(l); }
+  g.userData = { legs, neck, ember };
+  return g;
+}
+export function animateSteed(st, t, mv) {
+  st.userData.legs.forEach((l, i) => { l.rotation.x = Math.sin(t * 14 + (i % 2 ? Math.PI : 0) + (i > 1 ? 0.6 : 0)) * 0.8 * mv; });
+  st.userData.neck.rotation.x = Math.sin(t * 14) * 0.08 * mv;
+  st.position.y = Math.abs(Math.sin(t * 14)) * 0.12 * mv;
 }

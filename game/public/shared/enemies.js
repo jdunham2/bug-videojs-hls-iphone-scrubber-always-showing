@@ -13,6 +13,7 @@ export const ENEMIES = {
   goblin: { name: 'Treasure Goblin', hp: 220, dmg: 0, speed: 5.6, range: 0, cd: 99, windup: 0, gold: 90, xp: 60, radius: 0.5, aggro: 13, poise: 1, flee: true },
   ogre: { name: 'Siege Ogre', hp: 2600, dmg: 38, speed: 1.9, range: 3.4, cd: 2.6, windup: 0.9, gold: 200, xp: 400, radius: 1.8, aggro: 7, poise: 0, boss: true, siege: true },
   boss: { name: 'The Bone Tyrant', hp: 1300, dmg: 24, speed: 2.7, range: 3.3, cd: 2.2, windup: 0.8, gold: 150, xp: 320, radius: 1.6, aggro: 22, boss: true, poise: 0 },
+  colossus: { name: 'The Bog Colossus', hp: 1700, dmg: 27, speed: 2.4, range: 3.6, cd: 2.3, windup: 0.85, gold: 200, xp: 500, radius: 2.1, aggro: 24, boss: true, poise: 0, ai: 'tyrant' },
   drake: { name: 'The Storm Drake', hp: 1250, dmg: 22, speed: 3.4, range: 3.6, cd: 2.0, windup: 0.7, gold: 170, xp: 360, radius: 2.3, aggro: 24, boss: true, poise: 0 },
   hollowking: { name: 'The Hollow King', hp: 1700, dmg: 26, speed: 3.0, range: 3.2, cd: 2.0, windup: 0.7, gold: 220, xp: 450, radius: 1.5, aggro: 30, boss: true, poise: 0 },
   matriarch: { name: 'The Ash Matriarch', hp: 1150, dmg: 20, speed: 3.6, range: 3.0, cd: 1.8, windup: 0.6, gold: 160, xp: 340, radius: 2.0, aggro: 22, boss: true, poise: 0 },

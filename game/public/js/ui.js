@@ -8,6 +8,7 @@ import { xpForLevel, computeStats } from '../shared/stats.js';
 import { SHRINES } from '../shared/dungeon.js';
 import { AFFIXES } from '../shared/enemies.js';
 import { RIFT_MODS, RIFT_TIME, PARAGON, LEVEL_CAP, paragonXp } from '../shared/rifts.js';
+import { QUESTS, EVENTS, REGIONS } from '../shared/regions.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
 import { STYLE_RANKS, ROLL_CD } from './player.js';
 import { ACTION_LABELS, DEFAULT_BINDINGS, keyName } from './input.js';
@@ -165,6 +166,11 @@ class UI {
       bb.querySelector('.bb-fill').style.width = (boss.hp / boss.maxHp) * 100 + '%';
       bb.classList.toggle('enraged', !!(boss.flags & 16));
     } else bb.classList.add('hidden');
+    // quest tracker + world event
+    const q = c.quest || { i: 0, n: 0 }, Q = QUESTS[q.i];
+    const qt = Q ? `<div class="qt-t">${Q.title}</div><div class="qt-g">${Q.goal}${Q.need > 1 ? ` (${q.n}/${Q.need})` : ''}</div>` : '<div class="qt-t">Act I complete</div><div class="qt-g">Stormspire Peaks is open</div>';
+    const ev = G.event ? `<div class="qt-ev">⚑ ${EVENTS[G.event.kind].name}<br><span>${EVENTS[G.event.kind].goal}${G.event.left != null ? ` — ${G.event.left} left` : ''}</span></div>` : '';
+    if (qt + ev !== this._qt) { $('questTrack').innerHTML = qt + ev; this._qt = qt + ev; }
     // rift HUD
     const rh = $('riftHud');
     if (G.rift && G.zone?.type === 'dungeon') {
@@ -229,6 +235,7 @@ class UI {
     const dot = (x, z, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc((x - px) * sc, (z - pz) * sc, r, 0, 7); ctx.fill(); };
     for (const ic of zone.mapIcons || []) { dot(ic.x, ic.z, ic.icon === 'lever' || ic.icon === 'shrine' ? 4 : 5, ic.color); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (zone.type === 'town') for (const ch of zone.chests) if (!ch.open) dot(ch.x, ch.z, 3.5, '#ffd34d');
+    if (G.event) { const pulse = 4 + Math.sin(performance.now() / 120) * 2; dot(G.event.x, G.event.z, pulse + 2, '#ffd34d'); dot(G.event.x, G.event.z, 3, '#000'); }
     for (const s of G.structures.values()) { ctx.fillStyle = '#5ab0ff'; ctx.fillRect((s.s.x - px) * sc - 2, (s.s.z - pz) * sc - 2, 4, 4); }
     for (const l of G.loots.values()) dot(l.g.position.x, l.g.position.z, 2.5, RARITIES[l.item.rarity].color);
     for (const e of G.enemies.values()) if (!e.dead) dot(e.pos.x, e.pos.z, e.boss ? 5 : e.affix ? 3.6 : 2.6, e.type === 'goblin' ? '#ffd34d' : e.affix ? AFFIXES[e.affix].color : e.boss ? '#ff2a1a' : '#ff5a4a');
@@ -254,7 +261,7 @@ class UI {
   }
 
   // ---------- panels ----------
-  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research'].some((id) => !$(id).classList.contains('hidden')); }
+  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests'].some((id) => !$(id).classList.contains('hidden')); }
   togglePanel(id) { if ($(id).classList.contains('hidden')) this.openPanel(id); else this.closePanel(id); }
   openPanel(id) {
     $(id).classList.remove('hidden');
@@ -267,6 +274,8 @@ class UI {
     if (id === 'smith') { this.smithSel = null; this.renderSmith(); }
     if (id === 'riftPanel') this.renderRiftPanel();
     if (id === 'research') this.renderResearch();
+    if (id === 'waypoint') this.renderWaypoint();
+    if (id === 'quests') this.renderQuests();
   }
   closePanel(id) {
     $(id).classList.add('hidden');
@@ -275,7 +284,7 @@ class UI {
     this.hideTip();
     G.uiOpen = this.anyPanel;
   }
-  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
+  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
   sideBySide(id, on) {
     const inv = $('inventory'), other = $(id);
     if (on && innerWidth > 1400) { other.style.left = 'calc(50% - 400px)'; inv.style.left = 'calc(50% + 330px)'; }
@@ -366,6 +375,26 @@ class UI {
     $('stashGold').textContent = `◉ ${pr.gold.toLocaleString()} (shared by all your heroes)`;
     this.bagCells($('stashGrid'), pr.stash, STASH, (i) => G.net.send({ t: 'stash', op: 'take', i }), null, false);
     this.bagCells($('stashBag'), pr.char.bag, BAG, (i) => G.net.send({ t: 'stash', op: 'put', i }), null, false);
+  }
+
+  npcDialog(who, text, then) {
+    const el = $('npcDialog');
+    el.querySelector('.nd-name').textContent = who; el.querySelector('.nd-portrait').textContent = who[0];
+    const body = el.querySelector('.nd-text'); body.textContent = '';
+    el.classList.remove('hidden'); G.uiOpen = true; G.input.unlock();
+    let i = 0; clearInterval(this._typer);
+    this._typer = setInterval(() => { body.textContent = text.slice(0, ++i); if (i % 3 === 0) G.audio.click(); if (i >= text.length) clearInterval(this._typer); }, 18);
+    el.querySelector('.nd-next').onclick = () => { if (i < text.length) { i = text.length; body.textContent = text; return; } el.classList.add('hidden'); clearInterval(this._typer); G.uiOpen = this.anyPanel; then?.(); };
+  }
+  renderWaypoint() {
+    const pr = G.prof, peaksOpen = pr.peaks || (pr.char.quest?.i || 0) >= QUESTS.length;
+    const dests = [['town', 'Emberhold', 'The last city'], ['marsh', REGIONS.marsh.name, REGIONS.marsh.sub], ['peaks', REGIONS.peaks.name, peaksOpen ? REGIONS.peaks.sub : 'Sealed — complete Act I']];
+    $('wpList').innerHTML = dests.map(([k, n, s]) => `<button class="btn wpb" data-k="${k}" ${(k === 'peaks' && !peaksOpen) || k === G.zoneKey ? 'disabled' : ''}><b>${n}</b><br><span class="small muted">${k === G.zoneKey ? 'You are here' : s}</span></button>`).join('');
+    $('wpList').querySelectorAll('button').forEach((b) => (b.onclick = () => { this.closePanel('waypoint'); G.actions.travel(b.dataset.k); }));
+  }
+  renderQuests() {
+    const q = G.prof.char.quest || { i: 0, n: 0 };
+    $('questList').innerHTML = QUESTS.map((Q, i) => `<div class="qrow ${i < q.i ? 'done' : i === q.i ? 'cur' : 'locked'}"><b>${i < q.i ? '✔' : i === q.i ? '➤' : '•'} ${Q.title}</b><div class="small muted">${i <= q.i ? Q.goal : '???'}${i === q.i && Q.need > 1 ? ` (${q.n}/${Q.need})` : ''}</div></div>`).join('');
   }
 
   renderResearch() {
@@ -619,6 +648,8 @@ class UI {
 export function zoneName(z) {
   if (!z) return '';
   if (z.startsWith('dungeon')) return 'Dungeon';
+  if (z.startsWith('rift')) return 'Ember Rift';
+  if (REGIONS[z]) return REGIONS[z].name;
   return z === 'dark' ? 'Dark World' : 'Emberhold';
 }
 

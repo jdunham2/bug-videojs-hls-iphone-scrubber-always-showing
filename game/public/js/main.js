@@ -19,6 +19,8 @@ import { entityRoot, EnemyView, RemoteView, LootView, ProjView, StructView, Haza
 import { TownZone } from './zones/town.js';
 import { DungeonZone } from './zones/dungeon.js';
 import { DarkZone } from './zones/dark.js';
+import { RegionZone } from './zones/region.js';
+import { REGIONS, QUESTS, EVENTS } from '../shared/regions.js';
 import { STRUCTURES, TOWN } from '../shared/world.js';
 import { RARITIES } from '../shared/items.js';
 import { CLASSES } from '../shared/classes.js';
@@ -60,6 +62,7 @@ const cine = new Cinematic(camera);
 const town = new TownZone(renderer);
 town.grassMax = town.grass.count;
 let dark = null, dungeon = null;
+const regions = {};
 const camRig = new CameraRig(camera);
 let player = null;
 const killed = new Map();
@@ -71,7 +74,7 @@ function applySettings() {
   resize();
   const shadowWas = renderer.shadowMap.enabled;
   renderer.shadowMap.enabled = Q.shadows;
-  for (const z of [town, dark, dungeon]) {
+  for (const z of [town, dark, dungeon, regions.marsh, regions.peaks]) {
     if (!z) continue;
     const L = z.sun || z.moon;
     if (L && L.shadow.mapSize.x !== Q.shadowMap) { L.shadow.mapSize.set(Q.shadowMap, Q.shadowMap); L.shadow.map?.dispose(); L.shadow.map = null; }
@@ -112,6 +115,7 @@ let zoneQueue = Promise.resolve();
 function musicFor() {
   if (!G.zone) return 'town';
   if (G.rift && !G.rift.done) return G.rift.guardian ? 'boss' : 'night';
+  if (G.zone.type === 'region') { for (const e of G.enemies.values()) if (e.boss && !e.dead && player && e.pos.distanceTo(player.pos) < 40) return 'boss'; return G.event ? 'night' : G.zoneKey === 'marsh' ? 'dark' : 'town'; }
   for (const e of G.enemies.values()) if (e.boss && !e.dead && player && e.pos.distanceTo(player.pos) < 35 && (e.type !== 'ogre' || G.zone.type === 'town')) return 'boss';
   if (G.zone.type === 'town') return G.defense.phase === 'day' || G.defense.phase === 'dawn' ? 'town' : 'night';
   return G.zone.type;
@@ -128,6 +132,7 @@ async function switchZone(m) {
   let zone, oldDungeon = null;
   if (m.type === 'town') zone = town;
   else if (m.type === 'dark') zone = dark ||= new DarkZone(renderer);
+  else if (m.type === 'region') { zone = regions[m.zone] ||= new RegionZone(renderer, m.zone); applySettings(); }
   else if (m.type === 'rift') { if (dungeon) oldDungeon = dungeon; dungeon = new DungeonZone(renderer, m.seed, m.level, m.cleared, m.rift); dungeon.key = m.zone; zone = dungeon; applySettings(); }
   else {
     if (dungeon && dungeon.key !== m.zone) { oldDungeon = dungeon; dungeon = null; }
@@ -135,6 +140,7 @@ async function switchZone(m) {
     zone = dungeon;
   }
   G.zoneKey = m.zone;
+  G.event = null;
   G.rift = m.rift ? { ...m.rift, t0: performance.now() / 1000 - m.rift.elapsed } : null;
   setActiveZone(zone);
   if (oldDungeon) oldDungeon.dispose();
@@ -150,7 +156,7 @@ async function switchZone(m) {
   player.ry = Math.atan2(face.x, face.z);
   camRig.yaw = Math.atan2(-face.x, -face.z);
   camRig.snap(player);
-  const banners = { town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, zone.name || 'The Depths'], rift: [`EMBER RIFT ${m.rift?.k}`, (m.rift?.mods || []).map((k) => RIFT_MODS[k].name).join(' · ')] };
+  const banners = { town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, zone.name || 'The Depths'], region: [REGIONS[m.zone]?.name.toUpperCase() || '', REGIONS[m.zone]?.sub || ''], rift: [`EMBER RIFT ${m.rift?.k}`, (m.rift?.mods || []).map((k) => RIFT_MODS[k].name).join(' · ')] };
   if (prevKey || !settings.intro) ui.zoneBanner(...banners[m.type]);
   if (prevKey) sfx.portal();
   if (m.type === 'rift') setTimeout(() => ui.toast('Slay enemies to fill the rift — then face its Guardian', '#c77dff', `Beat ${Math.round(RIFT_TIME / 60)} minutes to raise your keystone`), 1200);
@@ -209,6 +215,8 @@ G.actions = {
   openStash() { ui.openPanel('stash'); },
   openSmith() { ui.openPanel('smith'); },
   openResearch() { ui.openPanel('research'); },
+  openWaypoint() { ui.openPanel('waypoint'); },
+  talk() { net.send({ t: 'talk' }); },
   challengeKing() { net.send({ t: 'challenge' }); },
   openRift() { ui.openPanel('riftPanel'); },
   openBoard() { ui.openPanel('board'); net.send({ t: 'leaderboard' }); },
@@ -399,6 +407,11 @@ net.on('strafe', (m) => {
 });
 net.on('teleport', (m) => { if (!player) return; ui.fade(true); setTimeout(() => { player.teleport(m.x, m.z, G.zone); camRig.snap(player); ui.fade(false); }, 300); });
 net.on('arenaShift', (m) => { ui.bigBanner('THE HOLLOW KING SHIFTS THE WORLD', `Phase ${m.phase} — a new arena`, 3000); sfx.portal(); sfx.roar(); });
+net.on('event', (m) => { G.event = { ...m, left: null }; ui.toast(`World event: ${EVENTS[m.kind].name}!`, '#ffd34d', EVENTS[m.kind].goal + ' — marked on your minimap'); sfx.horn(); if (G.zone) { const p = new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z), m.z); if (m.kind === 'meteor') fxPlay('meteor', { x: m.x, z: m.z, r: 4, delay: 3 }); else { fx.shockwave(p, 4, '#c77dff', 1); fx.beam(p, '#c77dff', 20, 40); } } });
+net.on('eventLeft', (m) => { if (G.event) G.event.left = m.left; });
+net.on('eventDone', (m) => { G.event = null; ui.bigBanner(m.ok ? 'EVENT COMPLETE' : 'EVENT FAILED', m.ok ? 'The region is safer — rewards granted' : 'The threat faded away…', 3000); if (m.ok) sfx.victory(); });
+net.on('questDone', (m) => { const Q = QUESTS[m.i]; sfx.levelUp(); ui.npcDialog('Captain Bryn', Q.done, () => ui.bigBanner('QUEST COMPLETE', Q.title, 3000)); });
+net.on('dialog', (m) => { const Q = QUESTS[m.i]; if (m.i === 0) ui.npcDialog(m.who, Q.intro); else if (!Q) ui.npcDialog(m.who, 'The Peaks await, hero. Emberhold owes you its life.'); else ui.npcDialog(m.who, `${Q.title}: ${Q.goal}. Don't keep the dark waiting.`); });
 net.on('riftProgress', (m) => { if (G.rift) G.rift.p = m.p; });
 net.on('guardian', () => { if (G.rift) { G.rift.p = 1; G.rift.guardian = true; } ui.bigBanner('THE GUARDIAN AWAKENS', 'The rift collapses around its master', 3000); sfx.roar(); });
 net.on('riftDone', (m) => {
@@ -453,6 +466,7 @@ function handleInput() {
   if (input.actHit('inventory') || input.hit('Tab')) ui.togglePanel('inventory');
   if (input.actHit('talents')) { ui._atTrainer = false; ui.togglePanel('talents'); }
   if (input.actHit('help')) ui.togglePanel('help');
+  if (input.actHit('quests')) ui.togglePanel('quests');
   if (input.hit('Escape') || input.pad.pressed.has('menu')) {
     if (G.emoteWheel) ui.closeWheel();
     else if (G.uiOpen) ui.closeAll();
@@ -589,7 +603,7 @@ function frame(now) {
     sendT -= realDt;
     if (sendT <= 0) {
       sendT = 1 / 15;
-      net.send({ t: 'state', x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), ry: +(player.ry + (player.kit.whirlT > 0 ? 0 : 0)).toFixed(2), anim: player.anim, hp: Math.ceil(player.hp), maxHp: player.stats.maxHp, dead: player.dead, gear: gearOf(player.char), style: player.rank, spirit: player.kit.spirits.length, emote: player.emote, block: player.blocking });
+      net.send({ t: 'state', mount: !!player.mounted, x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), ry: +(player.ry + (player.kit.whirlT > 0 ? 0 : 0)).toFixed(2), anim: player.anim, hp: Math.ceil(player.hp), maxHp: player.stats.maxHp, dead: player.dead, gear: gearOf(player.char), style: player.rank, spirit: player.kit.spirits.length, emote: player.emote, block: player.blocking });
     }
     musicT -= realDt;
     if (musicT <= 0) { musicT = 0.5; sfx.music(musicFor()); }

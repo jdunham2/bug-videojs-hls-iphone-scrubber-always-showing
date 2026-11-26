@@ -1,7 +1,7 @@
 // Local hero controller (movement, dodge roll, combat, class skills, style) and the third-person camera.
 import * as THREE from 'three';
 import { G, clamp, angleLerp, damp } from './state.js';
-import { buildHero, animateRig, applyGear } from './models.js';
+import { buildHero, animateRig, applyGear, buildSteed, animateSteed } from './models.js';
 import { computeStats } from '../shared/stats.js';
 import { CLASSES } from '../shared/classes.js';
 import { RARITIES } from '../shared/items.js';
@@ -36,6 +36,7 @@ export class LocalPlayer {
     this.slowT = 0; this.burnT = 0; this.furyT = 0; this.tailT = 0; this.phoenixCd = 0; this.thunderN = 0; this.burnDps = 0; this.unbreakCd = 0; this.dotAcc = 0; this.trapCd = 0; this.lavaAcc = 0;
     this.style = 0; this.styleIdle = 0; this.styleKeys = []; this.comboCount = 0; this.comboTimer = 0; this.lastRank = 0;
     this.emote = null; this.emoteT = 0; this.emoteDur = 0;
+    this.mounted = false; this.mountT = 0; this.steed = buildSteed(prof.color); this.steed.visible = false; this.root.add(this.steed);
     this.anim = 0;
     this.kit = new SkillKit(this);
     this.setProfile(prof, true);
@@ -144,6 +145,14 @@ export class LocalPlayer {
     if (active && input.actHit('dodge') && this.rollCd <= 0 && !this.roll && this.slamT < 0) this.startRoll(moving ? dir : null);
     if (active && input.actHit('jump') && this.onGround && this.slamT < 0 && !this.roll) { this.vy = 9; this.onGround = false; G.audio.jump(); }
     if (active && input.actHit('potion') && !G.buildMode) this.drinkPotion();
+    if (active && input.actHit('mount')) {
+      if (this.mounted) this.dismount();
+      else if (zone.type === 'dungeon') G.ui.toast('You cannot ride in the depths.', '#ff9a7a');
+      else if (this.combatT < 2) G.ui.toast('You cannot mount while in combat.', '#ff9a7a');
+      else if (this.mountT <= 0) { this.mountT = 1; this.castT = 1; G.audio.summon(); }
+    }
+    if (this.mountT > 0) { this.mountT -= dt; if (moving || this.combatT < 0.1) { this.mountT = 0; this.castT = 0; } else if (this.mountT <= 0) { this.mounted = true; this.steed.visible = true; G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 60, speed: 3, color: '#ffc060', color2: '#ff3a00', size: 0.35, life: 0.8 }); G.audio.portal(); } }
+    if (this.mounted && (this.atk.t >= 0 || this.roll || kit.busy() || this.slamT >= 0 || this.blocking || zone.type === 'dungeon')) this.dismount();
     kit.update(dt, yaw);
 
     // ---- attack progression ----
@@ -171,6 +180,7 @@ export class LocalPlayer {
     if (kit.whirlT > 0) speed *= 0.9;
     if (this.slowT > 0) speed *= 0.5;
     if (this.tailT > 0) speed *= 1.35;
+    if (this.mounted) speed *= 1.8;
     const tile = zone.d ? tileAt(zone.d, this.pos.x, this.pos.z) : 0;
     const accel = tile === 4 ? 1.6 : 14;
     if (this.roll) {
@@ -230,8 +240,15 @@ export class LocalPlayer {
       t: this.t, move: this.move, atk, combo: this.atk.combo, slam: this.slamT, dash: !!kit.bash, air: !this.onGround && this.slamT < 0, dead: this.dead ? this.deadAnim : 0, hurt: this.hurtT,
       roll: this.roll, block: this.blocking, channel: kit.whirlT > 0, cast: this.castT > 0 ? Math.min(1, this.castT * 4) : 0, emote: this.emote, emoteT: this.emoteT,
     });
+    if (this.mounted) {
+      animateSteed(this.steed, this.t, this.move); this.steed.rotation.y = 0;
+      this.rig.body.position.y += 0.85 + this.steed.position.y;
+      const P = this.rig.P; if (P.legL) { P.legL.rotation.x = P.legR.rotation.x = -1.3; P.shinL.rotation.x = P.shinR.rotation.x = 1.4; P.legL.rotation.z = -0.35; P.legR.rotation.z = 0.35; }
+    } else if (this.rig.P.legL) { this.rig.P.legL.rotation.z = this.rig.P.legR.rotation.z = 0; }
     this.anim = this.dead ? ANIM.dead : this.roll ? ANIM.roll : this.slamT >= 0 ? ANIM.slam : kit.bash ? ANIM.bash : kit.whirlT > 0 ? ANIM.whirl : this.blocking ? ANIM.block : this.castT > 0 ? ANIM.cast : this.atk.t >= 0 ? ANIM.atk0 + this.atk.combo : !this.onGround ? ANIM.air : this.move > 0.1 ? ANIM.run : ANIM.idle;
   }
+
+  dismount() { if (!this.mounted) return; this.mounted = false; this.steed.visible = false; G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 30, speed: 2, color: '#ffc060', color2: '#ff3a00', size: 0.3, life: 0.6 }); }
 
   startRoll(dir) {
     this.roll = 0.0001; this.rollT = 0; this.rollCd = ROLL_CD; this.atk.t = -1; this.castT = 0;
@@ -344,6 +361,7 @@ export class LocalPlayer {
     const armor = this.stats.armor * (this.tauntBuffT > 0 ? 1.4 : 1);
     const final = Math.max(1, Math.round(o.dot ? dmg : dmg * 100 / (100 + armor)));
     this.hp -= final; this.lastHurt = 0; this.combatT = 0;
+    if (!o.dot) this.dismount();
     if (!o.dot) {
       this.hurtT = 1;
       this.style *= 0.6; this.lastRank = Math.min(this.lastRank, this.rank);

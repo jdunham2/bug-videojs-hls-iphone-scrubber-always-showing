@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { TOWN, townHeight, townLayout, inGate } from '../../shared/world.js';
 import { fbm, smoothstep } from '../../shared/rng.js';
 import { G } from '../state.js';
+import { TOWN_WAYPOINT, CAPTAIN, QUESTS } from '../../shared/regions.js';
 import { buildHumanoid, animateRig } from '../models.js';
 import { makeSky, buildPortal, textures, Batcher, mtx, makeSun, followSun, makeGrass, heightTerrain, envFromSky } from './common.js';
 
@@ -340,6 +341,20 @@ export class TownZone {
       const face = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshStandardMaterial({ map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.35 })); face.position.set(0, 2, 0.07); bg.add(face);
       s.add(bg);
     }
+    // waypoint stone + Captain Bryn
+    {
+      const W = TOWN_WAYPOINT, wy = townHeight(W.x, W.z);
+      const wp = new THREE.Group(); wp.position.set(W.x, wy, W.z);
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.7, 3, 5), stoneMat); st.position.y = 1.5; st.castShadow = true; wp.add(st);
+      this.wpRune = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ab0ff').multiplyScalar(2.5) })); this.wpRune.position.y = 2.2; wp.add(this.wpRune);
+      s.add(wp);
+      this.captain = buildHumanoid({ cloth: '#7a1c1c', armor: '#b0b8c0', cape: '#7a1c1c', chestPlate: true, weapon: 'sword', rarity: 2, offhand: 'shield', shieldColor: '#7a1c1c', hair: '#8a5a2a' });
+      this.captain.root.position.set(CAPTAIN.x, townHeight(CAPTAIN.x, CAPTAIN.z), CAPTAIN.z);
+      this.captain.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      s.add(this.captain.root);
+      this.questMark = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd34d').multiplyScalar(2.5) }));
+      this.questMark.position.set(CAPTAIN.x, townHeight(CAPTAIN.x, CAPTAIN.z) + 2.75, CAPTAIN.z); this.questMark.scale.y = 1.8; s.add(this.questMark);
+    }
     // war table (defense research)
     {
       const W = TOWN.wartable, y0 = townHeight(W.x, W.z);
@@ -367,6 +382,8 @@ export class TownZone {
       { x: TOWN.obelisk.x, z: TOWN.obelisk.z, r: 3.4, mark: 'EMBER RIFTS', label: () => 'Open an Ember Rift (timed endgame)', action: () => G.actions.openRift() },
       { x: TOWN.board.x, z: TOWN.board.z, r: 3, mark: 'HALL OF EMBERS', label: () => 'Read the Hall of Embers (leaderboard)', action: () => G.actions.openBoard() },
       { x: TOWN.wartable.x, z: TOWN.wartable.z, r: 3, mark: 'WAR TABLE', label: () => 'Plan defenses at the War Table (research)', action: () => G.actions.openResearch() },
+      { x: TOWN_WAYPOINT.x, z: TOWN_WAYPOINT.z, r: 3, mark: 'WAYPOINT', label: () => 'Use the waypoint (travel to regions)', action: () => G.actions.openWaypoint() },
+      { x: CAPTAIN.x, z: CAPTAIN.z, r: 3, mark: 'CAPTAIN BRYN', label: () => 'Talk to Captain Bryn', action: () => G.actions.talk() },
       { x: TOWN.stash.x, z: TOWN.stash.z, r: 3, mark: 'STASH', label: () => 'Open the shared stash', action: () => G.actions.openStash() },
       { x: TOWN.bell.x, z: TOWN.bell.z, r: 3.2, mark: 'NIGHT BELL', label: () => (G.defense.phase === 'day' ? 'Ring the Night Bell — Defend the City' : null), action: () => G.actions.startNight() },
       ...this.chests.map((ch) => ({ x: ch.x, z: ch.z, r: 2.6, mark: null, label: () => (ch.open ? null : 'Open Ancient Chest'), action: () => G.actions.openChest(ch) })),
@@ -480,6 +497,10 @@ export class TownZone {
     if (this.bellSwing > 0) { this.bellSwing = Math.max(0, this.bellSwing - dt * 0.3); this.bellPivot.rotation.x = Math.sin(t * 6) * 0.5 * this.bellSwing; }
     for (const b of this.banners) b.rotation.x = Math.sin(t * 2 + b.position.x) * 0.08;
     animateRig(this.trainer, { t, move: 0, atk: -1, slam: -1 });
+    animateRig(this.captain, { t: t + 2, move: 0, atk: -1, slam: -1 });
+    this.captain.root.rotation.y = Math.atan2(playerPos.x - CAPTAIN.x, playerPos.z - CAPTAIN.z);
+    this.wpRune.rotation.y = t; this.wpRune.rotation.x = Math.sin(t) * 0.3;
+    const qi = G.prof?.char?.quest?.i || 0; this.questMark.visible = qi === 0 || qi >= QUESTS.length ? qi === 0 : QUESTS[qi].kind === 'talk'; this.questMark.rotation.y = t * 2; this.questMark.position.y = townHeight(CAPTAIN.x, CAPTAIN.z) + 2.75 + Math.sin(t * 3) * 0.1;
     const hm = (t * 0.9) % 1; animateRig(this.smith, { t, move: 0, atk: hm < 0.6 ? hm / 0.6 : -1, combo: 2, slam: -1 });
     if (hm > 0.32 && hm < 0.36 && Math.random() < 0.7) G.fx.emit({ pos: this.smith.root.position.clone().add(new THREE.Vector3(0, 1, 0)), count: 10, speed: 4, color: '#ffe0a0', color2: '#ff4a00', size: 0.18, life: 0.4, gravity: 10 });
     this.forgeLight.intensity = 9 + Math.sin(t * 9) * 2;

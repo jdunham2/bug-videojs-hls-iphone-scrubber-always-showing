@@ -161,6 +161,7 @@ export function townLayout() {
   }
   colliders.push({ x: TOWN.core.x, z: TOWN.core.z, r: TOWN.core.r });
   colliders.push({ x: TOWN.bell.x, z: TOWN.bell.z, r: 1.3 });
+  colliders.push({ x: -3.5, z: 20, r: 0.9 }, { x: 3.5, z: 20.5, r: 0.6 });
   colliders.push({ x: TOWN.stash.x, z: TOWN.stash.z, r: 0.9 }, { x: TOWN.smith.x - 1.2, z: TOWN.smith.z, r: 1.1 }, { x: TOWN.obelisk.x, z: TOWN.obelisk.z, r: 1.2 }, { x: TOWN.board.x, z: TOWN.board.z, r: 1 });
   for (const p of [TOWN.dungeonPortal, TOWN.darkPortal]) {
     const l = Math.hypot(p.x, p.z), fx = -p.x / l, fz = -p.z / l; // portal faces the town centre

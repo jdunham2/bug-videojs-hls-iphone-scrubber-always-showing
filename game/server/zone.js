@@ -5,6 +5,7 @@ import { DARK } from '../public/shared/world.js';
 import { SHRINES } from '../public/shared/dungeon.js';
 import { RNG } from '../public/shared/rng.js';
 import { RIFT_MOD_KEYS, riftEnemyLevel, riftHpMul, RIFT_TIME } from '../public/shared/rifts.js';
+import { REGIONS, EVENTS } from '../public/shared/regions.js';
 
 const rng = new RNG(Date.now() & 0xffffffff);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -16,6 +17,7 @@ export class Zone {
     this.room = room; this.key = key; this.type = type; this.level = level;
     this.enemies = new Map(); this.projectiles = new Map(); this.hazards = new Map();
     this.cleared = false; this.emptyT = 0; this.respawnT = 0;
+    if (type === 'region') { this.region = REGIONS[key]; this.eventT = 25; this.event = null; }
     if (type === 'dungeon' || type === 'rift') {
       this.seed = (Math.random() * 1e9) | 0;
       if (type === 'rift') {
@@ -68,7 +70,7 @@ export class Zone {
 
   collide(pos, r) {
     if (this.dungeon) dungeonCollide(this.dungeon, pos, r);
-    else if (this.type === 'dark') { const d = Math.hypot(pos.x, pos.z); if (d > DARK.bound - 4) { pos.x *= (DARK.bound - 4) / d; pos.z *= (DARK.bound - 4) / d; } }
+    else if (this.type === 'dark' || this.region) { const B = (this.region?.bound || DARK.bound) - 4, d = Math.hypot(pos.x, pos.z); if (d > B) { pos.x *= B / d; pos.z *= B / d; } }
   }
 
   addHazard(kind, x, z, r, dps, life, delay = 0) {
@@ -88,6 +90,7 @@ export class Zone {
       h.life -= dt;
       if (h.life <= 0) { this.hazards.delete(h.id); this.broadcast({ t: 'hazardEnd', id: h.id }); }
     }
+    if (this.region && this.players().length) this.tickRegion(dt);
     if (this.type === 'dark') {
       this.respawnT -= dt;
       if (this.respawnT <= 0 && this.enemies.size < 9 && this.players().length) {
@@ -155,7 +158,7 @@ export class Zone {
         e.aggro = true; target = { kind: 'player', p }; tx = p.x; tz = p.z; reach = def.ranged ? def.range : def.range + 0.4;
       } else {
         e.aggro = false;
-        if (this.type === 'dark') {
+        if (this.type === 'dark' || this.region) {
           e.wanderT -= dt;
           if (e.wanderT <= 0) { e.wanderT = rng.range(2, 5); e.wx = e.home.x + rng.range(-8, 8); e.wz = e.home.z + rng.range(-8, 8); }
           tx = e.wx; tz = e.wz; reach = 1;
@@ -165,7 +168,7 @@ export class Zone {
     const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz);
     if (d > 0.01) e.ry = Math.atan2(dx, dz);
     if (target && target.kind === 'player') {
-      if (e.type === 'boss' && this.tyrant(e, dt, alive, d)) return;
+      if ((e.type === 'boss' || def.ai === 'tyrant') && this.tyrant(e, dt, alive, d)) return;
       if (e.type === 'matriarch' && this.matriarch(e, dt, alive, target.p, d)) return;
       if (e.type === 'drake' && this.drake(e, dt, alive, target.p, d)) return;
       if (e.type === 'hollowking' && this.hollowKing(e, dt, alive, target.p, d)) return;
@@ -477,6 +480,8 @@ export class Zone {
         }
       }
     }
+    if (def.boss && this.type === 'dungeon') for (const p of this.players()) this.room.questEvent(p, 'dungeon');
+    if (e.type === 'colossus') for (const p of this.players()) this.room.questEvent(p, 'actboss');
     if (def.boss && this.type === 'dungeon' && !this.cleared) {
       this.cleared = true;
       for (const o of [...this.enemies.values()]) this.remove(o);
@@ -485,6 +490,63 @@ export class Zone {
       this.broadcast({ t: 'cleared', level: this.room.level, x: r2(e.x), z: r2(e.z) });
       this.room.broadcast({ t: 'roomLevel', level: this.room.level });
     }
+  }
+
+  tickRegion(dt) {
+    const R = this.region;
+    this.respawnT -= dt;
+    const ambient = [...this.enemies.values()].filter((e) => !e.event && !e.def.boss).length;
+    if (this.respawnT <= 0 && ambient < 14) {
+      this.respawnT = 4;
+      const a = rng.range(0, Math.PI * 2), r = rng.range(18, R.bound - 12);
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (Math.hypot(x - R.spawn.x, z - R.spawn.z) > 16) this.spawn(rng.weighted(R.spawns), x, z);
+    }
+    if (this.event) {
+      const ev = this.event; ev.t -= dt;
+      if (ev.kind === 'breach' && ev.spawnLeft > 0) {
+        ev.spawnT -= dt;
+        if (ev.spawnT <= 0) { ev.spawnT = 3.5; ev.spawnLeft--; for (let k = 0; k < 2; k++) this.spawn(rng.weighted(R.spawns), ev.x + rng.range(-2, 2), ev.z + rng.range(-2, 2), { event: ev.id, aggro: true }); }
+      }
+      const left = [...this.enemies.values()].filter((e) => e.event === ev.id).length;
+      if (ev.started && left === 0 && !(ev.kind === 'breach' && ev.spawnLeft > 0)) this.endEvent(true);
+      else if (ev.t <= 0) this.endEvent(false);
+      else if (Math.round(ev.t * 2) % 4 === 0 && ev.lastLeft !== left) { ev.lastLeft = left; this.broadcast({ t: 'eventLeft', left }); }
+      return;
+    }
+    this.eventT -= dt;
+    if (this.eventT <= 0) {
+      const kind = rng.pick(Object.keys(EVENTS));
+      const a = rng.range(0, Math.PI * 2), r = rng.range(20, R.bound - 25);
+      const ev = { id: this.room.nextId++, kind, x: Math.cos(a) * r, z: Math.sin(a) * r, t: 120, started: false, spawnLeft: kind === 'breach' ? 9 : 0, spawnT: 3 };
+      this.event = ev;
+      this.broadcast({ t: 'event', kind, x: r2(ev.x), z: r2(ev.z), id: ev.id });
+      setTimeout(() => {
+        if (this.event !== ev) return;
+        ev.started = true;
+        if (kind === 'meteor') {
+          this.addHazard('fire', ev.x, ev.z, 4, 14 * levelMul(this.lvl).dmg, 8, 0);
+          for (let k = 0; k < 7; k++) { const aa = (k / 7) * Math.PI * 2; this.spawn(rng.weighted(R.spawns), ev.x + Math.cos(aa) * 5, ev.z + Math.sin(aa) * 5, { event: ev.id, elite: k < 3 ? rng.pick(AFFIX_KEYS) : undefined }); }
+        }
+      }, kind === 'meteor' ? 3000 : 1000);
+    }
+  }
+  endEvent(ok) {
+    const ev = this.event; this.event = null; this.eventT = rng.range(60, 90);
+    for (const e of [...this.enemies.values()]) if (e.event === ev.id) this.remove(e);
+    this.broadcast({ t: 'eventDone', ok, kind: ev.kind });
+    if (!ok) return;
+    for (const p of this.players()) if (dist(p, ev) < 60) {
+      this.room.reward(p, 80 * this.lvl, 150 * this.lvl, ev.x, ev.z, true);
+      this.room.giveLoot(p, this.lvl, { minRarity: 2, luck: 2 }, ev.x + rng.range(-2, 2), ev.z + rng.range(-2, 2));
+      this.room.questEvent(p, 'event');
+    }
+  }
+  summonColossus(p) {
+    if ([...this.enemies.values()].some((e) => e.def.boss)) return;
+    if (dist(p, this.region.altar) > 8) return;
+    this.spawn(this.key === 'marsh' ? 'colossus' : 'drake', this.region.altar.x, this.region.altar.z - 4);
+    this.broadcast({ t: 'chat', from: '★', text: this.key === 'marsh' ? 'The bog churns… the Colossus rises!' : 'Thunder splits the sky — the Storm Drake descends!' });
   }
 
   challengeKing(p) {

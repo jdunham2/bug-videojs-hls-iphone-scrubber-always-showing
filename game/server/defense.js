@@ -185,7 +185,7 @@ export class Defense {
         else {
           d.phase = 'intermission'; d.timer = 15;
           const gold = Math.round(20 * d.wave * levelMul(this.room.level).gold);
-          for (const p of town.players()) this.room.reward(p, gold, 30 * d.wave, 0, 0, true);
+          for (const p of town.players()) { this.room.reward(p, gold, 30 * d.wave, 0, 0, true); this.room.questEvent(p, 'wave'); }
         }
       }
     } else if (d.phase === 'dawn' && d.timer <= 0) { d.phase = 'day'; d.result = null; }

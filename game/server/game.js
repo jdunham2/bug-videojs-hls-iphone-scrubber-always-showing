@@ -6,6 +6,7 @@ import { Defense, research } from './defense.js';
 import * as P from './profile.js';
 import { SETS } from '../public/shared/items.js';
 import { RIFT_TIME, season } from '../public/shared/rifts.js';
+import { REGIONS, QUESTS, CAPTAIN, questDone } from '../public/shared/regions.js';
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 export { TOKEN_RE };
@@ -60,6 +61,9 @@ class Room {
         this.currentDungeon = key;
       }
       zone = this.zones.get(this.currentDungeon);
+    } else if (REGIONS[type]) {
+      if (type === 'peaks' && !questDone(p.char.quest) && !p.prof.peaks) { send(p.ws, { t: 'notice', text: 'The pass to Stormspire is sealed. Finish Act I first.', color: '#ff9a7a' }); return; }
+      zone = this.zones.get(type) || this.zones.set(type, new Zone(this, type, 'region', this.level)).get(type);
     } else zone = this.zones.get(type === 'dark' ? 'dark' : 'town');
     this.joinZone(p, zone);
   }
@@ -72,6 +76,18 @@ class Room {
     }
     this.joinZone(p, zone);
   }
+  questEvent(p, kind, n = 1) {
+    const q = (p.char.quest ||= { i: 0, n: 0 });
+    const Q = QUESTS[q.i]; if (!Q || Q.kind !== kind) return;
+    q.n += n;
+    if (q.n >= Q.need) {
+      q.i++; q.n = 0;
+      this.reward(p, 60 + 40 * q.i, 120 * q.i, p.x, p.z, true);
+      if (q.i >= QUESTS.length) { p.prof.peaks = true; this.giveLoot(p, Math.max(this.level, p.char.level), { rarity: 4 }, p.x + 1.5, p.z); }
+      send(p.ws, { t: 'questDone', i: q.i - 1 });
+    }
+    p.dirty = true;
+  }
   riftComplete(zone, guardian) {
     const r = zone.rift, time = (Date.now() - r.start) / 1000, ok = time <= RIFT_TIME;
     const bump = ok ? (time < RIFT_TIME * 0.6 ? 2 : 1) : 0;
@@ -81,6 +97,7 @@ class Room {
       for (let i = 0; i < 2; i++) this.giveLoot(p, zone.level, { minRarity: 3, luck: 3 }, guardian.x + i * 1.5, guardian.z);
       if (Math.random() < 0.5 + zone.k * 0.03) this.giveLoot(p, zone.level, { rarity: 4 }, guardian.x - 1.5, guardian.z);
       p.prof.riftMax = Math.max(p.prof.riftMax || 1, zone.k + bump);
+      this.questEvent(p, 'rift');
       if (ok) {
         const list = (S[p.cls] ||= []);
         list.push({ name: p.prof.name, k: zone.k, time: Math.round(time * 10) / 10, party: zone.players().length });
@@ -151,7 +168,7 @@ class Room {
     }
     for (const p of this.players.values()) if (p.dirty) { p.dirty = false; send(p.ws, P.profileView(p)); db.touch(); }
     if (this.tickN % 3 === 0) {
-      const plist = [...this.players.values()].map((p) => ({ id: p.id, name: p.prof.name, color: p.prof.color, cls: p.cls, zone: p.zone, x: r2(p.x), y: r2(p.y), z: r2(p.z), ry: r2(p.ry), anim: p.anim, hp: p.hp, maxHp: p.maxHp, gear: p.gear, level: p.char.level, dead: p.dead, spirit: p.spirit, emote: p.emote, block: p.block }));
+      const plist = [...this.players.values()].map((p) => ({ id: p.id, name: p.prof.name, color: p.prof.color, cls: p.cls, zone: p.zone, x: r2(p.x), y: r2(p.y), z: r2(p.z), ry: r2(p.ry), anim: p.anim, hp: p.hp, maxHp: p.maxHp, gear: p.gear, level: p.char.level, dead: p.dead, spirit: p.spirit, emote: p.emote, block: p.block, mount: p.mount }));
       this.broadcast({ t: 'players', list: plist });
       for (const z of this.zones.values()) if (z.players().length) z.broadcast(z.snapshot());
     }
@@ -198,7 +215,7 @@ function attach(ws) {
       case 'state':
         p.x = +m.x || 0; p.y = +m.y || 0; p.z = +m.z || 0; p.ry = +m.ry || 0; p.anim = m.anim | 0;
         p.hp = m.hp | 0; p.maxHp = m.maxHp | 0; p.dead = !!m.dead; p.gear = m.gear || p.gear;
-        p.style = Math.max(0, Math.min(4, m.style | 0)); p.spirit = m.spirit | 0; p.emote = m.emote || null; p.block = !!m.block;
+        p.style = Math.max(0, Math.min(4, m.style | 0)); p.spirit = m.spirit | 0; p.emote = m.emote || null; p.block = !!m.block; p.mount = !!m.mount;
         break;
       case 'zone': if (m.to === 'dungeon') room.requestDungeon(p); else room.enterZone(p, m.to); break;
       case 'rift': {
@@ -210,7 +227,8 @@ function attach(ws) {
       }
       case 'leaderboard': { const S = (db.data.leaderboard || {})[season()] || {}; send(ws, { t: 'leaderboard', season: season(), data: S }); break; }
       case 'research': if (p.zone === 'town' && near(p, TOWN.wartable, 7)) ok(research(p, String(m.key)), 'Research complete!', '#5ab0ff'); break;
-      case 'challenge': if (zone?.type === 'dark') zone.challengeKing(p); break;
+      case 'challenge': if (zone?.type === 'dark') zone.challengeKing(p); else if (zone?.region) zone.summonColossus(p); break;
+      case 'talk': if (p.zone === 'town' && near(p, CAPTAIN, 6)) { send(ws, { t: 'dialog', who: 'Captain Bryn', i: (p.char.quest?.i || 0) }); room.questEvent(p, 'talk'); } break;
       case 'paragon': ok(P.spendParagon(p, String(m.key))); break;
       case 'readyResp': room.readyResp(p, !!m.yes); break;
       case 'hit': {
