@@ -14169,6 +14169,14 @@ function gx79Build() { GX79.done = true; const g = new THREE.Group(); GX79.grp =
 
 /* graphics round 81: softer shadow fill in Skyport at sunset/dusk so streets in shade are not pitch black */
 { const _udn81 = updateDayNight; updateDayNight = function () { _udn81(); if (W === HC_W && GFX.hd && S.hemi) { const n = S.night || 0, e = SURF_SUN.y; const dusk = e < 0.3 ? 1 - Math.max(0, e) / 0.3 : 0; S.hemi.intensity = Math.max(S.hemi.intensity, 0.35 + dusk * 0.35 * (1 - n * 0.6)); } }; }
+/* ============ graphics round 85: the Great Whale gets throat grooves on its belly and pale barnacle spots on its back ============ */
+const GX85 = { on: { value: 1 }, done: null };
+function gx85Skin(m, kind) { if (!m || m.userData.gx85) return; m.userData.gx85 = true; const prev = m.onBeforeCompile;
+  m.onBeforeCompile = function (sh, r) { if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r); sh.uniforms.wsOn = GX85.on; sh.vertexShader = 'varying vec3 vWsP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vWsP = position;');
+    sh.fragmentShader = 'uniform float wsOn; varying vec3 vWsP;\nfloat wsH(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5); }\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n { ' + (kind === 'belly' ? 'float gr = smoothstep(0.75, 1.0, abs(sin(vWsP.x * 22.0))) * smoothstep(-0.2, 0.6, vWsP.z); diffuseColor.rgb *= mix(1.0, 1.0 - gr * 0.35, wsOn);' : 'vec3 c = floor(vWsP * 9.0); float sp = step(0.93, wsH(c)) * smoothstep(-0.2, 0.5, vWsP.y); float n = wsH(floor(vWsP * 3.0)); diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * (0.85 + n * 0.25), vec3(0.75, 0.78, 0.8), sp * 0.8), wsOn);') + ' }'); };
+  m.customProgramCacheKey = () => 'whale' + kind; m.needsUpdate = true; }
+{ const _usc52 = updateSurfCamera; updateSurfCamera = function (dt) { _usc52(dt); if (W !== OC_W || !S.built || typeof OCV === 'undefined' || !OCV.whale) return; if (GX85.done !== OCV.whale) { GX85.done = OCV.whale; OCV.whale.traverse(o => { if (!o.isMesh || !o.material || !o.material.color) return; const hx = o.material.color.getHex(); if (hx === 0x3a5a8a) gx85Skin(o.material, 'back'); else if (hx === 0xd8e4f0) gx85Skin(o.material, 'belly'); }); } GX85.on.value = GFX.hd ? 1 : 0; }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
