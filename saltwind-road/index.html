@@ -2767,6 +2767,12 @@ const BALLOON_TOWNS = ['wren','frost','crownfall','tidewatch','prismvale','farha
 const BALLOONISTS = ['Captain Zephyr','Aeronaut Bree','Old Gusty','Skye Fairweather','Professor Nimbus','Cirrus Vane'];
 BALLOON_TOWNS.forEach((k, i) => NPCS.push({id: 'bln_' + k, town: k, dx: -3, dy: 3, name: BALLOONISTS[i], role: 'Balloon rides', cols: {cloak: ['#c84a3a','#3a7ad8','#d8a83a','#6a3a8a','#3a8a5a','#d86a3a'][i], skin: '#e0b896', hair: '#e8e0d0'}, balloon: true,
   hello: ['Up, up and away!', 'Fine flying weather today.', 'The world looks different from up there.'], rumors: ['From up high you can see lands you never knew were there.']}));
+const STABLE_NAMES = ['Bess Hayward', 'Tam Oatley', 'Rowan Bridle', 'Mags Farrier', 'Ned Saddler', 'Ivy Stirrup', 'Cobb Hackney', 'Wren Halter', 'Hal Paddock', 'Fen Gallop', 'Juno Mane', 'Otto Canter', 'Pip Fetlock', 'Rue Trotter', 'Silas Reins', 'Tilly Hoof', 'Bram Withers', 'Clem Furlong', 'Dot Pinto', 'Ezra Colt', 'Gwen Mare', 'Hob Shire', 'Isla Bay', 'Kit Roan', 'Lark Dapple', 'Moss Fjord', 'Nell Arden', 'Orrin Pony'];
+Object.keys(TOWNS).filter(k => k !== 'isle' && k !== 'blackwater').forEach((k, i) => NPCS.push({id: 'stb_' + k, town: k, dx: 4, dy: -1, name: STABLE_NAMES[i % STABLE_NAMES.length], role: 'Stables', cols: {cloak: ['#6a4a2a', '#4a5a3a', '#7a5a3a', '#5a4a3a'][i % 4], skin: '#e0b896', hair: ['#5a3a1a', '#c8a060', '#3a2a1a', '#a8a8a0'][i % 4]}, stable: true, freeSpot: true,
+  hello: ['Mind the hooves.', 'Fresh hay this morning.', 'Need a horse for the road?'], rumors: ['The roads are long now. A good horse makes all the difference.']}));
+const FERRYMEN = ['Captain Salt', 'Old Mariner Bly', 'Skipper Nell', 'Bosun Grig', 'Captain Pearl', 'Helmsman Quill'];
+['jade', 'lantern', 'tidewatch', 'blackwater', 'driftport', 'prismvale'].filter(k => TOWNS[k]).forEach((k, i) => NPCS.push({id: 'fer_' + k, town: k, dx: -4, dy: -1, name: FERRYMEN[i], role: 'Ferry', cols: {cloak: '#2a4a6a', skin: '#d8a878', hair: '#e8e0d0'}, ferry: true, freeSpot: true,
+  hello: ['Fair winds today.', 'All aboard who’s coming aboard!', 'The sea’s in a mood. Then again, it always is.'], rumors: ['Pirates have been bold on the crossings lately. Keep your blade handy.']}));
 const NPC_BY = Object.fromEntries(NPCS.map(n => [n.id, n]));
 NPC_BY.saffi.animals = {camel:180};
 NPC_BY.kesh.animals = {elk:220, fox:120};
@@ -3156,6 +3162,7 @@ function genWorld() {
     const P = PROPERTIES[k], h = P.estate ? houses.find(q => q.estate === k) : (() => { const hs = houses.filter(q => q.town === P.town); return hs[P.hi ?? 1] || hs[0]; })();
     P.door = {x: h.x + 1, y: h.y + 2.35}; P.hx = h.x; P.hy = h.y;
   }
+  placeWild(reach); placeSignposts();
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
   setTimeout(placeWells, 0); setTimeout(placeMonuments, 0); setTimeout(placeCastaway, 0); setTimeout(placeCircus, 50);
   for (const n of NPCS) if (n.balloon || n.freeSpot) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [m.x - .5, m.y - .8]);
@@ -3176,6 +3183,7 @@ function placeNodes() {
   for (const k in TOWNS) stamp(TOWNS[k].x, TOWNS[k].y, TOWNS[k].small ? 4.5 : 7);
   stamp(HOME.x, HOME.y, 9);
   for (const i of blocked) keepClear[i] = 1; for (const i of ESTATE_CLEAR) keepClear[i] = 1;
+  for (const w of WILD) stamp(w.x, w.y, w.kind === 'hamlet' ? 6 : 3); for (const q of SIGNPOSTS) stamp(q.x, q.y, 1.5);
   for (const sh of SHRINES) for (let y = sh.y - 3; y <= sh.y + 3; y++) for (let x = sh.x - 3; x <= sh.x + 3; x++) if (inB(x, y)) keepClear[idx(x, y)] = 1;
   for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) {
     const i = idx(x,y), t = map[i];
@@ -8375,8 +8383,12 @@ function bubEnd(won) {
 }
 // ===== walk around inside your home =====
 const HIN_W = 12, HIN_H = 9, HIN_C = 32, HIN_OX = 1, HIN_EDGE = 12; // the decorating grid (10×7) plus a strip either side and two rows at the front
-let hin = null, hinRet = false, hinPos = null;
+let hin = null, hinRet = false, hinPos = null, roomFloor = 0;
 function hinFixtures() {
+  if (roomFloor) return [
+    {id: 'stairs', x: HIN_W - 1, y: 7, w: 1, h: 1, name: 'Stairs', verb: 'Go downstairs', fn: () => hinStairs()},
+    {id: 'desk', x: 0, y: 4, w: 1, h: 1, name: 'Writing desk', verb: 'Decorate upstairs', fn: () => hinAway(() => decoOpen())},
+    {id: 'scope', x: 0, y: 1, w: 1, h: 2, name: 'Telescope', verb: 'Look out over the land', fn: () => hinScope()}];
   const L = S.home.level, f = [
     {id: 'bed', x: HIN_W - 1, y: 1, w: 1, h: 2, name: 'Bed', verb: 'Sleep until morning', fn: () => { sleep(); hin && (hin.msg = 'You sleep soundly and wake to birdsong.', hin.msgT = 3); }},
     {id: 'chest', x: HIN_W - 1, y: 4, w: 1, h: 1, name: 'Storage chest', verb: 'Open the chest and home menu', fn: () => hinAway(() => openHome())},
@@ -8384,14 +8396,15 @@ function hinFixtures() {
     {id: 'desk', x: 0, y: 4, w: 1, h: 1, name: 'Writing desk', verb: 'Decorate your room', fn: () => hinAway(() => decoOpen())},
   ];
   if (L >= 2) f.push({id: 'bench', x: 0, y: 6, w: 1, h: 1, name: 'Workbench', verb: 'Craft at the workbench', fn: () => hinAway(() => openCraft())});
+  if (L >= 2) f.push({id: 'stairs', x: HIN_W - 1, y: 7, w: 1, h: 1, name: 'Stairs', verb: 'Go upstairs', fn: () => hinStairs()});
   if (L >= 3) f.push({id: 'anvil', x: HIN_W - 1, y: 6, w: 1, h: 1, name: 'Forge', verb: 'Work the forge', fn: () => hinAway(() => openCraft())});
   return f;
 }
-function hinAway(fn) { if (!hin) return; hinPos = {x: hin.p.x, y: hin.p.y, f: hin.face}; hin = null; hinRet = true; $('talk').hidden = true; mode = 'play'; fn(); }
+function hinAway(fn) { if (!hin) return; hinPos = {x: hin.p.x, y: hin.p.y, f: hin.face, floor: roomFloor}; hin = null; hinRet = true; $('talk').hidden = true; mode = 'play'; fn(); }
 function hinMaybeBack() { if (!hinRet) return; setTimeout(() => { if (!hinRet || mode !== 'play') return; hinRet = false; if (Math.hypot(S.x - HOME.x, S.y - HOME.y) < 9 && S.home.level) hinOpen(true); }, 0); }
 function hinSolid(cx, cy) {
   if (cx < 0 || cx >= HIN_W || cy < 1) return true;
-  if (cy >= HIN_H) return !(cx === Math.floor(HIN_W/2) - 1 || cx === Math.floor(HIN_W/2));
+  if (cy >= HIN_H) return roomFloor ? true : !(cx === Math.floor(HIN_W/2) - 1 || cx === Math.floor(HIN_W/2));
   for (const f of hin.fx) if (cx >= f.x && cx < f.x + f.w && cy >= f.y && cy < f.y + f.h) return true;
   for (const it of roomState().items) { const F = FURNITURE[it.k]; if (F.flat || F.wall) continue; const x = it.x + HIN_OX; if (cx >= x && cx < x + F.w && cy >= it.y && cy < it.y + F.h) return true; }
   return false;
@@ -8399,27 +8412,29 @@ function hinSolid(cx, cy) {
 function hinFree(x, y) { const r = .3; for (const [a, b] of [[-r, -.1], [r, -.1], [-r, .3], [r, .3]]) if (hinSolid(Math.floor(x + a), Math.floor(y + b))) return false; return true; }
 function hinOpen(back) {
   if (!S.home.level) return;
-  homeCtx = null; roomState();
+  homeCtx = null; roomFloor = back && hinPos ? (hinPos.floor || 0) : 0; roomState();
   const p = back && hinPos ? {x: hinPos.x, y: hinPos.y} : {x: HIN_W/2, y: HIN_H - .45};
   hin = {on: true, p, face: back && hinPos ? hinPos.f : 'up', phase: 0, moving: false, keys: new Set(), padDir: null, path: null, goal: null, msg: '', msgT: 0, last: performance.now(), t: 0, fx: hinFixtures(), visits: 0,
     pet: S.pet ? {x: p.x + 1, y: p.y - .6, face: 'left', phase: 0, moving: false, wait: 1} : null};
   hinPos = null;
   if (!back) { S.homeVisits = (S.homeVisits || 0) + 1; SFX.click && SFX.click(); }
   const L = HOME_LEVELS[S.home.level];
-  openPanel(`Inside your ${L.name.toLowerCase()}`, `<canvas id="hinC" width="${HIN_W*HIN_C}" height="${HIN_H*HIN_C + HIN_EDGE}" style="display:block;margin:0 auto;border-radius:6px;width:100%;max-width:560px;image-rendering:pixelated;touch-action:none;cursor:pointer"></canvas><div id="hinInfo" style="text-align:center;min-height:2.6em;margin-top:6px"></div>`,
+  openPanel(roomFloor ? `Upstairs in your ${L.name.toLowerCase()}` : `Inside your ${L.name.toLowerCase()}`, `<canvas id="hinC" width="${HIN_W*HIN_C}" height="${HIN_H*HIN_C + HIN_EDGE}" style="display:block;margin:0 auto;border-radius:6px;width:100%;max-width:560px;image-rendering:pixelated;touch-action:none;cursor:pointer"></canvas><div id="hinInfo" style="text-align:center;min-height:2.6em;margin-top:6px"></div>`,
     [{label: 'Go outside', fn: hinExit}]);
   { const g = $('portrait').getContext('2d'); g.fillStyle = '#6e9c4e'; g.fillRect(0, 0, 72, 72); g.fillStyle = S.home.level >= 2 ? '#c8c4bc' : '#8a6038'; g.fillRect(14, 32, 44, 30); g.fillStyle = '#b83a2a'; g.beginPath(); g.moveTo(8, 34); g.lineTo(36, 10); g.lineTo(64, 34); g.fill(); g.fillStyle = '#5a3a20'; g.fillRect(31, 44, 10, 18); g.fillStyle = '#f0d070'; g.fillRect(18, 40, 8, 8); g.fillRect(46, 40, 8, 8); }
   setTimeout(() => { const c = document.getElementById('hinC'); if (!c || !hin) return;
     c.addEventListener('pointerdown', e => { e.preventDefault(); if (!hin) return; const r = c.getBoundingClientRect(), s = c.width/r.width; hinTap((e.clientX - r.left)*s/HIN_C, (e.clientY - r.top)*s/HIN_C); });
     hin.last = performance.now(); requestAnimationFrame(hinLoop); }, 30);
 }
-function hinExit() { if (!hin) { closeTalk(); return; } hin = null; hinRet = false; closeTalk(); player.facing = 'down'; SFX.click && SFX.click(); }
+function hinStairs() { if (!hin) return; roomFloor = roomFloor ? 0 : 1; hinPos = {x: HIN_W - 2 + .5, y: 7.55, f: 'left', floor: roomFloor}; hin = null; if (roomFloor) S.upstairsVisits = (S.upstairsVisits || 0) + 1; SFX.click && SFX.click(); hinOpen(true); }
+function hinScope() { if (!hin) return; reveal(HOME.x, HOME.y, 18*WS); S.scopeLooks = (S.scopeLooks || 0) + 1; hin.msg = 'You sweep the telescope across the hills. The land around your home is now on your map.'; hin.msgT = 4; SFX.chime && SFX.chime(); save(); }
+function hinExit() { roomFloor = 0; if (!hin) { closeTalk(); return; } hin = null; hinRet = false; closeTalk(); player.facing = 'down'; SFX.click && SFX.click(); }
 function hinTarget() {
   const H = hin, px = H.p.x, py = H.p.y; let best = null, bd = .95;
   const near = (x, y, w, h) => Math.hypot(Math.max(x - px, 0, px - (x + w)), Math.max(y - py, 0, py - (y + h)));
   for (const f of H.fx) { const d = near(f.x, f.y, f.w, f.h); if (d < bd) { bd = d; best = f; } }
   for (const it of roomState().items) { const F = FURNITURE[it.k]; const d = F.wall ? (py < 1.9 ? near(it.x + HIN_OX, 0, F.w, 1) : 9) : near(it.x + HIN_OX, it.y, F.w, F.h) + (F.flat ? .4 : 0); if (d < bd) { bd = d; best = {id: 'item', it, name: F.name, verb: 'Look'}; } }
-  if (Math.abs(px - HIN_W/2) < 1.3 && py > HIN_H - .9) best = {id: 'door', name: 'Front door', verb: 'Go outside', fn: hinExit};
+  if (!roomFloor && Math.abs(px - HIN_W/2) < 1.3 && py > HIN_H - .9) best = {id: 'door', name: 'Front door', verb: 'Go outside', fn: hinExit};
   return best;
 }
 const HIN_LOOK = {bed_quilt: 'A patchwork quilt, still warm.', rug: 'Soft under your boots.', chair: 'You sit for a moment and rest your feet.', armchair: 'You sink into the armchair. Bliss.', bookshelf: 'Dog-eared adventure stories and a cookbook.', hearth: 'The second hearth crackles happily.', plant: 'You give the fern a little water.', lamp: 'A warm, steady glow.', piano: 'You plink out a little tune.', fishtank: 'The fish blow bubbles at you.', rubber_duck: 'Squeak!'};
@@ -8486,14 +8501,16 @@ function hinDrawFixture(g, f, t) {
     box('#4a2a10', 7, Hh - 11, W - 14, 3); box('#3a3a3a', W/2 - 5, Hh/2 - 2, 10, 2); }
   else if (f.id === 'desk') { box('#7a5230', 2, 10, W - 4, 8); box('#5a3a20', 4, 18, 3, Hh - 20); box('#5a3a20', W - 7, 18, 3, Hh - 20); box('#f0ead8', 7, 6, 12, 8); box('#3a3a4a', 21, 8, 4, 5); g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.beginPath(); g.moveTo(X + 23, Y + 8); g.lineTo(X + 27, Y + 1); g.stroke(); }
   else if (f.id === 'bench') { box('#8a6038', 1, 9, W - 2, 8); box('#5a3a20', 3, 17, 3, Hh - 19); box('#5a3a20', W - 6, 17, 3, Hh - 19); box('#9a9aa2', 6, 5, 10, 3); box('#6a4422', 18, 3, 3, 7); box('#8a8a90', 16, 2, 7, 3); }
+  else if (f.id === 'stairs') { for (let k = 0; k < 5; k++) { box(k % 2 ? '#7a5230' : '#8a6038', 2, 2 + k*6, W - 4, 6); box('rgba(0,0,0,.25)', 2, 7 + k*6, W - 4, 1); } box('#5a3a20', 0, 0, 3, Hh); box('#5a3a20', W - 3, 0, 3, Hh); box('#f0e8d0', 8, roomFloor ? 26 : 3, 16, 3); }
+  else if (f.id === 'scope') { box('#5a3a20', 8, Hh - 10, 3, 9); box('#5a3a20', W - 11, Hh - 10, 3, 9); box('#5a3a20', W/2 - 1, Hh - 12, 3, 11); g.save(); g.translate(X + W/2, Y + Hh/2); g.rotate(-.6); g.fillStyle = '#c8a040'; g.fillRect(-12, -3, 24, 6); g.fillStyle = '#3a3a4a'; g.fillRect(10, -4, 4, 8); g.restore(); }
   else if (f.id === 'anvil') { box('#5a3a20', 9, Hh - 12, W - 18, 10); box('#4a4a52', 4, 8, W - 8, 7); box('#3a3a42', 9, 14, W - 18, 6); box('#6a6a72', 4, 8, W - 8, 2); }
 }
 function hinDraw(c) {
   const H = hin, g = c.getContext('2d'), L = S.home.level, t = H.t, CW = HIN_W*HIN_C, CH = HIN_H*HIN_C;
   g.setTransform(1, 0, 0, 1, 0, 0);
-  const wall = L >= 3 ? ['#5a7a5a', '#4e6e4e'] : L >= 2 ? ['#9a9690', '#86827c'] : ['#8a6038', '#7a5230'];
+  const wall = roomFloor ? ['#8a5a6a', '#7a4a5a'] : L >= 3 ? ['#5a7a5a', '#4e6e4e'] : L >= 2 ? ['#9a9690', '#86827c'] : ['#8a6038', '#7a5230'];
   g.fillStyle = wall[0]; g.fillRect(0, 0, CW, HIN_C);
-  if (L >= 3) { g.fillStyle = wall[1]; for (let x = 6; x < CW; x += 16) g.fillRect(x, 0, 6, HIN_C); g.fillStyle = '#c8a860'; g.fillRect(0, HIN_C - 8, CW, 2); }
+  if (L >= 3 || roomFloor) { g.fillStyle = wall[1]; for (let x = 6; x < CW; x += 16) g.fillRect(x, 0, 6, HIN_C); g.fillStyle = '#c8a860'; g.fillRect(0, HIN_C - 8, CW, 2); }
   else if (L >= 2) { g.fillStyle = wall[1]; for (let y = 0; y < HIN_C; y += 8) for (let x = (y/8 % 2)*10; x < CW; x += 20) g.fillRect(x, y, 18, 6); }
   else { g.fillStyle = wall[1]; for (let y = 3; y < HIN_C; y += 8) g.fillRect(0, y, CW, 3); }
   g.fillStyle = '#5a3a20'; g.fillRect(0, HIN_C - 4, CW, 4);
@@ -8502,10 +8519,10 @@ function hinDraw(c) {
   for (const wx of [0, HIN_W - 1]) { g.fillStyle = '#6a4a2a'; g.fillRect(wx*HIN_C + 5, 4, 22, 20); g.fillStyle = sky; g.fillRect(wx*HIN_C + 7, 6, 18, 16); g.fillStyle = '#6a4a2a'; g.fillRect(wx*HIN_C + 15, 6, 2, 16); g.fillRect(wx*HIN_C + 7, 13, 18, 2);
     if (sky === '#1a2440') { g.fillStyle = '#fff8c8'; g.fillRect(wx*HIN_C + 10, 8, 1, 1); g.fillRect(wx*HIN_C + 21, 17, 1, 1); } }
   // floor
-  for (let y = 1; y < HIN_H; y++) for (let x = 0; x < HIN_W; x++) { g.fillStyle = L >= 3 ? ((x + y) % 2 ? '#8a5a3a' : '#94643f') : (x + y) % 2 ? '#a07a50' : '#a8825a'; g.fillRect(x*HIN_C, y*HIN_C, HIN_C, HIN_C); g.fillStyle = 'rgba(0,0,0,.1)'; g.fillRect(x*HIN_C, y*HIN_C + HIN_C - 1, HIN_C, 1); }
+  for (let y = 1; y < HIN_H; y++) for (let x = 0; x < HIN_W; x++) { g.fillStyle = roomFloor ? ((x + y) % 2 ? '#b08a60' : '#b8926a') : L >= 3 ? ((x + y) % 2 ? '#8a5a3a' : '#94643f') : (x + y) % 2 ? '#a07a50' : '#a8825a'; g.fillRect(x*HIN_C, y*HIN_C, HIN_C, HIN_C); g.fillStyle = 'rgba(0,0,0,.1)'; g.fillRect(x*HIN_C, y*HIN_C + HIN_C - 1, HIN_C, 1); }
   // front wall with the door gap and a doormat
   const dx0 = (HIN_W/2 - 1)*HIN_C; g.fillStyle = wall[1]; g.fillRect(0, CH, CW, HIN_EDGE); g.fillStyle = '#5a3a20'; g.fillRect(0, CH, CW, 3);
-  g.fillStyle = '#6a8a4a'; g.fillRect(dx0, CH, HIN_C*2, HIN_EDGE); g.fillStyle = '#8a3a2a'; g.fillRect(dx0 + 10, CH - 14, HIN_C*2 - 20, 12); g.fillStyle = '#a85a3a'; g.fillRect(dx0 + 13, CH - 11, HIN_C*2 - 26, 6);
+  if (!roomFloor) { g.fillStyle = '#6a8a4a'; g.fillRect(dx0, CH, HIN_C*2, HIN_EDGE); g.fillStyle = '#8a3a2a'; g.fillRect(dx0 + 10, CH - 14, HIN_C*2 - 20, 12); g.fillStyle = '#a85a3a'; g.fillRect(dx0 + 13, CH - 11, HIN_C*2 - 26, 6); }
   const R = roomState(), items = R.items;
   for (const it of items) { const F = FURNITURE[it.k]; if (F.flat) decoPiece(g, it.k, (it.x + HIN_OX)*HIN_C, it.y*HIN_C, F.w*HIN_C, F.h*HIN_C); }
   for (const it of items) { const F = FURNITURE[it.k]; if (F.wall) decoPiece(g, it.k, (it.x + HIN_OX)*HIN_C, 0, F.w*HIN_C, F.h*HIN_C); }
@@ -8629,6 +8646,244 @@ function wgsEnd(won) {
     if (run >= 8 && !S.wgsCandle) { S.wgsCandle = 1; addItem('silver_candlestick', 1); txt += '<br>“Eight in a row! Take my silver candlestick. It’s seen a thousand word games.” <b style="color:var(--good)">You receive a Silver Candlestick! (You can place it when you decorate your home.)</b>'; }
     renderHUD(); save(); setTimeout(() => { if (wgs !== M) return; wgs = null; openPanel('Candle words', txt, [{label: 'Next word', primary: true, fn: () => wgsStart(n, run)}, {label: 'Stop here', fn: closeTalk}]); }, 900); }
   else { txt = `<b>The candle gutters out.</b> The word was “${M.word}”.${M.streak ? ` Your run ends at ${M.streak}.` : ''}<br>“Try the common letters first: E, A, R, T, O, S.”`; SFX.hurt(); renderHUD(); save(); setTimeout(() => { if (wgs !== M) return; wgs = null; openPanel('Candle words', txt, [{label: 'Light another', primary: true, fn: () => wgsStart(n, 0)}, {label: 'Close', fn: closeTalk}]); }, 900); }
+}
+// ===== stables: hire a horse for the day =====
+const STABLE_FEE = 40;
+function stableTalk(n) {
+  if (S.rental && S.rental.day === S.day) return say('“Your hired horse is saddled and waiting. Press V to ride. She’ll trot home on her own tomorrow morning.”', [back(n)]);
+  if (S.mounts.includes('horse') && !S.rental) return say('“That’s a fine horse you’ve got already. Treat her well, and mind she gets her oats.”', [back(n)]);
+  say(`“Long roads out there, and longer every year. Hire one of my horses for the day for ${STABLE_FEE} coin. Press V to mount up. She trots back here on her own tomorrow morning, wherever you leave her.”`, [
+    {label: `Hire a horse (${STABLE_FEE}◆)`, primary: true, disabled: S.coins < STABLE_FEE, fn: () => {
+      S.coins -= STABLE_FEE; const added = !S.mounts.includes('horse'); if (added) S.mounts.push('horse');
+      S.rental = {day: S.day, added, prev: S.mount || null}; S.mount = 'horse'; S.horsesHired = (S.horsesHired || 0) + 1;
+      SFX.coin(); renderHUD(); save(); closeTalk(); toast('<b>Horse hired!</b><br>Press V to ride. She trots home tomorrow morning.', 5000);
+    }}, back(n)]);
+}
+function rentalReturn() {
+  const R = S.rental; if (!R || R.day >= S.day) return; S.rental = null;
+  if (!R.added) return;
+  S.mounts = S.mounts.filter(m => m !== 'horse');
+  if (S.mount === 'horse') { S.mount = R.prev && S.mounts.includes(R.prev) ? R.prev : (S.mounts[0] || null); S.riding = false; }
+  setTimeout(() => toast('Your hired horse trotted back to her stable.', 4000), 1200);
+}
+
+// ===== signposts along every road =====
+let SIGNPOSTS = [], signT = 0;
+function placeSignposts() {
+  const seen = new Set(), gap = 30*WS, out = [], towns = Object.values(TOWNS);
+  for (const key in ROAD_PATHS) {
+    const P = ROAD_PATHS[key]; if (!P || P.length < gap || seen.has(P)) continue; seen.add(P);
+    const [a, b] = key.split('_'); let n = 0; // the path runs from b (index 0) back to a
+    for (let i = gap; i < P.length - gap/2; i += gap) {
+      const px = P[i] % W, py = (P[i]/W) | 0; if (towns.some(t => Math.hypot(t.x - px, t.y - py) < 14)) continue;
+      let spot = null;
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[-2,0]]) { const x = px + dx, y = py + dy; if (!inB(x, y)) continue; const t = map[idx(x, y)]; if (walkable(t, false, false) && ![T.ROAD, T.BRIDGE, T.SHAL, T.DEEP, T.HOUSE, T.FLOOR].includes(t)) { spot = {x, y}; break; } }
+      if (spot) out.push({id: `${a}_${b}_${n++}`, a, b, x: spot.x, y: spot.y, i, len: P.length});
+    }
+  }
+  SIGNPOSTS = out;
+}
+const roadSigns = (a, b) => SIGNPOSTS.filter(p => (p.a === a && p.b === b) || (p.a === b && p.b === a));
+const roadDone = (a, b) => { const L = roadSigns(a, b); return L.length > 0 && L.every(p => S.signs && S.signs[p.id]); };
+function nearestTown() { let best = null, bd = 1e9; for (const k in TOWNS) { if (k === 'isle') continue; const d = Math.hypot(TOWNS[k].x - S.x, TOWNS[k].y - S.y); if (d < bd) { bd = d; best = k; } } return best; }
+function roadFreeTo(k) { const n = nearestTown(); return !!n && n !== k && roadDone(n, k); }
+function signCheck(dt) {
+  signT -= dt; if (signT > 0) return; signT = .3; if (inDungeon() || balloonF || S.y >= WORLD_H) return;
+  for (const q of SIGNPOSTS) {
+    if (Math.abs(q.x - S.x) > 3 || Math.abs(q.y - S.y) > 3 || (S.signs && S.signs[q.id])) continue;
+    S.signs = S.signs || {}; S.signs[q.id] = 1; S.signsRead = (S.signsRead || 0) + 1;
+    const L = roadSigns(q.a, q.b), got = L.filter(p => S.signs[p.id]).length; SFX.chime();
+    toast(`<b>Signpost found</b> · ${TOWNS[q.a].name}–${TOWNS[q.b].name} road (${got} of ${L.length})${got === L.length ? `<br><span style="color:var(--good)">Every signpost on this road found: fast travel between ${TOWNS[q.a].name} and ${TOWNS[q.b].name} is now free.</span>` : ''}`, got === L.length ? 6000 : 3000);
+    save();
+  }
+}
+function signTarget() {
+  if (S.y >= WORLD_H) return null; const q = SIGNPOSTS.find(p => Math.abs(p.x + .5 - S.x) < 1.3 && Math.abs(p.y + .8 - S.y) < 1.3); if (!q) return null;
+  return {key: 'sign' + q.id, html: '<kbd style="margin:0 6px 0 0">E</kbd>Read the signpost', btn: 'Read', fn: () => signTalk(q)};
+}
+function signTalk(q) {
+  const A = TOWNS[q.a], B = TOWNS[q.b], L = roadSigns(q.a, q.b), got = L.filter(p => S.signs && S.signs[p.id]).length, done = got === L.length;
+  openPanel('Signpost', `<div style="text-align:center;font-size:1.05em">◂ <b>${A.name}</b> · ${q.len - 1 - q.i} paces &nbsp;|&nbsp; <b>${B.name}</b> · ${q.i} paces ▸</div><br>Signposts found on this road: <b>${got} of ${L.length}</b>.${done ? `<br><span style="color:var(--good)">Every signpost on this road is found: fast travel between ${A.name} and ${B.name} is free.</span>` : '<br>Find every signpost on a road and fast travel between its two towns becomes free.'}<br><span style="color:var(--muted)">The post wagon stops at every signpost and will carry you to either end of the road for free.</span>`, [
+    ...[q.a, q.b].map(k => ({label: `Post wagon to ${TOWNS[k].name}${S.towns[k] ? '' : ' (visit it first)'}`, disabled: !S.towns[k] || bossActive(), fn: () => { closeTalk(); fastTo(k); }})),
+    {label: 'Walk on', fn: closeTalk}]);
+}
+function fastTo(k) {
+  S.fastTravels = (S.fastTravels || 0) + 1; SFX.travel();
+  fadeThen(() => { S.x = TOWNS[k].x + .5; S.y = TOWNS[k].y + 2.3; enemies = []; eproj = []; hazards = []; petE = null; fishing = null; lastTile = -1; if (!isFlying() && tileAt(Math.floor(S.x), Math.floor(S.y)) === T.DEEP) S.riding = false; renderHUD(); renderRegion(); save(); });
+}
+function drawSignpost(q) {
+  const px = q.x*TS + 8, py = q.y*TS + 14, read = S.signs && S.signs[q.id];
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, 5, 2, 0, 0, 6.283); ctx.fill();
+  ctx.fillStyle = '#6a4a2a'; ctx.fillRect(px - 1, py - 18, 3, 18);
+  ctx.fillStyle = read ? '#c8a060' : '#a88050'; ctx.beginPath(); ctx.moveTo(px - 9, py - 16); ctx.lineTo(px + 1, py - 16); ctx.lineTo(px + 1, py - 11); ctx.lineTo(px - 9, py - 11); ctx.lineTo(px - 11, py - 13.5); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(px + 1, py - 10); ctx.lineTo(px + 11, py - 10); ctx.lineTo(px + 13, py - 7.5); ctx.lineTo(px + 11, py - 5); ctx.lineTo(px + 1, py - 5); ctx.fill();
+  ctx.fillStyle = 'rgba(60,40,20,.7)'; ctx.fillRect(px - 7, py - 14, 6, 1); ctx.fillRect(px + 3, py - 8, 6, 1);
+}
+
+// ===== the wilderness: camps, ruins, hamlets and wandering peddlers =====
+let WILD = [], WILD_BY = {}, wildT = 0;
+const HAMLET_NAMES = ['Thistledown', 'Brackenford', 'Owlhollow', 'Mistlecombe', 'Fernwick', 'Larkspur Rise', 'Cobbler’s End', 'Willowmere', 'Stonebrook', 'Heathercot', 'Quillby', 'Amberdell'];
+const HAMLET_ROOFS = ['#8a5a3a', '#6a7a4a', '#7a4a5a', '#4a6a8a', '#8a6a3a', '#5a5a6a'];
+const PEDDLERS = ['Mother Tansy', 'Jory the Pack', 'Old Hessel', 'Marlo Quickfoot', 'Widow Brack', 'Pell-Mell Pim', 'Sister Agate', 'Rook Tinker'];
+const PEDDLE_POOL = ['treasure_map', 'gem', 'swift_tonic', 'giant_draught', 'rocket_pack', 'pearl', 'silk_cloth', 'amber', 'crystal', 'jade', 'coral', 'spice', 'silver'];
+function placeWild(reach) {
+  let sd = SEED*13 + 7; const rnd = () => { sd = (Math.imul(sd, 1103515245) + 12345) | 0; return ((sd >>> 8) & 0xffffff)/16777216; };
+  const LAND = new Set([T.GRASS, T.FOREST, T.HILL, T.SAND, T.DUNE, T.SNOW, T.SAVANNA, T.MOOR, T.MESA, T.MAPLE, T.BLOSSOM, T.REDWOOD, T.JUNGLE, T.SHIMMER, T.SHROOM, T.BAMBOO, T.RUINS, T.GLOOM]);
+  const towns = Object.values(TOWNS), out = [];
+  const ok = (x, y, r) => { if (!reach[idx(x, y)]) return false; for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (!inB(x + dx, y + dy) || !LAND.has(map[idx(x + dx, y + dy)])) return false; } return true; };
+  const far = (x, y) => towns.every(t => Math.hypot(t.x - x, t.y - y) > 12*WS) && out.every(w => Math.hypot(w.x - x, w.y - y) > 8*WS) && Math.hypot(HOME.x - x, HOME.y - y) > 12*WS
+    && LANDMARKS.every(L => Math.hypot(L.x - x, L.y - y) > 8) && houses.every(h => Math.hypot(h.x - x, h.y - y) > 10);
+  for (const [kind, n, r] of [['hamlet', HAMLET_NAMES.length, 4], ['camp', 70, 2], ['ruin', 50, 2]]) {
+    let made = 0;
+    for (let k = 0; k < 60000 && made < n; k++) { const x = 6 + Math.floor(rnd()*(W - 12)), y = 6 + Math.floor(rnd()*(WORLD_H - 12)); if (!ok(x, y, r) || !far(x, y)) continue; out.push({id: kind[0] + made, kind, x, y, name: kind === 'hamlet' ? HAMLET_NAMES[made] : null}); made++; }
+  }
+  for (const w of out) if (w.kind === 'hamlet') {
+    for (let dy = -1; dy <= 3; dy++) for (let dx = -1; dx <= 1; dx++) map[idx(w.x + dx, w.y + dy)] = T.FLOOR;
+    for (const ox of [-4, 3]) { const hx = w.x + ox, hy = w.y - 3; houses.push({x: hx, y: hy, roof: HAMLET_ROOFS[(w.x + ox) % HAMLET_ROOFS.length], town: null, hamlet: w.id}); for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) map[idx(hx + xx, hy + yy)] = T.HOUSE; }
+  }
+  WILD = out; WILD_BY = Object.fromEntries(out.map(w => [w.id, w]));
+}
+const wildLabel = w => w.kind === 'hamlet' ? `the hamlet of ${w.name}` : w.kind === 'camp' ? 'a hunters’ camp' : 'old ruins';
+function ruinGuards(w) { return enemies.filter(e => e.wildRuin === w.id && !e.dead); }
+function wildCheck(dt) {
+  wildT -= dt; if (wildT > 0) return; wildT = .3; if (inDungeon() || balloonF || S.y >= WORLD_H) return;
+  S.wild = S.wild || {};
+  for (const w of WILD) {
+    const d = Math.hypot(w.x + .5 - S.x, w.y + .5 - S.y); if (d > 9) continue;
+    if (!S.wild[w.id] && d < 6) {
+      S.wild[w.id] = 1; const n = Object.keys(S.wild).length, c = w.kind === 'hamlet' ? 60 : 20; S.coins += c; gainXP(w.kind === 'hamlet' ? 40 : 15); SFX.chime(); renderHUD();
+      toast(`<b>You found ${wildLabel(w)}!</b> (${n} wild places found)<br><span style="color:var(--good)">+${c} coin</span>${w.kind === 'hamlet' ? '<br>Hamlets you find are free to fast travel to.' : ''}`, 5000); save();
+    }
+    if (w.kind === 'ruin' && !(S.ruinsLooted || {})[w.id] && d < 8 && !ruinGuards(w).length && !(w.cool > frameT)) {
+      w.cool = frameT + 45; const lv = 1 + (S.level || 1)*.06, types = ['skeleton', 'bandit', 'archer'];
+      for (let k = 0; k < 3; k++) { const a = k/3*6.283, x = w.x + .5 + Math.cos(a)*2, y = w.y + .5 + Math.sin(a)*2; const e = makeEnemy(types[k], enemyWalk(x, y) ? x : w.x + .5, enemyWalk(x, y) ? y : w.y + 1.5, {alert: true}); e.wildRuin = w.id; e.hp = e.max = Math.round(e.max*lv*1.2); enemies.push(e); }
+      toast('Guardians rise from the rubble!', 2500);
+    }
+  }
+}
+function peddlerSpot(i) { const R = WILD.filter(w => w.kind !== 'ruin'); if (!R.length) return null; const w = R[(i*7 + (S.day + i)*3) % R.length]; return {x: w.x + 2.5, y: w.y + 1.8, at: w}; }
+function wildTarget() {
+  if (S.y >= WORLD_H) return null; const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  for (let i = 0; i < PEDDLERS.length; i++) { const P = peddlerSpot(i); if (P && Math.hypot(P.x - S.x, P.y - S.y) < 1.4) return {key: 'ped' + i, html: `${K}Browse ${PEDDLERS[i]}’s pack`, btn: 'Browse', fn: () => peddlerTalk(i)}; }
+  const w = WILD.find(q => Math.abs(q.x + .5 - S.x) < (q.kind === 'hamlet' ? 2 : 1.6) && Math.abs(q.y + .8 - S.y) < (q.kind === 'hamlet' ? 2 : 1.6)); if (!w) return null;
+  if (w.kind === 'camp') return {key: 'camp' + w.id, html: `${K}Sit by the campfire`, btn: 'Camp', fn: () => campTalk(w)};
+  if (w.kind === 'hamlet') return {key: 'ham' + w.id, html: `${K}Visit ${w.name}`, btn: 'Visit', fn: () => hamletTalk(w)};
+  if ((S.ruinsLooted || {})[w.id]) return {key: 'ruin' + w.id + 'x', html: 'The ruined cache is empty.', btn: '', fn: () => {}};
+  if (ruinGuards(w).length) return {key: 'ruin' + w.id + 'g', html: 'Guardians still prowl the ruins.', btn: '', fn: () => {}};
+  return {key: 'ruin' + w.id, html: `${K}Search the ruined cache`, btn: 'Search', fn: () => ruinLoot(w)};
+}
+function ruinLoot(w) {
+  S.ruinsLooted = S.ruinsLooted || {}; S.ruinsLooted[w.id] = 1; const c = 80 + (S.level || 1)*8, g = pick(['gem', 'amber', 'silver', 'treasure_map', 'crystal', 'swift_tonic'].filter(k => GOODS[k]));
+  S.coins += c; addItem(g, 1); gainXP(30); SFX.victory(); burst(w.x + .5, w.y + .3, '#e8c870', 20, 4); renderHUD(); save();
+  toast(`<b>You search the ruins.</b><br><span style="color:var(--good)">${c} coin and ${GOODS[g].name}</span> (${Object.keys(S.ruinsLooted).length} ruins searched)`, 5000);
+}
+function campTalk(w) {
+  S.campRest = S.campRest || {}; const rested = S.campRest[w.id] === S.day;
+  openPanel('Hunters’ camp', `A low fire crackles between a patched tent and a rack of drying hides. A trapper nods at you.<br>“Sit, rest your feet. The roads are long out here.”`, [
+    {label: rested ? 'Rest by the fire (rested today)' : 'Rest by the fire', primary: !rested, disabled: rested, fn: () => { S.campRest[w.id] = S.day; S.hp = maxHP(); renderHP(); S.campRests = (S.campRests || 0) + 1; SFX.chime(); save(); say('You warm your hands and doze for a while. <span style="color:var(--good)">Fully healed.</span>', [{label: 'Thanks', fn: closeTalk}]); }},
+    {label: 'Buy trail rations (2 smoked meat · 20◆)', disabled: S.coins < 20, fn: () => { S.coins -= 20; addItem('smoked', 2); SFX.coin(); renderHUD(); save(); say('“Salt, smoke and a little juniper. Keeps for weeks.”', [{label: 'Thanks', fn: closeTalk}]); }},
+    {label: 'Leave', fn: closeTalk}]);
+}
+const HAMLET_JOBS = [['wood', 6], ['fish', 4], ['herbs', 3], ['wool', 3], ['iron', 2], ['honey', 2], ['bread', 2], ['planks', 3], ['stone', 5], ['berries', 4]];
+function hamletJob(w) { const J = HAMLET_JOBS.filter(j => GOODS[j[0]]); return J[Math.abs(hash2(w.x, S.day, 61)*1e6 | 0) % J.length]; }
+function hamletTalk(w) {
+  S.hamJobs = S.hamJobs || {}; const [g, n] = hamletJob(w), done = S.hamJobs[w.id] === S.day, pay = Math.round(20 + GOODS[g].base*n*1.6);
+  openPanel(w.name, `Two cottages lean together over a well. An old woman shells peas on a bench.<br>“Visitors! We don’t see many out here. Welcome to ${w.name}.”`, [
+    {label: 'Stay at the inn until morning (15◆)', disabled: S.coins < 15, fn: () => { S.coins -= 15; if (S.time > .27) { S.time = .27; newDay(); } else S.time = .27; S.hp = maxHP(); renderHP(); renderHUD(); closeTalk(); SFX.lullaby(); fadeThen(() => {}); toast(`<b>Good morning</b><br>You wake rested in ${w.name}.`, 4000); save(); }},
+    {label: done ? 'Ask about work (done today)' : `Ask about work: bring ${n} ${GOODS[g].name} (${have(g)}/${n}) · ${pay}◆`, disabled: done || have(g) < n, fn: () => { addItem(g, -n); S.coins += pay; gainXP(20); S.hamJobs[w.id] = S.day; S.hamletJobs = (S.hamletJobs || 0) + 1; SFX.coin(); renderHUD(); save(); say(`“Bless you! That’ll see us through the week.” <span style="color:var(--good)">+${pay} coin</span>`, [{label: 'Glad to help', fn: closeTalk}]); }},
+    {label: 'Leave', fn: closeTalk}]);
+}
+function peddlerStock(i) { const P = PEDDLE_POOL.filter(k => GOODS[k]), out = []; let h = Math.abs((hash2(i, S.day, 71)*1e9) | 0); while (out.length < 3 && out.length < P.length) { const k = P[h % P.length]; if (!out.includes(k)) out.push(k); h = (h*31 + 7) % 1000003; } return out; }
+function peddlerTalk(i) {
+  S.peddled = S.peddled || {}; const today = S.peddled[i] && S.peddled[i].day === S.day ? S.peddled[i].got : [], stock = peddlerStock(i);
+  openPanel(PEDDLERS[i], `A peddler with an enormous pack and a small cart, wandering from camp to hamlet.<br>“Bits and bobs from all over! One of each, mind. I’ll have new things tomorrow, somewhere else.”`, [
+    ...stock.map(k => { const pr = Math.ceil(GOODS[k].base*1.4), got = today.includes(k); return {label: `${GOODS[k].name} · ${pr}◆${got ? ' (bought)' : ''}`, disabled: got || S.coins < pr, fn: () => { S.coins -= pr; addItem(k, 1); S.peddled[i] = {day: S.day, got: [...today, k]}; S.peddlerBuys = (S.peddlerBuys || 0) + 1; SFX.coin(); renderHUD(); save(); peddlerTalk(i); }}; }),
+    {label: 'Leave', fn: closeTalk}]);
+}
+function drawWild(w) {
+  const px = w.x*TS + 8, py = w.y*TS + 12;
+  if (w.kind === 'camp') {
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + 2, 18, 5, 0, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#8a7a5a'; ctx.beginPath(); ctx.moveTo(px - 18, py); ctx.lineTo(px - 8, py - 18); ctx.lineTo(px + 2, py); ctx.fill(); ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.moveTo(px - 10, py); ctx.lineTo(px - 8, py - 9); ctx.lineTo(px - 6, py); ctx.fill();
+    ctx.fillStyle = '#5a3a1e'; ctx.fillRect(px + 6, py - 2, 10, 3); const f = Math.sin(frameT*9)*2;
+    ctx.fillStyle = '#e85a1a'; ctx.beginPath(); ctx.moveTo(px + 7, py - 1); ctx.lineTo(px + 11 + f*.5, py - 10 - f); ctx.lineTo(px + 15, py - 1); ctx.fill(); ctx.fillStyle = '#ffd070'; ctx.beginPath(); ctx.moveTo(px + 9, py - 1); ctx.lineTo(px + 11, py - 6 - f*.5); ctx.lineTo(px + 13, py - 1); ctx.fill();
+  } else if (w.kind === 'ruin') {
+    const looted = (S.ruinsLooted || {})[w.id];
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + 2, 18, 5, 0, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#8a8890'; ctx.fillRect(px - 16, py - 22, 6, 22); ctx.fillRect(px + 10, py - 14, 6, 14); ctx.fillRect(px - 16, py - 24, 12, 4); ctx.fillStyle = '#6a6870'; ctx.fillRect(px - 4, py - 4, 10, 4); ctx.fillRect(px - 14, py - 10, 2, 6);
+    ctx.fillStyle = looted ? '#5a4a3a' : '#8a5a2a'; ctx.fillRect(px - 4, py - 9, 9, 6); ctx.fillStyle = looted ? '#3a3028' : '#d8b040'; ctx.fillRect(px - 4, py - 7, 9, 1);
+  } else {
+    ctx.fillStyle = '#8a8a90'; ctx.fillRect(px - 6, py - 2, 12, 7); ctx.fillStyle = '#3a7ab8'; ctx.fillRect(px - 4, py - 3, 8, 2); ctx.fillStyle = '#6a4a2a'; ctx.fillRect(px - 6, py - 14, 2, 12); ctx.fillRect(px + 4, py - 14, 2, 12); ctx.fillRect(px - 7, py - 15, 14, 2);
+    ctx.font = '7px monospace'; const tw = Math.ceil(ctx.measureText(w.name).width) + 6; ctx.fillStyle = '#6a4a2a'; ctx.fillRect(px - 9 - tw/2, py + 14, 2, 8); ctx.fillStyle = '#c8a060'; ctx.fillRect(px - 8 - tw, py + 8, tw, 9); ctx.fillStyle = '#3a2a1a'; ctx.textAlign = 'left'; ctx.fillText(w.name, px - 5 - tw, py + 15);
+  }
+}
+function drawPeddler(i) {
+  const P = peddlerSpot(i); if (!P) return; const px = Math.round(P.x*TS), py = Math.round(P.y*TS);
+  ctx.fillStyle = '#7a5532'; ctx.fillRect(px + 6, py - 6, 14, 8); ctx.fillStyle = '#4a3020'; ctx.beginPath(); ctx.arc(px + 9, py + 3, 3, 0, 7); ctx.arc(px + 17, py + 3, 3, 0, 7); ctx.fill(); ctx.fillStyle = '#c8a070'; ctx.fillRect(px + 7, py - 10, 12, 4);
+  drawPerson(ctx, px, py, {cloak: ['#7a4a6a', '#4a6a7a', '#6a6a3a', '#8a4a2a'][i % 4], skin: '#e0b896', hair: '#d8d0c0'}, 0, false, 'down', {pack: true});
+}
+
+// ===== ferries between the lands =====
+const FERRY_PORTS = ['jade', 'lantern', 'tidewatch', 'blackwater', 'driftport', 'prismvale'].filter(k => TOWNS[k]);
+const FERRY_SEA = {};
+function seaPoint(k) {
+  if (FERRY_SEA[k] !== undefined) return FERRY_SEA[k]; const T0 = TOWNS[k];
+  for (let r = 4; r < 60*WS; r++) { const na = Math.max(16, Math.ceil(r*6.3)); for (let a = 0; a < na; a++) { const x = Math.floor(T0.x + Math.cos(a/na*6.283)*r), y = Math.floor(T0.y + Math.sin(a/na*6.283)*r); if (inB(x, y) && y < WORLD_H && map[idx(x, y)] === T.DEEP) return (FERRY_SEA[k] = {x: x + .5, y: y + .5}); } }
+  return (FERRY_SEA[k] = null);
+}
+function ferryRoute(a, b) {
+  const A = seaPoint(a), B = seaPoint(b); if (!A || !B) return null;
+  const Wc = Math.ceil(W/WS), Hc = Math.ceil(WORLD_H/WS), s0 = Math.floor(A.y/WS)*Wc + Math.floor(A.x/WS), g0 = Math.floor(B.y/WS)*Wc + Math.floor(B.x/WS), h = Math.floor(WS/2);
+  const cc = i => { if (i === s0 || i === g0) return 1; const x = (i % Wc)*WS + h, y = ((i / Wc) | 0)*WS + h, t = y < WORLD_H ? map[idx(x, y)] : T.VOID; return t === T.DEEP ? 1 : t === T.SHAL ? 3 : Infinity; };
+  const plan = astar(s0 % Wc, Math.floor(s0/Wc), g0 % Wc, Math.floor(g0/Wc), cc, Wc, Hc); if (plan.length < 2 || plan[plan.length - 1] !== s0) return null;
+  const pts = [[TOWNS[a].x + .5, TOWNS[a].y + 2.3], [A.x, A.y]];
+  for (let k = plan.length - 2; k > 0; k -= 3) pts.push([(plan[k] % Wc)*WS + h + .5, ((plan[k] / Wc) | 0)*WS + h + .5]);
+  pts.push([B.x, B.y], [TOWNS[b].x + .5, TOWNS[b].y + 2.3]);
+  const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  return {pts, cum, total: cum[cum.length - 1]};
+}
+const ferryFare = (a, b) => Math.round(25 + Math.hypot(TOWNS[a].x - TOWNS[b].x, TOWNS[a].y - TOWNS[b].y)/(8*WS));
+function ferryTalk(n) {
+  const dests = FERRY_PORTS.filter(k => k !== n.town);
+  say(`“All aboard for the far shores! My ferry sails to every port across the sea. The crossing takes a while, and the sea has moods: storms, pirates, now and then a pod of dolphins.”`, [
+    ...dests.map(k => ({label: `${TOWNS[k].name}${S.towns[k] ? '' : ' (new!)'} · ${ferryFare(n.town, k)}◆`, disabled: S.coins < ferryFare(n.town, k) || bossActive(), fn: () => ferrySail(n.town, k)})),
+    back(n)]);
+}
+function ferrySail(a, b) {
+  const R = ferryRoute(a, b); if (!R) { say('“The tides are wrong for that crossing today. Ask me again tomorrow.”', [{label: 'OK', fn: closeTalk}]); return; }
+  S.coins -= ferryFare(a, b); closeTalk(); renderHUD();
+  balloonF = {ferry: true, path: R.pts, cum: R.cum, total: R.total, fx: S.x, fy: S.y, tx: R.pts[R.pts.length - 1][0], ty: R.pts[R.pts.length - 1][1], t: 0, dur: Math.min(30, 9 + R.total/(50*WS)), to: b, rv: 0,
+    ev: Math.random() < .6 ? pick(['storm', 'pirates', 'dolphins']) : null, evAt: .35 + Math.random()*.25, evDone: false};
+  S.riding = false; petE = null; compE = null; fishing = null; SFX.travel(); toast(`<b>Cast off!</b><br>Sailing for ${TOWNS[b].name}...`, 3500);
+}
+function ferryPos(B, e) { const d = e*B.total; let k = 1; while (k < B.cum.length - 1 && B.cum[k] < d) k++; const a = B.path[k - 1], b = B.path[k], seg = B.cum[k] - B.cum[k - 1] || 1, f = Math.max(0, Math.min(1, (d - B.cum[k - 1])/seg)); return [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f]; }
+function ferryEvent(B) {
+  const lv = S.level || 1;
+  if (B.ev === 'dolphins') { gainXP(15); S.dolphinsSeen = (S.dolphinsSeen || 0) + 1; openPanel('At sea', 'A pod of dolphins races alongside the bow, leaping through the spray. The crew cheers. <span style="color:var(--good)">+15 XP</span>', [{label: 'Wave to them', primary: true, fn: closeTalk}]); return; }
+  if (B.ev === 'storm') {
+    openPanel('A squall!', 'The sky turns black and the sea heaves. Rain hammers the deck and the captain bellows for hands on the ropes.', [
+      {label: 'Help the crew trim the sails', primary: true, fn: () => { if (Math.random() < .6 + .04*sk('agi')) { gainXP(40); B.dur *= .85; say('You haul on the lines until the squall blows past. The captain claps your back. <span style="color:var(--good)">+40 XP, and a faster crossing.</span>', [{label: 'Onward', fn: closeTalk}]); } else { S.hp = Math.max(1, S.hp - 2); renderHP(); say('A wave knocks you flat across the deck. Soaked and bruised, you hold on until it passes. <span style="color:var(--bad)">−2 HP</span>', [{label: 'Ouch', fn: closeTalk}]); } }},
+      {label: 'Stay below deck', fn: () => { B.dur *= 1.1; say('You wait it out in the hold among barrels and seasick goats. The crossing runs a little late.', [{label: 'Onward', fn: closeTalk}]); }}]);
+    return;
+  }
+  const toll = Math.min(S.coins, 30 + lv*5), win = Math.min(.9, .45 + lv*.01 + (S.equip.weapon ? .1 : 0));
+  openPanel('Pirates!', `A black-sailed sloop swings alongside and grappling hooks bite the rail.<br><b>“Your purse or your planks!”</b>`, [
+    {label: `Pay them off (${toll}◆)`, fn: () => { S.coins -= toll; renderHUD(); say('The pirates pocket your coin and cast off, laughing.', [{label: 'Onward', fn: closeTalk}]); }},
+    {label: `Fight them off (${Math.round(win*100)}%)`, primary: true, fn: () => {
+      if (Math.random() < win) { const c = 60 + lv*4; S.coins += c; gainXP(60); S.ferryFights = (S.ferryFights || 0) + 1; if (GOODS.pirate_gold) addItem('pirate_gold', 1); SFX.victory(); renderHUD(); say(`Steel rings across the deck until the pirates leap back to their sloop. They leave a chest behind! <span style="color:var(--good)">+${c} coin${GOODS.pirate_gold ? ' and Pirate Gold' : ''}, +60 XP</span>`, [{label: 'Huzzah!', fn: closeTalk}]); }
+      else { const lost = Math.min(200, Math.round(S.coins*.15)); S.coins -= lost; S.hp = Math.max(1, Math.round(S.hp/2)); renderHP(); renderHUD(); say(`The pirates beat you back and grab what they can. <span style="color:var(--bad)">−${lost} coin</span>`, [{label: 'Blast', fn: closeTalk}]); }
+    }},
+    {label: 'Hide in the hold', fn: () => { if (Math.random() < .5) say('You crouch behind the cargo until the pirates give up and sail off.', [{label: 'Phew', fn: closeTalk}]); else { const lost = Math.round(S.coins*.1); S.coins -= lost; renderHUD(); say(`They find you behind the goats. <span style="color:var(--bad)">−${lost} coin</span>`, [{label: 'Blast', fn: closeTalk}]); } }}]);
+}
+function drawFerry(px, py) {
+  const bob = Math.sin(frameT*2)*1.5, y = py + bob;
+  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(px - 26, y + 8, 7, 2); ctx.fillRect(px + 20, y + 9, 6, 2);
+  ctx.fillStyle = '#5a3a1e'; ctx.beginPath(); ctx.moveTo(px - 22, y); ctx.lineTo(px + 22, y); ctx.lineTo(px + 15, y + 10); ctx.lineTo(px - 15, y + 10); ctx.fill();
+  ctx.fillStyle = '#7a5532'; ctx.fillRect(px - 22, y - 2, 44, 3);
+  ctx.fillStyle = '#4a3020'; ctx.fillRect(px + 6, y - 36, 2, 34);
+  ctx.fillStyle = '#f0e8d0'; ctx.beginPath(); ctx.moveTo(px + 8, y - 34); ctx.lineTo(px + 24, y - 10); ctx.lineTo(px + 8, y - 8); ctx.fill();
+  ctx.fillStyle = '#c84a3a'; ctx.fillRect(px + 8, y - 38, 8, 4);
+  drawPerson(ctx, px - 6, y - 4, player.cols, 0, false, 'down', {scarf: true});
 }
 // ===== pony jumping show (Hettie Hurdle, Hollowpine) =====
 let jump = null;
@@ -12007,10 +12262,11 @@ function balloonTalk(n) {
 }
 function updateBalloon(dt) {
   const B = balloonF; B.t += dt; const u = Math.min(1, B.t/B.dur), e = u < .5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
-  S.x = B.fx + (B.tx - B.fx)*e; S.y = B.fy + (B.ty - B.fy)*e; player.inv = Math.max(player.inv, .4); player.kx = player.ky = 0;
+  if (B.path) { const q = ferryPos(B, e); S.x = q[0]; S.y = q[1]; } else { S.x = B.fx + (B.tx - B.fx)*e; S.y = B.fy + (B.ty - B.fy)*e; } player.inv = Math.max(player.inv, .4); player.kx = player.ky = 0;
   B.rv -= dt; if (B.rv <= 0) { B.rv = .15; reveal(S.x, S.y, 11); }
   enemies = enemies.filter(m => m.boss || Math.hypot(m.x - S.x, m.y - S.y) > 6);
-  if (u >= 1) { balloonF = null; lastTile = -1; S.balloonRides = (S.balloonRides || 0) + 1; burst(S.x, S.y, '#e8d8b0', 12, 3); SFX.coin(); toast(`<b>Touchdown!</b> Welcome to ${TOWNS[B.to].name}.`, 3000); renderRegion(); save(); }
+  if (B.ferry && B.ev && !B.evDone && u >= B.evAt) { B.evDone = true; ferryEvent(B); return; }
+  if (u >= 1) { balloonF = null; lastTile = -1; if (B.ferry) S.ferryRides = (S.ferryRides || 0) + 1; else S.balloonRides = (S.balloonRides || 0) + 1; burst(S.x, S.y, '#e8d8b0', 12, 3); SFX.coin(); toast(`<b>${B.ferry ? 'Land ho!' : 'Touchdown!'}</b> Welcome to ${TOWNS[B.to].name}.`, 3000); renderRegion(); save(); }
 }
 function drawBalloon(px, py) {
   const lift = 46 + Math.sin(frameT*1.6)*3, by = py - lift;
@@ -12215,6 +12471,11 @@ const GUIDE = [
   ['Catapult', 'Bramwell the Siege-Master in Thornwick has five practice forts. Aim with ↑/↓ or the mouse, then stop the power bar; watch the wind flag. Wood breaks in one hit, stone in two, and unsupported blocks fall: a straw soldier that falls two rows, or gets landed on, is knocked out. Take every fort for a Toy Catapult.'],
   ['Dominoes', 'Pilar in Reedholm plays draw dominoes, first to 50. Match a tile to either end of the line; if nothing fits, draw from the boneyard, and pass if it is empty. Going out scores the pips left in the other hand. Win three matches for her Bone Domino Set.'],
   ['Inside your home', 'Walk up to your front door and step inside. Walk around with the arrow keys, WASD, the stick, or by tapping. The bed lets you sleep, the chest holds your things and opens the home menu, the fire and workbench are for crafting, and the writing desk lets you decorate. Furniture you place shows up in the room, and your pet comes in too.'],
+  ['Stables', 'Every town has a stablehand who hires out a horse for the day for 40 coin. Press V to ride; she trots home on her own the next morning.'],
+  ['Signposts', 'Signposts stand along every road. Walk past one to find it. Read it for the distance to each end of the road and a free post wagon ride to either town. Find every signpost on a road and fast travel between its two towns becomes free.'],
+  ['The wilderness', 'Hunters’ camps, old ruins and hidden hamlets lie far from the towns. Camps let you rest and buy rations; ruins are guarded but hide a cache; hamlets have an inn and odd jobs, and become free fast travel stops once found. Peddlers wander between camps and hamlets with rare goods, somewhere new each day.'],
+  ['Ferries', 'Ferrymen at Jadewater, Lantern Bay, Tidewatch, Blackwater, Driftport and Prismvale sail between the lands. Crossings can bring storms, pirates or dolphins.'],
+  ['Upstairs', 'A stone cottage or manor has stairs to an upstairs room. Decorate it from its own writing desk; furniture on both floors counts toward comfort. The telescope by the window maps the land around your home.'],
   ['Hedge maze', 'Lady Rosalind in Crownfall lets you into the royal hedge maze. Walk with the arrow keys, WASD, the stick, or by holding a finger toward a direction. You only see a few paces, but remember where you have been; the blue arrow points to the fountain at the centre. Find the three golden roses for extra pay, and all three in the great labyrinth for a Topiary Peacock.'],
   ['Rafting', 'Clem the Rafter in Greenstem takes you down the river. Steer with left and right (or hold a finger where you want to go), paddle faster with up. Three knocks on rocks or banks and the raft breaks; pass through flag gates for points and beware whirlpools. Finish Thunder gorge without a knock for Clem’s Carved Paddle.'],
   ['Juggling', 'Jolly Jem the jester in Maplehold teaches juggling. Press left (← or A) as a ball lands in your left hand and right (→ or D) for your right; on a touch screen, tap that half. Three drops ends the show. You speed up, then get a fourth and fifth ball. 100 catches earns Jem’s Juggling Clubs.'],
@@ -12583,7 +12844,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); warlordTick(); pkTick(); rmTick(); gladeTick(); rpTick(dt); lostTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  signCheck(dt); wildCheck(dt); updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); warlordTick(); pkTick(); rmTick(); gladeTick(); rpTick(dt); lostTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = (party && (S.placed || []).some(q => q.t === 'party_banner' && Math.hypot(q.x - S.x, q.y - S.y) < 6) ? .3 : 0) + (safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0));
@@ -13587,6 +13848,9 @@ function render() {
   if (ISLET && inView(ISLET.x, ISLET.y)) sprites.push({y: ISLET.y - .2, f: drawIslet});
   for (const k in MON_SPOTS) if (inView(MON_SPOTS[k].x, MON_SPOTS[k].y)) sprites.push({y: MON_SPOTS[k].y, f: () => drawMonument(k, MON_SPOTS[k])});
   for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
+  for (const q of SIGNPOSTS) if (inView(q.x, q.y)) sprites.push({y: q.y + .9, f: () => drawSignpost(q)});
+  for (const w of WILD) if (inView(w.x, w.y)) sprites.push({y: w.y + .8, f: () => drawWild(w)});
+  if (S.y < WORLD_H) for (let i = 0; i < PEDDLERS.length; i++) { const P = peddlerSpot(i); if (P && inView(P.x, P.y)) sprites.push({y: P.y, f: () => drawPeddler(i)}); }
   if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
   if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; if (C.golem) sprites.push({y: compE.y, f: () => drawGolem(Math.round(compE.x*TS), Math.round(compE.y*TS), compE.phase, compE.moving, compE.face) }); else sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
@@ -13625,7 +13889,7 @@ function render() {
     const px = Math.round(S.x*TS), py = Math.round(S.y*TS), psc = potScale(); if (psc !== 1) { ctx.save(); ctx.translate(px, py); ctx.scale(psc, psc); ctx.translate(-px, -py); }
     if (player.inv > 0 && Math.floor(frameT*20) % 2) ctx.globalAlpha = .5;
     const swimRide = S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].swim;
-    if (balloonF) drawBalloon(px, py);
+    if (balloonF) (balloonF.ferry ? drawFerry : drawBalloon)(px, py);
     else if (player.glide) {
       const dir = player.dir && player.dir.x < 0 ? -1 : 1, bob = Math.sin(frameT*3)*1.5;
       ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + 6, 9, 3, 0, 0, 6.283); ctx.fill();
@@ -14020,7 +14284,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || eclTarget() || islTarget() || hsTarget() || pkTarget() || rmTarget() || totTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || eclTarget() || islTarget() || hsTarget() || pkTarget() || rmTarget() || totTarget() || gladeTarget() || signTarget() || wildTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -14203,7 +14467,7 @@ function raidWalk(x, y) {
   return !ESTATE_TILES.has(idx(tx, ty));
 }
 function newDay() {
-  S.day++; lottoDraw();
+  S.day++; lottoDraw(); rentalReturn();
   for (const n of NPCS) if (n.trader) {
     const st = S.npc[n.id];
     for (const g in n.stock) { const max = n.stock[g]; if (max > 0 && (st.stock[g] || 0) < max) st.stock[g] = Math.min(max, (st.stock[g] || 0) + Math.ceil(max/3)); }
@@ -14481,6 +14745,8 @@ function mainOptions(n) {
   if (n.id === 'bess' && S.flags.boat) o.push({label: 'The regatta', fn: () => regattaTalk(n)});
   if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
   if (n.balloon) o.push({label: 'Take a balloon ride', primary: true, fn: () => balloonTalk(n)});
+  if (n.stable) o.push({label: 'Hire a horse', primary: true, fn: () => stableTalk(n)});
+  if (n.ferry) o.push({label: 'Take the ferry', primary: true, fn: () => ferryTalk(n)});
   if (n.trainer && (S.pet || S.petExp)) o.push({label: S.petExp ? 'Check on your pet\u2019s expedition' : 'Send your pet on an expedition', fn: () => petExpTalk(n)});
   if (n.trainer && S.pet) o.push({label: `Name your ${PETS[S.pet].name.toLowerCase()}`, fn: () => namePetTalk(n)});
   if (n.trainer) o.push({label: petShowDay() ? 'Pet show today! ★' : 'Pet tricks', primary: petShowDay() && S.petShow !== S.day && !!S.pet, fn: () => trainerTalk(n)});
@@ -16284,8 +16550,8 @@ const FURNITURE = {
   silver_candlestick: {name: 'Silver Candlestick', w: 1, h: 1, comfort: 12, item: true}};
 const DECO_KEYS = Object.keys(FURNITURE);
 const COMFORT_TIERS = [[20, 'Cozy', 2, .05], [45, 'Snug', 4, .1], [80, 'Lovely', 6, .15]];
-function roomState() { S.room = S.room || {items: [], stash: {}}; return S.room; }
-function roomComfort() { const R = roomState(), kinds = new Set(R.items.map(i => i.k)); return R.items.reduce((a, i) => a + FURNITURE[i.k].comfort, 0) + kinds.size*2; }
+function roomState() { S.room = S.room || {items: [], stash: {}}; if (roomFloor) { S.room2 = S.room2 || {items: []}; S.room2.stash = S.room.stash; return S.room2; } return S.room; }
+function roomComfort() { roomState(); const items = [...S.room.items, ...(S.room2 ? S.room2.items : [])], kinds = new Set(items.map(i => i.k)); return items.reduce((a, i) => a + FURNITURE[i.k].comfort, 0) + kinds.size*2; } // both floors count
 function comfortTier(c) { let t = null; for (const T of COMFORT_TIERS) if (c >= T[0]) t = T; return t; }
 const restedHP = () => (S && S.rested && S.rested.day === S.day ? S.rested.hp : 0);
 const restedXP = () => (S && S.rested && S.rested.day === S.day ? 1 + S.rested.xp : 1);
@@ -16302,7 +16568,7 @@ let deco = null;
 function decoOpen() {
   closeModal('home'); roomState();
   deco = {on: true, hold: null, cur: {x: 4, y: 3}, tab: 'place', msg: ''};
-  openPanel('Decorate your home', `<canvas id="decoC" width="${DECO_W*DECO_C}" height="${DECO_H*DECO_C}" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%;touch-action:none"></canvas><div id="decoInfo" style="text-align:center;margin:6px 0;color:var(--muted)"></div><div id="decoPal" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-height:150px;overflow:auto"></div>`,
+  openPanel(roomFloor ? 'Decorate upstairs' : 'Decorate your home', `<canvas id="decoC" width="${DECO_W*DECO_C}" height="${DECO_H*DECO_C}" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%;touch-action:none"></canvas><div id="decoInfo" style="text-align:center;margin:6px 0;color:var(--muted)"></div><div id="decoPal" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-height:150px;overflow:auto"></div>`,
     [{label: 'Done', primary: true, fn: () => { deco = null; save(); closeTalk(); }}]);
   setTimeout(() => {
     const c = document.getElementById('decoC'); if (!c) return;
@@ -16680,6 +16946,7 @@ function drawBigMap() {
     g.beginPath(); g.arc((L.x+.5)*s, (L.y+.5)*s, 3*dpr, 0, 7); g.fill();
     if (!S.found[L.id]) g.fillText('?', (L.x+.5)*s, (L.y-1)*s);
   }
+  for (const w of WILD) if (S.wild && S.wild[w.id]) { g.fillStyle = w.kind === 'hamlet' ? '#e3a948' : w.kind === 'camp' ? '#e8803a' : '#a8a8b0'; g.fillRect((w.x+.5)*s - 2*dpr, (w.y+.5)*s - 2*dpr, 4*dpr, 4*dpr); if (w.kind === 'hamlet') g.fillText(w.name, (w.x+.5)*s, (w.y-2)*s); }
   for (const k of BK) if (S.lairsSeen[k]) {
     const B = BOSSES[k], bx = (B.x+.5)*s, by = (B.y+.5)*s, r = 5*dpr;
     g.strokeStyle = S.bosses[k] ? '#6a6a6a' : '#e5484d'; g.lineWidth = 2.5*dpr;
@@ -17549,6 +17816,15 @@ const ACH = [
   ['sgc_all','Siege Engineer','Take all five of Bramwell’s forts', () => (S.sgcDone || []).length >= SGC_LV.length],
   ['dmn_win','Clack Clack','Win a dominoes match against Pilar', () => (S.dmnWins || 0) >= 1],
   ['home_inside','Make Yourself at Home','Step inside your homestead and look around', () => (S.homeVisits || 0) >= 1],
+  ['sign_10','Reading the Road','Find 10 roadside signposts', () => (S.signsRead || 0) >= 10],
+  ['sign_road','Every Mile Marked','Find every signpost on one road', () => SIGNPOSTS.some(q => roadDone(q.a, q.b))],
+  ['stable_1','Hired Hooves','Hire a horse from a stable', () => (S.horsesHired || 0) >= 1],
+  ['wild_20','Off the Beaten Track','Find 20 wild places', () => Object.keys(S.wild || {}).length >= 20],
+  ['hamlet_all','Hamlet Hopper','Find every hidden hamlet', () => WILD.length > 0 && WILD.filter(w => w.kind === 'hamlet').every(w => (S.wild || {})[w.id])],
+  ['ruin_10','Rubble Raider','Search 10 ruins', () => Object.keys(S.ruinsLooted || {}).length >= 10],
+  ['upstairs','Moving On Up','Climb the stairs in your home', () => (S.upstairsVisits || 0) >= 1],
+  ['ferry_5','Sea Legs','Take 5 ferry crossings', () => (S.ferryRides || 0) >= 5],
+  ['ferry_fight','Repel Boarders','Fight off pirates on a ferry', () => (S.ferryFights || 0) >= 1],
   ['maz_first','Amazing','Find the fountain in Lady Rosalind’s hedge maze', () => (S.mazWins || 0) >= 1],
   ['maz_great','Heart of the Labyrinth','Solve the great labyrinth', () => (S.mazBeat || 0) >= 3],
   ['maz_roses','Golden Bouquet','Find all three golden roses in one maze', () => (S.mazRoses || 0) >= 3],
@@ -18212,15 +18488,16 @@ function fadeThen(fn) { const f = $('fade'); f.style.opacity = 1; setTimeout(() 
 /* ================= fast travel ================= */
 const bossActive = () => enemies.some(e => e.boss);
 const ownBoss = () => enemies.some(e => e.boss && !e.net);
-function travelCost(k) { if (k.startsWith('ws:')) return 0; if (facPerk('league') >= 3 || k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / (6*WS))); }
+function travelCost(k) { if (k.startsWith('ws:') || k.startsWith('wd:')) return 0; if (TOWNS[k] && roadFreeTo(k)) return 0; if (facPerk('league') >= 3 || k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / (6*WS))); }
 function renderTravel() {
   const list = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle');
   const blocked = bossActive() || !!inDungeon() || inArena();
   $('travel').innerHTML = `<span style="width:100%;text-align:center;background:none">${inDungeon() ? 'Climb out of the dungeon before you fast travel.' : blocked ? 'You can’t fast travel during a boss fight.' : 'Fast travel to a place you’ve been'}</span>`
     + (S.home.level ? `<button class="btn sm" data-go="home" ${blocked ? 'disabled' : ''}>Home · free</button>` : '')
     + PK.filter(k => PROPERTIES[k].estate && S.props[k]).map(k => `<button class="btn sm" data-go="prop:${k}" ${blocked ? 'disabled' : ''}>${PROPERTIES[k].name} · free</button>`).join('')
-    + list.map(k => `<button class="btn sm" data-go="${k}" ${blocked || S.coins < travelCost(k) ? 'disabled' : ''}>${TOWNS[k].name} · ${travelCost(k) ? travelCost(k) + '◆' : 'your house'}</button>`).join('')
-    + (S.waystones || []).map((w, i) => w.on ? `<button class="btn sm" data-go="ws:${i}" ${blocked ? 'disabled' : ''}>◈ ${esc(w.name)} · free</button>` : '').join('');
+    + list.map(k => `<button class="btn sm" data-go="${k}" ${blocked || S.coins < travelCost(k) ? 'disabled' : ''}>${TOWNS[k].name} · ${travelCost(k) ? travelCost(k) + '◆' : roadFreeTo(k) ? 'free road' : 'your house'}</button>`).join('')
+    + (S.waystones || []).map((w, i) => w.on ? `<button class="btn sm" data-go="ws:${i}" ${blocked ? 'disabled' : ''}>◈ ${esc(w.name)} · free</button>` : '').join('')
+    + WILD.filter(w => w.kind === 'hamlet' && S.wild && S.wild[w.id]).map(w => `<button class="btn sm" data-go="wd:${w.id}" ${blocked ? 'disabled' : ''}>⌂ ${w.name} · free</button>`).join('');
 }
 $('travel').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || bossActive() || inDungeon()) return;
@@ -18228,7 +18505,7 @@ $('travel').addEventListener('click', e => {
   S.coins -= cost; S.fastTravels = (S.fastTravels || 0) + 1; SFX.travel();
   closeModal('mapView');
   fadeThen(() => {
-    if (k.startsWith('ws:')) { const w = S.waystones[+k.slice(3)]; S.x = w.x + .5; S.y = w.y + 1.5; } else if (k === 'home') { S.x = HOME.x + .5; S.y = HOME.y - .3; } else if (k.startsWith('prop:')) { const P = PROPERTIES[k.slice(5)]; S.x = P.door.x; S.y = P.door.y + .3; } else { S.x = TOWNS[k].x + .5; S.y = TOWNS[k].y + 2.3; }
+    if (k.startsWith('ws:')) { const w = S.waystones[+k.slice(3)]; S.x = w.x + .5; S.y = w.y + 1.5; } else if (k.startsWith('wd:')) { const w = WILD_BY[k.slice(3)]; S.x = w.x + .5; S.y = w.y + 2.6; } else if (k === 'home') { S.x = HOME.x + .5; S.y = HOME.y - .3; } else if (k.startsWith('prop:')) { const P = PROPERTIES[k.slice(5)]; S.x = P.door.x; S.y = P.door.y + .3; } else { S.x = TOWNS[k].x + .5; S.y = TOWNS[k].y + 2.3; }
     enemies = []; eproj = []; hazards = []; petE = null; fishing = null; lastTile = -1;
     if (!isFlying() && tileAt(Math.floor(S.x), Math.floor(S.y)) === T.DEEP) S.riding = false;
     renderHUD(); save();
@@ -18265,8 +18542,13 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 52;
+const WN_VER = 53;
 const WHATS_NEW = [
+  ['Stables and signposts', 'Hire a horse in any town, and find the signposts along the roads for free post wagon rides and free fast travel.'],
+  ['The wilderness', 'Camps, guarded ruins, hidden hamlets and wandering peddlers fill the wild lands between towns.'],
+  ['Ferries', 'Sail between the lands from six port towns. Mind the storms and the pirates.'],
+  ['Upstairs', 'Stone cottages and manors now have an upstairs room to decorate, with a telescope.'],
+  ['Faster loading', 'The world now builds on several cores at once and uses much less memory.'],
   ['Fleet hunt', 'Admiral Corvina in Blackwater challenges you to a battle of hidden fleets.'],
   ['Candle words', 'Nan Wicklow in Farhaven plays a word-guessing game by candlelight.'],
   ['A vast world', 'The whole world is now ten times as wide and ten times as tall as it began: a hundred times the land, with long stretches of wild country between every town. Journeys take longer, so mounts, balloons and fast travel matter more. Your save carries over.'],
@@ -18620,7 +18902,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {get flt(){return flt;}, get wgs(){return wgs;}, fltFire: c => fltFire(c), wgsGuess: l => wgsGuess(l), get hin(){return hin;}, homeXY: () => ({x: HOME.x, y: HOME.y}), get gmode(){return mode;}, hinOpen: b => hinOpen(b), hinAct: () => hinAct(), hinTap: (x, y) => hinTap(x, y), revealAt: (x, y, r) => reveal(x, y, r), get ahk(){return ahk;}, get bub(){return bub;}, bubFire: () => bubFire(), get stk(){return stk;}, get jig(){return jig;}, stkDrop: () => stkDrop(), jigGrab: (x, y) => jigGrab(x, y), jigRelease: () => jigRelease(), get wrd(){return wrd;}, get hen(){return hen;}, wrdType: c => wrdType(c), wrdSubmit: () => wrdSubmit(), get dck(){return dck;}, get bns(){return bns;}, dckHop: (x, y) => dckHop(x, y), get snk(){return snk;}, get mtc(){return mtc;}, snkTurn: d => snkTurn(d), mtcTry: (a, b) => mtcTry(a, b), mtcMatches: g => mtcMatches(g), get bdm(){return bdm;}, get brk(){return brk;}, bdmSwing: () => bdmSwing(), bdmPredict: s => bdmPredict(s), brkLaunch: () => brkLaunch(), get chs(){return chs;}, get cup(){return cup;}, chsPick: (st, l) => chsPick(st, l), chsLegal: st => chsLegal(st), chsClick: q => chsClick(q), cupPick: i => cupPick(i), get chp(){return chp;}, get dye(){return dye;}, chpChop: s => chpChop(s), dyeMix: d => dyeMix(d), dyeAdd: i => dyeAdd(i), get twd(){return twd;}, get mrs(){return mrs;}, twdAct: () => twdAct(), twdSend: () => twdSend(), MRS, mrsDown: () => mrsDown(), mrsUp: () => mrsUp(), get sgc(){return sgc;}, get dmn(){return dmn;}, sgcPress: () => sgcPress(), dmnTry: (i, s) => dmnTry(i, s), dmnPlayable: h => dmnPlayable(h), dmnDrawTile: () => dmnDrawTile(), get maz(){return maz;}, get rft(){return rft;}, mazStep: (x, y) => mazStep(x, y), get jug(){return jug;}, get sdk(){return sdk;}, jugPress: h => jugPress(h), sdkPut: d => sdkPut(d), get kln(){return kln;}, get cdv(){return cdv;}, klnMove: (a, b) => klnMove(a, b), klnAct: h => klnAct(h), get crl(){return crl;}, get gls(){return gls;}, crlSim: (st, sh) => crlSim(st, sh), crlLaunch: (a, p, s) => crlLaunch(a, p, s), crlScore: st => crlScore(st), glsQuality: () => glsQuality(), get cbk(){return cbk;}, get drg(){return drg;}, cbkScore: (a, b) => cbkScore(a, b), drgPick: (b, p, l) => drgPick(b, p, l), drgMoves: (b, p) => drgMoves(b, p), get nono(){return nono;}, get rev(){return rev;}, revPick: (b, p, l) => revPick(b, p, l), revMoves: (b, p) => revMoves(b, p), get spook(){return spook;}, spookStart: () => spookStart(), get skip(){return skip;}, skipThrow: (a, p) => skipThrow(a, p), skipPlan: (a, p) => skipPlan(a, p), get pipe(){return pipe;}, pipeStart: (n, i) => pipeStart(n, i), pipeSolved: () => pipeSolved(), pipeGen: n => pipeGen(n), pipeRot: (m, k) => pipeRot(m, k), get lamp(){return lamp;}, lampSolve: (b, n) => lampSolve(b, n), bagStep: (B, dt) => bagStep(B, dt), BG: {BG_LANE, BGH, BG_SLOTV, BG_PEGS, BG_CUPS, BG_ARC}, get sweep(){return sweep;}, sweepStart: (n, i) => sweepStart(n, i), sweepAct: f => sweepAct(f), sweepCount: (x, y) => sweepCount(sweep, x, y), get bag(){return bag;}, bagShoot: pw => bagShoot(pw), bagNudge: d => bagNudge(d), get crate(){return crate;}, crateStart: (n, i) => crateStart(n, i), crateMove: (x, y) => crateMove(x, y), CRATE_LV, get tiles(){return tiles;}, tileClick: i => tileClick(i), tileMoves: () => tileMoves(), tileShuffle: () => tileShuffle(), tileFreeIn: (a, i) => tileFreeIn(new Set(a), i), TILE_POS, get ice(){return ice;}, iceStart: (n, i) => iceStart(n, i), ICE_PUZ, get axe(){return axe;}, axeAim: A => axeAim(A), get isl(){return isl;}, islTick: () => islTick(0), get islSpots(){return islSpots;}, openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get SIGNPOSTS(){return SIGNPOSTS;}, get WILD(){return WILD;}, signTalk: q => signTalk(q), ferrySail: (a, b) => ferrySail(a, b), ferryRoute: (a, b) => ferryRoute(a, b), get balloonF(){return balloonF;}, peddlerSpot: i => peddlerSpot(i), ruinGuards: w => ruinGuards(w), hinStairs: () => hinStairs(), get roomFloor(){return roomFloor;}, rentalReturn: () => rentalReturn(), get flt(){return flt;}, get wgs(){return wgs;}, fltFire: c => fltFire(c), wgsGuess: l => wgsGuess(l), get hin(){return hin;}, homeXY: () => ({x: HOME.x, y: HOME.y}), get gmode(){return mode;}, hinOpen: b => hinOpen(b), hinAct: () => hinAct(), hinTap: (x, y) => hinTap(x, y), revealAt: (x, y, r) => reveal(x, y, r), get ahk(){return ahk;}, get bub(){return bub;}, bubFire: () => bubFire(), get stk(){return stk;}, get jig(){return jig;}, stkDrop: () => stkDrop(), jigGrab: (x, y) => jigGrab(x, y), jigRelease: () => jigRelease(), get wrd(){return wrd;}, get hen(){return hen;}, wrdType: c => wrdType(c), wrdSubmit: () => wrdSubmit(), get dck(){return dck;}, get bns(){return bns;}, dckHop: (x, y) => dckHop(x, y), get snk(){return snk;}, get mtc(){return mtc;}, snkTurn: d => snkTurn(d), mtcTry: (a, b) => mtcTry(a, b), mtcMatches: g => mtcMatches(g), get bdm(){return bdm;}, get brk(){return brk;}, bdmSwing: () => bdmSwing(), bdmPredict: s => bdmPredict(s), brkLaunch: () => brkLaunch(), get chs(){return chs;}, get cup(){return cup;}, chsPick: (st, l) => chsPick(st, l), chsLegal: st => chsLegal(st), chsClick: q => chsClick(q), cupPick: i => cupPick(i), get chp(){return chp;}, get dye(){return dye;}, chpChop: s => chpChop(s), dyeMix: d => dyeMix(d), dyeAdd: i => dyeAdd(i), get twd(){return twd;}, get mrs(){return mrs;}, twdAct: () => twdAct(), twdSend: () => twdSend(), MRS, mrsDown: () => mrsDown(), mrsUp: () => mrsUp(), get sgc(){return sgc;}, get dmn(){return dmn;}, sgcPress: () => sgcPress(), dmnTry: (i, s) => dmnTry(i, s), dmnPlayable: h => dmnPlayable(h), dmnDrawTile: () => dmnDrawTile(), get maz(){return maz;}, get rft(){return rft;}, mazStep: (x, y) => mazStep(x, y), get jug(){return jug;}, get sdk(){return sdk;}, jugPress: h => jugPress(h), sdkPut: d => sdkPut(d), get kln(){return kln;}, get cdv(){return cdv;}, klnMove: (a, b) => klnMove(a, b), klnAct: h => klnAct(h), get crl(){return crl;}, get gls(){return gls;}, crlSim: (st, sh) => crlSim(st, sh), crlLaunch: (a, p, s) => crlLaunch(a, p, s), crlScore: st => crlScore(st), glsQuality: () => glsQuality(), get cbk(){return cbk;}, get drg(){return drg;}, cbkScore: (a, b) => cbkScore(a, b), drgPick: (b, p, l) => drgPick(b, p, l), drgMoves: (b, p) => drgMoves(b, p), get nono(){return nono;}, get rev(){return rev;}, revPick: (b, p, l) => revPick(b, p, l), revMoves: (b, p) => revMoves(b, p), get spook(){return spook;}, spookStart: () => spookStart(), get skip(){return skip;}, skipThrow: (a, p) => skipThrow(a, p), skipPlan: (a, p) => skipPlan(a, p), get pipe(){return pipe;}, pipeStart: (n, i) => pipeStart(n, i), pipeSolved: () => pipeSolved(), pipeGen: n => pipeGen(n), pipeRot: (m, k) => pipeRot(m, k), get lamp(){return lamp;}, lampSolve: (b, n) => lampSolve(b, n), bagStep: (B, dt) => bagStep(B, dt), BG: {BG_LANE, BGH, BG_SLOTV, BG_PEGS, BG_CUPS, BG_ARC}, get sweep(){return sweep;}, sweepStart: (n, i) => sweepStart(n, i), sweepAct: f => sweepAct(f), sweepCount: (x, y) => sweepCount(sweep, x, y), get bag(){return bag;}, bagShoot: pw => bagShoot(pw), bagNudge: d => bagNudge(d), get crate(){return crate;}, crateStart: (n, i) => crateStart(n, i), crateMove: (x, y) => crateMove(x, y), CRATE_LV, get tiles(){return tiles;}, tileClick: i => tileClick(i), tileMoves: () => tileMoves(), tileShuffle: () => tileShuffle(), tileFreeIn: (a, i) => tileFreeIn(new Set(a), i), TILE_POS, get ice(){return ice;}, iceStart: (n, i) => iceStart(n, i), ICE_PUZ, get axe(){return axe;}, axeAim: A => axeAim(A), get isl(){return isl;}, islTick: () => islTick(0), get islSpots(){return islSpots;}, openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
