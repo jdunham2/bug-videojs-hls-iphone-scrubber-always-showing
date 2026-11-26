@@ -14263,6 +14263,13 @@ function gx112Tick(dt) { const on = GFX.hd && G.state === 'fly' && renderScene =
   for (let i = GX112.fx.length - 1; i >= 0; i--) { const f = GX112.fx[i]; f.t += dt; const k = f.t / f.life; f.o.material.opacity = 0.55 * (1 - k); f.o.scale.setScalar(f.s0 * (1 - k * 0.6)); if (k >= 1) { scene.remove(f.o); f.o.material.dispose(); GX112.fx.splice(i, 1); } } }
 { const _ub37 = updateBoss; updateBoss = function (dt) { _ub37(dt); gx112Tick(dt); }; }
 
+/* ============ feel round 114: picking something up throws a little fountain of sparkles and a glowing ring ============ */
+const GX114 = { fx: [] };
+function gx114Burst(p, col) { for (let i = 0; i < 14; i++) { const s = glowSprite(i % 3 ? col : 0xffffff, rand(0.25, 0.55)); s.position.copy(p); surf.add(s); const a = rand(0, TAU), up = rand(3, 6), out = rand(0.8, 2.4); GX114.fx.push({ o: s, v: new V3(Math.cos(a) * out, up, Math.sin(a) * out), t: 0, life: rand(0.6, 1.0), g: true }); }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.32, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.copy(p).add(new V3(0, -0.8, 0)); surf.add(ring); GX114.fx.push({ o: ring, v: new V3(), t: 0, life: 0.6, ring: true }); }
+{ const _hv = harvest; harvest = function () { const it = S.near, pos = it && it.obj ? it.obj.position.clone().add(new V3(0, 0.9, 0)) : null, col = it && ITEMS[it.type] ? ITEMS[it.type].color : 0xffe080; _hv(); if (pos && GFX.hd && it && !S.items.includes(it)) gx114Burst(pos, col); }; }
+{ const _usc64 = updateSurfCamera; updateSurfCamera = function (dt) { _usc64(dt); for (let i = GX114.fx.length - 1; i >= 0; i--) { const f = GX114.fx[i]; f.t += dt; const k = f.t / f.life; if (f.ring) { f.o.scale.setScalar(1 + k * 9); f.o.material.opacity = 0.9 * (1 - k); } else { f.v.y -= 9 * dt; f.o.position.addScaledVector(f.v, dt); f.o.material.opacity = 1 - k; } if (k >= 1 || f.o.parent !== surf) { if (f.o.parent) f.o.parent.remove(f.o); f.o.material.dispose(); GX114.fx.splice(i, 1); } } }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
