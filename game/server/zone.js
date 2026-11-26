@@ -10,6 +10,7 @@ const QI = (k) => QUESTS.findIndex((q) => q.kind === k);
 const HERALD_Q = QUESTS.findIndex((q) => q.kind === 'herald');
 import { WEATHER_TABLE, weatherFx, hourAt, isNight } from '../public/shared/life.js';
 import { separate, pack } from './crowd.js';
+import { DIFFICULTY, trialOf } from '../public/shared/endgame.js';
 
 const rng = new RNG(Date.now() & 0xffffffff);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -17,17 +18,19 @@ const r2 = (v) => Math.round(v * 100) / 100;
 export const send = (ws, msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
 
 export class Zone {
-  constructor(room, key, type, level) {
+  constructor(room, key, type, level, opts = {}) {
     this.room = room; this.key = key; this.type = type; this.level = level;
+    this.diff = (type === 'dungeon' || type === 'rift') && !opts.trial ? room.difficulty || 0 : 0;
     this.enemies = new Map(); this.projectiles = new Map(); this.hazards = new Map(); this.allies = new Map();
-    this.cleared = false; this.emptyT = 0; this.respawnT = 0;
+    this.cleared = false; this.emptyT = 0; this.respawnT = 0; this.recN = 0;
     if (type === 'region') { this.region = REGIONS[key]; this.eventT = 25; this.event = null; }
     this.weather = 'clear'; this.weatherT = WEATHER_TABLE[key] ? rng.range(40, 90) : 1e9;
     if (type === 'dungeon' || type === 'rift') {
       this.seed = (Math.random() * 1e9) | 0;
+      if (opts.trial) { this.trial = trialOf(opts.trial); this.seed = this.trial.seed; }
       if (type === 'rift') {
-        this.k = level; this.level = riftEnemyLevel(level, room.level);
-        const mods = RIFT_MOD_KEYS.slice().sort(() => Math.random() - 0.5).slice(0, 2);
+        this.k = this.trial ? this.trial.k : level; this.level = this.trial ? this.trial.level : riftEnemyLevel(level, room.level);
+        const mods = this.trial ? this.trial.mods.slice() : RIFT_MOD_KEYS.slice().sort(() => Math.random() - 0.5).slice(0, 2);
         this.rift = { mods, progress: 0, need: 0, start: Date.now(), guardian: false, done: false };
       }
       this.dungeon = generateDungeon(this.seed, this.level);
@@ -48,6 +51,15 @@ export class Zone {
   players() { return [...this.room.players.values()].filter((p) => p.zone === this.key); }
   alive() { return this.players().filter((p) => !p.dead); }
   broadcast(msg) { const s = JSON.stringify(msg); for (const p of this.players()) if (p.ws.readyState === 1) p.ws.send(s); }
+  // Rift Trial replays: 5 Hz frames of every hero and enemy, quantized to 10 cm
+  recordFrame() {
+    const R = (this.rec ||= { players: {}, types: [], frames: [] }), t = Date.now() - this.rift.start;
+    if (R.frames.length > 2400) return; // 8 minutes max
+    const ti = (type) => { let i = R.types.indexOf(type); if (i < 0) { i = R.types.length; R.types.push(type); } return i; };
+    const ps = this.players().map((p) => { R.players[p.id] ||= { name: p.prof.name, cls: p.cls, color: p.prof.color, gear: p.gear, level: p.char.level }; return [p.id, Math.round(p.x * 10), Math.round(p.z * 10), Math.round(p.ry * 100), p.anim | 0, Math.round((p.hp / Math.max(1, p.maxHp)) * 100), p.dead ? 1 : 0]; });
+    const es = [...this.enemies.values()].map((e) => [e.id, ti(e.type), Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.ry * 100), Math.round((e.hp / e.maxHp) * 100), e.affix ? 1 : 0]);
+    R.frames.push([t, ps, es]);
+  }
   get W() { return weatherFx(this.weather); }
   get night() { return (this.region || this.type === 'dark') && isNight(hourAt(this.room.clock)); }
   tickWeather(dt) {
@@ -65,10 +77,11 @@ export class Zone {
     const def = ENEMIES[type];
     const lvl = this.lvl, m = levelMul(lvl);
     const elite = extra.elite || (this.type === 'dark' && rng.chance(0.1) ? rng.pick(AFFIX_KEYS) : null);
-    const k = (elite ? 2.6 : 1) * (this.rift ? riftHpMul(this.k) : 1);
+    const D = DIFFICULTY[this.diff || 0];
+    const k = (elite ? 2.6 : 1) * (this.rift ? riftHpMul(this.k) : 1) * D.hp;
     const e = {
       id: this.room.nextId++, type, def, x, z, ry: rng.range(0, 6.28), level: lvl,
-      hp: Math.round(def.hp * m.hp * k), maxHp: Math.round(def.hp * m.hp * k), dmg: Math.round(def.dmg * m.dmg * (elite ? 1.35 : 1)), gold: def.gold * m.gold * (elite ? 3 : 1),
+      hp: Math.round(def.hp * m.hp * k), maxHp: Math.round(def.hp * m.hp * k), dmg: Math.round(def.dmg * m.dmg * (elite ? 1.35 : 1) * D.dmg), gold: def.gold * m.gold * (elite ? 3 : 1) * D.gold,
       xpMul: elite ? 3 : 1, radius: def.radius * (elite ? 1.15 : 1),
       cd: rng.range(0.3, 1.2), windT: 0, slamT: 0, slamCd: 6, geyserCd: 4, abilityCd: 3, abi: 0, phase: 1, stunT: 0, staggerImm: 0, introT: 0,
       aggro: false, home: { x, z }, slow: 0, wp: 0, summoned: 0, state: 0, wanderT: 0, wx: x, wz: z, tauntT: 0, tauntBy: 0, shieldCd: 4, shieldUp: false, leapT: 0,
@@ -108,6 +121,7 @@ export class Zone {
     for (const e of list) if (this.enemies.has(e.id)) this.tickEnemy(e, dt, alive);
     this.tickProjectiles(dt, alive);
     if (this.allies.size) this.tickAllies(dt);
+    if (this.trial && this.rift && !this.rift.done && ++this.recN % 4 === 0) this.recordFrame();
     for (const h of [...this.hazards.values()]) {
       if (h.delay > 0) { h.delay -= dt; continue; }
       h.life -= dt;
@@ -764,6 +778,7 @@ export class Zone {
         const n = def.boss ? 3 : def.flee ? 3 : 1;
         for (let k = 0; k < n; k++) {
           const opts = def.boss ? { minRarity: k === 0 ? 3 : 2, luck: 2 } : def.flee ? { minRarity: 2, luck: 2.5 } : e.affix ? { minRarity: 1, luck: 1.5 } : {};
+          if (this.diff) { opts.luck = (opts.luck || 1) * DIFFICULTY[this.diff].luck; if (def.boss) opts.nightmare = this.diff; }
           this.room.giveLoot(p, e.level, opts, e.x + rng.range(-1.4, 1.4), e.z + rng.range(-1.4, 1.4));
         }
       }
@@ -775,6 +790,7 @@ export class Zone {
       if (def.boss) { this.room.bounty(p, 'boss'); this.room.marks(p, 5); }
       if (def.boss && this.type === 'dungeon') this.room.bounty(p, 'dungeon');
     }
+    if (def.boss && this.diff) for (const p of this.players()) { const m = (p.prof.mats ||= { shards: 0, cores: 0 }); m.essence = (m.essence || 0) + DIFFICULTY[this.diff].essence; p.dirty = true; send(p.ws, { t: 'notice', text: `+${DIFFICULTY[this.diff].essence} Nightmare Essence`, color: '#c83aff' }); }
     if (def.boss && this.type === 'dungeon') for (const p of this.players()) this.room.questEvent(p, 'dungeon');
     if (e.type === 'colossus') for (const p of this.players()) this.room.questEvent(p, 'actboss');
     if (this.key === 'citadel') for (const p of this.players()) {

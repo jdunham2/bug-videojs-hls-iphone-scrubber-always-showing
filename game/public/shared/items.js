@@ -32,7 +32,7 @@ const PREFIX = [
   ["Dawnbreaker's", "Ashen King's", 'Eternal', 'Starfallen'],
 ];
 
-const AFFIXES = {
+export const AFFIXES = {
   dmgPct: { label: 'Damage', fmt: (v) => `+${Math.round(v * 100)}% Damage`, suffix: 'of Fury', roll: (r, l) => r.range(0.05, 0.12) + l * 0.004 },
   hp: { label: 'Health', fmt: (v) => `+${Math.round(v)} Health`, suffix: 'of Vigor', roll: (r, l) => r.range(10, 22) * (1 + l * 0.15) },
   crit: { label: 'Crit', fmt: (v) => `+${(v * 100).toFixed(1)}% Crit Chance`, suffix: 'of Precision', roll: (r) => r.range(0.02, 0.06) },
@@ -130,6 +130,11 @@ export const LEGENDARIES = {
   g_tailwind: { cls: null, name: 'Tailwind', desc: 'Dodge rolls grant +35% move speed for 2 seconds.' },
   g_combust: { cls: null, name: 'Combustion', desc: 'Enemies you kill explode for 60% damage around them.' },
   g_greed: { cls: null, name: "Goblin's Greed", desc: '+50% gold find.', stats: { goldFind: 0.5 } },
+  // Nightmare-only powers (drop from Nightmare difficulty, or crafted with Nightmare Essence)
+  n_dread: { cls: null, nightmare: true, name: 'Dreadcrown', desc: '+22% damage and +10% crit chance.', stats: { dmgPct: 0.22, crit: 0.1 } },
+  n_void: { cls: null, nightmare: true, name: 'Voidheart', desc: '+30% maximum health and +20% armor.', stats: { hpPct: 0.3, armorPct: 0.2 } },
+  n_abyss: { cls: null, nightmare: true, name: 'Abyssal Gaze', desc: '+80% critical hit damage.', stats: { critDmg: 0.8 } },
+  n_night: { cls: null, nightmare: true, name: 'Eternal Night', desc: '18% cooldown reduction and skills cost 20% less.', stats: { cdr: 0.18, costMul: -0.2 } },
 };
 
 export const SETS = {
@@ -165,7 +170,7 @@ export function decorateItem(item, rng) {
   const ns = SOCKETS[item.slot]?.[item.rarity] || 0;
   if (ns) item.sockets = Array(ns).fill(null);
   if (item.rarity === 4) {
-    const pool = Object.entries(LEGENDARIES).filter(([, L]) => item.slot === 'weapon' ? (L.cls === null ? rng.chance(0.3) : WEAPON_CLASSES[item.type].includes(L.cls)) : (L.cls === null || rng.chance(0.4)));
+    const pool = Object.entries(LEGENDARIES).filter(([, L]) => !L.nightmare && (item.slot === 'weapon' ? (L.cls === null ? rng.chance(0.3) : WEAPON_CLASSES[item.type].includes(L.cls)) : (L.cls === null || rng.chance(0.4))));
     if (pool.length) item.leg = rng.pick(pool)[0];
   } else if (item.rarity >= 3 && rng.chance(0.2)) {
     const sets = Object.entries(SETS).filter(([, S]) => item.slot !== 'weapon' || WEAPON_CLASSES[item.type].includes(S.cls));

@@ -104,6 +104,10 @@ const lobby = new Lobby();
 const cine = new Cinematic(camera);
 import { DialogueScene } from './dialogue.js';
 const dlg = new DialogueScene(camera);
+import { ReplayViewer } from './replay.js';
+import { renderForge, renderTrial } from './endgameui.js';
+import { DIFFICULTY } from '../shared/endgame.js';
+const replay = new ReplayViewer({ renderer, camera, DungeonZone, setActiveZone: (z) => setActiveZone(z), clearEntities: () => clearEntities(), get town() { return town; }, player: () => player, snap: () => camRig.snap(player) });
 Object.defineProperty(cine, 'active', { get() { return !!cine.shots || dlg.active; } });
 
 const town = new TownZone(renderer);
@@ -294,7 +298,7 @@ G.actions = {
 
 // ---------- networking ----------
 net.on('welcome', (m) => {
-  G.myId = m.id; G.roomCode = m.room; G.roomLevel = m.level;
+  G.myId = m.id; G.roomCode = m.room; G.roomLevel = m.level; G.roomDiff = m.diff || 0;
   setToken(m.token);
   ui.setRoom(m.room);
   lobby.dispose();
@@ -309,6 +313,7 @@ net.on('profile', (m) => {
   if (first) { player = new LocalPlayer(m); G.player = player; ui.buildSkillBar(m.cls); }
   else player.setProfile(m, false);
   ui.setProfile(m);
+  if (!document.getElementById('forge').classList.contains('hidden')) renderForge(ui);
 });
 net.on('levelUp', (m) => {
   if (!player) return;
@@ -587,6 +592,12 @@ net.on('tradeState', (m) => ui.tradeState(m));
 net.on('tradeClosed', (m) => { ui.tradeClosed(m.text); if (/complete/i.test(m.text)) sfx.buy(); });
 net.on('plevel', (m) => { const r = G.remotes.get(m.id); if (r && m.id !== G.myId) fx.levelUp(r.pos.clone()); });
 net.on('chat', (m) => ui.chat(m.from, m.text, m.color));
+// ---- endgame ----
+net.on('roomDiff', (m) => { G.roomDiff = m.d; const D = DIFFICULTY[m.d]; ui.toast(`Difficulty: ${D.name}`, D.color, m.d ? `Enemies ×${D.hp} health, ×${D.dmg} damage · loot luck ×${D.luck}` : 'Standard challenge'); if (!document.getElementById('riftPanel').classList.contains('hidden')) renderTrial(ui, ui._trialBoard); ui.setDepth(G.roomLevel); });
+net.on('trialBoard', (m) => { ui._trialBoard = m; if (!document.getElementById('riftPanel').classList.contains('hidden')) renderTrial(ui, m); });
+net.on('trialReplay', (m) => { if (G.zone !== town) { ui.toast('Watch replays from Emberhold.', '#ff9a7a'); return; } replay.start(m.replay); });
+net.on('trialDone', (m) => { sfx.victory(); ui.bigBanner(m.ok ? (m.best ? 'NEW WEEKLY RECORD!' : `TRIAL CLEARED · RANK ${m.rank}`) : 'TRIAL CLEARED — TOO SLOW', `Time ${Math.floor(m.time / 60)}:${String(Math.floor(m.time % 60)).padStart(2, '0')}`, 6000); });
+net.on('enchantOpts', (m) => { ui.enchOpts = m.opts; renderForge(ui); });
 net.on('social', (m) => { const first = !G.social; G.social = m; if (!document.getElementById('social').classList.contains('hidden')) renderSocialPanel(); if (first && m.requests.length) ui.toast(`${m.requests.length} friend request${m.requests.length > 1 ? 's' : ''} waiting`, '#7ad0ff', 'Press O to open Social'); applyCosmetics(); });
 net.on('whisper', (m) => { ui.chat(m.self ? `To ${m.to}` : `From ${m.from}`, m.text, '#e08aff'); if (!m.self) sfx.pop(); });
 net.on('bountyReady', (m) => { ui.toast(`${m.weekly ? 'Weekly' : 'Daily'} bounty complete!`, '#ffd34d', `${m.text} — claim it at the Bounty Board`); sfx.levelUp(); });
@@ -752,7 +763,8 @@ function frame(now) {
   const zone = G.zone;
   input.pollGamepad(realDt);
   input.wantLock = G.inGame && !G.uiOpen && !ui.chatting && !cine.active;
-  if (G.inGame && player && zone) {
+  if (replay.active) { replay.update(realDt, input); }
+  else if (G.inGame && player && zone) {
     handleInput();
     player.update(dt, input, camRig, zone);
     if (!dlg.update(realDt) && !cine.update(realDt)) camRig.update(realDt, input, player, zone);

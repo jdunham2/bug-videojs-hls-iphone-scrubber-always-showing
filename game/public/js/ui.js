@@ -10,6 +10,8 @@ import { AFFIXES } from '../shared/enemies.js';
 import { RIFT_MODS, RIFT_TIME, PARAGON, LEVEL_CAP, paragonXp } from '../shared/rifts.js';
 import { QUESTS, EVENTS, REGIONS, ACT1_END, ACT2_END, COMPANIONS } from '../shared/regions.js';
 import { renderSocial } from './socialui.js';
+import { renderForge, renderTrial } from './endgameui.js';
+import { compareItem, DIFFICULTY } from '../shared/endgame.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
 import { STYLE_RANKS, ROLL_CD } from './player.js';
 import { ACTION_LABELS, DEFAULT_BINDINGS, keyName } from './input.js';
@@ -58,7 +60,7 @@ class UI {
     $('copyInv').onclick = () => { navigator.clipboard?.writeText(url); this.toast('Invite link copied!', '#ffd98a'); };
     history.replaceState(null, '', `?room=${code}`);
   }
-  setDepth(l) { const e = $('depthTxt'); if (e) e.textContent = l; }
+  setDepth(l) { const e = $('depthTxt'); if (e) e.innerHTML = `${l}${G.roomDiff ? ` · <span style="color:${DIFFICULTY[G.roomDiff].color}">${DIFFICULTY[G.roomDiff].name}</span>` : ''}`; }
 
   // ---------- messages ----------
   zoneBanner(title, sub) {
@@ -263,7 +265,7 @@ class UI {
   }
 
   // ---------- panels ----------
-  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe', 'social'].some((id) => !$(id).classList.contains('hidden')); }
+  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe', 'social', 'forge'].some((id) => !$(id).classList.contains('hidden')); }
   togglePanel(id) { if ($(id).classList.contains('hidden')) this.openPanel(id); else this.closePanel(id); }
   openPanel(id) {
     $(id).classList.remove('hidden');
@@ -274,8 +276,9 @@ class UI {
     if (id === 'stash') { $('inventory').classList.add('hidden'); this.renderStash(); }
     if (id === 'talents') this.renderTalents();
     if (id === 'settings') this.renderSettings();
-    if (id === 'smith') { this.smithSel = null; this.renderSmith(); }
-    if (id === 'riftPanel') this.renderRiftPanel();
+    if (id === 'smith') { this.smithSel = null; this.renderSmith(); $('openForge').onclick = () => { this.closePanel('smith'); this.openPanel('forge'); }; }
+    if (id === 'riftPanel') { this.renderRiftPanel(); renderTrial(this, null); G.net.send({ t: 'trialBoard' }); }
+    if (id === 'forge') renderForge(this);
     if (id === 'research') this.renderResearch();
     if (id === 'waypoint') this.renderWaypoint();
     if (id === 'quests') this.renderQuests();
@@ -288,7 +291,7 @@ class UI {
     this.hideTip();
     G.uiOpen = this.anyPanel;
   }
-  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe', 'social'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
+  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe', 'social', 'forge'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
   sideBySide(id, on) {
     const inv = $('inventory'), other = $(id);
     if (on && innerWidth > 1400) { other.style.left = 'calc(50% - 400px)'; inv.style.left = 'calc(50% + 330px)'; }
@@ -647,10 +650,13 @@ class UI {
     const main = it.slot === 'weapon' ? `${it.dmg} Damage · ${it.speed.toFixed(2)} speed<br><span class="muted">${WEAPONS[it.type].name}${WEAPONS[it.type].cleave ? ' · wide cleave' : ''}${WEAPONS[it.type].ranged ? ' · ranged' : ''}</span>` : `${it.armor} Armor · +${it.hp} Health`;
     let html = `<div class="tn">${escapeHtml(it.name)}</div><div class="tr">${R.name} ${SLOT_NAMES[it.slot]} · Item Level ${it.level}</div><div class="tm">${main}</div>`;
     html += affixLines(it).map((l) => `<div class="ta">${l}</div>`).join('');
-    if (it.leg && LEGENDARIES[it.leg]) { const L = LEGENDARIES[it.leg]; html += `<div class="tleg">✦ ${L.name}${L.cls ? ` <span class="muted">(${CLASSES[L.cls].name})</span>` : ''}<br><span style="font-weight:600">${L.desc}</span></div>`; }
+    if (it.leg && LEGENDARIES[it.leg]) { const L = LEGENDARIES[it.leg]; html += `<div class="tleg">${L.nightmare ? '<span class="nmtag">Nightmare</span> ' : ''}✦ ${L.name}${L.cls ? ` <span class="muted">(${CLASSES[L.cls].name})</span>` : ''}<br><span style="font-weight:600">${L.desc}</span></div>`; }
     if (it.set && SETS[it.set]) { const S = SETS[it.set], n = G.prof ? Object.values(G.prof.char.equipped).filter((x) => x && x.set === it.set).length : 0; html += `<div class="tset"><b>${S.name}</b> (${n}/4)<br><span class="${n >= 2 ? '' : 'off'}">(2) ${S.d2}</span><br><span class="${n >= 4 ? '' : 'off'}">(4) ${S.d4}</span></div>`; }
     if (it.slot === 'weapon' && G.prof && !CLASSES[G.prof.cls].weapons.includes(it.type)) html += `<div class="cmp neg">Your ${CLASSES[G.prof.cls].name} cannot wield this</div>`;
-    else if (cmp && cmp !== it) { const diff = it.power - cmp.power; html += `<div class="cmp">vs equipped: <span class="${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '▲ +' : '▼ '}${diff} power</span></div>`; }
+    else if (cmp !== it && G.prof && it.slot) { // real stat deltas against what is equipped in this slot
+      const c = compareItem(G.prof.char, G.prof.cls, it), pc = (v) => `${v >= 0 ? '▲ +' : '▼ '}${(v * 100).toFixed(1)}%`;
+      html += `<div class="cmp">vs equipped: <span class="${c.dpsPct >= 0 ? 'pos' : 'neg'}">${pc(c.dpsPct)} DPS</span> · <span class="${c.ehpPct >= 0 ? 'pos' : 'neg'}">${pc(c.ehpPct)} toughness</span><br><span class="muted small">DPS ${Math.round(c.cur.dmg * c.cur.atkSpeed)} → ${Math.round(c.next.dmg * c.next.atkSpeed)} · Health ${c.cur.maxHp} → ${c.next.maxHp} · Armor ${c.cur.armor} → ${c.next.armor}</span></div>`;
+    }
     else if (cmp === null && G.prof && !G.prof.char.equipped[it.slot]) html += `<div class="cmp pos">Empty slot — equip it!</div>`;
     html += `<div class="tp">Power ${it.power} · Sells for ${it.price}g</div>`;
     t.innerHTML = html; t.classList.remove('hidden');

@@ -11,6 +11,9 @@ import { REGIONS, QUESTS, CAPTAIN, questDone, ACT1_END, ACT2_END, COMPANIONS } f
 const companionOf = (p) => { const qi = p.char.quest?.i || 0; if (p.companion === false) return null; if (p.companion && COMPANIONS[p.companion] && qi >= COMPANIONS[p.companion].unlock) return p.companion; return qi >= COMPANIONS.corvin.unlock ? 'corvin' : qi >= COMPANIONS.ilsa.unlock ? 'ilsa' : null; };
 import { FISH, rollFish, nearLake, MIN_REEL, hourAt, isNight } from '../public/shared/life.js';
 import { createSocial } from './social.js';
+import { DIFFICULTY, trialOf, TRIAL_LIMIT, NIGHTMARE_LEGS, NIGHTMARE_DROP } from '../public/shared/endgame.js';
+import { weekKey } from '../public/shared/social.js';
+import { LEGENDARIES } from '../public/shared/items.js';
 const SOCIAL_T = new Set(['social', 'friendAdd', 'friendAccept', 'friendDecline', 'friendRemove', 'whisper', 'guildCreate', 'guildInvite', 'guildAccept', 'guildLeave', 'guildStash', 'bountyClaim', 'seasonClaim', 'cosEquip']);
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
@@ -49,7 +52,7 @@ function makeCode() {
 class Room {
   constructor(code) {
     this.code = code; this.players = new Map(); this.level = 1; this.nextId = 1; this.zones = new Map();
-    this.currentDungeon = null; this.ready = null; this.tickN = 0; this.clock0 = Date.now(); this.crowd = crowd;
+    this.currentDungeon = null; this.ready = null; this.tickN = 0; this.clock0 = Date.now(); this.crowd = crowd; this.difficulty = 0;
     this.zones.set('town', new Zone(this, 'town', 'town', 1));
     this.zones.set('dark', new Zone(this, 'dark', 'dark', 1));
     this.defense = new Defense(this);
@@ -68,6 +71,7 @@ class Room {
   }
   giveLoot(p, level, opts, x, z) {
     const item = P.rollItem(p, level, opts);
+    if (opts.nightmare && item.rarity === 4 && Math.random() < NIGHTMARE_DROP[opts.nightmare]) { item.leg = NIGHTMARE_LEGS[Math.floor(Math.random() * NIGHTMARE_LEGS.length)]; item.name = `${LEGENDARIES[item.leg].name} ${item.name.split(' ').slice(-1)[0]}`; item.nightmare = true; }
     p.loot.set(item.id, { item, x, z, zone: p.zone });
     if (p.loot.size > 60) p.loot.delete(p.loot.keys().next().value);
     send(p.ws, { t: 'loot', item, x: r2(x), z: r2(z) });
@@ -116,7 +120,24 @@ class Room {
     }
     p.dirty = true;
   }
+  trialComplete(zone, guardian) {
+    const r = zone.rift, time = Math.round((Date.now() - r.start) / 100) / 10, ok = time <= TRIAL_LIMIT, T = zone.trial;
+    zone.recordFrame();
+    const W = ((db.data.trials ||= {})[T.week] ||= { list: [] });
+    const entry = { names: zone.players().map((p) => p.prof.name), cls: zone.players().map((p) => p.cls), time, at: Date.now() };
+    if (ok) { W.list.push(entry); W.list.sort((a, b) => a.time - b.time); W.list.length = Math.min(W.list.length, 25); }
+    const best = ok && W.list[0] === entry;
+    if (best) (db.data.trialReplays ||= {})[T.week] = { week: T.week, seed: T.seed, level: T.level, mods: T.mods, time, names: entry.names, ...zone.rec };
+    for (const p of zone.players()) {
+      this.reward(p, 1500, 3000, guardian.x, guardian.z, true);
+      for (let i = 0; i < 2; i++) this.giveLoot(p, Math.max(T.level, p.char.level), { minRarity: 3, luck: 3 }, guardian.x + i * 1.5, guardian.z);
+      this.marks(p, ok ? 60 : 20); p.dirty = true;
+    }
+    db.touch(); zone.cleared = true;
+    zone.broadcast({ t: 'trialDone', time, ok, rank: ok ? W.list.indexOf(entry) + 1 : 0, best, x: guardian.x, z: guardian.z });
+  }
   riftComplete(zone, guardian) {
+    if (zone.trial) return this.trialComplete(zone, guardian);
     const r = zone.rift, time = (Date.now() - r.start) / 1000, ok = time <= RIFT_TIME;
     const bump = ok ? (time < RIFT_TIME * 0.6 ? 2 : 1) : 0;
     const lb = (db.data.leaderboard ||= {}), S = (lb[season()] ||= {});
@@ -145,7 +166,7 @@ class Room {
     { const k = companionOf(p); if (zone.type !== 'town' && k) zone.addAlly(p, k); }
     p.zone = zone.key;
     p.loot.clear();
-    const msg = { t: 'enterZone', zone: zone.key, type: zone.type, level: zone.dungeon ? zone.level : this.level, clock: Math.round(this.clock * 10) / 10, weather: zone.weather };
+    const msg = { t: 'enterZone', diff: zone.diff || 0, trial: !!zone.trial, zone: zone.key, type: zone.type, level: zone.dungeon ? zone.level : this.level, clock: Math.round(this.clock * 10) / 10, weather: zone.weather };
     if (zone.dungeon) { msg.seed = zone.seed; msg.cleared = zone.cleared; }
     if (zone.rift) msg.rift = zone.riftState();
     if (zone.type === 'town') { msg.structs = this.defense.list(); msg.defense = this.defense.view(); }
@@ -155,9 +176,18 @@ class Room {
     if (zone.dungeon) send(p.ws, zone.dstate());
   }
 
-  enterTarget(p, target) { if (target.type === 'rift') this.enterRift(p, target.k); else this.enterZone(p, 'dungeon'); }
+  enterTarget(p, target) { if (target.type === 'rift') this.enterRift(p, target.k); else if (target.type === 'trial') this.enterTrial(p); else this.enterZone(p, 'dungeon'); }
+  enterTrial(p) {
+    let zone = this.currentTrial && this.zones.get(this.currentTrial);
+    if (!zone || zone.rift.done || !zone.players().length || zone.trial.week !== weekKey()) {
+      const key = 'trial:' + this.nextId++;
+      zone = new Zone(this, key, 'rift', 0, { trial: weekKey() });
+      this.zones.set(key, zone); this.currentTrial = key;
+    }
+    this.joinZone(p, zone);
+  }
   requestDungeon(p, target = { type: 'dungeon' }) {
-    const cur = target.type === 'rift' ? this.currentRift && this.zones.get(this.currentRift) : this.currentDungeon && this.zones.get(this.currentDungeon);
+    const cur = target.type === 'rift' ? this.currentRift && this.zones.get(this.currentRift) : target.type === 'trial' ? this.currentTrial && this.zones.get(this.currentTrial) : this.currentDungeon && this.zones.get(this.currentDungeon);
     if (this.players.size === 1 || (cur && cur.players().length && (target.type !== 'rift' || cur.k === target.k))) return this.enterTarget(p, target);
     if (this.ready) return;
     this.ready = { by: p.id, yes: new Set([p.id]), t: 20, target };
@@ -236,7 +266,7 @@ function attach(ws) {
       online.set(token, p);
       room.players.set(p.id, p);
       db.touch();
-      send(ws, { t: 'welcome', id: p.id, room: code, level: room.level, token });
+      send(ws, { t: 'welcome', id: p.id, room: code, level: room.level, token, diff: room.difficulty });
       send(ws, P.profileView(p)); social.push(p); social.notifyFriends(p);
       room.broadcast({ t: 'chat', from: '★', text: `${prof.name} the ${CLASSES[cls].name} has joined the party.` });
       room.enterZone(p, 'town');
@@ -299,6 +329,20 @@ function attach(ws) {
         else if (p.zone === 'citadel' && near(p, REGIONS.citadel.gate, 6) && (p.char.quest?.i || 0) === ACT2_END) { send(ws, { t: 'dialog', who: 'Sir Corvin', i: ACT2_END }); room.questEvent(p, 'talk3'); }
         break;
       case 'relic': if (p.zone === 'peaks') zone.takeRelic(p, m.i | 0); break;
+      // ---- endgame: Nightmare difficulty, weekly Rift Trials, crafting 2.0 ----
+      case 'difficulty': {
+        const d = Math.max(0, Math.min(DIFFICULTY.length - 1, m.d | 0)), low = [...room.players.values()].find((q) => q.char.level < DIFFICULTY[d].minLevel);
+        if (low) { notice(`${low.prof.name} needs level ${DIFFICULTY[d].minLevel} for ${DIFFICULTY[d].name}.`); break; }
+        room.difficulty = d; room.currentDungeon = null; room.currentRift = null; room.broadcast({ t: 'roomDiff', d });
+        break;
+      }
+      case 'trial': if (p.zone === 'town' && near(p, TOWN.obelisk, 7)) room.requestDungeon(p, { type: 'trial' }); break;
+      case 'trialBoard': { const T = trialOf(), W = (db.data.trials || {})[T.week] || { list: [] }; send(ws, { t: 'trialBoard', trial: T, list: W.list.slice(0, 10), replay: !!(db.data.trialReplays || {})[T.week] }); break; }
+      case 'trialReplay': { const R = (db.data.trialReplays || {})[+m.week || trialOf().week]; send(ws, R ? { t: 'trialReplay', replay: R } : { t: 'notice', text: 'No replay recorded yet this week.' }); break; }
+      case 'craftRecipe': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.craftRecipe(p, String(m.key), String(m.slot)), 'The forge sings — a legendary is born!', '#ff9a3c'); break;
+      case 'enchantRoll': if (p.zone === 'town' && near(p, TOWN.smith, 7)) { const r = P.enchantRoll(p, m.src, m.ref, String(m.key)); if (typeof r === 'string') notice(r); else send(ws, { t: 'enchantOpts', opts: r.opts }); } break;
+      case 'enchantPick': ok(P.enchantPick(p, m.idx | 0), 'Enchanted!', '#c77dff'); break;
+      case 'transmute': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.transmute(p, m.src, m.ref | 0, String(m.set), String(m.slot)), 'The set piece reshapes itself.', '#5eea8a'); break;
       // ---- fishing (server rolls the fish and validates the reel time) ----
       case 'fishStart': {
         if (p.zone !== 'town' || !nearLake(p.x, p.z) || p.fish) break;
@@ -344,6 +388,7 @@ function attach(ws) {
       case 'chat':
         if (/^\/w \S+ ./.test(m.text || '')) { const [, to, ...rest] = m.text.split(' '); const r = social.handle(p, { t: 'whisper', to, text: rest.join(' ') }, {}); if (typeof r === 'string') notice(r); break; }
         if (/^\/g ./.test(m.text || '')) { const r = social.guildChat(p, m.text.slice(3)); if (typeof r === 'string') notice(r); break; }
+        if (dev && zone?.rift && !zone.rift.done && m.text === '/riftwin') { zone.rift.done = true; room.riftComplete(zone, { x: p.x, z: p.z }); break; }
         if (dev && zone && /^\/weather (clear|rain|snow|ash)$/.test(m.text || '')) { zone.weather = m.text.split(' ')[1]; zone.weatherT = 600; zone.broadcast({ t: 'weather', kind: zone.weather, zone: zone.key }); break; }
         if (dev && /^\/(depth|gold|xp|wave|loot|gems|quest|hour) \d+$/.test(m.text || '')) {
           const [cmd, n] = m.text.slice(1).split(' ');

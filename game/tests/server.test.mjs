@@ -359,3 +359,60 @@ test('act III: Corvin tanks, tide bells need low water, the 5-phase King and its
   assert.equal(c.last.actComplete?.act, 3);
   assert.equal(p.char.quest.i, QUESTS.length, 'act III complete');
 });
+
+test('endgame: Nightmare scaling, weekly Rift Trial with ranks and a replay, crafting 2.0, comparisons', { timeout: 60000 }, async () => {
+  const { DIFFICULTY, trialOf, compareItem } = await import('../public/shared/endgame.js');
+  const { TOWN } = await import('../public/shared/world.js');
+  const game = G(), c = client(game);
+  await wait(20);
+  const room = game.rooms.get(c.room), p = [...room.players.values()][0];
+  c.send({ t: 'difficulty', d: 2 }); await wait(30);
+  assert.match(c.last.notice.text, /needs level/);
+  c.send({ t: 'chat', text: '/xp 400000' }); await wait(60);
+  c.send({ t: 'difficulty', d: 2 }); await wait(30);
+  assert.equal(c.last.roomDiff.d, 2);
+  c.send({ t: 'zone', to: 'dungeon' }); await wait(80);
+  assert.equal(c.zone.diff, 2);
+  const dz = room.zones.get(room.currentDungeon), sk = [...dz.enemies.values()].find((e) => e.type === 'skeleton' && !e.affix);
+  if (sk) { const base = dz.spawn('skeleton', 0, 0); assert.equal(base.maxHp, sk.maxHp); dz.diff = 0; const norm = dz.spawn('skeleton', 0, 0); assert.ok(Math.abs(sk.maxHp / norm.maxHp - DIFFICULTY[2].hp) < 0.05, 'Nightmare II hp'); }
+  c.send({ t: 'zone', to: 'town' }); await wait(60);
+  // weekly trial: fixed seed and modifiers, recorded, ranked
+  c.send({ t: 'state', x: TOWN.obelisk.x, y: 0, z: TOWN.obelisk.z + 2, hp: 100, maxHp: 100 });
+  c.send({ t: 'trial' }); await wait(100);
+  const T = trialOf();
+  assert.equal(c.zone.seed, T.seed); assert.deepEqual(c.zone.rift.mods, T.mods); assert.ok(c.zone.trial);
+  const tz = room.zones.get(room.currentTrial);
+  for (let r = 0; r < 400 && !c.last.guardian; r++) { const e = [...tz.enemies.values()].find((x) => !x.guardian && !x.burrowed); if (e) { e.introT = 0; tz.damageEnemy(e, e.hp + 1, p.id); } await wait(8); }
+  assert.ok(c.last.guardian, 'guardian');
+  await wait(3200);
+  const gd = tz.enemies.get(c.last.guardian.id);
+  while (tz.enemies.has(gd.id)) { gd.introT = 0; gd.strafe = null; gd.flying = false; c.send({ t: 'state', x: gd.x + 2, y: 0, z: gd.z, hp: 100, maxHp: 100 }); for (let h = 0; h < 4; h++) c.send({ t: 'hit', id: gd.id, dmg: 1100 }); await wait(1050); }
+  assert.ok(c.last.trialDone?.ok && c.last.trialDone.rank === 1 && c.last.trialDone.best);
+  c.send({ t: 'trialBoard' }); c.send({ t: 'trialReplay' }); await wait(60);
+  assert.equal(c.last.trialBoard.list[0].names[0], 'Tester'); assert.ok(c.last.trialBoard.replay);
+  const R = c.last.trialReplay.replay;
+  assert.ok(R.frames.length > 20 && R.types.length > 0 && Object.keys(R.players).length === 1, 'replay frames recorded');
+  // crafting at the smith
+  c.send({ t: 'zone', to: 'town' }); await wait(60);
+  c.send({ t: 'state', x: TOWN.smith.x + 1, y: 0, z: TOWN.smith.z, hp: 100, maxHp: 100 });
+  p.prof.mats = { shards: 5000, cores: 20, essence: 10 }; p.prof.gold = 50000;
+  const bag0 = p.char.bag.length;
+  c.send({ t: 'craftRecipe', key: 'n_dread', slot: 'helm' }); await wait(30);
+  const crafted = p.char.bag.at(-1);
+  assert.equal(p.char.bag.length, bag0 + 1); assert.equal(crafted.leg, 'n_dread'); assert.equal(p.prof.mats.essence, 5);
+  const key = Object.keys(crafted.affixes)[0];
+  c.send({ t: 'enchantRoll', src: 'bag', ref: p.char.bag.length - 1, key }); await wait(30);
+  assert.equal(c.last.enchantOpts.opts.length, 3);
+  const pick = c.last.enchantOpts.opts[2];
+  c.send({ t: 'enchantPick', idx: 2 }); await wait(30);
+  assert.equal(crafted.affixes[pick.k], pick.v); assert.equal(crafted.enchKey, pick.k);
+  const other = Object.keys(crafted.affixes).find((k) => k !== pick.k);
+  if (other) { c.send({ t: 'enchantRoll', src: 'bag', ref: p.char.bag.length - 1, key: other }); await wait(30); assert.match(c.last.notice.text, /can be enchanted/); }
+  c.send({ t: 'chat', text: '/loot 0' }); await wait(80); // gives a full class set
+  const si = p.char.bag.findIndex((it) => it.set);
+  c.send({ t: 'transmute', src: 'bag', ref: si, set: 'warlord', slot: 'boots' }); await wait(30);
+  assert.equal(p.char.bag[si].set, 'warlord'); assert.equal(p.char.bag[si].slot, 'boots');
+  // comparison math: a much better weapon raises DPS
+  const better = { ...p.char.equipped.weapon, dmg: p.char.equipped.weapon.dmg * 3, id: 'x' };
+  assert.ok(compareItem(p.char, p.cls, better).dpsPct > 1);
+});

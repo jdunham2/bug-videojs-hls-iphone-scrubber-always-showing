@@ -24,7 +24,7 @@ export function profileView(p) {
   const pr = p.prof;
   pr.mats ||= { shards: 0, cores: 0 };
   pr.gems ||= {};
-  return { t: 'profile', fish: pr.fish || {}, name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, gems: pr.gems, looks: pr.looks || [], riftMax: pr.riftMax || 1, research: pr.research || {}, peaks: !!pr.peaks, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
+  return { t: 'profile', fish: pr.fish || {}, name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, gems: pr.gems, looks: pr.looks || [], riftMax: pr.riftMax || 1, research: pr.research || {}, peaks: !!pr.peaks, citadel: !!pr.citadel, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
 }
 
 export function activeBuffs(p) {
@@ -209,3 +209,51 @@ export function setLook(p, look) {
   p.char.look = l; p.dirty = true; return null;
 }
 export function saveLook(p, slot) { const L = (p.prof.looks ||= []); if (slot < 0 || slot > 2) return 'Invalid slot.'; L[slot] = { ...(p.char.look || {}) }; p.dirty = true; return null; }
+
+// ---------- crafting 2.0 (Blacksmith): legendary recipes, enchanting, set transmutation ----------
+import { CRAFT, recipesFor, setsFor, ENCHANT_KEYS, canWield } from '../public/shared/endgame.js';
+import { LEGENDARIES, SETS, AFFIXES } from '../public/shared/items.js';
+const SLOT_I = { weapon: 0, helm: 1, chest: 2, boots: 3 };
+const pay = (p, c) => {
+  const m = (p.prof.mats ||= { shards: 0, cores: 0 });
+  if ((m.cores || 0) < (c.cores || 0) || (m.shards || 0) < (c.shards || 0) || p.prof.gold < (c.gold || 0) || (m.essence || 0) < (c.essence || 0)) return `Needs ${[c.cores && `${c.cores} Ember Cores`, c.shards && `${c.shards} shards`, c.essence && `${c.essence} Nightmare Essence`, c.gold && `${c.gold} gold`].filter(Boolean).join(', ')}.`;
+  m.cores -= c.cores || 0; m.shards -= c.shards || 0; m.essence = (m.essence || 0) - (c.essence || 0); p.prof.gold -= c.gold || 0;
+  return null;
+};
+export function craftRecipe(p, key, slot) {
+  const L = recipesFor(p.cls).find((r) => r.key === key); if (!L) return 'Unknown recipe.';
+  if (!(slot in SLOT_I)) return 'Choose a slot.';
+  if (p.char.bag.length >= BAG_SIZE) return 'Your bag is full.';
+  const err = pay(p, L.nightmare ? CRAFT.recipeNightmare : CRAFT.recipe); if (err) return err;
+  const it = rollItem(p, Math.max(1, p.char.level), { rarity: 4, slot, types: CLASSES[p.cls].weapons });
+  it.leg = key; it.crafted = true; it.name = `${L.name} ${it.name.split(' ').slice(-1)[0]}`;
+  p.char.bag.push(it); p.dirty = true; return null;
+}
+export function enchantRoll(p, src, ref, key) {
+  const it = itemRef(p, src, ref); if (!it || !it.affixes || !(key in it.affixes)) return 'Pick an affix to enchant.';
+  if (it.enchKey && it.enchKey !== key) return `Only ${AFFIXES[it.enchKey].name || it.enchKey} can be enchanted on this item.`;
+  const n = it.enchants || 0, err = pay(p, CRAFT.enchant(n)); if (err) return err;
+  const keys = ENCHANT_KEYS(it.slot).filter((k) => k === key || !(k in it.affixes));
+  const opts = [{ k: key, v: it.affixes[key] }]; // keeping the current roll is always an option
+  while (opts.length < 3) { const k = keys[Math.floor(Math.random() * keys.length)]; opts.push({ k, v: AFFIXES[k].roll(rng, it.level) }); }
+  p.enchant = { id: it.id, src, ref, key, opts };
+  it.enchants = n + 1; it.enchKey = key; p.dirty = true;
+  return { opts: opts.map((o) => ({ k: o.k, v: o.v, text: AFFIXES[o.k].fmt(o.v) })) };
+}
+export function enchantPick(p, idx) {
+  const E = p.enchant; if (!E) return 'Nothing to enchant.';
+  const it = itemRef(p, E.src, E.ref); if (!it || it.id !== E.id) { p.enchant = null; return 'The item moved.'; }
+  const o = E.opts[idx | 0]; if (!o) return 'Pick one of the options.';
+  delete it.affixes[E.key]; it.affixes[o.k] = o.v; it.enchKey = o.k;
+  it.power = itemPower(it); p.enchant = null; p.dirty = true; return null;
+}
+export function transmute(p, src, ref, set, slot) {
+  const it = itemRef(p, src, ref); if (!it || !it.set) return 'Pick a set item.';
+  if (!setsFor(p.cls).includes(set) || !(slot in SLOT_I)) return 'Choose one of your class sets and a slot.';
+  if (src === 'eq') return 'Unequip the item first.';
+  const err = pay(p, CRAFT.transmute); if (err) return err;
+  const S = SETS[set];
+  const nu = rollItem(p, it.level, { rarity: 3, slot, types: CLASSES[p.cls].weapons.filter((t) => canWield(p.cls, t)) });
+  nu.set = set; nu.name = `${S.name.replace(/^(The )/, '')} ${S.pieces[SLOT_I[slot]]}`; nu.power = itemPower(nu) + 25;
+  p.char.bag[ref | 0] = nu; p.dirty = true; return null;
+}
