@@ -1,9 +1,5 @@
 // Emberfall client entry: renderer, post-processing, zones, networking glue, cinematics, music, game loop.
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { G } from './state.js';
 import { Input } from './input.js';
 import { sfx } from './audio.js';
@@ -46,6 +42,7 @@ import { DarkZone } from './zones/dark.js';
 import { RegionZone } from './zones/region.js';
 import { setupTouch } from './touch.js';
 import { REGIONS, QUESTS, EVENTS, ACT1_END } from '../shared/regions.js';
+import { applySnapshot } from '../shared/snapshot.js';
 import { STRUCTURES, TOWN } from '../shared/world.js';
 import { RARITIES, GEMS, gemName, parseGem } from '../shared/items.js';
 const RARITY_BASE = RARITIES.map((r) => r.color);
@@ -57,17 +54,35 @@ import { RIFT_MODS, RIFT_TIME } from '../shared/rifts.js';
 // ---------- renderer ----------
 const settings = loadSettings();
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+// WebGPU path: opt-in in Settings. The page's import map already points "three" at the WebGPU build.
+let gpu = null;
+if (window.EMBERFALL_GPU) { try { gpu = await import('./gpu.js'); } catch (e) { console.warn('WebGPU path unavailable, using WebGL', e); } }
+G.gpu = gpu;
+let renderer;
+if (gpu) { try { renderer = new gpu.THREE.WebGPURenderer({ canvas, antialias: true, powerPreference: 'high-performance', forceWebGL: /[?&]gpu=gl/.test(location.search) }); /* ?gpu=gl: the same node renderer on its WebGL2 backend, for debugging */ await renderer.init(); } catch (e) { console.warn('WebGPU init failed', e); renderer = null; G.gpu = gpu = null; } }
+renderer ||= new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+G.backend = gpu ? (renderer.backend?.isWebGPUBackend ? 'WebGPU' : 'WebGPU renderer (WebGL2 backend)') : 'WebGL';
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.info.autoReset = false; // the composer renders several passes; count the whole frame
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 900);
-const composer = new EffectComposer(renderer);
-const renderPass = new RenderPass(new THREE.Scene(), camera);
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.5, 0.85);
-composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new OutputPass());
+let composer, renderPass, bloom;
+if (gpu) { // TSL post-processing behind the same small interface the WebGL composer offers
+  const post = gpu.makePost(renderer, new THREE.Scene(), camera);
+  composer = { render: () => post.render(), setPixelRatio() {}, setSize() {} };
+  renderPass = { set scene(s) { post.setScene(s); } };
+  bloom = post.bloom;
+  fx.useGpu(gpu);
+} else {
+  // WebGL post stack, loaded on demand (these add-ons need the WebGL build of three)
+  const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }] = await Promise.all(['EffectComposer', 'RenderPass', 'UnrealBloomPass', 'OutputPass'].map((n) => import(`three/addons/postprocessing/${n}.js`)));
+  composer = new EffectComposer(renderer);
+  renderPass = new RenderPass(new THREE.Scene(), camera);
+  bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.5, 0.85);
+  composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new OutputPass());
+}
 
 let dynScale = 1;
 function resize() {
@@ -76,7 +91,7 @@ function resize() {
   composer.setPixelRatio(renderer.getPixelRatio());
   composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  fx.p.mat.uniforms.scale.value = (innerHeight * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  if (!gpu) fx.p.mat.uniforms.scale.value = (innerHeight * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
 }
 addEventListener('resize', resize);
 
@@ -317,7 +332,10 @@ net.on('players', (m) => {
   for (const id of G.party.keys()) if (!seen.has(id)) G.party.delete(id);
 });
 net.on('left', (m) => { G.party.delete(m.id); const v = G.remotes.get(m.id); if (v) { v.dispose(); G.remotes.delete(m.id); } });
-net.on('ents', (m) => {
+const snapState = {};
+net.on('entsD', (m) => { if (m.zone === G.zoneKey && G.zone) onEnts(applySnapshot(snapState, m)); });
+net.on('ents', (m) => { if (m.zone === G.zoneKey && G.zone) onEnts(applySnapshot(snapState, m)); });
+function onEnts(m) {
   if (m.zone !== G.zoneKey || !G.zone) return;
   const ids = new Set();
   for (const a of m.list) {
@@ -330,7 +348,7 @@ net.on('ents', (m) => {
   const aids = new Set();
   for (const a of m.allies || []) { aids.add(a[0]); const v = G.allies.get(a[0]); if (v) v.apply(a); else G.allies.set(a[0], new AllyView(a)); }
   for (const [id, v] of G.allies) if (!aids.has(id)) { v.dispose(); G.allies.delete(id); }
-});
+}
 // ---- Act II: companion, Storm Herald, story cutscenes ----
 const allyPos = (id) => G.allies.get(id)?.pos.clone();
 net.on('allyDown', (m) => { const v = G.allies.get(m.id); ui.toast('Scout Ilsa is down!', '#ff9a7a', 'Stand next to her to revive'); if (v) fx.emit({ pos: v.pos.clone().setY(v.pos.y + 1), count: 30, speed: 3, color: '#ff8a6a', color2: '#400000', size: 0.3, life: 0.6 }); });
@@ -483,6 +501,19 @@ net.on('strafe', (m) => {
     if (k < m.delay + m.dur + 1) requestAnimationFrame(tick); else { rect.parent?.remove(rect); rect.geometry.dispose(); rect.material.dispose(); }
   };
   tick();
+});
+// client-side prediction + reconciliation: the hero moves instantly; if the server clamps a move it sends the
+// corrected position for that state's sequence number, and we shift the hero (and later history) by the error.
+let moveSeq = 0, corrections = 0; const moveHist = [];
+net.on('correct', (m) => {
+  if (!player) return;
+  const i = moveHist.findIndex((h) => h.seq === m.seq);
+  const base = i >= 0 ? moveHist[i] : { x: player.pos.x, z: player.pos.z };
+  const dx = m.x - base.x, dz = m.z - base.z;
+  player.pos.x += dx; player.pos.z += dz; G.zone.collide(player.pos, 0.45); player.vel.multiplyScalar(0.3);
+  for (const h of moveHist) if (h.seq > m.seq) { h.x += dx; h.z += dz; }
+  if (i >= 0) moveHist.splice(0, i + 1);
+  corrections++;
 });
 net.on('teleport', (m) => { if (!player) return; ui.fade(true); setTimeout(() => { player.teleport(m.x, m.z, G.zone); camRig.snap(player); ui.fade(false); }, 300); });
 net.on('arenaShift', (m) => { ui.bigBanner('THE HOLLOW KING SHIFTS THE WORLD', `Phase ${m.phase} — a new arena`, 3000); sfx.portal(); sfx.roar(); });
@@ -661,7 +692,7 @@ function laneThreat() {
 let sendT = 0, last = performance.now(), musicT = 0, ftEma = 16, dynT = 0, perfOn = false, perfT = 0, netIn = 0;
 const perfEl = document.getElementById('perf');
 addEventListener('keydown', (e) => { if (e.code === 'F3') { e.preventDefault(); perfOn = !perfOn; perfEl.classList.toggle('hidden', !perfOn); } });
-net.on('ents', () => netIn++); net.on('players', () => netIn++);
+net.on('ents', () => netIn++); net.on('entsD', () => netIn++); net.on('players', () => netIn++);
 function frame(now) {
   requestAnimationFrame(frame);
   const rawDt = (now - last) / 1000;
@@ -677,7 +708,7 @@ function frame(now) {
   }
   if (perfOn && (perfT -= realDt) <= 0) {
     perfT = 0.5; const ri = renderer.info;
-    perfEl.textContent = `FPS ${Math.round(1000 / ftEma)}  ${ftEma.toFixed(1)} ms\nres ${(renderer.getPixelRatio()).toFixed(2)}x${settings.dynres ? ' (dyn ' + dynScale.toFixed(2) + ')' : ''}  ${settings.quality}\ndraw calls ${ri.render.calls}  tris ${(ri.render.triangles / 1000).toFixed(0)}k\ngeo ${ri.memory.geometries}  tex ${ri.memory.textures}\nenemies ${G.enemies.size}  players ${G.remotes.size + 1}\nnet msgs/s ${netIn * 2}  zone ${G.zoneKey}`;
+    perfEl.textContent = `FPS ${Math.round(1000 / ftEma)}  ${ftEma.toFixed(1)} ms\nres ${(renderer.getPixelRatio()).toFixed(2)}x${settings.dynres ? ' (dyn ' + dynScale.toFixed(2) + ')' : ''}  ${settings.quality}\n${G.backend}\ndraw calls ${ri.render.calls ?? ri.render.drawCalls}  tris ${(ri.render.triangles / 1000).toFixed(0)}k\ngeo ${ri.memory.geometries}  tex ${ri.memory.textures}\nenemies ${G.enemies.size}  players ${G.remotes.size + 1}\nnet msgs/s ${netIn * 2}  zone ${G.zoneKey}\nmove corrections ${corrections}`;
     netIn = 0;
   }
   let dt = realDt;
@@ -723,7 +754,8 @@ function frame(now) {
     sendT -= realDt;
     if (sendT <= 0) {
       sendT = 1 / 15;
-      net.send({ t: 'state', mount: !!player.mounted, x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), ry: +(player.ry + (player.kit.whirlT > 0 ? 0 : 0)).toFixed(2), anim: player.anim, hp: Math.ceil(player.hp), maxHp: player.stats.maxHp, dead: player.dead, gear: gearOf(player.char), style: player.rank, spirit: player.kit.spirits.length, emote: player.emote, block: player.blocking });
+      const seq = ++moveSeq; moveHist.push({ seq, x: player.pos.x, z: player.pos.z }); if (moveHist.length > 64) moveHist.shift();
+      net.send({ t: 'state', seq, mount: !!player.mounted, x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), ry: +(player.ry + (player.kit.whirlT > 0 ? 0 : 0)).toFixed(2), anim: player.anim, hp: Math.ceil(player.hp), maxHp: player.stats.maxHp, dead: player.dead, gear: gearOf(player.char), style: player.rank, spirit: player.kit.spirits.length, emote: player.emote, block: player.blocking });
     }
     musicT -= realDt;
     if (musicT <= 0) { musicT = 0.5; sfx.music(musicFor()); }

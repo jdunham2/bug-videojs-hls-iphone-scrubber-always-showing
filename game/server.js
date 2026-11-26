@@ -52,7 +52,8 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 32 * 1024 });
-game = createGame({ db, makeToken: () => crypto.randomBytes(16).toString('hex'), dev: !!process.env.EMBERFALL_DEV });
+const crowd = process.env.EMBERFALL_WORKERS === '1' ? new (await import('./server/crowd-node.js')).CrowdWorker(80) : null;
+game = createGame({ db, makeToken: () => crypto.randomBytes(16).toString('hex'), dev: !!process.env.EMBERFALL_DEV, crowd });
 wss.on('connection', (ws) => game.attach(ws));
 const shutdown = () => { console.log('Shutting down…'); for (const c of wss.clients) c.close(1001, 'server restarting'); db.flush(); setTimeout(() => process.exit(0), 300); };
 process.removeAllListeners('SIGTERM'); process.removeAllListeners('SIGINT');

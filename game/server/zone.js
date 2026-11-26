@@ -8,6 +8,7 @@ import { RIFT_MOD_KEYS, riftEnemyLevel, riftHpMul, RIFT_TIME } from '../public/s
 import { REGIONS, EVENTS, QUESTS, ACT1_END } from '../public/shared/regions.js';
 const HERALD_Q = QUESTS.findIndex((q) => q.kind === 'herald');
 import { WEATHER_TABLE, weatherFx, hourAt, isNight } from '../public/shared/life.js';
+import { separate, pack } from './crowd.js';
 
 const rng = new RNG(Date.now() & 0xffffffff);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -95,8 +96,15 @@ export class Zone {
   }
 
   tick(dt) {
-    const alive = this.alive();
-    for (const e of [...this.enemies.values()]) if (this.enemies.has(e.id)) this.tickEnemy(e, dt, alive);
+    const alive = this.alive(), list = [...this.enemies.values()];
+    // crowd separation: spatial hash on this thread, or a worker thread for big waves (Node, EMBERFALL_WORKERS=1)
+    this.push = null;
+    if (list.length > 1) {
+      const cw = this.room.crowd;
+      if (cw && list.length >= cw.threshold) this.push = cw.step(this.key, list);
+      else { this._pb = pack(list, this._pb); this._po = separate(this._pb, list.length, this._po && this._po.length >= list.length * 2 ? this._po : undefined); this.push = new Map(); for (let i = 0; i < list.length; i++) this.push.set(list[i].id, [this._po[i * 2], this._po[i * 2 + 1]]); }
+    }
+    for (const e of list) if (this.enemies.has(e.id)) this.tickEnemy(e, dt, alive);
     this.tickProjectiles(dt, alive);
     if (this.allies.size) this.tickAllies(dt);
     for (const h of [...this.hazards.values()]) {
@@ -207,11 +215,7 @@ export class Zone {
       e.windT = def.windup / (e.enraged ? 1.2 : 1); e.cd = (def.cd / enr) * (e.cdMul || 1); e.atk = target;
       this.broadcast({ t: 'eatk', id: e.id });
     }
-    for (const o of this.enemies.values()) {
-      if (o === e) continue;
-      const ox = e.x - o.x, oz = e.z - o.z, od = Math.hypot(ox, oz), min = e.radius + o.radius;
-      if (od < min && od > 0.001) { const push = (min - od) * 0.5; e.x += (ox / od) * push; e.z += (oz / od) * push; }
-    }
+    const pp = this.push?.get(e.id); if (pp) { e.x += pp[0]; e.z += pp[1]; }
     this.collide(e, e.radius);
     if (defense) this.room.defense.collideStructs(e);
     e.state = moving ? 1 : 0;
@@ -337,7 +341,7 @@ export class Zone {
     if (this.phaseCheck(e, [0.66, 0.33])) {
       const A = DARK.arenas[(e.phase - 1) % DARK.arenas.length];
       e.x = A.x; e.z = A.z - 4;
-      for (const p of this.players()) send(p.ws, { t: 'teleport', x: A.x + rng.range(-2, 2), z: A.z + 5 + rng.range(-1, 1) });
+      for (const p of this.players()) { p.mvGrace = Date.now() + 2500; send(p.ws, { t: 'teleport', x: A.x + rng.range(-2, 2), z: A.z + 5 + rng.range(-1, 1) }); }
       for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; this.addHazard('fire', A.x + Math.cos(a) * 15, A.z + Math.sin(a) * 15, 2.6, 18 * levelMul(this.lvl).dmg, 60, 1.5); }
       this.broadcast({ t: 'arenaShift', x: A.x, z: A.z, phase: e.phase });
       this.summon(e, 'wraith', e.phase === 3 ? 4 : 3);
@@ -774,6 +778,32 @@ export class Zone {
   }
 
   riftState() { const r = this.rift; return r && { k: this.k, mods: r.mods, p: Math.min(1, r.progress / r.need), elapsed: (Date.now() - r.start) / 1000, limit: RIFT_TIME, guardian: r.guardian, done: r.done }; }
+
+  // Delta-compressed snapshot vs the previous broadcast: new rows in full, moved rows as [id,x,z,ry],
+  // rows whose vitals changed as [id,x,z,ry,hp,flags,maxHp], removed ids. Values are absolute, so a delta
+  // also applies cleanly on top of the newer full snapshot a joining player receives. Keyframe every 40.
+  deltaSnapshot() {
+    const full = this.snapshot();
+    this.snapN = (this.snapN || 0) + 1;
+    const prev = this.lastSnap, cur = new Map(full.list.map((r) => [r[0], r]));
+    this.lastSnap = cur;
+    if (!prev || this.snapN % 40 === 0) return full;
+    const add = [], upd = [], del = [];
+    for (const [id, r] of cur) {
+      const p = prev.get(id);
+      if (!p) { add.push(r); continue; }
+      const vit = p[5] !== r[5] || p[8] !== r[8] || p[6] !== r[6];
+      const mov = Math.abs(p[2] - r[2]) > 0.02 || Math.abs(p[3] - r[3]) > 0.02 || Math.abs(p[4] - r[4]) > 0.05;
+      const qx = Math.round(r[2] * 20), qz = Math.round(r[3] * 20), qr = Math.round(r[4] * 40); // 5 cm / 1.4° integers
+      if (vit) upd.push([id, qx, qz, qr, r[5], r[8], r[6]]);
+      else if (mov) upd.push([id, qx, qz, qr]);
+      else r[2] = p[2], r[3] = p[3], r[4] = p[4]; // keep the base the client has so slow drift is still sent later
+    }
+    for (const id of prev.keys()) if (!cur.has(id)) del.push(id);
+    const out = { t: 'entsD', zone: this.key, add, upd, del };
+    if (full.allies) out.allies = full.allies;
+    return out;
+  }
 
   snapshot() {
     const list = [];

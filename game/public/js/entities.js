@@ -286,6 +286,7 @@ export class AllyView {
 
 const beamMats = {};
 function beamMat(color) {
+  if (G.gpu) return beamMats[color] ||= G.gpu.beamMaterial(color);
   return beamMats[color] ||= new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     uniforms: { color: { value: new THREE.Color(color) }, time: { value: 0 } },

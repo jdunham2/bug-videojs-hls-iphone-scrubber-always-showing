@@ -7,8 +7,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
-  <script type="importmap">
-    { "imports": { "three": "/lib/three/build/three.module.js", "three/addons/": "/lib/three/examples/jsm/" } }
+  <script>
+    // Picks the Three.js build before any module loads: the WebGPU build when the (experimental) WebGPU renderer is enabled.
+    (function () {
+      var s = {}; try { s = JSON.parse(localStorage.getItem('emberfall_settings_v2')) || {}; } catch (e) {}
+      var base = '/lib/three', gpu = s.renderer === 'webgpu' && !!navigator.gpu, wg = base + '/build/three.webgpu.js';
+      window.EMBERFALL_GPU = gpu;
+      var map = { imports: { three: gpu ? wg : base + '/build/three.module.js', 'three/webgpu': wg, 'three/tsl': wg, 'three/addons/': base + '/examples/jsm/' } };
+      var el = document.createElement('script'); el.type = 'importmap'; el.textContent = JSON.stringify(map); document.currentScript.after(el);
+    })();
   </script>
 </head>
 <body>
@@ -178,6 +185,7 @@
     <div class="stabs"><button class="stab on" data-p="sp-gfx">Graphics</button><button class="stab" data-p="sp-audio">Audio</button><button class="stab" data-p="sp-ctrl">Controls</button></div>
     <div class="spage" id="sp-gfx">
       <div class="srow"><span>Graphics quality</span><select id="setQuality"></select></div>
+      <div class="srow"><span>Renderer <small class="muted">(reloads)</small></span><select id="setRenderer"><option value="webgl">WebGL (recommended)</option><option value="webgpu">WebGPU (experimental)</option></select></div>
       <div class="muted small">Low: no shadows/bloom, lower resolution, sparse grass. Ultra: 4K shadow maps, supersampling.</div>
       <div class="srow"><span>Dynamic resolution (hold 60 fps)</span><input type="checkbox" id="setDynres" /></div>
       <div class="srow"><span>Controller rumble</span><input type="checkbox" id="setRumble" /></div>

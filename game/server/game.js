@@ -25,10 +25,11 @@ function damageCap(p) {
   return p.cap;
 }
 
-export function createGame({ db, makeToken, dev = false }) {
+export function createGame({ db, makeToken, dev = false, crowd = null, moveCheck = !dev }) {
 const rooms = new Map();
 const online = new Map(); // token -> player
 const DT = 0.05;
+const MOVE_SPEED = 26, BURST_MAX = 18, BURST_REFILL = 8; // m/s, m, m/s
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const r2 = (v) => Math.round(v * 100) / 100;
 const CHESTS = new Map(townLayout().chests.map((c) => [c.id, c]));
@@ -46,7 +47,7 @@ function makeCode() {
 class Room {
   constructor(code) {
     this.code = code; this.players = new Map(); this.level = 1; this.nextId = 1; this.zones = new Map();
-    this.currentDungeon = null; this.ready = null; this.tickN = 0; this.clock0 = Date.now();
+    this.currentDungeon = null; this.ready = null; this.tickN = 0; this.clock0 = Date.now(); this.crowd = crowd;
     this.zones.set('town', new Zone(this, 'town', 'town', 1));
     this.zones.set('dark', new Zone(this, 'dark', 'dark', 1));
     this.defense = new Defense(this);
@@ -135,6 +136,7 @@ class Room {
   }
   joinZone(p, zone) {
     if (p.trade) this.closeTrade(p.trade, 'Trade cancelled.');
+    p.mvGrace = Date.now() + 3000; // zone travel teleports the hero
     for (const z of this.zones.values()) z.removeAllies(p.id);
     if (zone.type !== 'town' && (p.char.quest?.i || 0) > ACT1_END && p.companion !== false) zone.addAlly(p);
     p.zone = zone.key;
@@ -196,7 +198,7 @@ class Room {
     if (this.tickN % 3 === 0) {
       const plist = [...this.players.values()].map((p) => ({ id: p.id, name: p.prof.name, color: p.prof.color, cls: p.cls, zone: p.zone, x: r2(p.x), y: r2(p.y), z: r2(p.z), ry: r2(p.ry), anim: p.anim, hp: p.hp, maxHp: p.maxHp, gear: p.gear, level: p.char.level, dead: p.dead, spirit: p.spirit, emote: p.emote, block: p.block, mount: p.mount, cos: p.prof.cos, gtag: social.guildOf(p.prof)?.tag }));
       this.broadcast({ t: 'players', list: plist });
-      for (const z of this.zones.values()) if (z.players().length) z.broadcast(z.snapshot());
+      for (const z of this.zones.values()) if (z.players().length) z.broadcast(this.fullSnapshots ? z.snapshot() : z.deltaSnapshot());
     }
     if (this.tickN % 10 === 0 && this.defense.state.phase !== 'day') this.town.broadcast(this.defense.view());
   }
@@ -244,11 +246,33 @@ function attach(ws) {
     const zone = room.zones.get(p.zone);
     if (SOCIAL_T.has(m.t)) { const r = social.handle(p, m, { atStash: p.zone === 'town' && near(p, TOWN.stash, 6), atBoard: p.zone === 'town' && near(p, TOWN.board, 7), level: room.level }); if (typeof r === 'string') notice(r); return; }
     switch (m.t) {
-      case 'state':
-        p.x = +m.x || 0; p.y = +m.y || 0; p.z = +m.z || 0; p.ry = +m.ry || 0; p.anim = m.anim | 0;
+      case 'state': {
+        // server-side movement validation: speed budget + a refilling burst allowance for rolls, blinks and knockback.
+        // Over-budget moves are clamped and the client is told to reconcile ('correct').
+        let nx = +m.x || 0, nz = +m.z || 0;
+        const now = Date.now();
+        if (moveCheck && !p.dead && !m.dead && now > (p.mvGrace || 0) && p.mvT) {
+          const dt = Math.min(1, (now - p.mvT) / 1000), d = Math.hypot(nx - p.x, nz - p.z), allow = MOVE_SPEED * dt + 0.6;
+          p.burst = Math.min(BURST_MAX, (p.burst ?? BURST_MAX) + BURST_REFILL * dt);
+          if (d > allow) {
+            const extra = d - allow;
+            if (extra <= p.burst) p.burst -= extra;
+            else {
+              const k = (allow + p.burst) / d; p.burst = 0;
+              nx = p.x + (nx - p.x) * k; nz = p.z + (nz - p.z) * k;
+              p.corrections = (p.corrections || 0) + 1;
+              if (p.corrections % 10 === 1) logCheat({ room: room.code, name: p.prof.name, cls: p.cls, level: p.char.level, dmg: Math.round(d), cap: Math.round(allow + extra), capSec: 0, total: p.corrections, kind: 'move' });
+              send(ws, { t: 'correct', seq: m.seq | 0, x: r2(nx), z: r2(nz) });
+            }
+          }
+        }
+        if (p.dead && !m.dead) p.mvGrace = now + 1500; // respawn teleports
+        p.mvT = now;
+        p.x = nx; p.y = +m.y || 0; p.z = nz; p.ry = +m.ry || 0; p.anim = m.anim | 0;
         p.hp = m.hp | 0; p.maxHp = m.maxHp | 0; p.dead = !!m.dead; p.gear = m.gear || p.gear;
         p.style = Math.max(0, Math.min(4, m.style | 0)); p.spirit = m.spirit | 0; p.emote = m.emote || null; p.block = !!m.block; p.mount = !!m.mount;
         break;
+      }
       case 'zone': if (m.to === 'dungeon') room.requestDungeon(p); else room.enterZone(p, m.to); break;
       case 'rift': {
         const k = Math.max(1, m.k | 0);

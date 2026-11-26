@@ -78,6 +78,7 @@ class Particles {
       this.alpha[i] = Math.min(1, (1 - k) * 2.2) * Math.min(1, k * 12 + 0.2);
       for (let c = 0; c < 3; c++) this.col[i * 3 + c] = this.c0[i * 3 + c] + (this.c1[i * 3 + c] - this.c0[i * 3 + c]) * k;
     }
+    if (this.gpuAttrs) { for (const a of this.gpuAttrs) a.needsUpdate = true; return; }
     const g = this.points.geometry;
     g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true; g.attributes.size.needsUpdate = true; g.attributes.alpha.needsUpdate = true;
   }
@@ -168,6 +169,8 @@ export class FX {
     }
   }
 
+  // WebGPU: swap the point sprites for instanced node-material sprites that share the same buffers
+  useGpu(gpu) { const mesh = gpu.particleMesh(this.p, this.p.pos.length / 3); this.root.remove(this.p.points); this.p.points = mesh; this.p.gpuAttrs = mesh.userData.attrs; this.root.add(mesh); }
   clear() {
     for (const it of this.items) { it.obj.parent?.remove(it.obj); it.dispose?.(); }
     this.items = [];

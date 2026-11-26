@@ -27,7 +27,7 @@ let html = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
 html = html.replace(/<!doctype html>\s*/i, '').replace(/<\/?html[^>]*>\s*/g, '').replace(/<\/?head>\s*/g, '').replace(/<\/?body>\s*/g, '')
   .replace(/<meta charset="utf-8" \/>\s*/, '').replace(/<meta name="viewport"[^>]*>\s*/, '<meta name="claude:viewport-fit-sides" content="cover" />\n  ')
   .replace('href="/style.css"', 'href="style.css"')
-  .replace('"three": "/lib/three/build/three.module.js", "three/addons/": "/lib/three/examples/jsm/"', `"three": "${THREE}/build/three.module.js", "three/addons/": "${THREE}/examples/jsm/"`)
+  .replace("var base = '/lib/three'", `var base = '${THREE}'`)
   .replace('<script type="module" src="/js/main.js"></script>', '<script>window.EMBERFALL_OFFLINE = true;</script>\n  <script type="module" src="js/main.js"></script>');
 fs.writeFileSync(path.join(out, 'index.html'), html);
 const files = [];

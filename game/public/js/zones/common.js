@@ -1,8 +1,10 @@
 // Shared zone building blocks: sky dome, portals, procedural textures, geometry batching, labels.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { G } from '../state.js';
 
 export function makeSky(o) {
+  if (G.gpu) { const m = new THREE.Mesh(new THREE.SphereGeometry(450, 32, 16), G.gpu.skyMaterial(o)); m.frustumCulled = false; m.renderOrder = -1; return m; }
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: {
@@ -28,6 +30,7 @@ export function makeSky(o) {
 }
 
 export function portalMaterial(c1, c2) {
+  if (G.gpu) return G.gpu.portalMaterial(c1, c2);
   return new THREE.ShaderMaterial({
     transparent: true, side: THREE.DoubleSide, depthWrite: false,
     uniforms: { time: { value: 0 }, c1: { value: new THREE.Color(c1) }, c2: { value: new THREE.Color(c2) } },
@@ -225,6 +228,7 @@ export function heightTerrain(size, segs, heightFn, colorFn) {
 }
 
 export function envFromSky(renderer, sky) {
+  if (G.gpu) return null; // node renderer: skip the prefiltered environment map (hemisphere + sun light the scene)
   const pm = new THREE.PMREMGenerator(renderer);
   const sc = new THREE.Scene();
   const s = sky.clone(); s.material = sky.material; sc.add(s);

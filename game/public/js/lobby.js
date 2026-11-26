@@ -16,7 +16,8 @@ export class Lobby {
     this.color = lsGet('emberfall_color') || COLORS[0];
     this.levels = {};
     const canvas = $('preview');
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    const R = THREE.WebGLRenderer || THREE.WebGPURenderer; // the WebGPU build (experimental renderer) has no WebGLRenderer
+    this.renderer = new R({ canvas, antialias: true, alpha: true, forceWebGL: true }); this.renderer.init?.();
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.setSize(canvas.clientWidth || 320, canvas.clientHeight || 360, false);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;

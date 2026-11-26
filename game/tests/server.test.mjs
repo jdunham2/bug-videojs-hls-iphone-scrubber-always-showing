@@ -277,3 +277,31 @@ test('friends, whispers, guilds with a shared stash, bounties, seasons and the a
   assert.equal(ad.anticheat[0].name, 'Ash');
   assert.ok(ad.rooms.some((r) => r.players.some((pl) => pl.guild === 'EW')));
 });
+
+test('delta snapshots reproduce the full state; speed hacks are clamped and corrected', { timeout: 30000 }, async () => {
+  // deltas: the client's reconstructed entity list matches the server's full snapshot
+  const game = G(), c = client(game);
+  await wait(20);
+  c.send({ t: 'zone', to: 'marsh' }); await wait(100);
+  const zone = game.rooms.get(c.room).zones.get('marsh');
+  c.send({ t: 'state', x: 0, y: 0, z: 0, hp: 100, maxHp: 100 });
+  await wait(1500); // ~10 broadcasts, mostly deltas
+  assert.ok(c.count('entsD') > 3, 'deltas are sent');
+  const full = zone.snapshot().list, mine = new Map(c.ents.list.map((r) => [r[0], r]));
+  assert.equal(mine.size, full.length);
+  for (const r of full) { const m = mine.get(r[0]); assert.ok(m, 'entity present'); assert.ok(Math.abs(m[2] - r[2]) < 0.6 && Math.abs(m[3] - r[3]) < 0.6, 'position within one tick'); assert.equal(m[6], r[6]); }
+  // movement validation (on in production): a 60 m jump in 0.1 s is clamped and the client is told
+  const { makeGame } = await import('./harness.mjs');
+  const g2 = makeGame({ moveCheck: true }); games.push(g2);
+  const d = client(g2); await wait(3200); // after the zone-entry grace window
+  const p = [...g2.rooms.get(d.room).players.values()][0];
+  d.send({ t: 'state', seq: 1, x: 0, y: 0, z: 13, hp: 100, maxHp: 100 }); await wait(100);
+  d.send({ t: 'state', seq: 2, x: 2, y: 0, z: 13, hp: 100, maxHp: 100 }); await wait(100); // normal run
+  assert.equal(d.count('correct'), 0);
+  d.send({ t: 'state', seq: 3, x: 6, y: 0, z: 13, hp: 100, maxHp: 100 }); await wait(100); // a roll: uses burst
+  assert.equal(d.count('correct'), 0, 'rolls and blinks fit the burst allowance');
+  d.send({ t: 'state', seq: 4, x: 66, y: 0, z: 13, hp: 100, maxHp: 100 }); await wait(50);
+  assert.equal(d.last.correct.seq, 4);
+  assert.ok(p.x < 30, `clamped to ${p.x}`);
+  assert.equal(g2.admin().anticheat[0].kind, 'move');
+});
