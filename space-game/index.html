@@ -14276,6 +14276,14 @@ const GX115 = { t: 0, g: 0 };
   if (GX115.t <= 0) { GX115.t = 0.09; const p = S.pos.clone().add(new V3(rand(-0.15, 0.15), 0.55, rand(-0.15, 0.15))); gx7Puff(p, 1, 0.55, 0xd8d8e0); }
   const gy = Math.max(hgt(S.pos.x, S.pos.z), S.water && S.water.visible ? S.water.position.y : -999), h = S.pos.y - gy; if (h < 5 && GX115.g <= 0) { GX115.g = 0.14; const col = (typeof gx26Sandy === 'function' && gx26Sandy()) ? 0xfff0d8 : (typeof atCold === 'function' && atCold()) ? 0xffffff : W.hot ? 0x8a7a70 : 0xe8e4d4; for (let i = 0; i < 3; i++) { const a = rand(0, TAU), r = rand(0.6, 1.8); gx7Puff(new V3(S.pos.x + Math.cos(a) * r, gy + 0.2, S.pos.z + Math.sin(a) * r), 1, 1.1 - h * 0.15, col); } } }; }
 
+/* ============ feel round 119: cinematic camera ease when undocking, leaving a planet, and lifting off ============ */
+const GX119 = { t: 0, d: 1.8, from: new V3(), q: new THREE.Quaternion() };
+function gx119Start(side) { if (!GFX.hd) return; const r = SH().cam || 1; const right = new V3(1, 0, 0).applyQuaternion(player.quaternion), fwd = new V3(0, 0, -1).applyQuaternion(player.quaternion); GX119.from.copy(player.position).addScaledVector(right, side * 14 * r).addScaledVector(fwd, 10 * r).add(new V3(0, 3 * r, 0)); GX119.t = GX119.d; }
+{ const _ss119 = setState; setState = function (st) { const prev = G.state; _ss119.apply(this, arguments); if (prev === 'docked' && st === 'fly') gx119Start(Math.random() < 0.5 ? -1 : 1); }; }
+{ const _ets = exitToSpace; exitToSpace = function () { _ets(); gx119Start(1); }; }
+{ const _uc119 = updateCamera; updateCamera = function (dt) { _uc119(dt); if (GX119.t <= 0) return; if (G.state !== 'fly' || !GFX.hd) { GX119.t = 0; return; } GX119.t -= dt; const k = 1 - Math.max(0, GX119.t) / GX119.d, e = k * k * (3 - 2 * k); camera.position.lerpVectors(GX119.from, camPos, e); const q = camera.quaternion.clone(); camera.lookAt(player.position); GX119.q.copy(camera.quaternion); camera.quaternion.copy(GX119.q).slerp(q, e); }; }
+// lift-off: camera cranes up as the ship rises, with a rumble at ignition
+{ const _ut = updateTakeoff; updateTakeoff = function (dt) { _ut(dt); if (!GFX.hd) return; const t = G.seqT, c = t < 3 ? t / 3 : 1, ce = c * c * (3 - 2 * c); camera.position.y += ce * 10; camera.position.x -= ce * 6; camera.position.z += ce * 5; const rum = Math.max(0, 1 - Math.abs(t - 1.1) / 0.9) * 0.18; if (rum > 0) camera.position.add(new V3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).multiplyScalar(rum)); camera.lookAt(S.ship.position); }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
