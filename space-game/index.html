@@ -828,6 +828,13 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 #gx127.gxadm-in .gx127r { color: #ffd25a; }
 @media (max-width: 700px) { #gxAbil, #gxAbil2 { display: none !important; } #arHud { top: 150px; left: 8px; right: auto; bottom: auto; min-width: 150px; max-width: 46vw; font-size: 11px; padding: 6px 9px; } #arHud .t { white-space: normal; } #arHud .pw { display: none; } }
 #tAbil.gxrdy, #tAbil2.gxrdy { box-shadow: 0 0 0 2px #ffd25a, 0 0 14px rgba(255,210,90,.5); }
+#gspList { position: fixed; left: 16px; bottom: 120px; z-index: 12; min-width: 170px; padding: 8px 12px; border-radius: 12px; background: rgba(10,14,28,.62); border: 1px solid rgba(111,216,255,.35); color: #e6ecff; font-size: 13px; pointer-events: none; }
+#gspList[hidden] { display: none; }
+#gspList .t { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8fe4ff; margin-bottom: 4px; }
+#gspList div:not(.t):not(.h) { display: flex; justify-content: space-between; gap: 12px; padding: 1px 0; }
+#gspList span { color: #9aa6c8; font-variant-numeric: tabular-nums; }
+#gspList .h { margin-top: 4px; font-size: 11px; color: #ffd25a; }
+@media (max-width: 700px) { #gspList { bottom: auto; top: 150px; left: 8px; font-size: 12px; min-width: 140px; } #gspList .h { display: none; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -15000,6 +15007,9 @@ GSP.ships = new Map();
   if (here) for (const [peer, a] of GSP.av) { const F = NET.friends.get(peer); if (!F || !F.p || F.p.st === 'crew' || F.p.crewOf) continue; want.add(peer); const key = gxcKey(F.p); let q = GSP.ships.get(peer); if (!q || q.key !== key || q.g.parent !== surf) { if (q && q.g.parent) q.g.parent.remove(q.g); const sh = gxcShipFor(F.p); let m; try { m = sh.make(); } catch (_) { m = makeFighter(STYLE_PLAYER); } const box = new THREE.Box3().setFromObject(m), sz = box.getSize(new V3()); m.scale.multiplyScalar(13 / Math.max(sz.x, sz.y, sz.z, 0.001)); const g = new THREE.Group(); g.add(m); surf.add(g); q = { g, m, key }; GSP.ships.set(peer, q); }
     const side = slot++ % 2 ? -1 : 1, off = 15 + Math.floor(slot / 2) * 14; const px = PAD.x + Math.cos(SHIP_YAW) * off * side, pz = PAD.z - Math.sin(SHIP_YAW) * off * side; q.g.position.set(px, PAD_H + 1.6 + Math.sin(T * 1.5 + slot) * 0.05, pz); q.g.rotation.y = SHIP_YAW; if (q.m.userData.gxAnim) q.m.userData.gxAnim(T, dt); }
   for (const [peer, q] of GSP.ships) if (!want.has(peer)) { if (q.g.parent) q.g.parent.remove(q.g); GSP.ships.delete(peer); } }; }
+/* ============ friends on planets: a small "friends here" list ============ */
+{ const el = document.createElement('div'); el.id = 'gspList'; el.hidden = true; document.body.appendChild(el);
+  (function gspListLoop() { requestAnimationFrame(gspListLoop); const show = G.state === 'surface' && GSP.av.size > 0 && W !== SHIP_W; el.hidden = !show; if (!show) return; const names = [...GSP.av.keys()].map(peer => { const F = NET.friends.get(peer); const g = F && F.p && F.p.gsp; const d = g ? Math.round(Math.hypot(g[0] - S.pos.x, g[2] - S.pos.z)) : 0; return `<div><b>🧑‍🚀 ${escH((F && F.name) || 'Friend')}</b><span>${d} m</span></div>`; }).join(''); const h = `<div class="t">Friends here</div>${names}<div class="h">Press Z to wave 👋</div>`; if (el._h !== h) { el._h = h; el.innerHTML = h; } })(); }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
