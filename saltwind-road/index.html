@@ -367,7 +367,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
 
 <div id="worldLoad" style="position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:#0d131b;color:#ebe4d3;font:18px 'Pixelify Sans',monospace;letter-spacing:.04em">Shaping the world…</div>
 <script>
-setTimeout(() => {
+setTimeout(async () => {
 'use strict';
 
 /* ================= constants & data ================= */
@@ -1621,7 +1621,7 @@ function islApply() {
 }
 function islRemove() {
   const o = isl; isl = null;
-  for (const [i, t] of o.orig) { map[i] = t; if (S.explored[i]) revealMapPixel(i); else mapCol[i] = 0; }
+  for (const [i, t] of o.orig) { map[i] = t; }
   islRedraw(o.x, o.y);
 }
 function islNearTown() { let best = null, bd = 1e9; for (const k in TOWNS) { const d = Math.hypot(TOWNS[k].x - isl.x, TOWNS[k].y - isl.y); if (d < bd) { bd = d; best = k; } } return best; }
@@ -1810,7 +1810,7 @@ function placeBlock(x, y) {
   if (!inB(x, y) || y >= WORLD_H) return 'You cannot build there.';
   const t = map[idx(x,y)];
   if (t === T.DEEP || t === T.SHAL || t === T.MOUNT || t === T.HOUSE || t === T.LAVA || t === T.BRIDGE || t === T.VOID) return 'You cannot build there.';
-  if (nodeGrid[idx(x,y)] >= 0) return 'Something is already growing there.';
+  if (ngGet(idx(x,y)) >= 0) return 'Something is already growing there.';
   if (placeGood === 'crab_pot' && ![[1,0],[-1,0],[0,1],[0,-1]].some(([a, b]) => { const tt = map[idx(x + a, y + b)]; return tt === T.SHAL || tt === T.DEEP; })) return 'A crab pot must go right next to water.';
   if (ESTATE_CLEAR.has(idx(x,y))) return 'Too close to an estate.';
   if (placedAt(x, y)) return 'Something is already there.';
@@ -2969,7 +2969,13 @@ const inB = (x,y) => x >= 0 && y >= 0 && x < W && y < H;
 const tileAt = (x,y) => inB(x,y) ? map[idx(x,y)] : T.DEEP;
 const houses = [];
 const nodes = [];
-const nodeGrid = new Int32Array(W*H).fill(-1);
+// which node sits on a tile: an open-addressing hash (a world-sized grid would cost 100 MB)
+const NG = {cap: 0, keys: null, vals: null, n: 0};
+function ngInit(cap) { NG.cap = cap; NG.keys = new Int32Array(cap).fill(-1); NG.vals = new Int32Array(cap).fill(-1); NG.n = 0; }
+ngInit(1 << 16);
+function ngSlot(i) { const m = NG.cap - 1; let h = (Math.imul(i, -1640531535) >>> 0) & m; while (NG.keys[h] !== -1 && NG.keys[h] !== i) h = (h + 1) & m; return h; }
+function ngGet(i) { const h = ngSlot(i); return NG.keys[h] === i ? NG.vals[h] : -1; }
+function ngSet(i, v) { let h = ngSlot(i); if (NG.keys[h] !== i) { if (NG.n + 1 > NG.cap*.6) { const ok = NG.keys, ov = NG.vals; ngInit(NG.cap*2); for (let k = 0; k < ok.length; k++) if (ok[k] !== -1 && ov[k] >= 0) ngSet(ok[k], ov[k]); h = ngSlot(i); } NG.keys[h] = i; NG.n++; } NG.vals[h] = v; }
 let spawn = {x:0,y:0};
 
 // fine detail for the land: noise that repeats every 256 tiles, worked out once (the big shapes never repeat, so the repeat doesn't show)
@@ -2978,18 +2984,19 @@ function pvnoise(x, y, s, P) {
   const a = hash2(m(xi), m(yi), s), b = hash2(m(xi + 1), m(yi), s), c = hash2(m(xi), m(yi + 1), s), d = hash2(m(xi + 1), m(yi + 1), s);
   return a + (b - a)*u + (c - a)*v + (a - b - c + d)*u*v;
 }
-const DETAIL = (() => { const e = new Float32Array(65536), m = new Float32Array(65536), b = new Float32Array(65536);
+function makeDetail() { const e = new Float32Array(65536), m = new Float32Array(65536), b = new Float32Array(65536);
   for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const i = y*256 + x;
     e[i] = (pvnoise(x/8, y/8, SEED+201, 32)*.67 + pvnoise(x/4, y/4, SEED+218, 64)*.33 - .5)*.1;
     m[i] = (pvnoise(x/8, y/8, SEED+202, 32)*.67 + pvnoise(x/4, y/4, SEED+219, 64)*.33 - .5)*.12;
     b[i] = (pvnoise(x/16, y/16, SEED+229, 16)*.45 + pvnoise(x/8, y/8, SEED+230, 32)*.35 + pvnoise(x/4, y/4, SEED+231, 64)*.2 - .5)*.5; }
-  return {e, m, b}; })();
-function genTerrain() {
+  return {e, m, b}; }
+const DETAIL = makeDetail();
+function terrainBand(Y0, Y1, out) {
   // the shape of the land is designed at one design tile per WS world tiles: work its fields out on that coarse grid, then blend them up
-  const Wc = W/WS + 1, Hc = WORLD_H/WS + 1, NF = 15, F = new Float32Array(Wc*Hc*NF), coldY = new Float32Array(Wc);
+  const Wc = W/WS + 1, Hc = WORLD_H/WS + 1, NF = 15, cy0 = Math.max(0, Math.floor((Y0 + .5)/WS) - 1), cy1 = Math.min(Hc - 1, Math.ceil((Y1 + .5)/WS) + 1), F = new Float32Array(Wc*(cy1 - cy0 + 1)*NF), coldY = new Float32Array(Wc);
   for (let x = 0; x < Wc; x++) coldY[x] = 34 + (fbm(x/16, 3, SEED+7) - .5) * 26;
-  for (let y = 0; y < Hc; y++) for (let x = 0; x < Wc; x++) {
-    const o = (y*Wc + x)*NF, wx = x*WS;
+  for (let y = cy0; y <= cy1; y++) for (let x = 0; x < Wc; x++) {
+    const o = ((y - cy0)*Wc + x)*NF, wx = x*WS;
     const nx = wx >= RIM_W ? (wx - RIM_W)/(W - RIM_W)*2 - 1 : wx >= FAR_W ? (wx - FAR_W)/(RIM_W - FAR_W)*2 - 1 : wx >= EAST_W ? (wx - EAST_W)/(FAR_W - EAST_W)*2 - 1 : wx >= OLD_W ? (wx - OLD_W)/(EAST_W - OLD_W)*2 - 1 : wx/OLD_W*2 - 1, ny = y*WS/WORLD_H*2 - 1;
     const edge = Math.pow(Math.max(Math.abs(nx), Math.abs(ny)), 3) * .55 + Math.pow(Math.hypot(nx,ny)/1.414, 2) * .35;
     let e = fbm(x/32, y/32, SEED) + .32 - edge;
@@ -3021,10 +3028,10 @@ function genTerrain() {
     const bamboo = bump(x,y,770,82,44,1) + (fbm(x/11, y/11, SEED+43) - .5) * .4;
     F[o] = e; F[o+1] = m; F[o+2] = volc; F[o+3] = gloom; F[o+4] = jungle; F[o+5] = mesa; F[o+6] = moor; F[o+7] = blossom; F[o+8] = savanna; F[o+9] = maple; F[o+10] = ruins; F[o+11] = shroom; F[o+12] = shimmer; F[o+13] = redwood; F[o+14] = bamboo;
   }
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (y >= WORLD_H) { map[idx(x,y)] = T.VOID; continue; }
+  for (let y = Y0; y < Y1; y++) for (let x = 0; x < W; x++) {
+    if (y >= WORLD_H) { out[(y - Y0)*W + x] = T.VOID; continue; }
     const fx = Math.min(Wc - 1.0001, (x + .5)/WS), fy = Math.min(Hc - 1.0001, (y + .5)/WS), x0 = fx|0, y0 = fy|0, ax = fx - x0, ay = fy - y0;
-    const o00 = (y0*Wc + x0)*NF, o10 = o00 + NF, o01 = o00 + Wc*NF, o11 = o01 + NF, w00 = (1 - ax)*(1 - ay), w10 = ax*(1 - ay), w01 = (1 - ax)*ay, w11 = ax*ay;
+    const o00 = ((y0 - cy0)*Wc + x0)*NF, o10 = o00 + NF, o01 = o00 + Wc*NF, o11 = o01 + NF, w00 = (1 - ax)*(1 - ay), w10 = ax*(1 - ay), w01 = (1 - ax)*ay, w11 = ax*ay;
     const f = k => F[o00 + k]*w00 + F[o10 + k]*w10 + F[o01 + k]*w01 + F[o11 + k]*w11;
     const di = ((y & 255) << 8) | (x & 255), e = F[o00]*w00 + F[o10]*w10 + F[o01]*w01 + F[o11]*w11 + DETAIL.e[di];
     let t;
@@ -3059,12 +3066,38 @@ function genTerrain() {
     const iX = x - ISLE.x, iY = y - ISLE.y, dI2 = iX*iX + iY*iY, dI = dI2 < ISLE.ring*ISLE.ring ? Math.sqrt(dI2) : 1e9;
     if (dI < ISLE.land) t = dI > ISLE.land-1.6 ? T.SAND : (hash2(x,y,5) > .7 ? T.FOREST : T.GRASS);
     else if (dI < ISLE.ring) t = T.DEEP;
-    map[idx(x,y)] = t;
+    out[(y - Y0)*W + x] = t;
   }
 }
+function genTerrain() { terrainBand(0, H, map); }
+// build the terrain in background workers when the browser allows it (several cores at once); otherwise on this thread
+function terrainWorkerSrc() {
+  const consts = {W, H, WS, WORLD_H, OLD_W, EAST_W, FAR_W, RIM_W, SEED};
+  return "'use strict';\n" + Object.entries(consts).map(([k, v]) => `const ${k} = ${v};`).join('\n') + `\nconst T = ${JSON.stringify(T)};\nconst ISLE = ${JSON.stringify(ISLE)};\nconst bump = ${String(bump)};\n` +
+    [hash2, vnoise, fbm, pvnoise, makeDetail, terrainBand].map(String).join('\n') +
+    "\nconst DETAIL = makeDetail();\nonmessage = e => { const {Y0, Y1} = e.data, out = new Uint8Array((Y1 - Y0)*W); terrainBand(Y0, Y1, out); postMessage({Y0, buf: out.buffer}, [out.buffer]); };";
+}
+function genTerrainFast() {
+  return new Promise(res => {
+    const n = Math.min(8, (navigator.hardwareConcurrency || 2) - 1), sync = () => { genTerrain(); res(); };
+    if (n < 2 || typeof Worker === 'undefined' || /syncgen/.test(location.hash)) return sync();
+    let url; try { url = URL.createObjectURL(new Blob([terrainWorkerSrc()], {type: 'text/javascript'})); } catch (e) { return sync(); }
+    const rows = Math.ceil(H/n), ws = []; let left = 0, failed = false;
+    const fail = () => { if (failed) return; failed = true; clearTimeout(timer); ws.forEach(w => w.terminate()); URL.revokeObjectURL(url); sync(); };
+    const timer = setTimeout(fail, 30000);
+    for (let Y0 = 0; Y0 < H; Y0 += rows) {
+      const Y1 = Math.min(H, Y0 + rows); let w; try { w = new Worker(url); } catch (e) { return fail(); }
+      ws.push(w); left++;
+      w.onmessage = e => { if (failed) return; map.set(new Uint8Array(e.data.buf), e.data.Y0*W); w.terminate(); if (--left === 0) { clearTimeout(timer); URL.revokeObjectURL(url); terrainBuiltBy = ws.length; res(); } };
+      w.onerror = fail;
+      w.postMessage({Y0, Y1});
+    }
+  });
+}
+let terrainBuiltBy = 0, terrainReady = false;
 const PLACE_OFFS = (() => { const R = 30*WS, a = []; for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx*dx + dy*dy <= R*R) a.push([dx, dy]); return a.sort((p, q) => (p[0]*p[0] + p[1]*p[1]) - (q[0]*q[0] + q[1]*q[1])); })();
 function genWorld() {
-  genTerrain();
+  if (!terrainReady) genTerrain();
   for (const k in TOWNS) {
     const tw = TOWNS[k], r = tw.small ? 4 : 6;
     for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
@@ -3146,7 +3179,11 @@ function placeNodes() {
   for (const sh of SHRINES) for (let y = sh.y - 3; y <= sh.y + 3; y++) for (let x = sh.x - 3; x <= sh.x + 3; x++) if (inB(x, y)) keepClear[idx(x, y)] = 1;
   for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) {
     const i = idx(x,y), t = map[i];
-    if (keepClear[i]) continue;
+    if (keepClear[i] || t === T.VOID) continue;
+    if (t === T.DEEP) { // open sea holds only the odd satchel or flotsam (same rolls as below)
+      if (y < WORLD_H) { const q = hash2(x, y, 191), ty = q < .0013 ? 'satchel' : q < .0045 ? 'flotsam' : null; if (ty) { ngSet(i, nodes.length); nodes.push({x, y, type: ty}); } }
+      continue;
+    }
     const r = hash2(x, y, 77), nearMt = (t === T.HILL || t === T.SNOW || t === T.MESA) && near(x,y,T.MOUNT), silverLand = Math.hypot(x - 150*WS, y - 95*WS) < 34*WS;
     let type = null;
     switch (t) {
@@ -3189,7 +3226,7 @@ function placeNodes() {
         case T.DEEP: type = q < .0045 ? 'flotsam' : null; break;
       }
     }
-    if (type) { nodeGrid[i] = nodes.length; nodes.push({x, y, type}); }
+    if (type) { ngSet(i, nodes.length); nodes.push({x, y, type}); }
   }
   MINE.slot0 = nodes.length;
   for (let k = 0; k < MINE_SLOTS; k++) nodes.push({x: -1, y: -1, type: 'ore', mine: true});
@@ -3276,13 +3313,14 @@ function flood(sx, sy, raft, climb) {
 }
 
 /* ================= terrain pre-render (chunked) ================= */
-let chunks = [], mapStrips = [], mapCol = null;
+let chunks = [], mapStrips = [];
 const MAP_SW = 2048; let MAP_PAL = null;
-function mapPut(x, y, w, h) { // copy part of mapCol onto the strip canvases
+function mapPut(x, y, w, h) { // draw part of the map (terrain colours where explored) onto the strip canvases
   const x0 = Math.max(0, Math.floor(x)), y0 = Math.max(0, Math.floor(y)), x1 = Math.min(W, Math.ceil(x + w)), y1 = Math.min(H, Math.ceil(y + h)); if (x1 <= x0 || y1 <= y0) return;
   for (const st of mapStrips) { const a = Math.max(x0, st.x0), b = Math.min(x1, st.x0 + st.w); if (b <= a) continue;
     const img = st.g.createImageData(b - a, y1 - y0), d = img.data; let o = 0;
-    for (let yy = y0; yy < y1; yy++) for (let xx = a; xx < b; xx++) { const c = MAP_PAL[mapCol[yy*W + xx]]; d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = 255; o += 4; }
+    const ex = S && S.explored;
+    for (let yy = y0; yy < y1; yy++) for (let xx = a; xx < b; xx++) { const i = yy*W + xx, t = map[i], c = MAP_PAL[ex && ex[i] ? (t === T.HOUSE ? 255 : t + 1) : 0]; d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = 255; o += 4; }
     st.g.putImageData(img, a - st.x0, y0); }
 }
 function mapDraw(g, sx, sy, sw, sh, dx, dy, dw, dh) { // drawImage of the map, across strips
@@ -3299,7 +3337,7 @@ function drawTile(g, x, y) {
   g.fillStyle = TILE_COL[t === T.BRIDGE ? T.SHAL : t]; g.fillRect(px,py,TS,TS);
   const dot = (c, n, s=1) => { g.fillStyle = c; for (let i = 0; i < n; i++) g.fillRect(px + (r(i*2+1)*TS|0), py + (r(i*2+2)*TS|0), s, s); };
   const trees = (dark, mid, trunk) => {
-    if (nodeGrid[idx(x,y)] >= 0) return;
+    if (ngGet(idx(x,y)) >= 0) return;
     const n = r(9) > .45 ? 2 : 1;
     for (let i = 0; i < n; i++) {
       const tx = px + 4 + r(10+i)*8, ty = py + 5 + r(20+i)*7;
@@ -3330,18 +3368,18 @@ function drawTile(g, x, y) {
     case T.DUNE: g.fillStyle = '#c99a4c'; g.fillRect(px+2, py+5+(r(4)*6|0), 9, 1); g.fillRect(px+6, py+9+(r(5)*5|0), 8, 1); dot('#efcf88', 2); break;
     case T.ASH: dot('#38333a', 6); dot('#6a6266', 3); if (r(47) > .93) { g.fillStyle = '#ff7a2a'; g.fillRect(px+(r(48)*12|0)+2, py+(r(49)*12|0)+2, 1, 1); } break;
     case T.LAVA: g.fillStyle = '#ff8a2a'; g.beginPath(); g.ellipse(px+4+r(5)*8, py+5+r(6)*6, 4, 2.5, 0, 0, 7); g.fill(); g.fillStyle = '#ffd060'; g.fillRect(px+(r(7)*12|0)+2, py+(r(8)*12|0)+2, 2, 2); g.fillStyle = '#8a2a10'; g.fillRect(px+(r(9)*12|0), py+(r(10)*14|0), 4, 1); break;
-    case T.JUNGLE: dot('#2e6a2e', 4); if (nodeGrid[idx(x,y)] < 0 && r(50) > .35) { const tx = px + 4 + r(51)*8, ty = py + 6 + r(52)*5; g.fillStyle = '#5a4020'; g.fillRect(tx-1, ty, 2, 7); g.fillStyle = '#3a9a3a'; for (let k = 0; k < 5; k++) { const a = k/5*6.28; g.fillRect(tx + Math.cos(a)*4 - 2, ty - 1 + Math.sin(a)*2, 4, 2); } g.fillStyle = '#5ac04a'; g.fillRect(tx-1, ty-2, 2, 2); } break;
+    case T.JUNGLE: dot('#2e6a2e', 4); if (ngGet(idx(x,y)) < 0 && r(50) > .35) { const tx = px + 4 + r(51)*8, ty = py + 6 + r(52)*5; g.fillStyle = '#5a4020'; g.fillRect(tx-1, ty, 2, 7); g.fillStyle = '#3a9a3a'; for (let k = 0; k < 5; k++) { const a = k/5*6.28; g.fillRect(tx + Math.cos(a)*4 - 2, ty - 1 + Math.sin(a)*2, 4, 2); } g.fillStyle = '#5ac04a'; g.fillRect(tx-1, ty-2, 2, 2); } break;
     case T.MESA: g.fillStyle = '#a0522e'; g.fillRect(px, py+4+(r(4)*3|0), TS, 1); g.fillRect(px, py+11+(r(5)*3|0), TS, 1); dot('#d8875a', 3); break;
     case T.MOOR: dot('#5a4a5a', 5); g.fillStyle = '#9a6aaa'; for (let k = 0; k < 3; k++) g.fillRect(px+(r(60+k)*14|0), py+(r(63+k)*14|0), 2, 2); break;
     case T.VOID: g.fillStyle = '#05070a'; g.fillRect(px, py, TS, TS); break;
     case T.SHIMMER: dot('#c8d8e8', 5); dot('#8a9ab0', 2); if (r(110) > .7) { g.fillStyle = ['#9fe8ff','#e8a8ff','#fff0a0'][(r(111)*3)|0]; const sx = px + (r(112)*13|0), sy = py + (r(113)*13|0); g.fillRect(sx, sy, 2, 3); g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(sx, sy, 1, 1); } break;
-    case T.REDWOOD: dot('#2a4a1a', 5); dot('#5a3a2a', 2); if (nodeGrid[idx(x,y)] < 0 && r(114) > .55) { const tx = px + 5 + r(115)*6; g.fillStyle = '#7a3a22'; g.fillRect(tx - 2, py + 6, 4, 10); g.fillStyle = '#244a1c'; g.beginPath(); g.moveTo(tx - 7, py + 10); g.lineTo(tx, py - 6); g.lineTo(tx + 7, py + 10); g.fill(); g.fillStyle = '#2e5a24'; g.beginPath(); g.moveTo(tx - 5, py + 4); g.lineTo(tx, py - 8); g.lineTo(tx + 5, py + 4); g.fill(); } break;
-    case T.SHROOM: dot('#3a2a4a', 5); dot('#6a5a8a', 2); if (r(90) > .82) { g.fillStyle = '#9fe8ff'; g.fillRect(px + (r(91)*14|0), py + (r(92)*14|0), 1, 1); } if (nodeGrid[idx(x,y)] < 0 && r(93) > .55) { const tx = px + 4 + r(94)*8, ty = py + 6 + r(95)*6, big = r(96) > .5; g.fillStyle = '#d8d0c0'; g.fillRect(tx-1, ty, 2, big ? 6 : 4); g.fillStyle = r(97) > .5 ? '#b98ad8' : '#7ac8d8'; g.beginPath(); g.ellipse(tx, ty, big ? 5 : 3, big ? 3 : 2, 0, Math.PI, 0); g.fill(); g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(tx - 2, ty - 2, 1, 1); g.fillRect(tx + 1, ty - 1, 1, 1); } break;
-    case T.BAMBOO: dot('#5a8a3a', 4); dot('#8ab85a', 2); if (nodeGrid[idx(x,y)] < 0 && r(98) > .35) { for (let k = 0; k < 3; k++) { const bx = px + 2 + k*5 + (r(99+k)*3|0), h = 9 + (r(102+k)*6|0); g.fillStyle = '#7aa83a'; g.fillRect(bx, py + 16 - h, 2, h); g.fillStyle = '#5a8a2a'; g.fillRect(bx, py + 16 - h + 4, 2, 1); g.fillRect(bx, py + 16 - h + 9, 2, 1); g.fillStyle = '#9ac85a'; g.fillRect(bx + 2, py + 16 - h + 1, 3, 1); } } break;
-    case T.MAPLE: dot('#7a6a3a', 4); dot('#e8a040', 2); if (nodeGrid[idx(x,y)] < 0 && r(80) > .4) { const tx = px + 4 + r(81)*8, ty = py + 5 + r(82)*7; g.fillStyle = '#4a3020'; g.fillRect(tx-1, ty+2, 2, 4); g.fillStyle = r(83) > .5 ? '#c8401a' : '#e07a20'; g.beginPath(); g.arc(tx, ty, 5, 0, 7); g.fill(); g.fillStyle = r(84) > .5 ? '#f0a030' : '#e05a2a'; g.beginPath(); g.arc(tx-1.5, ty-1.5, 2.6, 0, 7); g.fill(); } break;
-    case T.RUINS: g.fillStyle = '#7a7880'; g.fillRect(px, py + 7, TS, 1); g.fillRect(px + ((y % 2)*8) + 3, py, 1, 7); g.fillRect(px + ((y % 2)*8) + 11, py + 8, 1, 8); if (r(85) > .7) { g.fillStyle = '#5a7a4a'; g.fillRect(px + (r(86)*12|0), py + (r(87)*12|0), 3, 2); } if (nodeGrid[idx(x,y)] < 0 && r(88) > .965) { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px + 3, py + 13, 10, 2); g.fillStyle = '#b8b4bc'; g.fillRect(px + 5, py + (r(89) > .5 ? 0 : 5), 6, r(89) > .5 ? 14 : 9); g.fillStyle = '#d8d4dc'; g.fillRect(px + 4, py + (r(89) > .5 ? 0 : 5), 8, 2); } break;
-    case T.BLOSSOM: dot('#6a9a52', 4); dot('#ffc8e0', 3); if (nodeGrid[idx(x,y)] < 0 && r(80) > .45) { const tx = px + 4 + r(81)*8, ty = py + 5 + r(82)*7; g.fillStyle = '#5a3a2a'; g.fillRect(tx-1, ty+2, 2, 4); g.fillStyle = '#f08ab8'; g.beginPath(); g.arc(tx, ty, 5, 0, 7); g.fill(); g.fillStyle = '#ffc8e0'; g.beginPath(); g.arc(tx-1.5, ty-1.5, 2.6, 0, 7); g.fill(); } break;
-    case T.SAVANNA: g.fillStyle = '#b09848'; for (let k = 0; k < 4; k++) g.fillRect(px + (r(90+k)*14|0), py + 4 + (r(94+k)*10|0), 1, 3); dot('#d8c070', 3); if (nodeGrid[idx(x,y)] < 0 && r(98) > .96) { const tx = px + 8, ty = py + 6; g.fillStyle = '#5a4020'; g.fillRect(tx-1, ty, 2, 8); g.fillStyle = '#5a7a2a'; g.fillRect(tx-7, ty-3, 14, 3); g.fillStyle = '#6a8a3a'; g.fillRect(tx-5, ty-4, 10, 1); } break;
+    case T.REDWOOD: dot('#2a4a1a', 5); dot('#5a3a2a', 2); if (ngGet(idx(x,y)) < 0 && r(114) > .55) { const tx = px + 5 + r(115)*6; g.fillStyle = '#7a3a22'; g.fillRect(tx - 2, py + 6, 4, 10); g.fillStyle = '#244a1c'; g.beginPath(); g.moveTo(tx - 7, py + 10); g.lineTo(tx, py - 6); g.lineTo(tx + 7, py + 10); g.fill(); g.fillStyle = '#2e5a24'; g.beginPath(); g.moveTo(tx - 5, py + 4); g.lineTo(tx, py - 8); g.lineTo(tx + 5, py + 4); g.fill(); } break;
+    case T.SHROOM: dot('#3a2a4a', 5); dot('#6a5a8a', 2); if (r(90) > .82) { g.fillStyle = '#9fe8ff'; g.fillRect(px + (r(91)*14|0), py + (r(92)*14|0), 1, 1); } if (ngGet(idx(x,y)) < 0 && r(93) > .55) { const tx = px + 4 + r(94)*8, ty = py + 6 + r(95)*6, big = r(96) > .5; g.fillStyle = '#d8d0c0'; g.fillRect(tx-1, ty, 2, big ? 6 : 4); g.fillStyle = r(97) > .5 ? '#b98ad8' : '#7ac8d8'; g.beginPath(); g.ellipse(tx, ty, big ? 5 : 3, big ? 3 : 2, 0, Math.PI, 0); g.fill(); g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(tx - 2, ty - 2, 1, 1); g.fillRect(tx + 1, ty - 1, 1, 1); } break;
+    case T.BAMBOO: dot('#5a8a3a', 4); dot('#8ab85a', 2); if (ngGet(idx(x,y)) < 0 && r(98) > .35) { for (let k = 0; k < 3; k++) { const bx = px + 2 + k*5 + (r(99+k)*3|0), h = 9 + (r(102+k)*6|0); g.fillStyle = '#7aa83a'; g.fillRect(bx, py + 16 - h, 2, h); g.fillStyle = '#5a8a2a'; g.fillRect(bx, py + 16 - h + 4, 2, 1); g.fillRect(bx, py + 16 - h + 9, 2, 1); g.fillStyle = '#9ac85a'; g.fillRect(bx + 2, py + 16 - h + 1, 3, 1); } } break;
+    case T.MAPLE: dot('#7a6a3a', 4); dot('#e8a040', 2); if (ngGet(idx(x,y)) < 0 && r(80) > .4) { const tx = px + 4 + r(81)*8, ty = py + 5 + r(82)*7; g.fillStyle = '#4a3020'; g.fillRect(tx-1, ty+2, 2, 4); g.fillStyle = r(83) > .5 ? '#c8401a' : '#e07a20'; g.beginPath(); g.arc(tx, ty, 5, 0, 7); g.fill(); g.fillStyle = r(84) > .5 ? '#f0a030' : '#e05a2a'; g.beginPath(); g.arc(tx-1.5, ty-1.5, 2.6, 0, 7); g.fill(); } break;
+    case T.RUINS: g.fillStyle = '#7a7880'; g.fillRect(px, py + 7, TS, 1); g.fillRect(px + ((y % 2)*8) + 3, py, 1, 7); g.fillRect(px + ((y % 2)*8) + 11, py + 8, 1, 8); if (r(85) > .7) { g.fillStyle = '#5a7a4a'; g.fillRect(px + (r(86)*12|0), py + (r(87)*12|0), 3, 2); } if (ngGet(idx(x,y)) < 0 && r(88) > .965) { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px + 3, py + 13, 10, 2); g.fillStyle = '#b8b4bc'; g.fillRect(px + 5, py + (r(89) > .5 ? 0 : 5), 6, r(89) > .5 ? 14 : 9); g.fillStyle = '#d8d4dc'; g.fillRect(px + 4, py + (r(89) > .5 ? 0 : 5), 8, 2); } break;
+    case T.BLOSSOM: dot('#6a9a52', 4); dot('#ffc8e0', 3); if (ngGet(idx(x,y)) < 0 && r(80) > .45) { const tx = px + 4 + r(81)*8, ty = py + 5 + r(82)*7; g.fillStyle = '#5a3a2a'; g.fillRect(tx-1, ty+2, 2, 4); g.fillStyle = '#f08ab8'; g.beginPath(); g.arc(tx, ty, 5, 0, 7); g.fill(); g.fillStyle = '#ffc8e0'; g.beginPath(); g.arc(tx-1.5, ty-1.5, 2.6, 0, 7); g.fill(); } break;
+    case T.SAVANNA: g.fillStyle = '#b09848'; for (let k = 0; k < 4; k++) g.fillRect(px + (r(90+k)*14|0), py + 4 + (r(94+k)*10|0), 1, 3); dot('#d8c070', 3); if (ngGet(idx(x,y)) < 0 && r(98) > .96) { const tx = px + 8, ty = py + 6; g.fillStyle = '#5a4020'; g.fillRect(tx-1, ty, 2, 8); g.fillStyle = '#5a7a2a'; g.fillRect(tx-7, ty-3, 14, 3); g.fillStyle = '#6a8a3a'; g.fillRect(tx-5, ty-4, 10, 1); } break;
     case T.DFLOOR: case T.DSTAIR: case T.DSPIKE: case T.DDOWN: {
       const th = themeAt(x);
       g.fillStyle = (x + y) % 2 ? th.floor : th.floor2; g.fillRect(px, py, TS, TS);
@@ -3400,7 +3438,7 @@ function renderTerrain() {
   for (const [x, y] of chunkLive) { const o = chunks[y] && chunks[y][x]; if (o) o.width = o.height = 0; }
   chunks = Array.from({length: CHH}, () => Array(CW).fill(null)); chunkLive = [];
   for (const st of mapStrips) st.c.width = st.c.height = 0;
-  mapStrips = []; mapCol = new Uint8Array(W*H);
+  mapStrips = [];
   if (!MAP_PAL) { MAP_PAL = [[14,18,25]]; for (let t = 0; t < 254; t++) MAP_PAL.push(TILE_RGB[t] || [14,18,25]); MAP_PAL[255] = [120,80,60]; }
   for (let x0 = 0; x0 < W; x0 += MAP_SW) { const c = document.createElement('canvas'); c.width = Math.min(MAP_SW, W - x0); c.height = H; const g = c.getContext('2d'); g.fillStyle = '#0e1219'; g.fillRect(0, 0, c.width, c.height); mapStrips.push({c, g, x0, w: c.width}); }
 }
@@ -3484,7 +3522,7 @@ function drawAnvil(g, px, py) {
   g.fillStyle = '#6a6a74'; g.fillRect(px+3, py+6, 10, 1);
 }
 function revealMapPixel(i) {
-  const t = map[i]; mapCol[i] = t === T.HOUSE ? 255 : t + 1;
+  // map colours are worked out from the terrain and S.explored when drawn
 }
 
 /* ================= game state ================= */
@@ -3714,7 +3752,6 @@ function reveal(cx, cy, r) {
   if (changed) mapPut(x0, y0, Math.ceil(r*2) + 2, Math.ceil(r*2) + 2);
 }
 function rebuildMapPixels() {
-  for (let i = 0; i < W*H; i++) if (S.explored[i]) revealMapPixel(i); else mapCol[i] = 0;
   mapPut(0, 0, W, H);
 }
 let exploredMemo = {t: -1e9, s: null, v: 0};
@@ -3769,7 +3806,7 @@ function nearestNode() {
   const px = Math.floor(S.x), py = Math.floor(S.y);
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
     if (!inB(px+dx, py+dy)) continue;
-    const i = nodeGrid[idx(px+dx, py+dy)]; if (i < 0 || !nodeAvail(i)) continue;
+    const i = ngGet(idx(px+dx, py+dy)); if (i < 0 || !nodeAvail(i)) continue;
     const n = nodes[i], d = Math.hypot(n.x + .5 - S.x, n.y + .5 - S.y) - (n.type === 'fish' ? .4 : 0);
     if (d < bd) { bd = d; best = i; }
   }
@@ -12741,7 +12778,7 @@ view.addEventListener('pointerdown', e => {
     const n = NPCS.find(n => Math.hypot(n.x - w.x, n.y - .4 - w.y) < .9);
     if (n && Math.hypot(n.x - S.x, n.y - S.y) < 2.2) { openTalk(n); return; }
     const bt = boardAt(w.x, w.y, 1); if (bt && Math.hypot(TOWNS[bt].x + .5 - S.x, TOWNS[bt].y + .5 - S.y) < 2.2) { openBoard(bt); return; }
-    const ni = inB(Math.floor(w.x), Math.floor(w.y)) ? nodeGrid[idx(Math.floor(w.x), Math.floor(w.y))] : -1;
+    const ni = inB(Math.floor(w.x), Math.floor(w.y)) ? ngGet(idx(Math.floor(w.x), Math.floor(w.y))) : -1;
     if (ni >= 0 && nodeAvail(ni) && Math.hypot(nodes[ni].x + .5 - S.x, nodes[ni].y + .5 - S.y) < 1.9 && !enemies.some(en => Math.hypot(en.x - S.x, en.y - S.y) < 3)) { gather(ni); return; }
     attack(w.x - S.x, w.y - (S.y - .5)); mouseHeld = true; chargeT = 0;
     return;
@@ -13436,7 +13473,7 @@ function render() {
   const inView = (x, y) => x >= x0-2 && x <= x1+2 && y >= y0-2 && y <= y1+3;
   const sprites = [];
   for (let y = Math.max(0, y0-1); y <= Math.min(H-1, y1+2); y++) for (let x = x0; x <= x1; x++) {
-    const ni = nodeGrid[idx(x,y)];
+    const ni = ngGet(idx(x,y));
     if (ni >= 0) sprites.push({y: y + .85, f: () => drawNode(ctx, ni, frameT)});
   }
   for (const L of LANDMARKS) if (inView(L.x, L.y)) sprites.push({y: L.y+.9, f: () => drawLandmark(ctx, L, frameT)});
@@ -13725,7 +13762,7 @@ function render() {
       if (t === T.DTORCH) hole(x*TS + 8, y*TS + 8, 58, .85);
       if (t === T.DSTAIR) hole(x*TS + 8, y*TS + 8, 34, .7);
       if (t === T.DDOWN) hole(x*TS + 8, y*TS + 8, 40, .75);
-      const ni = nodeGrid[idx(x,y)]; if (ni >= 0 && (nodes[ni].type === 'crystal' || nodes[ni].type === 'mushroom') && nodeAvail(ni)) hole(x*TS + 8, y*TS + 6, 20, .5);
+      const ni = ngGet(idx(x,y)); if (ni >= 0 && (nodes[ni].type === 'crystal' || nodes[ni].type === 'mushroom') && nodeAvail(ni)) hole(x*TS + 8, y*TS + 6, 20, .5);
     }
     for (const e of enemies) if (e.type === 'imp' || e.type === 'wisp' || e.boss === 'wyrm' || e.boss === 'lich') hole(e.x*TS, e.y*TS - 12, 30, .6);
     for (const p of eproj) hole(p.x*TS, p.y*TS, 14, .5);
@@ -14518,7 +14555,7 @@ function treasureSpot() {
     const x = Math.floor(TOWNS[tk].x + Math.cos(a)*r), y = Math.floor(TOWNS[tk].y + Math.sin(a)*r);
     if (!inB(x, y) || y >= WORLD_H - 2 || Math.hypot(x - ISLE.x, y - ISLE.y) < ISLE.ring + 3) continue;
     const t = map[idx(x, y)];
-    if (!walkable(t, false, false) || t === T.SHAL || t === T.ROAD || t === T.FLOOR || t === T.BRIDGE || townAt(x + .5, y + .5, 9) || ESTATE_TILES.has(idx(x, y)) || nodeGrid[idx(x, y)] >= 0 || (S.placed.length && placedAt(x, y))) continue;
+    if (!walkable(t, false, false) || t === T.SHAL || t === T.ROAD || t === T.FLOOR || t === T.BRIDGE || townAt(x + .5, y + .5, 9) || ESTATE_TILES.has(idx(x, y)) || ngGet(idx(x, y)) >= 0 || (S.placed.length && placedAt(x, y))) continue;
     if (![[1,0],[-1,0],[0,1],[0,-1]].every(([dx, dy]) => walkable(map[idx(x + dx, y + dy)], false, false))) continue;
     return {x, y, town: tk, dir: DIRS8[Math.round(((Math.atan2(y - TOWNS[tk].y, x - TOWNS[tk].x) + 6.283) % 6.283) / .785) % 8], dist: Math.round(r)};
   }
@@ -16915,13 +16952,13 @@ function mineNodes() {
   const tiles = (D.floorTiles || []).slice();
   for (let k = 0; k < MINE_SLOTS; k++) {
     const i = MINE.slot0 + k, n = nodes[i];
-    if (n.x >= 0 && nodeGrid[idx(n.x, n.y)] === i) nodeGrid[idx(n.x, n.y)] = -1;
+    if (n.x >= 0 && ngGet(idx(n.x, n.y)) === i) ngSet(idx(n.x, n.y), -1);
     if (S) delete S.depleted[i];
     n.x = n.y = -1;
     if (k >= Math.min(MINE_SLOTS, 34 + f*3) || !tiles.length) continue;
     const t = tiles.splice(Math.floor(rnd()*tiles.length), 1)[0], r = rnd();
     n.type = f >= 6 && r < .12 ? 'mithril' : f >= 4 && r < .22 ? 'gemvein' : f >= 3 && r < .36 ? 'crystal' : f >= 2 && r < .52 ? 'silver' : f >= 8 && r < .6 ? 'obsidian' : r < .8 ? 'ore' : 'rock';
-    n.x = t[0]; n.y = t[1]; nodeGrid[idx(n.x, n.y)] = i;
+    n.x = t[0]; n.y = t[1]; ngSet(idx(n.x, n.y), i);
   }
 }
 function populateMine() {
@@ -17001,7 +17038,7 @@ function redrawRect([rx, ry, rw, rh]) {
     const g = chunks[cy][cx].getContext('2d'); g.setTransform(1, 0, 0, 1, -cx*CH*TS, -cy*CH*TS);
     for (let y = cy*CH; y < Math.min(H, (cy + 1)*CH); y++) for (let x = cx*CH; x < Math.min(W, (cx + 1)*CH); x++) drawTile(g, x, y);
   }
-  for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) { const i = idx(x,y); if (S) S.explored[i] = 0; mapCol[i] = 0; }
+  for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) { const i = idx(x,y); if (S) S.explored[i] = 0; }
   mapPut(rx, ry, rw, rh);
 }
 function populateAbyss() {
@@ -18566,6 +18603,7 @@ function begin(state) {
   }
 }
 
+await genTerrainFast(); terrainReady = true;
 genWorld();
 renderTerrain();
 resize();
