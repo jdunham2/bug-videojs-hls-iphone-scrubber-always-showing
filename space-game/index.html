@@ -14256,6 +14256,13 @@ const GX108 = { t: 0, ring: false };
 const GX109 = { ph: 0, amp: 0 };
 { const _usc63 = updateSurfCamera; updateSurfCamera = function (dt) { _usc63(dt); if (!GFX.hd || G.state !== 'surface' || !S.vel || S.bike || S.mech || (typeof DS !== 'undefined' && (DS.ride || DS.fly)) || (typeof HC !== 'undefined' && W === HC_W && HC.fly)) { GX109.amp = 0; return; } const hv = Math.hypot(S.vel.x, S.vel.z), grounded = S.grounded !== false; const want = grounded && hv > 2.5 ? Math.min(1, hv / 9) : 0; GX109.amp += (want - GX109.amp) * Math.min(1, dt * 6); if (GX109.amp < 0.01) return; GX109.ph += dt * (4 + hv * 0.55); camera.position.y += Math.abs(Math.sin(GX109.ph)) * 0.09 * GX109.amp; camera.rotation.z += Math.sin(GX109.ph) * 0.004 * GX109.amp; }; }
 
+/* ============ feel round 112: a glowing exhaust trail streams from your engines when you fly fast ============ */
+const GX112 = { fx: [], t: 0, tmp: new V3(), tex: null };
+function gx112Tick(dt) { const on = GFX.hd && G.state === 'fly' && renderScene === scene && player.visible; const spd = P.vel ? P.vel.length() : 0;
+  if (on && spd > 60) { GX112.t -= dt; if (GX112.t <= 0) { GX112.t = 0.035; const eng = player.userData.engines || []; const boost = keys.ShiftLeft || keys.ShiftRight; const col = boost ? 0xffb070 : 0x8fe0ff; eng.forEach(e => { e.getWorldPosition(GX112.tmp); const s = glowSprite(col, (P.r || 6) * (boost ? 0.55 : 0.4)); s.position.copy(GX112.tmp); s.material.opacity = 0.55; scene.add(s); GX112.fx.push({ o: s, t: 0, life: boost ? 0.7 : 0.45, s0: s.scale.x }); }); } }
+  for (let i = GX112.fx.length - 1; i >= 0; i--) { const f = GX112.fx[i]; f.t += dt; const k = f.t / f.life; f.o.material.opacity = 0.55 * (1 - k); f.o.scale.setScalar(f.s0 * (1 - k * 0.6)); if (k >= 1) { scene.remove(f.o); f.o.material.dispose(); GX112.fx.splice(i, 1); } } }
+{ const _ub37 = updateBoss; updateBoss = function (dt) { _ub37(dt); gx112Tick(dt); }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
