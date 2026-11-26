@@ -459,3 +459,42 @@ test('combat depth: elemental combos, counters on heavy blows, training dummies'
   assert.equal(c.count('edie'), c.msgs.filter((m) => m.t === 'edie').length); assert.ok(room.zones.get('training').enemies.has(d[0]), 'dummy survives');
   assert.equal(c.prof.gold, g0);
 });
+
+test('housing: craft decor, validated placement, boss trophies, friends can visit but not edit', { timeout: 30000 }, async () => {
+  const { HOUSE } = await import('../public/shared/housing.js');
+  const game = G();
+  const a = client(game, { name: 'Ash' }), b = client(game, { name: 'Bryn', room: 'HHHH' }), s = client(game, { name: 'Stranger', room: 'SSSS' });
+  await wait(60);
+  const A = a.last.social.tag, pa = [...game.rooms.get(a.room).players.values()][0];
+  a.send({ t: 'houseEnter' }); await wait(60);
+  assert.equal(a.zone.type, 'house'); assert.equal(a.zone.house.owner, A);
+  a.send({ t: 'decorPlace', k: 'table', x: 2, z: 0, r: 0 }); await wait(30);
+  assert.match(a.last.notice.text, /Craft a/);
+  a.send({ t: 'chat', text: '/gold 5000' }); await wait(80); pa.prof.mats = { shards: 200, cores: 0 };
+  a.send({ t: 'decorBuy', k: 'table' }); a.send({ t: 'decorBuy', k: 'chair' }); await wait(30);
+  assert.equal(a.last.houseOwned.owned.table, 1);
+  a.send({ t: 'decorPlace', k: 'table', x: 2.1, z: 0.2, r: 1 }); await wait(30);
+  assert.equal(a.last.house.house.items.length, 1); assert.equal(a.last.house.house.items[0].x, 2); // snapped to the grid
+  a.send({ t: 'decorPlace', k: 'chair', x: 2.3, z: 0, r: 0 }); await wait(30);
+  assert.match(a.last.notice.text, /already there/);
+  a.send({ t: 'decorPlace', k: 'chair', x: HOUSE.door.x, z: HOUSE.door.z - 0.5, r: 0 }); await wait(30);
+  assert.match(a.last.notice.text, /doorway/);
+  a.send({ t: 'decorPlace', k: 'chair', x: -3, z: -2, r: 0 }); await wait(30);
+  assert.equal(a.last.house.house.items.length, 2);
+  // trophies come from bosses
+  a.send({ t: 'decorPlace', k: 'trophy_drake', x: -5, z: -4, r: 0 }); await wait(30);
+  assert.match(a.last.notice.text, /Slay that boss/);
+  pa.prof.trophies = { drake: 1 };
+  a.send({ t: 'decorPlace', k: 'trophy_drake', x: -5, z: -4, r: 0 }); a.send({ t: 'decorPlace', k: 'trophy_drake', x: 5, z: -4, r: 0 }); await wait(40);
+  assert.equal(a.last.house.house.items.filter((i) => i.k === 'trophy_drake').length, 1);
+  // visiting: strangers no, friends yes (read-only)
+  s.send({ t: 'houseEnter', tag: A }); await wait(30); assert.match(s.last.notice.text, /friends/);
+  a.send({ t: 'friendAdd', code: b.last.social.tag }); await wait(20); b.send({ t: 'friendAccept', code: A }); await wait(30);
+  b.send({ t: 'houseEnter', tag: A }); await wait(60);
+  assert.equal(b.zone.house.items.length, 3); assert.equal(b.zone.house.owned, undefined);
+  b.send({ t: 'decorRemove', id: b.zone.house.items[0].id }); await wait(30);
+  assert.match(b.last.notice.text, /own home/);
+  // picking furniture up returns it to storage
+  a.send({ t: 'decorRemove', id: a.last.house.house.items.find((i) => i.k === 'chair').id }); await wait(30);
+  assert.equal(a.last.houseOwned.owned.chair, 1);
+});

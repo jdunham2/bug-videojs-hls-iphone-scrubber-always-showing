@@ -24,13 +24,14 @@ export function renderSocial(ui) {
       <div class="soc-row"><input id="socAdd" maxlength="6" placeholder="Friend code" /><button class="btn small" id="socAddBtn">Add friend</button></div>
       ${S.requests.map((r) => `<div class="soc-row req"><span>📨 <b>${esc(r.name)}</b> wants to be friends</span><button class="btn small" data-acc="${r.tag}">Accept</button><button class="btn small ghost" data-dec="${r.tag}">Decline</button></div>`).join('')}
       <div class="soc-list">${S.friends.length ? S.friends.map((f) => `<div class="soc-friend"><i class="dot ${f.online ? 'on' : ''}"></i><div><b>${esc(f.name)}</b> <span class="muted small">${f.online ? `Lv${f.level} ${f.cls || ''} · ${zoneName(f.zone)}${f.room ? ` · party ${f.room}` : ''}` : 'offline'}</span></div>
-        <span class="sp"></span>${f.online ? `<button class="btn small" data-w="${esc(f.name)}">Whisper</button>${f.room && f.room !== G.roomCode ? `<button class="btn small" data-join="${f.room}">Join</button>` : ''}` : ''}<button class="btn small ghost" data-rm="${f.tag}">✕</button></div>`).join('') : '<div class="muted small" style="padding:8px">Share your friend code to add friends. Whisper anyone online with <b>/w Name message</b>.</div>'}</div>`;
+        <span class="sp"></span>${f.online ? `<button class="btn small" data-w="${esc(f.name)}">Whisper</button>${f.room && f.room !== G.roomCode ? `<button class="btn small" data-join="${f.room}">Join</button>` : ''}` : ''}<button class="btn small" data-visit="${f.tag}" title="Visit their home (from Emberhold)">🏠</button><button class="btn small ghost" data-rm="${f.tag}">✕</button></div>`).join('') : '<div class="muted small" style="padding:8px">Share your friend code to add friends. Whisper anyone online with <b>/w Name message</b>.</div>'}</div>`;
     $('socCopy').onclick = () => { navigator.clipboard?.writeText(S.tag); ui.toast('Friend code copied', '#5eea8a'); };
     $('socAddBtn').onclick = () => { const v = $('socAdd').value.trim().toUpperCase(); if (v) send({ t: 'friendAdd', code: v }); };
     body.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => send({ t: 'friendAccept', code: b.dataset.acc })));
     body.querySelectorAll('[data-dec]').forEach((b) => (b.onclick = () => send({ t: 'friendDecline', code: b.dataset.dec })));
     body.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => send({ t: 'friendRemove', code: b.dataset.rm })));
     body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { ui.closeAll(); ui.openChat(); ui.chatInput.value = `/w ${b.dataset.w} `; }));
+    body.querySelectorAll('[data-visit]').forEach((b) => (b.onclick = () => { ui.closeAll(); G.net.send({ t: 'houseEnter', tag: b.dataset.visit }); }));
     body.querySelectorAll('[data-join]').forEach((b) => (b.onclick = () => { location.href = `${location.pathname}?room=${b.dataset.join}`; }));
   } else if (ui.socTab === 'guild') {
     const g = S.guild;

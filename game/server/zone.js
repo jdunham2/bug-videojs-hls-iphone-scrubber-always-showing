@@ -831,6 +831,7 @@ export class Zone {
       }
     }
     const bz = this.dungeon ? 'dungeon' : this.region ? this.key : this.type;
+    if (def.boss) for (const p of this.players()) { const T = (p.prof.trophies ||= {}); if (!T[e.type]) send(p.ws, { t: 'notice', text: `Trophy earned: ${e.def.name} — display it in your home!`, color: '#ffd34d' }); T[e.type] = (T[e.type] || 0) + 1; p.dirty = true; }
     for (const p of this.players()) {
       this.room.bounty(p, 'kill', 1, { zone: bz });
       if (e.affix) this.room.bounty(p, 'elite');

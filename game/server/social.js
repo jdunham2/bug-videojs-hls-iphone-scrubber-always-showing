@@ -181,5 +181,6 @@ export function createSocial({ db, online, send, P }) {
   const notifyFriends = (p) => { for (const t of p.prof.friends || []) pushTag(t); };
   const guildOf = (prof) => (prof.guild ? guilds()[prof.guild] : null);
 
-  return { ensure, view, push, handle, bountyEvent, addMarks, guildRift, guildBoard, guildChat, notifyFriends, guildOf };
+  const isFriend = (a, b) => (a.friends || []).includes(b.tag);
+  return { byTag, isFriend, ensure, view, push, handle, bountyEvent, addMarks, guildRift, guildBoard, guildChat, notifyFriends, guildOf };
 }

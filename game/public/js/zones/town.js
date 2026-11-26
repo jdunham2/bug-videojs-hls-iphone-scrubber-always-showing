@@ -381,6 +381,7 @@ export class TownZone {
       { x: TOWN.trainer.x - 2.2, z: TOWN.trainer.z + 1.2, r: 1.6, label: () => 'Enter the Training Grounds (dummies + DPS meter)', action: () => G.actions.travel('training') },
       { x: TOWN.smith.x, z: TOWN.smith.z, r: 3.4, mark: 'BLACKSMITH', label: () => 'Visit the Blacksmith (salvage, reroll, upgrade)', action: () => G.actions.openSmith() },
       { x: TOWN.obelisk.x, z: TOWN.obelisk.z, r: 3.4, mark: 'EMBER RIFTS', label: () => 'Open an Ember Rift (timed endgame)', action: () => G.actions.openRift() },
+      ...(() => { const h = this.layout.houses.slice().sort((a, b) => Math.hypot(a.x - TOWN.spawn.x, a.z - TOWN.spawn.z) - Math.hypot(b.x - TOWN.spawn.x, b.z - TOWN.spawn.z))[0]; const d = Math.hypot(h.x, h.z) || 1, k = Math.max(h.w, h.d) * 0.62 + 1; this.homeDoor = { x: h.x - (h.x / d) * k, z: h.z - (h.z / d) * k }; return [{ x: this.homeDoor.x, z: this.homeDoor.z, r: 2.2, mark: 'YOUR HOME', label: () => 'Enter your home', action: () => G.net.send({ t: 'houseEnter' }) }]; })(),
       { x: TOWN.board.x, z: TOWN.board.z, r: 3, mark: 'HALL OF EMBERS', label: () => 'Read the Hall of Embers (leaderboard)', action: () => G.actions.openBoard() },
       { x: TOWN.wartable.x, z: TOWN.wartable.z, r: 3, mark: 'WAR TABLE', label: () => 'Plan defenses at the War Table (research)', action: () => G.actions.openResearch() },
       { x: TOWN_WAYPOINT.x, z: TOWN_WAYPOINT.z, r: 3, mark: 'WAYPOINT', label: () => 'Use the waypoint (travel to regions)', action: () => G.actions.openWaypoint() },

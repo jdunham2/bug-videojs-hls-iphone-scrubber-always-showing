@@ -14,6 +14,7 @@ import { createSocial } from './social.js';
 import { DIFFICULTY, trialOf, TRIAL_LIMIT, NIGHTMARE_LEGS, NIGHTMARE_DROP } from '../public/shared/endgame.js';
 import { weekKey } from '../public/shared/social.js';
 import { LEGENDARIES } from '../public/shared/items.js';
+import { DECOR, HOUSE, TROPHIES, trophyKey, decorDef, canPlace, snap } from '../public/shared/housing.js';
 const SOCIAL_T = new Set(['social', 'friendAdd', 'friendAccept', 'friendDecline', 'friendRemove', 'whisper', 'guildCreate', 'guildInvite', 'guildAccept', 'guildLeave', 'guildStash', 'bountyClaim', 'seasonClaim', 'cosEquip']);
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
@@ -90,7 +91,8 @@ class Room {
       if (type === 'citadel' && (p.char.quest?.i || 0) < ACT2_END && !p.prof.citadel) { send(p.ws, { t: 'notice', text: 'The Sunken Citadel lies beyond the storm. Finish Act II first.', color: '#ff9a7a' }); return; }
       if (type === 'peaks' && !questDone(p.char.quest) && !p.prof.peaks) { send(p.ws, { t: 'notice', text: 'The pass to Stormspire is sealed. Finish Act I first.', color: '#ff9a7a' }); return; }
       zone = this.zones.get(type) || this.zones.set(type, new Zone(this, type, 'region', this.level)).get(type);
-    } else if (type === 'training') zone = this.zones.get('training') || this.zones.set('training', new Zone(this, 'training', 'training', 1)).get('training');
+    } else if (type.startsWith('house:')) { zone = this.zones.get(type) || this.zones.set(type, new Zone(this, type, 'house', 1)).get(type); zone.owner = type.slice(6); }
+    else if (type === 'training') zone = this.zones.get('training') || this.zones.set('training', new Zone(this, 'training', 'training', 1)).get('training');
     else zone = this.zones.get(type === 'dark' ? 'dark' : 'town');
     this.joinZone(p, zone);
   }
@@ -171,6 +173,7 @@ class Room {
     if (zone.dungeon) { msg.seed = zone.seed; msg.cleared = zone.cleared; }
     if (zone.rift) msg.rift = zone.riftState();
     if (zone.type === 'town') { msg.structs = this.defense.list(); msg.defense = this.defense.view(); }
+    if (zone.type === 'house') msg.house = houseView(zone.owner, p);
     send(p.ws, msg);
     send(p.ws, zone.snapshot());
     for (const h of zone.hazards.values()) send(p.ws, { t: 'hazard', h });
@@ -241,6 +244,15 @@ class Room {
 
 let nextPlayer = 1;
 const near = (p, pos, r) => dist(p, pos) < r;
+
+// ---- housing helpers ----
+function houseOf(prof) { return (prof.house ||= { items: [], owned: {}, next: 1 }); }
+function houseView(tag, viewer) {
+  const prof = [...online.values()].find((q) => q.prof.tag === tag)?.prof || social.byTag(tag);
+  if (!prof) return null;
+  const H = houseOf(prof);
+  return { owner: tag, name: prof.name, items: H.items, fish: prof.fish || {}, trophies: prof.trophies || {}, owned: viewer && viewer.prof.tag === tag ? H.owned : undefined };
+}
 
 function attach(ws) {
   let room = null, p = null;
@@ -330,6 +342,44 @@ function attach(ws) {
         else if (p.zone === 'citadel' && near(p, REGIONS.citadel.gate, 6) && (p.char.quest?.i || 0) === ACT2_END) { send(ws, { t: 'dialog', who: 'Sir Corvin', i: ACT2_END }); room.questEvent(p, 'talk3'); }
         break;
       case 'relic': if (p.zone === 'peaks') zone.takeRelic(p, m.i | 0); break;
+      // ---- player housing ----
+      case 'houseEnter': {
+        const tag = String(m.tag || p.prof.tag).toUpperCase(), owner = tag === p.prof.tag ? p.prof : social.byTag(tag);
+        if (!owner) { notice('No such home.'); break; }
+        const party = [...room.players.values()].some((q) => q.prof.tag === tag);
+        if (owner !== p.prof && !party && !social.isFriend(owner, p.prof)) { notice('You can only visit friends and party members.'); break; }
+        if (p.zone !== 'town' && !p.zone.startsWith('house:')) { notice('Homes are reached from Emberhold.'); break; }
+        room.enterZone(p, 'house:' + tag);
+        break;
+      }
+      case 'decorBuy': {
+        if (m.k === '__refresh') { const H = houseOf(p.prof); send(ws, { t: 'houseOwned', owned: H.owned, trophies: p.prof.trophies || {} }); break; }
+        const D = DECOR[m.k]; if (!D) break;
+        const mats = (p.prof.mats ||= { shards: 0, cores: 0 });
+        if (p.prof.gold < (D.cost.gold || 0) || (mats.shards || 0) < (D.cost.shards || 0)) { notice(`${D.name} costs ${D.cost.gold}g${D.cost.shards ? ` and ${D.cost.shards} shards` : ''}.`); break; }
+        p.prof.gold -= D.cost.gold || 0; mats.shards -= D.cost.shards || 0;
+        const H = houseOf(p.prof); H.owned[m.k] = (H.owned[m.k] || 0) + 1; p.dirty = true; db.touch();
+        send(ws, { t: 'houseOwned', owned: H.owned, trophies: p.prof.trophies || {} }); notice(`${D.name} crafted — place it in your home.`, '#5eea8a');
+        break;
+      }
+      case 'decorPlace': case 'decorMove': case 'decorRemove': {
+        if (!zone || zone.type !== 'house' || zone.owner !== p.prof.tag) { notice('You can only decorate your own home.'); break; }
+        const H = houseOf(p.prof), x = snap(+m.x), z = snap(+m.z), r = ((m.r | 0) % 4 + 4) % 4;
+        if (m.t === 'decorRemove') { const i = H.items.findIndex((it) => it.id === m.id); if (i < 0) break; const it = H.items.splice(i, 1)[0]; if (!it.k.startsWith('trophy_')) H.owned[it.k] = (H.owned[it.k] || 0) + 1; }
+        else if (m.t === 'decorMove') { const it = H.items.find((x2) => x2.id === m.id); if (!it) break; const err = canPlace(H.items, it.k, x, z, it.id); if (err) { notice(err); break; } it.x = x; it.z = z; it.r = r; }
+        else {
+          const k = String(m.k), D = decorDef(k); if (!D) break;
+          if (H.items.length >= HOUSE.maxItems) { notice('Your home is full.'); break; }
+          if (D.trophy) { if (!(p.prof.trophies || {})[D.trophy]) { notice('Slay that boss first to earn its trophy.'); break; } if (H.items.some((it) => it.k === k)) { notice('That trophy is already on display.'); break; } }
+          else if (!(H.owned[k] > 0)) { notice(`Craft a ${D.name} first.`); break; }
+          const err = canPlace(H.items, k, x, z); if (err) { notice(err); break; }
+          if (!D.trophy) H.owned[k]--;
+          H.items.push({ id: H.next++, k, x, z, r });
+        }
+        p.dirty = true; db.touch();
+        zone.broadcast({ t: 'house', house: houseView(p.prof.tag, null) }); send(ws, { t: 'houseOwned', owned: H.owned, trophies: p.prof.trophies || {} });
+        break;
+      }
       case 'counter': if (zone && zone.counter(p, m.id)) p.counters = (p.counters || 0) + 1; break;
       // ---- endgame: Nightmare difficulty, weekly Rift Trials, crafting 2.0 ----
       case 'difficulty': {

@@ -41,7 +41,36 @@ import { DungeonZone } from './zones/dungeon.js';
 import { DarkZone } from './zones/dark.js';
 import { RegionZone } from './zones/region.js';
 import { TrainingZone } from './zones/training.js';
-let training = null;
+import { HouseZone } from './zones/house.js';
+import { DECOR, TROPHIES, trophyKey, decorDef, canPlace, snap as hsnap, HOUSE } from '../shared/housing.js';
+let training = null, house = null;
+// ---- housing: decorating mode (B inside your own home) ----
+const decorDock = document.createElement('div'); decorDock.id = 'decorDock'; decorDock.hidden = true; document.getElementById('hud')?.appendChild(decorDock);
+let decor = { on: false, list: [], i: 0, r: 0 };
+function decorList() {
+  const owned = G.houseOwned?.owned || {}, tro = G.houseOwned?.trophies || {}, shown = new Set((house?.view?.items || []).map((x) => x.k));
+  return [...Object.keys(DECOR).map((k) => ({ k, n: owned[k] || 0, cost: DECOR[k].cost })), ...Object.keys(TROPHIES).filter((b) => tro[b] && !shown.has(trophyKey(b))).map((b) => ({ k: trophyKey(b), n: 1, trophy: true }))];
+}
+function drawDecorDock() {
+  decorDock.hidden = !decor.on; if (!decor.on) return;
+  decor.list = decorList(); decor.i = Math.min(decor.i, decor.list.length - 1);
+  decorDock.innerHTML = `<div class="dd-h">Decorate · [ ] select · R rotate · click place · X pick up · C craft · B done</div>${decor.list.map((d, i) => `<div class="dd-row ${i === decor.i ? 'on' : ''} ${d.n ? '' : 'none'}" data-i="${i}"><span>${decorDef(d.k).name}</span><span>${d.trophy ? '🏆' : d.n ? '×' + d.n : `${d.cost.gold}g${d.cost.shards ? ' +' + d.cost.shards + '◆' : ''}`}</span></div>`).join('')}`;
+  decorDock.querySelectorAll('[data-i]').forEach((el) => (el.onclick = () => { decor.i = +el.dataset.i; const d = decor.list[decor.i]; if (!d.n && !d.trophy) net.send({ t: 'decorBuy', k: d.k }); drawDecorDock(); house.setGhost(decor.list[decor.i]?.k); }));
+  house.setGhost(decor.list[decor.i]?.k);
+}
+function updateDecor() {
+  if (!decor.on || G.zone !== house || !player) return;
+  const d = decor.list[decor.i]; if (!d) return;
+  if (input.hit('BracketRight')) { decor.i = (decor.i + 1) % decor.list.length; drawDecorDock(); }
+  if (input.hit('BracketLeft')) { decor.i = (decor.i - 1 + decor.list.length) % decor.list.length; drawDecorDock(); }
+  if (input.hit('KeyR')) decor.r = (decor.r + 1) % 4;
+  const x = hsnap(player.pos.x + Math.sin(player.ry) * 2.2), z = hsnap(player.pos.z + Math.cos(player.ry) * 2.2);
+  house.ghost.visible = true; house.ghost.position.set(x, 0, z); house.ghost.rotation.y = decor.r * Math.PI / 2;
+  const err = canPlace(house.view?.items || [], d.k, x, z); house.ring.material.color.set(err || (!d.n && !d.trophy) ? '#ff5a4a' : '#5eea8a');
+  if (input.hit('KeyC') && !d.trophy) net.send({ t: 'decorBuy', k: d.k });
+  if (input.click(0) || input.pad.pressed.has('attack')) { if (err) ui.toast(err, '#ff9a7a'); else if (!d.n && !d.trophy) ui.toast(`Craft it first (C) — ${d.cost.gold}g`, '#ff9a7a'); else net.send({ t: 'decorPlace', k: d.k, x, z, r: decor.r }); }
+  if (input.hit('KeyX')) { const near = (house.view?.items || []).map((it) => [it, Math.hypot(it.x - x, it.z - z)]).sort((a, b) => a[1] - b[1])[0]; if (near && near[1] < 1.4) net.send({ t: 'decorRemove', id: near[0].id }); }
+}
 import { setupTouch } from './touch.js';
 import { REGIONS, QUESTS, EVENTS, ACT1_END, ACT2_END } from '../shared/regions.js';
 import { applySnapshot } from '../shared/snapshot.js';
@@ -196,6 +225,7 @@ async function switchZone(m) {
   if (m.type === 'town') zone = town;
   else if (m.type === 'dark') zone = dark ||= new DarkZone(renderer);
   else if (m.type === 'training') zone = training ||= new TrainingZone(renderer);
+  else if (m.type === 'house') { zone = house ||= new HouseZone(renderer); house.setHouse(m.house); }
   else if (m.type === 'region') { zone = regions[m.zone] ||= new RegionZone(renderer, m.zone); applySettings(); }
   else if (m.type === 'rift') { if (dungeon) oldDungeon = dungeon; dungeon = new DungeonZone(renderer, m.seed, m.level, m.cleared, m.rift); dungeon.key = m.zone; zone = dungeon; applySettings(); }
   else {
@@ -206,7 +236,7 @@ async function switchZone(m) {
   G.zoneKey = m.zone;
   G.event = null;
   if (typeof m.clock === 'number') clockStart = performance.now() / 1000 - m.clock;
-  setWeather(m.weather, false); fishing.stop(false, true);
+  setWeather(m.weather, false); fishing.stop(false, true); decor.on = false; drawDecorDock();
   G.rift = m.rift ? { ...m.rift, t0: performance.now() / 1000 - m.rift.elapsed } : null;
   setActiveZone(zone);
   if (oldDungeon) oldDungeon.dispose();
@@ -222,7 +252,7 @@ async function switchZone(m) {
   player.ry = Math.atan2(face.x, face.z);
   camRig.yaw = Math.atan2(-face.x, -face.z);
   camRig.snap(player);
-  const banners = { training: ['TRAINING GROUNDS', 'Test your build against the dummies'], town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, zone.name || 'The Depths'], region: [REGIONS[m.zone]?.name.toUpperCase() || '', REGIONS[m.zone]?.sub || ''], rift: [`EMBER RIFT ${m.rift?.k}`, (m.rift?.mods || []).map((k) => RIFT_MODS[k].name).join(' · ')] };
+  const banners = { house: [(m.house?.name || 'Your').toUpperCase() + (m.house ? "'S HOME" : ' HOME'), m.house?.owner === G.social?.tag ? 'Press B to decorate' : 'Visiting a friend'], training: ['TRAINING GROUNDS', 'Test your build against the dummies'], town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, zone.name || 'The Depths'], region: [REGIONS[m.zone]?.name.toUpperCase() || '', REGIONS[m.zone]?.sub || ''], rift: [`EMBER RIFT ${m.rift?.k}`, (m.rift?.mods || []).map((k) => RIFT_MODS[k].name).join(' · ')] };
   if (prevKey || !settings.intro) ui.zoneBanner(...banners[m.type]);
   if (prevKey) sfx.portal();
   if (m.type === 'rift') setTimeout(() => ui.toast('Slay enemies to fill the rift — then face its Guardian', '#c77dff', `Beat ${Math.round(RIFT_TIME / 60)} minutes to raise your keystone`), 1200);
@@ -626,6 +656,8 @@ net.on('tradeState', (m) => ui.tradeState(m));
 net.on('tradeClosed', (m) => { ui.tradeClosed(m.text); if (/complete/i.test(m.text)) sfx.buy(); });
 net.on('plevel', (m) => { const r = G.remotes.get(m.id); if (r && m.id !== G.myId) fx.levelUp(r.pos.clone()); });
 net.on('chat', (m) => ui.chat(m.from, m.text, m.color));
+net.on('house', (m) => { if (G.zone === house) { house.setHouse(m.house); drawDecorDock(); } });
+net.on('houseOwned', (m) => { G.houseOwned = m; drawDecorDock(); });
 // ---- endgame ----
 net.on('roomDiff', (m) => { G.roomDiff = m.d; const D = DIFFICULTY[m.d]; ui.toast(`Difficulty: ${D.name}`, D.color, m.d ? `Enemies ×${D.hp} health, ×${D.dmg} damage · loot luck ×${D.luck}` : 'Standard challenge'); if (!document.getElementById('riftPanel').classList.contains('hidden')) renderTrial(ui, ui._trialBoard); ui.setDepth(G.roomLevel); });
 net.on('trialBoard', (m) => { ui._trialBoard = m; if (!document.getElementById('riftPanel').classList.contains('hidden')) renderTrial(ui, m); });
@@ -672,7 +704,10 @@ function handleInput() {
     else ui.openPanel('settings');
   }
   if (G.uiOpen) return;
-  if (input.actHit('build')) {
+  if (input.actHit('build') && G.zone === house) {
+    if (house.view?.owner !== G.social?.tag) ui.toast('Only the owner can decorate.', '#ff9a7a');
+    else { decor.on = !decor.on; house.ghost.visible = decor.on; if (decor.on) net.send({ t: 'decorBuy', k: '__refresh' }); drawDecorDock(); }
+  } else if (input.actHit('build')) {
     if (G.zone === town) { G.buildMode = !G.buildMode; if (G.buildMode) ui.toast('Build: 1-5 choose · click place · aim at a structure to upgrade (U) / repair (R)', '#5ab0ff'); }
     else ui.toast('You can only build in Emberhold.', '#ff6a5a');
   }
@@ -810,7 +845,7 @@ function frame(now) {
     for (const [id, e] of G.enemies) if (!e.update(dt, zone, camera)) { e.dispose(); G.enemies.delete(id); }
     for (const r of G.remotes.values()) r.update(dt, camera);
     for (const a of G.allies.values()) a.update(dt, camera, zone);
-    decals.update(dt); updateSigilTags(); if ((G.time * 4 | 0) !== (G._dpsT | 0)) { G._dpsT = G.time * 4; drawDps(); }
+    decals.update(dt); updateSigilTags(); updateDecor(); if ((G.time * 4 | 0) !== (G._dpsT | 0)) { G._dpsT = G.time * 4; drawDps(); }
     G.clock = performance.now() / 1000 - clockStart; G.hour = hourAt(G.clock);
     weather.update(dt, zone, camera);
     zone.wildlife?.update(dt, G.time, player ? player.pos : camera.position);
