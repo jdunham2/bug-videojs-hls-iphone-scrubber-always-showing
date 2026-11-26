@@ -10,12 +10,14 @@ import { AFFIXES } from '../shared/enemies.js';
 import { RIFT_MODS, RIFT_TIME, PARAGON, LEVEL_CAP, paragonXp } from '../shared/rifts.js';
 import { QUESTS, EVENTS, REGIONS, ACT1_END, ACT2_END, COMPANIONS } from '../shared/regions.js';
 import { renderSocial } from './socialui.js';
+import { icon, SKILL_ICON } from './icons.js';
 const FINISH_ICON = { warden: '🛡', emberblade: '🔥', hexcaller: '✴', ranger: '⚡' }, FINISH_NAME = { warden: 'Shield Slam', emberblade: 'Ember Execution', hexcaller: 'Arcane Overload', ranger: 'Storm Arrow' };
 import { renderForge, renderTrial } from './endgameui.js';
 import { compareItem, DIFFICULTY } from '../shared/endgame.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
 import { STYLE_RANKS, ROLL_CD } from './player.js';
-import { ACTION_LABELS, DEFAULT_BINDINGS, keyName } from './input.js';
+import { ACTION_LABELS, DEFAULT_BINDINGS, keyName, DEFAULT_PAD, PAD_NAMES } from './input.js';
+import { t, translateDOM } from './i18n.js';
 import { QUALITY, saveSettings, getToken, setToken } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -70,13 +72,29 @@ class UI {
     el.classList.add('show'); clearTimeout(this._zb);
     this._zb = setTimeout(() => el.classList.remove('show'), 3200);
   }
+  // ---- controller navigation for menus (spatial focus between visible controls) ----
+  focusables() { const roots = [...document.querySelectorAll('.panel:not(.hidden), #npcDialog:not(.hidden), #dialog:not(.hidden)')]; return roots.flatMap((r) => [...r.querySelectorAll('button:not([disabled]), select, input, [data-k], [data-i], .bcell, .tnode')]).filter((e) => e.offsetParent); }
+  padNav(dir) {
+    const els = this.focusables(); if (!els.length) return;
+    const cur = els.includes(document.activeElement) ? document.activeElement : null;
+    if (!cur) { els[0].focus(); els[0].classList.add('padfocus'); return; }
+    const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    let best = null, bd = 1e9;
+    for (const e of els) { if (e === cur) continue; const b = e.getBoundingClientRect(), dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
+      const ok = dir === 'up' ? dy < -4 : dir === 'down' ? dy > 4 : dir === 'left' ? dx < -4 : dx > 4; if (!ok) continue;
+      const d = dir === 'up' || dir === 'down' ? Math.abs(dy) + Math.abs(dx) * 2.5 : Math.abs(dx) + Math.abs(dy) * 2.5; if (d < bd) { bd = d; best = e; } }
+    if (best) { cur.classList.remove('padfocus'); best.focus(); best.classList.add('padfocus'); best.scrollIntoView({ block: 'nearest' }); best.dispatchEvent(new MouseEvent('mouseenter')); }
+  }
+  padClick() { const e = document.activeElement; if (e && this.focusables().includes(e)) e.click(); else this.padNav('down'); }
+  padBack() { if (!$('npcDialog').classList.contains('hidden')) $('npcDialog').querySelector('.nd-next').click(); else this.closeAll(); }
   bigBanner(title, sub, ms = 3500) {
     const el = $('bigBanner');
-    el.querySelector('.bb-t').textContent = title; el.querySelector('.bb-s').textContent = sub || '';
+    el.querySelector('.bb-t').textContent = t(title); el.querySelector('.bb-s').textContent = t(sub || '');
     el.classList.remove('hidden'); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
     clearTimeout(this._bb); this._bb = setTimeout(() => el.classList.add('hidden'), ms);
   }
   toast(html, color = '#efe7d6', sub = '') {
+    html = t(html); sub = t(sub);
     const d = document.createElement('div'); d.className = 'toast'; d.style.color = color;
     d.innerHTML = html + (sub ? `<small>${sub}</small>` : '');
     $('toasts').prepend(d);
@@ -125,10 +143,11 @@ class UI {
     const C = cls ? CLASSES[cls] : null;
     const b = G.input?.bindings || DEFAULT_BINDINGS;
     const skill = (id, ico, key, extra = '') => `<div class="skill" id="${id}"><div class="ico">${ico}</div><div class="key">${key}</div>${extra}<div class="cd"></div><div class="cdt"></div></div>`;
-    let html = skill('skLMB', cls === 'hexcaller' ? '🔥' : cls === 'ranger' ? '➶' : '⚔️', 'LMB');
-    if (C) C.skills.forEach((s, i) => { html += skill('sk' + (i + 1), s.icon, keyName(b['skill' + (i + 1)]), s.cost ? `<div class="cost">${s.cost}</div>` : ''); });
-    if (cls) html += skill('skFin', FINISH_ICON[cls], keyName(b.finisher || 'KeyF'), '<div class="pips" id="cpPips"><i></i><i></i><i></i><i></i><i></i></div>');
-    html += skill('skDodge', '🌀', keyName(b.dodge)) + skill('skPot', '🧪', keyName(b.potion), '<div class="cnt" id="potCount">3</div>');
+    const SI = SKILL_ICON[cls] || SKILL_ICON.warden, col = C?.color || '#ffd34d';
+    let html = skill('skLMB', icon(SI[0], col), 'LMB');
+    if (C) C.skills.forEach((s, i) => { html += skill('sk' + (i + 1), icon(SI[i + 1], col), keyName(b['skill' + (i + 1)]), s.cost ? `<div class="cost">${s.cost}</div>` : ''); });
+    if (cls) html += skill('skFin', icon(SI[5], '#ffd34d'), keyName(b.finisher || 'KeyF'), '<div class="pips" id="cpPips"><i></i><i></i><i></i><i></i><i></i></div>');
+    html += skill('skDodge', icon('dodge', '#9ac8ff'), keyName(b.dodge)) + skill('skPot', icon('potion', '#ff6a6a'), keyName(b.potion), '<div class="cnt" id="potCount">3</div>');
     $('skills').innerHTML = html;
     if (C) C.skills.forEach((s, i) => { const el = $('sk' + (i + 1)); el.onmouseenter = (e) => this.showText(`<div class="tn" style="color:${C.color}">${s.name}</div><div class="tm">${s.cost ? `${s.cost} ${C.resource.name} · ` : ''}${s.cd ? `${s.cd}s cooldown` : s.hold ? 'Hold' : ''}</div><div>${s.desc}</div>`, C.color, e); el.onmouseleave = () => this.hideTip(); });
     $('resFill').style.background = C ? C.resource.color : '#4a8cff';
@@ -285,7 +304,7 @@ class UI {
   get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe', 'social', 'forge'].some((id) => !$(id).classList.contains('hidden')); }
   togglePanel(id) { if ($(id).classList.contains('hidden')) this.openPanel(id); else this.closePanel(id); }
   openPanel(id) {
-    $(id).classList.remove('hidden');
+    $(id).classList.remove('hidden'); setTimeout(() => translateDOM($(id)), 0);
     G.uiOpen = true; G.input.unlock();
     if (id === 'inventory') this.renderInventory();
     if (id === 'social') { renderSocial(this); G.net.send({ t: 'social' }); }
@@ -625,7 +644,7 @@ class UI {
     const bind = (id, key, fmt = (v) => v) => { const el = $(id); el.oninput = el.onchange = () => { s[key] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value; saveSettings(s); G.actions.applySettings(); if ($(id + 'V')) $(id + 'V').textContent = fmt(s[key]); }; };
     bind('setQuality', 'quality'); bind('setMaster', 'master', (v) => Math.round(v * 100) + '%'); bind('setMusic', 'music', (v) => Math.round(v * 100) + '%'); bind('setSfx', 'sfx', (v) => Math.round(v * 100) + '%');
     bind('setSens', 'sens', (v) => v.toFixed(2) + '×'); bind('setInvert', 'invertY'); bind('setIntro', 'intro');
-    bind('setDynres', 'dynres'); $('setRenderer').onchange = (e) => { s.renderer = e.target.value; saveSettings(s); setTimeout(() => location.reload(), 150); }; bind('setRumble', 'rumble'); bind('setCb', 'cb'); bind('setUiScale', 'uiScale', (v) => Math.round(v * 100) + '%'); bind('setTouch', 'touch');
+    bind('setDynres', 'dynres'); bind('setReduced', 'reducedMotion'); bind('setHC', 'highContrast'); bind('setSubs', 'subs'); bind('setCaptions', 'captions'); bind('setLang', 'lang'); $('setRenderer').onchange = (e) => { s.renderer = e.target.value; saveSettings(s); setTimeout(() => location.reload(), 150); }; bind('setRumble', 'rumble'); bind('setCb', 'cb'); bind('setUiScale', 'uiScale', (v) => Math.round(v * 100) + '%'); bind('setTouch', 'touch');
     $('acctCopy').onclick = () => { try { navigator.clipboard.writeText(getToken()); this.toast('Recovery code copied — keep it safe', '#ffd98a'); } catch (e) { this.toast('Select the code and copy it manually', '#ff9a7a'); } };
     $('acctEmailBtn').onclick = () => {
       if (G.net.offline) { this.toast('Email login needs an online server.', '#ff9a7a'); return; }
@@ -638,7 +657,7 @@ class UI {
   }
   renderSettings() {
     const s = this.settings;
-    $('setDynres').checked = s.dynres; $('setRenderer').value = s.renderer || 'webgl'; $('setRumble').checked = s.rumble !== false; $('setCb').checked = s.cb; $('setUiScale').value = s.uiScale; $('setUiScaleV').textContent = Math.round(s.uiScale * 100) + '%'; $('setTouch').value = s.touch;
+    $('setDynres').checked = s.dynres; $('setReduced').checked = !!s.reducedMotion; $('setHC').checked = !!s.highContrast; $('setSubs').value = s.subs || 'normal'; $('setCaptions').checked = !!s.captions; $('setLang').value = s.lang || 'en'; $('setRenderer').value = s.renderer || 'webgl'; $('setRumble').checked = s.rumble !== false; $('setCb').checked = s.cb; $('setUiScale').value = s.uiScale; $('setUiScaleV').textContent = Math.round(s.uiScale * 100) + '%'; $('setTouch').value = s.touch;
     $('acctCode').textContent = getToken() || '(join a game first)';
     $('setQuality').value = s.quality; $('setMaster').value = s.master; $('setMusic').value = s.music; $('setSfx').value = s.sfx; $('setSens').value = s.sens; $('setInvert').checked = s.invertY; $('setIntro').checked = s.intro;
     $('setMasterV').textContent = Math.round(s.master * 100) + '%'; $('setMusicV').textContent = Math.round(s.music * 100) + '%'; $('setSfxV').textContent = Math.round(s.sfx * 100) + '%'; $('setSensV').textContent = (+s.sens).toFixed(2) + '×';
@@ -656,6 +675,15 @@ class UI {
       };
       list.appendChild(row);
     }
+    const pl = $('padBindList'); pl.innerHTML = '';
+    for (const act of Object.keys(DEFAULT_PAD)) {
+      const row = document.createElement('div'); row.className = 'brow'; const idx = (s.padBindings || {})[act] ?? DEFAULT_PAD[act];
+      row.innerHTML = `<span>${ACTION_LABELS[act] || act}</span><button class="btn kbtn">${PAD_NAMES[idx] || 'Button ' + idx}</button>`;
+      const btn = row.querySelector('button');
+      btn.onclick = () => { btn.textContent = 'Press a gamepad button…'; btn.classList.add('listen'); G.input.padCapture = (i) => { s.padBindings ||= {}; const cur = { ...DEFAULT_PAD, ...s.padBindings }; for (const k in cur) if (cur[k] === i && k !== act) s.padBindings[k] = cur[act]; s.padBindings[act] = i; saveSettings(s); G.actions.applySettings(); this.renderSettings(); }; };
+      pl.appendChild(row);
+    }
+    $('resetPad').onclick = () => { s.padBindings = {}; saveSettings(s); G.actions.applySettings(); this.renderSettings(); };
     $('padInfo').textContent = G.input.pad.connected ? '🎮 Gamepad connected — Left stick move · Right stick camera · A jump · B dodge · X attack · Y interact · LB/RB/LT/RT skills 1–4 · R3 lock-on · D-pad ↑ potion · Start settings' : 'Connect a gamepad and press any button to use it.';
   }
 

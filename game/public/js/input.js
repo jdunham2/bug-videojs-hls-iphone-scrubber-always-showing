@@ -1,3 +1,4 @@
+import { G } from './state.js';
 // Input: rebindable keyboard actions, mouse with pointer lock, and gamepad support.
 export const DEFAULT_BINDINGS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', dodge: 'ShiftLeft',
@@ -10,7 +11,11 @@ export const ACTION_LABELS = {
   lockon: 'Lock-on target', emote: 'Emote wheel (hold)', mount: 'Summon mount', quests: 'Quest log', social: 'Social (friends, guild, bounties)', finisher: 'Combo finisher', inventory: 'Inventory', talents: 'Talents', build: 'Build mode', chat: 'Chat', help: 'Help', upgrade: 'Upgrade structure',
 };
 // gamepad (standard mapping) -> action
-const PAD = { 0: 'jump', 1: 'dodge', 2: 'attack', 3: 'interact', 4: 'skill1', 5: 'skill2', 6: 'skill3', 7: 'skill4', 8: 'inventory', 9: 'menu', 10: 'emote', 11: 'lockon', 12: 'potion', 13: 'talents', 14: 'build' };
+export const DEFAULT_PAD = { jump: 0, dodge: 1, attack: 2, interact: 3, skill1: 4, skill2: 5, skill3: 6, skill4: 7, inventory: 8, menu: 9, emote: 10, lockon: 11, potion: 12, talents: 13, build: 14, finisher: 15 };
+export const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'L3', 'R3', 'D-pad ↑', 'D-pad ↓', 'D-pad ←', 'D-pad →', 'Home'];
+let PAD = {}; // button index -> action, built from the (remappable) bindings
+export function setPadBindings(map) { PAD = {}; for (const [a, i] of Object.entries({ ...DEFAULT_PAD, ...(map || {}) })) PAD[i] = a; }
+setPadBindings();
 
 export const keyName = (code) => (code || '').replace(/^Key/, '').replace(/^Digit/, '').replace('ShiftLeft', 'Shift').replace('ShiftRight', 'RShift').replace('ControlLeft', 'Ctrl').replace('Space', 'Space').replace('Arrow', '');
 
@@ -89,6 +94,13 @@ export class Input {
     pad.moveX = dz(gp.axes[0] || 0); pad.moveY = -dz(gp.axes[1] || 0);
     this.dx += dz(gp.axes[2] || 0) * 900 * dt * this.sens;
     this.dy += dz(gp.axes[3] || 0) * 600 * dt * this.sens * (this.invertY ? -1 : 1);
+    const raw = gp.buttons.map((b) => b.pressed || b.value > 0.5);
+    pad.rawPressed = raw.map((v, i) => v && !(pad.raw?.[i])); pad.raw = raw;
+    if (this.padCapture) { const i = pad.rawPressed.findIndex(Boolean); if (i >= 0) { const f = this.padCapture; this.padCapture = null; f(i); } return; }
+    // menus: D-pad / left stick move focus, A clicks, B backs out
+    if (G.uiOpen) { const ax = pad.moveX, ay = pad.moveY, now = performance.now(); let dir = pad.rawPressed[12] ? 'up' : pad.rawPressed[13] ? 'down' : pad.rawPressed[14] ? 'left' : pad.rawPressed[15] ? 'right' : null;
+      if (!dir && Math.hypot(ax, ay) > 0.6 && now - (pad.navT || 0) > 220) { dir = Math.abs(ax) > Math.abs(ay) ? (ax > 0 ? 'right' : 'left') : (ay > 0 ? 'up' : 'down'); pad.navT = now; }
+      if (dir) G.ui?.padNav(dir); if (pad.rawPressed[0]) G.ui?.padClick(); if (pad.rawPressed[1]) G.ui?.padBack(); return; }
     gp.buttons.forEach((b, i) => { const a = PAD[i]; if (a && (b.pressed || b.value > 0.5)) pad.down.add(a); });
     for (const a of pad.down) if (!pad.prev.has(a)) pad.pressed.add(a);
   }

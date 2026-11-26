@@ -88,7 +88,7 @@ export const decals = new Decals();
 export const SPLAT = { wraith: '#5a3a7a', imp: '#3a1a10', brute: '#3a4a2a', spider: '#2a3a10', spiderling: '#2a3a10', matriarch: '#2a3a10', goblin: '#c8a040', healer: '#2a6a3a', drake: '#2a4a7a', herald: '#4a8ac8', colossus: '#3a4a20', bomber: '#2a1a10' };
 
 // ---- camera recoil ----
-export const recoil = { pitch: 0, yaw: 0, vp: 0, vy: 0, kick(p, y = (Math.random() - 0.5) * p) { this.vp += p * 9; this.vy += y * 9; }, update(dt) {
+export const recoil = { pitch: 0, yaw: 0, vp: 0, vy: 0, kick(p, y = (Math.random() - 0.5) * p) { if (G.settings?.reducedMotion) return; this.vp += p * 9; this.vy += y * 9; }, update(dt) {
   // critically damped spring back to rest
   this.vp += (-this.pitch * 160 - this.vp * 22) * dt; this.vy += (-this.yaw * 160 - this.vy * 22) * dt;
   this.pitch += this.vp * dt; this.yaw += this.vy * dt;

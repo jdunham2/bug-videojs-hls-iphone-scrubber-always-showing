@@ -41,7 +41,7 @@ class Particles {
     for (let i = 0; i < MAX; i++) this.pos[i * 3 + 1] = -9999;
   }
   emit(o) {
-    const n = o.count || 10;
+    const n = Math.max(1, Math.round((o.count || 10) * (G.settings?.reducedMotion ? 0.5 : 1)));
     const c0 = new THREE.Color(o.color || '#ffaa44'), c1 = new THREE.Color(o.color2 || o.color || '#ff4400');
     for (let k = 0; k < n; k++) {
       const i = this.head; this.head = (this.head + 1) % MAX;

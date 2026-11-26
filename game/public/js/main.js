@@ -12,6 +12,13 @@ import { LocalPlayer, CameraRig, gearOf } from './player.js';
 import { fxPlay, enemiesInRadius } from './skills.js';
 import { Cinematic, introShots, bossShots, storyShots } from './cinematic.js';
 import { Footsteps, decals, recoil, rumble, SPLAT } from './feel.js';
+import { setPadBindings } from './input.js';
+import { setLang, translateDOM, t } from './i18n.js';
+// sound captions: short descriptions of important sounds for players who can't hear them
+const captionEl = document.createElement('div'); captionEl.id = 'captions'; document.body.appendChild(captionEl);
+const CAPTIONS = { roar: '[A monster roars]', horn: '[War horn]', bell: '[Bell tolls]', slam: '[The ground shakes]', explode: '[Explosion]', portal: '[Portal hums]', boss: '[Ominous music swells]', goblin: '[Goblin cackles]', gate: '[Stone grinds]', zap: '[Lightning crackles]' };
+const capT = {};
+for (const k of Object.keys(CAPTIONS)) { const f = sfx[k].bind(sfx); sfx[k] = (...a) => { if (G.settings?.captions && performance.now() - (capT[k] || 0) > 1500) { capT[k] = performance.now(); const d = document.createElement('div'); d.textContent = t(CAPTIONS[k]); captionEl.appendChild(d); setTimeout(() => d.remove(), 2600); while (captionEl.children.length > 3) captionEl.firstChild.remove(); } return f(...a); }; }
 import { renderSocial } from './socialui.js';
 import { COSMETICS } from '../shared/social.js';
 import { tintSteed } from './models.js';
@@ -136,6 +143,14 @@ const net = new Net();
 Object.assign(G, { renderer, camera, fx, audio: sfx, ui, net, input, party: new Map(), hazards: new Map(), hazardViews: new Map(), prof: null, lock: null, slowmo: 0, cinematic: false, laneThreat: [0, 0, 0], buildTarget: null, settings });
 ui.init(settings);
 const lobby = new Lobby();
+import { Trailer } from './trailer.js';
+let trailerDungeon = null;
+const trailer = new Trailer({ renderer, camera, get cine() { return cine; }, setActiveZone: (z) => setActiveZone(z), get town() { return town; },
+  region: (k) => (regions[k] ||= new RegionZone(renderer, k)), dark: () => (dark ||= new DarkZone(renderer)), dungeon: () => (trailerDungeon ||= new DungeonZone(renderer, 777, 3, false, null)),
+  weather: (k) => { G.weather = k; weather.set(k); } });
+G.trailer = trailer; window.__emberfallTrailer = trailer;
+document.getElementById('trailerBtn')?.addEventListener('click', () => trailer.play());
+let idleT = 0; addEventListener('pointermove', () => (idleT = 0)); addEventListener('keydown', () => (idleT = 0));
 const cine = new Cinematic(camera);
 import { DialogueScene } from './dialogue.js';
 const dlg = new DialogueScene(camera);
@@ -157,6 +172,10 @@ let ghost = null, ghostKind = null;
 
 function applySettings() {
   const Q = QUALITY[settings.quality];
+  // accessibility + language
+  document.body.classList.toggle('hc', !!settings.highContrast); document.body.classList.toggle('reduced', !!settings.reducedMotion);
+  document.body.classList.toggle('subs-large', settings.subs === 'large'); document.body.classList.toggle('subs-xl', settings.subs === 'xl');
+  setPadBindings(settings.padBindings); setLang(settings.lang); translateDOM(document.body);
   resize();
   const shadowWas = renderer.shadowMap.enabled;
   renderer.shadowMap.enabled = Q.shadows;
@@ -829,6 +848,7 @@ function frame(now) {
     netIn = 0;
   }
   let dt = realDt;
+  if (settings.reducedMotion) { G.shake *= 0.25; G.slowmo = 0; G.hitstop = Math.min(G.hitstop, 0.015); }
   if (G.slowmo > 0) { G.slowmo -= realDt; dt *= 0.3; }
   document.getElementById('slowmo').style.opacity = G.slowmo > 0 ? 1 : 0;
   if (G.hitstop > 0) { G.hitstop -= realDt; dt *= 0.1; }
@@ -882,10 +902,14 @@ function frame(now) {
     ui.drawMinimap(zone, player, camRig.yaw);
   } else {
     const t = now / 1000, a = t * 0.05 + 0.8;
-    camera.position.set(Math.cos(a) * 46, 20 + Math.sin(t * 0.2) * 3, Math.sin(a) * 46);
-    camera.lookAt(0, 4, 0);
-    town.update(dt, G.time, new THREE.Vector3(0, 0, 0));
-    lobby.update(realDt);
+    if (!trailer.active) camera.position.set(Math.cos(a) * 46, 20 + Math.sin(t * 0.2) * 3, Math.sin(a) * 46);
+    if (!trailer.active) camera.lookAt(0, 4, 0);
+    if (trailer.active) { cine.update(realDt); trailer.update(dt); weather.update(dt, G.zone, camera); }
+    else {
+      town.update(dt, G.time, new THREE.Vector3(0, 0, 0));
+      lobby.update(realDt);
+      idleT += realDt; if (idleT > 45 && !G.inGame) { idleT = 0; trailer.play(); } // attract mode after 45 s idle on the title screen
+    }
   }
   fx.update(dt, camera);
   renderer.info.reset();
