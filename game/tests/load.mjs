@@ -1,0 +1,20 @@
+// Load test: 4 players fighting ~60 enemies; reports server tick cost. Run: node tests/load.mjs
+import { makeGame, client, wait } from './harness.mjs';
+const g = makeGame();
+const a = client(g); await wait(20);
+const cs = [a, client(g, { room: a.room }), client(g, { room: a.room }), client(g, { room: a.room })];
+await wait(50);
+cs[0].send({ t: 'chat', text: '/gold 99999' });
+cs[0].send({ t: 'startNight' }); cs[0].send({ t: 'chat', text: '/wave 5' });
+const room = g.rooms.get(a.room);
+const town = room.zones.get('town');
+for (let i = 0; i < 40; i++) town.spawn(['skeleton', 'brute', 'imp', 'cultist', 'bomber', 'healer'][i % 6], Math.cos(i) * 60, Math.sin(i) * 60, { aggro: true });
+const times = []; const orig = room.tick.bind(room);
+room.tick = () => { const t0 = performance.now(); orig(); times.push(performance.now() - t0); };
+const bots = setInterval(() => cs.forEach((c, i) => c.send({ t: 'state', x: Math.cos(Date.now() / 900 + i) * 12, y: 0, z: Math.sin(Date.now() / 900 + i) * 12, hp: 100, maxHp: 100 })), 66);
+await wait(8000);
+clearInterval(bots); g.stop();
+times.sort((x, y) => x - y);
+const avg = times.reduce((s, v) => s + v, 0) / times.length;
+console.log(JSON.stringify({ ticks: times.length, enemies: town.enemies.size, avgMs: +avg.toFixed(3), p95Ms: +times[Math.floor(times.length * 0.95)].toFixed(3), maxMs: +times[times.length - 1].toFixed(3), budgetMs: 50 }));
+process.exit(0);

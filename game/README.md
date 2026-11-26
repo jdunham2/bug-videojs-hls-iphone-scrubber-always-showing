@@ -38,9 +38,29 @@ Up to 4 players per party.
 | **Presentation** | Cinematic intro flyover with title cards. Boss intro cameras. **Procedural adaptive music** (town, dungeon, night siege, Dark World, boss) with crossfades. A **settings menu** (graphics quality Low→Ultra, master/music/SFX volume, mouse sensitivity, invert Y, full **key rebinding**, intro toggle). **Gamepad support** (standard mapping). |
 | **Still here** | The explorable valley with chests, gear rarities and affixes, the Dark World merchant (now with server-side shop stock), day/night lighting, and synthesized audio. |
 
-### Dev mode
-Start the server with `EMBERFALL_DEV=1 npm start` to enable chat cheats for testing: `/depth N`, `/gold N`, `/xp N`, `/wave N`. Keep it off on a public server.
+### Endgame, world and story (milestone 3)
+| Feature | Details |
+|---|---|
+| **Legendary powers** | 18 powers: 4 per class that change a skill (Forked Storm, Ember Vortex, Mirror Shield…), plus 6 generic ones (Thunderlord, Phoenix Heart, Combustion…). |
+| **Item sets** | 9 class sets with 2-piece and 4-piece bonuses (e.g. +40% skill damage, skills cost 35% less, Ember Spirits never expire). |
+| **Blacksmith** | Salvage items into Ember Shards and Ember Cores, reroll a single affix, and raise an item's level. All of it is server-side. |
+| **Ember Rifts** | Timed keystone dungeons from the Rift Obelisk, with 2 random modifiers (Swift, Frenzied, Volatile, Empowered, Darkness). Kills fill a progress bar; at 100% the Guardian spawns. Clearing in under 5 minutes raises your keystone (+2 if under 3 minutes) and enters you on the seasonal **Hall of Embers** leaderboard. |
+| **Paragon** | Level cap 30. XP beyond the cap earns Paragon points to spend on Might, Vitality, Bulwark, Precision, Haste or Fortune. |
+| **New enemies** | Shield-bearers (block from the front, so you have to flank), Ash Burrowers (move underground and erupt under you), Cinder Menders (heal their allies), Blast Imps (suicide bombers that also target your structures). |
+| **New bosses** | **Storm Drake**: breath strafes and storm strikes; the dungeon boss on depths 3, 6, 9… and the Stormspire world boss. **Hollow King**: Dark World throne boss who moves the fight to a new arena each phase. **Bog Colossus**: the Act I boss. |
+| **Defense** | Night mutators (Blood Moon, Choking Fog, Siege Night) and a **War Table** research tree (towers, walls, braziers, frost totems, Ember Heart health). |
+| **World and story** | **Ashen Marsh** and **Stormspire Peaks** open regions with world events (Meteor Crash, Rift Breach). A six-step Act I questline with Captain Bryn (typed dialogue, quest tracker, J for the quest log) unlocks the Peaks. Waypoints connect the regions; summon an **Ember Steed** mount with M. |
+| **Launch readiness** | Server-side damage budgets (per hit and per second, derived from your real stats; rejected hits are logged). Per-connection rate limits and a 32 KB payload cap. A public party browser. `/healthz`. A SQLite store (`EMBERFALL_SQLITE=1`). Graceful shutdown. A Dockerfile, plus a GitHub Actions CI workflow that runs syntax checks, `npm test` (9 server-simulation tests), a load test and the static build. |
+| **Client** | F3 performance overlay, dynamic resolution, touch controls (auto-enabled on phones and tablets), colour-blind-safe rarity palette, interface scale, and an account recovery code (Settings → Graphics) to carry your hero to another device. |
 
+### Static solo build
+`npm run build:artifact` writes `dist-artifact/`, a static solo build. It runs the server simulation inside the page and saves to localStorage. This is the version published as a claude.ai Artifact.
+
+### Tests
+`npm test` runs the server-simulation suite in about 25 seconds. `npm run load` simulates 4 players fighting about 60 enemies and prints the per-tick server cost (about 0.4 ms average against a 50 ms budget).
+
+### Dev mode
+Start with `EMBERFALL_DEV=1` to enable `/depth N`, `/gold N`, `/xp N`, `/wave N` and `/loot N` in chat.
 ## Controls
 WASD move · Mouse look (click to lock) · LMB basic attack · 1–4 (and RMB) class skills · Shift dodge roll · Space jump · R potion · E interact / trade · V or MMB lock-on · hold T emote wheel · I inventory · K talents · B build (U upgrade, R repair) · Enter chat · Esc settings · H help. Every key can be rebound in Settings.
 

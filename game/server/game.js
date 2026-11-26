@@ -11,6 +11,17 @@ import { REGIONS, QUESTS, CAPTAIN, questDone } from '../public/shared/regions.js
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 export { TOKEN_RE };
 
+// Generous per-hit and per-second damage budgets derived from the hero's real stats (server-side).
+function damageCap(p) {
+  if (!p.capT || Date.now() - p.capT > 2000) {
+    const st = P.statsOf(p);
+    const base = st.dmg * st.critDmg * (1 + st.skillDmg) * 1.5;
+    p.cap = { hit: base * 16 + 50, sec: base * 60 + 200 };
+    p.capT = Date.now();
+  }
+  return p.cap;
+}
+
 export function createGame({ db, makeToken, dev = false }) {
 const rooms = new Map();
 const online = new Map(); // token -> player
@@ -197,9 +208,9 @@ function attach(ws) {
       let code = String(m.room || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
       if (!code) code = makeCode();
       room = rooms.get(code);
-      if (!room) { room = new Room(code); rooms.set(code, room); }
+      if (!room) { room = new Room(code); room.public = !!m.public; rooms.set(code, room); }
       if (room.players.size >= 4) { send(ws, { t: 'error', text: 'Party is full (4 players max).' }); room = null; return; }
-      p = { id: nextPlayer++, ws, token, prof, cls, char, zone: 'town', x: TOWN.spawn.x, y: 0, z: TOWN.spawn.z, ry: 0, anim: 0, hp: 100, maxHp: 100, gear: {}, dead: false, buffs: {}, loot: new Map(), shop: null, style: 0, spirit: false, trade: null, emote: null, block: false };
+      p = { dmgWin: 0, dmgSum: 0, msgWin: Date.now(), msgN: 0, id: nextPlayer++, ws, token, prof, cls, char, zone: 'town', x: TOWN.spawn.x, y: 0, z: TOWN.spawn.z, ry: 0, anim: 0, hp: 100, maxHp: 100, gear: {}, dead: false, buffs: {}, loot: new Map(), shop: null, style: 0, spirit: false, trade: null, emote: null, block: false };
       online.set(token, p);
       room.players.set(p.id, p);
       db.touch();
@@ -210,6 +221,10 @@ function attach(ws) {
       return;
     }
     if (!p) return;
+    // rate limiting: drop floods, disconnect abusive clients
+    const tnow = Date.now();
+    if (tnow - p.msgWin > 1000) { if (p.msgN > 400) { ws.close(1008, 'rate limit'); return; } p.msgWin = tnow; p.msgN = 0; }
+    if (++p.msgN > 150) return;
     const zone = room.zones.get(p.zone);
     switch (m.t) {
       case 'state':
@@ -233,7 +248,12 @@ function attach(ws) {
       case 'readyResp': room.readyResp(p, !!m.yes); break;
       case 'hit': {
         const e = zone?.enemies.get(m.id);
-        if (e && dist(e, p) < 24) zone.damageEnemy(e, Math.min(100000, Math.max(0, +m.dmg || 0)), p.id, m.crit, Math.max(-2, Math.min(4, +m.kb || 0)), Math.min(4, +m.stun || 0), p.x, p.z);
+        if (!e || dist(e, p) >= 24) break;
+        const dmg = Math.max(0, +m.dmg || 0), cap = damageCap(p), now = Date.now();
+        if (now - p.dmgWin > 1000) { p.dmgWin = now; p.dmgSum = 0; }
+        if (dmg > cap.hit || p.dmgSum + dmg > cap.sec) { p.rejected = (p.rejected || 0) + 1; if (p.rejected % 20 === 1) console.warn(`[anticheat] rejected hit from ${p.prof.name} (${p.cls}): ${Math.round(dmg)} (cap ${Math.round(cap.hit)}/hit, ${Math.round(cap.sec)}/s), total rejected ${p.rejected}`); break; }
+        p.dmgSum += dmg;
+        zone.damageEnemy(e, dmg, p.id, m.crit, Math.max(-2, Math.min(4, +m.kb || 0)), Math.min(4, +m.stun || 0), p.x, p.z);
         break;
       }
       case 'taunt': zone?.taunt(p, Math.min(14, +m.r || 10), Math.min(8, +m.dur || 6)); break;
@@ -355,5 +375,6 @@ function attach(ws) {
 }
 
   const timer = setInterval(() => { for (const r of rooms.values()) r.tick(); }, DT * 1000);
-  return { attach, rooms, stop: () => clearInterval(timer) };
+  const parties = () => [...rooms.values()].filter((r) => r.public && r.players.size < 4).map((r) => ({ code: r.code, depth: r.level, players: [...r.players.values()].map((p) => ({ name: p.prof.name, cls: p.cls, level: p.char.level })) }));
+  return { attach, rooms, parties, stop: () => clearInterval(timer) };
 }

@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { DB } from './server/db.js';
+import { SqliteDB } from './server/db-sqlite.js';
 import { createGame, TOKEN_RE } from './server/game.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -13,11 +14,14 @@ const PUBLIC = path.join(__dirname, 'public');
 const THREE_DIR = path.join(__dirname, 'node_modules', 'three');
 const PORT = process.env.PORT || 3000;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
-const db = new DB(process.env.EMBERFALL_DB || path.join(__dirname, 'data', 'profiles.json'));
+const db = process.env.EMBERFALL_SQLITE ? new SqliteDB(process.env.EMBERFALL_SQLITE === '1' ? path.join(__dirname, 'data', 'emberfall.db') : process.env.EMBERFALL_SQLITE) : new DB(process.env.EMBERFALL_DB || path.join(__dirname, 'data', 'profiles.json'));
+let game;
 
 const server = http.createServer((req, res) => {
   const [rawPath, qs] = req.url.split('?');
   const url = decodeURIComponent(rawPath);
+  if (url === '/healthz') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ ok: true, rooms: game?.rooms.size || 0, uptime: Math.round(process.uptime()) })); }
+  if (url === '/api/parties') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify(game ? game.parties() : [])); }
   if (url === '/api/profile') {
     const token = new URLSearchParams(qs || '').get('token') || '';
     const prof = TOKEN_RE.test(token) ? db.get(token) : null;
@@ -36,7 +40,10 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const wss = new WebSocketServer({ server, path: '/ws' });
-const game = createGame({ db, makeToken: () => crypto.randomBytes(16).toString('hex'), dev: !!process.env.EMBERFALL_DEV });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 32 * 1024 });
+game = createGame({ db, makeToken: () => crypto.randomBytes(16).toString('hex'), dev: !!process.env.EMBERFALL_DEV });
 wss.on('connection', (ws) => game.attach(ws));
+const shutdown = () => { console.log('Shutting down…'); for (const c of wss.clients) c.close(1001, 'server restarting'); db.flush(); setTimeout(() => process.exit(0), 300); };
+process.removeAllListeners('SIGTERM'); process.removeAllListeners('SIGINT');
+process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
 server.listen(PORT, () => console.log(`Emberfall running at http://localhost:${PORT}`));

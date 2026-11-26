@@ -12,7 +12,7 @@ export const QUALITY = {
 export function loadSettings() {
   let s = {};
   try { s = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { /* ignore */ }
-  return { quality: 'high', master: 0.8, music: 0.55, sfx: 0.85, sens: 1, invertY: false, intro: true, ...s, bindings: { ...DEFAULT_BINDINGS, ...(s.bindings || {}) } };
+  return { quality: 'high', master: 0.8, music: 0.55, sfx: 0.85, sens: 1, invertY: false, intro: true, dynres: true, cb: false, uiScale: 1, touch: 'auto', ...s, bindings: { ...DEFAULT_BINDINGS, ...(s.bindings || {}) } };
 }
 export function saveSettings(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } }
 

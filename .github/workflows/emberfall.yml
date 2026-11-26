@@ -1,0 +1,28 @@
+name: Emberfall
+on:
+  push:
+    paths: ['game/**', '.github/workflows/emberfall.yml']
+  pull_request:
+    paths: ['game/**']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: game/package-lock.json
+      - run: npm ci
+      - name: Syntax check
+        run: for f in server.js server/*.js public/js/*.js public/js/zones/*.js public/shared/*.js; do node --check "$f"; done
+      - name: Server simulation tests
+        run: npm test
+      - name: Load test (4 players, ~60 enemies)
+        run: npm run load
+      - name: Build the static offline build
+        run: npm run build:artifact

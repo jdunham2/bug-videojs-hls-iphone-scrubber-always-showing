@@ -24,6 +24,7 @@ export class Input {
     this.bindings = { ...DEFAULT_BINDINGS };
     this.sens = 1; this.invertY = false;
     this.pad = { connected: false, moveX: 0, moveY: 0, down: new Set(), pressed: new Set(), prev: new Set() };
+    this.touch = { moveX: 0, moveY: 0, down: new Set(), pressed: new Set() };
     this.capture = null; // key-rebind capture callback
     this.typing = () => document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName);
     addEventListener('keydown', (e) => {
@@ -63,17 +64,17 @@ export class Input {
   mouse(b) { return this.buttons.has(b) && !this.swallow; }
   click(b) { return this.clicked.has(b) && !this.swallow; }
   // actions (keyboard binding OR gamepad)
-  act(name) { return this.keys.has(this.bindings[name]) || (name === 'dodge' && this.keys.has('ShiftRight')) || this.pad.down.has(name); }
-  actHit(name) { return this.pressed.has(this.bindings[name]) || (name === 'dodge' && this.pressed.has('ShiftRight')) || this.pad.pressed.has(name); }
+  act(name) { return this.keys.has(this.bindings[name]) || (name === 'dodge' && this.keys.has('ShiftRight')) || this.pad.down.has(name) || this.touch.down.has(name); }
+  actHit(name) { return this.pressed.has(this.bindings[name]) || (name === 'dodge' && this.pressed.has('ShiftRight')) || this.pad.pressed.has(name) || this.touch.pressed.has(name); }
   actUp(name) { return this.released.has(this.bindings[name]) || (this.pad.prev.has(name) && !this.pad.down.has(name)); }
-  attackHeld() { return this.mouse(0) || this.pad.down.has('attack'); }
+  attackHeld() { return this.mouse(0) || this.pad.down.has('attack') || this.touch.down.has('attack'); }
   moveAxes() {
     let x = 0, y = 0;
     if (this.act('forward') || this.down('ArrowUp')) y += 1;
     if (this.act('back') || this.down('ArrowDown')) y -= 1;
     if (this.act('right') || this.down('ArrowRight')) x += 1;
     if (this.act('left') || this.down('ArrowLeft')) x -= 1;
-    x += this.pad.moveX; y += this.pad.moveY;
+    x += this.pad.moveX + this.touch.moveX; y += this.pad.moveY + this.touch.moveY;
     const l = Math.hypot(x, y);
     return l > 1 ? { x: x / l, y: y / l } : { x, y };
   }
@@ -92,5 +93,5 @@ export class Input {
     for (const a of pad.down) if (!pad.prev.has(a)) pad.pressed.add(a);
   }
   unlock() { if (this.locked) document.exitPointerLock?.(); }
-  endFrame() { this.pressed.clear(); this.released.clear(); this.clicked.clear(); this.dx = 0; this.dy = 0; this.wheel = 0; }
+  endFrame() { this.touch.pressed.clear(); this.pressed.clear(); this.released.clear(); this.clicked.clear(); this.dx = 0; this.dy = 0; this.wheel = 0; }
 }

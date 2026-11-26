@@ -12,7 +12,7 @@ import { QUESTS, EVENTS, REGIONS } from '../shared/regions.js';
 import { placeLabel, escapeHtml, EMOTES } from './entities.js';
 import { STYLE_RANKS, ROLL_CD } from './player.js';
 import { ACTION_LABELS, DEFAULT_BINDINGS, keyName } from './input.js';
-import { QUALITY, saveSettings } from './settings.js';
+import { QUALITY, saveSettings, getToken, setToken } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 export const COLORS = ['#e8a33d', '#e0453a', '#3a8ee0', '#4ac46a', '#b05ae0', '#e05aa8', '#3ad0c8', '#f2f2f2'];
@@ -570,12 +570,17 @@ class UI {
     const bind = (id, key, fmt = (v) => v) => { const el = $(id); el.oninput = el.onchange = () => { s[key] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value; saveSettings(s); G.actions.applySettings(); if ($(id + 'V')) $(id + 'V').textContent = fmt(s[key]); }; };
     bind('setQuality', 'quality'); bind('setMaster', 'master', (v) => Math.round(v * 100) + '%'); bind('setMusic', 'music', (v) => Math.round(v * 100) + '%'); bind('setSfx', 'sfx', (v) => Math.round(v * 100) + '%');
     bind('setSens', 'sens', (v) => v.toFixed(2) + '×'); bind('setInvert', 'invertY'); bind('setIntro', 'intro');
+    bind('setDynres', 'dynres'); bind('setCb', 'cb'); bind('setUiScale', 'uiScale', (v) => Math.round(v * 100) + '%'); bind('setTouch', 'touch');
+    $('acctCopy').onclick = () => { try { navigator.clipboard.writeText(getToken()); this.toast('Recovery code copied — keep it safe', '#ffd98a'); } catch (e) { this.toast('Select the code and copy it manually', '#ff9a7a'); } };
+    $('acctRestore').onclick = () => { const v = $('acctInput').value.trim().toLowerCase(); if (!/^[a-f0-9]{32}$/.test(v)) { this.toast('That is not a valid recovery code', '#ff6a5a'); return; } setToken(v); location.reload(); };
     $('replayIntro').onclick = () => { this.closePanel('settings'); G.actions.playIntro(); };
     $('resetBinds').onclick = () => { s.bindings = { ...DEFAULT_BINDINGS }; saveSettings(s); G.actions.applySettings(); this.renderSettings(); };
     document.querySelectorAll('.stab').forEach((b) => (b.onclick = () => { document.querySelectorAll('.stab').forEach((x) => x.classList.toggle('on', x === b)); document.querySelectorAll('.spage').forEach((p) => p.classList.toggle('hidden', p.id !== b.dataset.p)); }));
   }
   renderSettings() {
     const s = this.settings;
+    $('setDynres').checked = s.dynres; $('setCb').checked = s.cb; $('setUiScale').value = s.uiScale; $('setUiScaleV').textContent = Math.round(s.uiScale * 100) + '%'; $('setTouch').value = s.touch;
+    $('acctCode').textContent = getToken() || '(join a game first)';
     $('setQuality').value = s.quality; $('setMaster').value = s.master; $('setMusic').value = s.music; $('setSfx').value = s.sfx; $('setSens').value = s.sens; $('setInvert').checked = s.invertY; $('setIntro').checked = s.intro;
     $('setMasterV').textContent = Math.round(s.master * 100) + '%'; $('setMusicV').textContent = Math.round(s.music * 100) + '%'; $('setSfxV').textContent = Math.round(s.sfx * 100) + '%'; $('setSensV').textContent = (+s.sens).toFixed(2) + '×';
     const list = $('bindList'); list.innerHTML = '';

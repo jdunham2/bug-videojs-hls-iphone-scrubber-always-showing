@@ -20,9 +20,12 @@ import { TownZone } from './zones/town.js';
 import { DungeonZone } from './zones/dungeon.js';
 import { DarkZone } from './zones/dark.js';
 import { RegionZone } from './zones/region.js';
+import { setupTouch } from './touch.js';
 import { REGIONS, QUESTS, EVENTS } from '../shared/regions.js';
 import { STRUCTURES, TOWN } from '../shared/world.js';
 import { RARITIES } from '../shared/items.js';
+const RARITY_BASE = RARITIES.map((r) => r.color);
+const RARITY_CB = ['#d0d0d0', '#f0e442', '#56b4e9', '#cc79a7', '#e69f00'];
 import { CLASSES } from '../shared/classes.js';
 import { SHRINES, LEVER_NAMES } from '../shared/dungeon.js';
 import { RIFT_MODS, RIFT_TIME } from '../shared/rifts.js';
@@ -35,14 +38,16 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.info.autoReset = false; // the composer renders several passes; count the whole frame
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 900);
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(new THREE.Scene(), camera);
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.5, 0.85);
 composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new OutputPass());
 
+let dynScale = 1;
 function resize() {
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5) * QUALITY[settings.quality].pixel);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5) * QUALITY[settings.quality].pixel * (settings.dynres ? dynScale : 1));
   renderer.setSize(innerWidth, innerHeight);
   composer.setPixelRatio(renderer.getPixelRatio());
   composer.setSize(innerWidth, innerHeight);
@@ -85,7 +90,13 @@ function applySettings() {
   sfx.setVolumes({ master: settings.master, music: settings.music, sfx: settings.sfx });
   input.sens = settings.sens; input.invertY = settings.invertY; input.bindings = { ...settings.bindings };
   if (player) ui.buildSkillBar(player.cls);
+  RARITIES.forEach((r, i) => (r.color = settings.cb ? RARITY_CB[i] : RARITY_BASE[i]));
+  document.documentElement.style.setProperty('--ui-scale', settings.uiScale);
+  const touchOn = settings.touch === 'on' || (settings.touch === 'auto' && (matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window));
+  if (touchOn && !touchUI) touchUI = setupTouch(input);
+  touchUI?.show(touchOn && G.inGame); document.body.classList.toggle('touchmode', touchOn);
 }
+let touchUI = null;
 applySettings();
 
 function setActiveZone(zone) {
@@ -239,6 +250,7 @@ net.on('welcome', (m) => {
   lobby.dispose();
   ui.hideLobby();
   G.inGame = true;
+  applySettings();
   setTimeout(() => ui.chat('★', net.offline ? 'Press H for help. Solo mode: your hero is saved in this browser.' : 'Press H for help. Share your party code to play with friends!'), 800);
 });
 net.on('profile', (m) => {
@@ -449,7 +461,7 @@ document.getElementById('playBtn').onclick = async () => {
   document.getElementById('playBtn').disabled = true;
   try {
     await net.connect();
-    net.send({ t: 'hello', token: getToken(), name: v.name, color: v.color, room: v.room, cls: v.cls });
+    net.send({ t: 'hello', token: getToken(), name: v.name, color: v.color, room: v.room, cls: v.cls, public: document.getElementById('publicParty').checked });
   } catch (e) {
     ui.lobbyMsg(e.message + ' Start it with: npm start');
     document.getElementById('playBtn').disabled = false;
@@ -569,10 +581,28 @@ function laneThreat() {
   return out;
 }
 
-let sendT = 0, last = performance.now(), musicT = 0;
+let sendT = 0, last = performance.now(), musicT = 0, ftEma = 16, dynT = 0, perfOn = false, perfT = 0, netIn = 0;
+const perfEl = document.getElementById('perf');
+addEventListener('keydown', (e) => { if (e.code === 'F3') { e.preventDefault(); perfOn = !perfOn; perfEl.classList.toggle('hidden', !perfOn); } });
+net.on('ents', () => netIn++); net.on('players', () => netIn++);
 function frame(now) {
   requestAnimationFrame(frame);
-  const realDt = Math.min(0.05, (now - last) / 1000); last = now;
+  const rawDt = (now - last) / 1000;
+  const realDt = Math.min(0.05, rawDt); last = now;
+  ftEma += (Math.min(rawDt, 0.1) * 1000 - ftEma) * 0.05;
+  dynT += realDt;
+  if (settings.dynres && G.inGame && dynT > 1.2) {
+    dynT = 0;
+    const was = dynScale;
+    if (ftEma > 19 && dynScale > 0.55) dynScale = Math.max(0.5, dynScale - 0.1);
+    else if (ftEma < 13 && dynScale < 1) dynScale = Math.min(1, dynScale + 0.05);
+    if (was !== dynScale) resize();
+  }
+  if (perfOn && (perfT -= realDt) <= 0) {
+    perfT = 0.5; const ri = renderer.info;
+    perfEl.textContent = `FPS ${Math.round(1000 / ftEma)}  ${ftEma.toFixed(1)} ms\nres ${(renderer.getPixelRatio()).toFixed(2)}x${settings.dynres ? ' (dyn ' + dynScale.toFixed(2) + ')' : ''}  ${settings.quality}\ndraw calls ${ri.render.calls}  tris ${(ri.render.triangles / 1000).toFixed(0)}k\ngeo ${ri.memory.geometries}  tex ${ri.memory.textures}\nenemies ${G.enemies.size}  players ${G.remotes.size + 1}\nnet msgs/s ${netIn * 2}  zone ${G.zoneKey}`;
+    netIn = 0;
+  }
   let dt = realDt;
   if (G.slowmo > 0) { G.slowmo -= realDt; dt *= 0.3; }
   document.getElementById('slowmo').style.opacity = G.slowmo > 0 ? 1 : 0;
@@ -618,6 +648,7 @@ function frame(now) {
     lobby.update(realDt);
   }
   fx.update(dt, camera);
+  renderer.info.reset();
   composer.render();
   input.endFrame();
 }

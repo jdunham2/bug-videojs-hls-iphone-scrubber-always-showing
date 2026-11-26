@@ -54,6 +54,16 @@ export class Lobby {
       this.buildCards();
     }).catch(() => {});
     this.active = true;
+    if (!window.EMBERFALL_OFFLINE) this.loadParties();
+  }
+  loadParties() {
+    fetch('/api/parties').then((r) => r.json()).then((list) => {
+      const el = $('partyBrowser');
+      if (!this.active) return;
+      el.innerHTML = list.length ? '<label>Public parties</label>' + list.map((p) => `<div class="pb-row"><span><b>${p.code}</b> · Depth ${p.depth} · ${p.players.map((x) => `${x.cls[0].toUpperCase()}${x.level}`).join(' ')}</span><button class="btn" data-c="${p.code}">Join</button></div>`).join('') : '';
+      el.querySelectorAll('button').forEach((b) => (b.onclick = () => { $('roomInput').value = b.dataset.c; $('playBtn').click(); }));
+      setTimeout(() => this.active && this.loadParties(), 5000);
+    }).catch(() => {});
   }
   buildCards() {
     $('classCards').innerHTML = Object.entries(CLASSES).map(([k, C]) => `<div class="ccard ${k === this.cls ? 'on' : ''}" data-k="${k}" style="--c:${C.color}"><div class="cicon">${{ warden: '🛡️', emberblade: '🔥', hexcaller: '🔮' }[k]}</div><div class="cname">${C.name}</div><div class="crole">${C.role}</div>${this.levels[k] ? `<div class="clvl">Lv ${this.levels[k]}</div>` : ''}</div>`).join('');
