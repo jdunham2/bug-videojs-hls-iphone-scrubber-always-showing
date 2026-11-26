@@ -225,8 +225,9 @@ export class RemoteView {
     if (this.slamT >= 0) { this.slamT += dt / 0.7; if (this.slamT >= 1) this.slamT = -1; else slam = this.slamT; }
     if (this.rollT >= 0) { this.rollT += dt / 0.5; if (this.rollT >= 1) this.rollT = -1; else roll = Math.max(0.0001, this.rollT); }
     this.deadT = this.p.dead ? Math.min(1, this.deadT + dt) : 0;
+    if (this.p.hp < (this.lastHp ?? this.p.hp) - 1) this.hurtT = 1; this.lastHp = this.p.hp; this.hurtT = Math.max(0, (this.hurtT || 0) - dt * 4);
     if (this.emote) { this.emoteT += dt; if (this.emoteT > 3 || this.move > 0.3) { this.emote = null; this.bubble.style.display = 'none'; } }
-    animateRig(this.rig, { t: this.t, move: this.move, atk, combo: this.combo, slam, roll, dash: a === 12, air: a === 8, dead: this.deadT, block: a === 11, channel: a === 9, cast: a === 10 ? 0.8 : 0, emote: this.emote, emoteT: this.emoteT });
+    animateRig(this.rig, { t: this.t, move: this.move, atk, combo: this.combo, slam, roll, dash: a === 12, air: a === 8, dead: this.deadT, block: a === 11, channel: a === 9, cast: a === 10 ? 0.8 : 0, emote: this.emote, emoteT: this.emoteT, sprint: a === 13, mount: !!this.p.mount, hurt: this.hurtT || 0 });
     if (a === 9 && Math.random() < dt * 30) G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 0.9), count: 1, speed: 6, color: '#ffd080', color2: '#ff2a00', size: 0.4, life: 0.4, flat: true });
     this.steed.visible = !!this.p.mount;
     if (this.p.mount) { animateSteed(this.steed, this.t, this.move); this.rig.body.position.y += 0.85 + this.steed.position.y; const P = this.rig.P; if (P.legL) { P.legL.rotation.x = P.legR.rotation.x = -1.3; P.shinL.rotation.x = P.shinR.rotation.x = 1.4; } }

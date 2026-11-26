@@ -598,7 +598,7 @@ class UI {
     const bind = (id, key, fmt = (v) => v) => { const el = $(id); el.oninput = el.onchange = () => { s[key] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value; saveSettings(s); G.actions.applySettings(); if ($(id + 'V')) $(id + 'V').textContent = fmt(s[key]); }; };
     bind('setQuality', 'quality'); bind('setMaster', 'master', (v) => Math.round(v * 100) + '%'); bind('setMusic', 'music', (v) => Math.round(v * 100) + '%'); bind('setSfx', 'sfx', (v) => Math.round(v * 100) + '%');
     bind('setSens', 'sens', (v) => v.toFixed(2) + '×'); bind('setInvert', 'invertY'); bind('setIntro', 'intro');
-    bind('setDynres', 'dynres'); bind('setCb', 'cb'); bind('setUiScale', 'uiScale', (v) => Math.round(v * 100) + '%'); bind('setTouch', 'touch');
+    bind('setDynres', 'dynres'); bind('setRumble', 'rumble'); bind('setCb', 'cb'); bind('setUiScale', 'uiScale', (v) => Math.round(v * 100) + '%'); bind('setTouch', 'touch');
     $('acctCopy').onclick = () => { try { navigator.clipboard.writeText(getToken()); this.toast('Recovery code copied — keep it safe', '#ffd98a'); } catch (e) { this.toast('Select the code and copy it manually', '#ff9a7a'); } };
     $('acctRestore').onclick = () => { const v = $('acctInput').value.trim().toLowerCase(); if (!/^[a-f0-9]{32}$/.test(v)) { this.toast('That is not a valid recovery code', '#ff6a5a'); return; } setToken(v); location.reload(); };
     $('replayIntro').onclick = () => { this.closePanel('settings'); G.actions.playIntro(); };
@@ -607,7 +607,7 @@ class UI {
   }
   renderSettings() {
     const s = this.settings;
-    $('setDynres').checked = s.dynres; $('setCb').checked = s.cb; $('setUiScale').value = s.uiScale; $('setUiScaleV').textContent = Math.round(s.uiScale * 100) + '%'; $('setTouch').value = s.touch;
+    $('setDynres').checked = s.dynres; $('setRumble').checked = s.rumble !== false; $('setCb').checked = s.cb; $('setUiScale').value = s.uiScale; $('setUiScaleV').textContent = Math.round(s.uiScale * 100) + '%'; $('setTouch').value = s.touch;
     $('acctCode').textContent = getToken() || '(join a game first)';
     $('setQuality').value = s.quality; $('setMaster').value = s.master; $('setMusic').value = s.music; $('setSfx').value = s.sfx; $('setSens').value = s.sens; $('setInvert').checked = s.invertY; $('setIntro').checked = s.intro;
     $('setMasterV').textContent = Math.round(s.master * 100) + '%'; $('setMusicV').textContent = Math.round(s.music * 100) + '%'; $('setSfxV').textContent = Math.round(s.sfx * 100) + '%'; $('setSensV').textContent = (+s.sens).toFixed(2) + '×';

@@ -1,6 +1,7 @@
 // Class skills, client projectiles, Ember Spirits, and skill VFX (also replayed for remote players).
 import * as THREE from 'three';
 import { G } from './state.js';
+import { decals, recoil, rumble } from './feel.js';
 import { CLASSES } from '../shared/classes.js';
 import { isFloor } from '../shared/dungeon.js';
 
@@ -125,7 +126,7 @@ function meteorFx(P, r, delay) {
     rock.geometry.dispose(); rock.material.dispose();
     G.fx.shockwave(P, r, '#ff8a2a', 0.5); G.fx.shockwave(P, r * 0.5, '#ffffff', 0.3);
     G.fx.emit({ pos: P.clone().setY(P.y + 0.5), count: 120, speed: 11, color: '#ffe0a0', color2: '#ff1000', size: 0.55, life: 0.9, up: 1 });
-    G.shake = Math.max(G.shake, 0.7); G.audio.explode();
+    G.shake = Math.max(G.shake, 0.7); G.audio.explode(); decals.add('scorch', P.x, P.z, r * 1.5); recoil.kick(0.03); rumble(0.6, 0.4, 220);
   });
 }
 
@@ -162,7 +163,7 @@ export class SkillKit {
     p.combatT = 0;
     return true;
   }
-  send(kind, d) { fxPlay(kind, d); G.net.send({ t: 'fx', kind, ...d }); }
+  send(kind, d) { fxPlay(kind, { ...d, mine: true }); G.net.send({ t: 'fx', kind, ...d }); }
   mods(k) { return 1 + (this.p.stats.T[k] || 0) + this.p.stats.skillDmg; }
   has(f) { return !!this.p.stats.flags[f]; }
 

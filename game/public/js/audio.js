@@ -175,6 +175,19 @@ class Sfx {
   style(rank) { this.tone(400 + rank * 180, 0.35, 'triangle', 0.12, 800 + rank * 300); }
   pop() { this.tone(900, 0.12, 'sine', 0.1, 1400); }
   click() { this.tone(1200, 0.04, 'square', 0.04); }
+  // footsteps per surface (filtered noise bursts + a soft thump)
+  step(surface, v = 1) {
+    const j = 0.85 + Math.random() * 0.3, V = v * 0.6;
+    switch (surface) {
+      case 'stone': this.noise(0.06, 0.16 * V, 2600 * j, 900, 'bandpass', 0, 1.5); this.tone(110 * j, 0.05, 'sine', 0.05 * V, 70); break;
+      case 'grass': this.noise(0.09, 0.12 * V, 1800 * j, 3200, 'highpass', 0, 0.6); break;
+      case 'snow': this.noise(0.14, 0.16 * V, 900 * j, 300, 'lowpass', 0, 0.8); this.noise(0.05, 0.06 * V, 4000, 2500, 'bandpass', 0.03, 2); break;
+      case 'ash': this.noise(0.12, 0.12 * V, 700 * j, 250, 'lowpass', 0, 0.7); break;
+      case 'mud': this.noise(0.13, 0.15 * V, 380 * j, 160, 'lowpass', 0, 2); this.tone(90 * j, 0.08, 'sine', 0.06 * V, 50); break;
+      case 'water': this.noise(0.18, 0.18 * V, 1200 * j, 500, 'bandpass', 0, 1.2); this.noise(0.1, 0.07 * V, 3500, 5000, 'highpass', 0.05); break;
+      case 'ice': this.noise(0.05, 0.14 * V, 4200 * j, 2600, 'bandpass', 0, 3); this.tone(1900 * j, 0.04, 'sine', 0.02 * V, 1500); break;
+    }
+  }
 }
 
 export const sfx = new Sfx();

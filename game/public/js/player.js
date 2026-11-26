@@ -6,12 +6,13 @@ import { computeStats } from '../shared/stats.js';
 import { CLASSES } from '../shared/classes.js';
 import { RARITIES } from '../shared/items.js';
 import { tileAt } from '../shared/dungeon.js';
+import { recoil, rumble, decals } from './feel.js';
 import { levelMul } from '../shared/enemies.js';
 import { SkillKit, enemiesInArc, enemiesInRadius, fxPlay } from './skills.js';
 
 const angDiff = (a, b) => Math.abs(((a - b + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
 export const ROLL_CD = 0.9, POT_CD = 1.0;
-export const ANIM = { idle: 0, run: 1, atk0: 2, atk1: 3, atk2: 4, slam: 5, roll: 6, dead: 7, air: 8, whirl: 9, cast: 10, block: 11, bash: 12 };
+export const ANIM = { idle: 0, run: 1, atk0: 2, atk1: 3, atk2: 4, slam: 5, roll: 6, dead: 7, air: 8, whirl: 9, cast: 10, block: 11, bash: 12, sprint: 13 };
 export const STYLE_RANKS = [
   { r: 'D', min: 0, name: 'Dull', color: '#9a9a9a' }, { r: 'C', min: 20, name: 'Cool', color: '#5eea8a' }, { r: 'B', min: 45, name: 'Brutal', color: '#5ab0ff' },
   { r: 'A', min: 80, name: 'Awesome', color: '#c77dff' }, { r: 'S', min: 130, name: 'Savage!', color: '#ffb347' },
@@ -182,6 +183,11 @@ export class LocalPlayer {
     if (this.slowT > 0) speed *= 0.5;
     if (this.tailT > 0) speed *= 1.35;
     if (this.mounted) speed *= 1.8;
+    // out-of-combat sprint ramps in after a moment of uninterrupted running
+    const canSprint = moving && !this.mounted && this.onGround && this.combatT > 3 && this.atk.t < 0 && this.castT <= 0 && !this.blocking && !this.roll;
+    this.sprintT = canSprint ? (this.sprintT || 0) + dt : 0;
+    this.sprinting = this.sprintT > 0.6;
+    if (this.sprinting) speed *= 1 + 0.3 * Math.min(1, (this.sprintT - 0.6) * 2);
     const tile = zone.d ? tileAt(zone.d, this.pos.x, this.pos.z) : 0;
     const accel = tile === 4 ? 1.6 : 14;
     if (this.roll) {
@@ -239,14 +245,14 @@ export class LocalPlayer {
     const atk = this.atk.t >= 0 ? this.atk.t : -1;
     animateRig(this.rig, {
       t: this.t, move: this.move, atk, combo: this.atk.combo, slam: this.slamT, dash: !!kit.bash, air: !this.onGround && this.slamT < 0, dead: this.dead ? this.deadAnim : 0, hurt: this.hurtT,
-      roll: this.roll, block: this.blocking, channel: kit.whirlT > 0, cast: this.castT > 0 ? Math.min(1, this.castT * 4) : 0, emote: this.emote, emoteT: this.emoteT,
+      roll: this.roll, block: this.blocking, channel: kit.whirlT > 0, sprint: this.sprinting, mount: this.mounted, cast: this.castT > 0 ? Math.min(1, this.castT * 4) : 0, emote: this.emote, emoteT: this.emoteT,
     });
     if (this.mounted) {
       animateSteed(this.steed, this.t, this.move); this.steed.rotation.y = 0;
       this.rig.body.position.y += 0.85 + this.steed.position.y;
       const P = this.rig.P; if (P.legL) { P.legL.rotation.x = P.legR.rotation.x = -1.3; P.shinL.rotation.x = P.shinR.rotation.x = 1.4; P.legL.rotation.z = -0.35; P.legR.rotation.z = 0.35; }
     } else if (this.rig.P.legL) { this.rig.P.legL.rotation.z = this.rig.P.legR.rotation.z = 0; }
-    this.anim = this.dead ? ANIM.dead : this.roll ? ANIM.roll : this.slamT >= 0 ? ANIM.slam : kit.bash ? ANIM.bash : kit.whirlT > 0 ? ANIM.whirl : this.blocking ? ANIM.block : this.castT > 0 ? ANIM.cast : this.atk.t >= 0 ? ANIM.atk0 + this.atk.combo : !this.onGround ? ANIM.air : this.move > 0.1 ? ANIM.run : ANIM.idle;
+    this.anim = this.dead ? ANIM.dead : this.roll ? ANIM.roll : this.slamT >= 0 ? ANIM.slam : kit.bash ? ANIM.bash : kit.whirlT > 0 ? ANIM.whirl : this.blocking ? ANIM.block : this.castT > 0 ? ANIM.cast : this.atk.t >= 0 ? ANIM.atk0 + this.atk.combo : !this.onGround ? ANIM.air : this.sprinting ? ANIM.sprint : this.move > 0.1 ? ANIM.run : ANIM.idle;
   }
 
   dismount() { if (!this.mounted) return; this.mounted = false; this.steed.visible = false; G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 30, speed: 2, color: '#ffc060', color2: '#ff3a00', size: 0.3, life: 0.6 }); }
@@ -291,7 +297,7 @@ export class LocalPlayer {
     for (const e of hit) this.dealDamage(e, S.dmg * mul, { kb: c === 2 ? 1.6 : 0.5, stun: c === 2 ? 0.3 : 0 });
     const sp = this.pos.clone(); sp.y += 1.15;
     G.fx.slash(sp, this.ry, this.weaponColor, range + 0.3, c, arc);
-    if (hit.length) { G.hitstop = c === 2 ? 0.08 : 0.045; G.shake = Math.max(G.shake, c === 2 ? 0.35 : 0.15); }
+    if (hit.length) { G.hitstop = c === 2 ? 0.08 : 0.045; G.shake = Math.max(G.shake, c === 2 ? 0.35 : 0.15); if (c === 2) { recoil.kick(-0.025); rumble(0.45, 0.2, 90); } else rumble(0.15, 0.25, 50); }
   }
 
   dealDamage(e, base, o = {}, quiet = false) {
@@ -326,7 +332,7 @@ export class LocalPlayer {
   }
 
   perfectDodge() {
-    G.slowmo = 1.1;
+    G.slowmo = 1.1; rumble(0.2, 0.9, 160);
     this.resource = Math.min(this.stats.resMax, this.resource + this.stats.resMax * 0.4);
     this.addStyle(25, 'perfect');
     G.audio.perfect();
@@ -368,6 +374,8 @@ export class LocalPlayer {
       this.style *= 0.6; this.lastRank = Math.min(this.lastRank, this.rank);
       if (this.R.onHurt) this.resource = Math.min(this.stats.resMax, this.resource + this.R.onHurt);
       G.shake = Math.max(G.shake, 0.25); G.ui.hurtFlash(); G.audio.hurt();
+      const heavy = final > this.stats.maxHp * 0.12 || o.kb; recoil.kick(heavy ? 0.06 : 0.02, (Math.random() - 0.5) * (heavy ? 0.06 : 0.02)); rumble(heavy ? 0.8 : 0.35, heavy ? 0.5 : 0.25, heavy ? 260 : 110);
+      if (heavy && Math.random() < 0.5) decals.add('splat', this.pos.x, this.pos.z, 0.9, '#5a0a0a', 12);
       G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1.2), count: 12, speed: 4, color: '#ff4a3a', color2: '#400000', size: 0.25, life: 0.5, gravity: 10 });
       if (o.affix === 'frozen') { this.slowT = 2; G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 20, speed: 2, color: '#dffaff', color2: '#3ab0ff', size: 0.3, life: 0.8 }); }
       if (o.affix === 'molten') { this.burnT = 3; this.burnDps = Math.max(3, dmg * 0.25); }
@@ -409,10 +417,12 @@ export class CameraRig {
     if (zone.cameraClamp) cam = zone.cameraClamp(this.target, cam);
     const gh = zone.groundHeight(cam.x, cam.z) + 0.6;
     if (cam.y < gh) cam.y = gh;
+    recoil.update(dt);
     G.shake = Math.max(0, G.shake - dt * 1.8);
     const s = G.shake * G.shake * 0.6;
     cam.x += (Math.random() - 0.5) * s; cam.y += (Math.random() - 0.5) * s; cam.z += (Math.random() - 0.5) * s;
     this.camera.position.copy(cam);
     this.camera.lookAt(this.target);
+    if (recoil.pitch || recoil.yaw) { this.camera.rotateX(recoil.pitch); this.camera.rotateY(recoil.yaw); }
   }
 }

@@ -15,6 +15,9 @@ import { loadSettings, saveSettings, QUALITY, getToken, setToken } from './setti
 import { LocalPlayer, CameraRig, gearOf } from './player.js';
 import { fxPlay, enemiesInRadius } from './skills.js';
 import { Cinematic, introShots, bossShots, storyShots } from './cinematic.js';
+import { Footsteps, decals, recoil, rumble, SPLAT } from './feel.js';
+const footsteps = new Footsteps();
+G.decals = decals;
 import { entityRoot, EnemyView, AllyView, RemoteView, LootView, ProjView, StructView, HazardView, buildStructure, EMOTES } from './entities.js';
 import { TownZone } from './zones/town.js';
 import { DungeonZone } from './zones/dungeon.js';
@@ -100,7 +103,7 @@ let touchUI = null;
 applySettings();
 
 function setActiveZone(zone) {
-  zone.scene.add(fx.root, entityRoot);
+  zone.scene.add(fx.root, entityRoot, decals.root);
   if (player) zone.scene.add(player.root);
   renderPass.scene = zone.scene;
   G.zone = zone;
@@ -115,7 +118,7 @@ function clearEntities() {
   for (const m of [G.enemies, G.allies, G.loots, G.projectiles, G.structures, G.hazardViews]) { for (const v of m.values()) v.dispose(); m.clear(); }
   G.hazards.clear();
   for (const r of G.remotes.values()) r.dispose();
-  G.remotes.clear(); killed.clear(); fx.clear();
+  G.remotes.clear(); killed.clear(); fx.clear(); decals.clear();
   player?.kit.clear();
   G.lock = null;
 }
@@ -342,12 +345,13 @@ net.on('edie', (m) => {
   pos.y += 1;
   if (e) e.die();
   if (G.lock === e) G.lock = null;
+  decals.add('splat', pos.x, pos.z, ENEMY_BOSS.has(m.type) ? 5 : 1.4 + Math.random() * 0.8, SPLAT[m.type] || (G.zone?.type === 'region' && G.zoneKey === 'peaks' ? '#c8c8d0' : '#4a4038'));
   fx.boneBurst(pos, m.type === 'wraith' ? '#b26bff' : m.type === 'imp' ? '#ff6a3a' : m.type === 'brute' ? '#8a9a6a' : m.type.includes('spider') || m.type === 'matriarch' ? '#5a2a20' : m.type === 'goblin' ? '#ffd34d' : '#e8e0cc');
   sfx.enemyDie();
   if (player) { player.addStyle(m.affix ? 18 : 10, 'kill'); }
   if (player && e && player.stats.flags.g_combust && e.hitByMe && G.time - e.hitByMe < 3) { for (const o of enemiesInRadius(e.pos, 3)) if (o !== e) player.dealDamage(o, player.stats.dmg * 0.6, { kb: 1 }, true); fxPlay('explode', { x: e.pos.x, z: e.pos.z, r: 3 }); }
   if (m.type === 'goblin') { ui.toast('Treasure Goblin slain!', '#ffd34d', 'It spilled its hoard'); fx.goldBurst(pos); fx.emit({ pos, count: 120, speed: 8, color: '#ffe066', color2: '#ffaa00', size: 0.3, life: 1.5, gravity: 12, up: 1.5 }); sfx.coin(); sfx.coin(); }
-  if (ENEMY_BOSS.has(m.type)) { G.shake = 1; fx.shockwave(pos, 10, '#ff6a3a', 1); fx.emit({ pos, count: 200, speed: 10, color: '#ffcf6a', color2: '#ff2000', size: 0.5, life: 1.6, up: 1 }); }
+  if (ENEMY_BOSS.has(m.type)) { recoil.kick(0.05); rumble(0.9, 0.6, 500); decals.add('scorch', pos.x, pos.z, 7, '#ffffff', 40); G.shake = 1; fx.shockwave(pos, 10, '#ff6a3a', 1); fx.emit({ pos, count: 200, speed: 10, color: '#ffcf6a', color2: '#ff2000', size: 0.5, life: 1.6, up: 1 }); }
 });
 const ENEMY_BOSS = new Set(['boss', 'matriarch', 'ogre', 'drake', 'hollowking', 'herald', 'colossus']);
 net.on('hurt', (m) => { if (player) player.hurt(m.dmg, m.from >= 0 ? m.from : null, { affix: m.affix, kb: m.kb }); });
@@ -382,7 +386,7 @@ net.on('projEnd', (m) => {
   if (m.hit || v.kind !== 'arrow') fx.emit({ pos: v.pos.clone(), count: 14, speed: 4, color: v.color || '#ffe6a0', color2: '#5a00a0', size: 0.3, life: 0.4 });
   v.dispose(); G.projectiles.delete(m.id);
 });
-net.on('hazard', (m) => { if (!G.zone) return; const h = { ...m.h }; G.hazards.set(h.id, h); G.hazardViews.set(h.id, new HazardView(h, G.zone)); });
+net.on('hazard', (m) => { if (!G.zone) return; const h = { ...m.h }; if (h.kind === 'fire' || h.kind === 'storm') setTimeout(() => decals.add('scorch', h.x, h.z, h.r * (h.kind === 'storm' ? 1.1 : 1.6), h.kind === 'storm' ? '#a0c0ff' : '#ffffff', h.kind === 'storm' ? 10 : 24), (h.delay || 0) * 1000); G.hazards.set(h.id, h); G.hazardViews.set(h.id, new HazardView(h, G.zone)); });
 net.on('hazardEnd', (m) => { G.hazards.delete(m.id); const v = G.hazardViews.get(m.id); if (v) { v.dispose(); G.hazardViews.delete(m.id); } });
 net.on('slam', (m) => {
   const y = G.zone.groundHeight(m.x, m.z);
@@ -391,7 +395,8 @@ net.on('slam', (m) => {
   setTimeout(() => {
     if (!G.zone) return;
     const p = new THREE.Vector3(m.x, y, m.z);
-    fx.shockwave(p, m.r, '#ff4a20', 0.5);
+    fx.shockwave(p, m.r, '#ff4a20', 0.5); decals.add('crack', m.x, m.z, m.r * 1.2, '#ffffff', 18);
+    if (player && p.distanceTo(player.pos) < m.r + 6) { recoil.kick(0.035); rumble(0.7, 0.4, 260); }
     fx.emit({ pos: p.clone().setY(y + 0.3), count: 90, speed: 10, color: '#ffb060', color2: '#ff1000', size: 0.5, life: 0.8, flat: true, drag: 2.5 });
     G.shake = Math.max(G.shake, 0.8); sfx.slam();
   }, m.delay * 1000);
@@ -430,7 +435,7 @@ net.on('heal', (m) => {
   for (let i = 0; i <= 12; i++) fx.emit({ pos: pa.clone().lerp(pb, i / 12), count: 2, speed: 0.4, color: '#a0ffc0', color2: '#10a040', size: 0.35, life: 0.6 });
   fx.text(pb, `+${m.amt}`, 'heal', 0.8);
 });
-net.on('boom', (m) => { const p = new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z) + 0.5, m.z); fx.shockwave(p, m.r, '#ff6a1a', 0.4); fx.emit({ pos: p, count: 90, speed: 9, color: '#ffe0a0', color2: '#ff1000', size: 0.55, life: 0.8, up: 1 }); sfx.explode(); G.shake = Math.max(G.shake, 0.4); });
+net.on('boom', (m) => { const p = new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z) + 0.5, m.z); decals.add('scorch', m.x, m.z, m.r * 1.3); if (player && p.distanceTo(player.pos) < 8) { recoil.kick(0.03); rumble(0.6, 0.3, 200); } fx.shockwave(p, m.r, '#ff6a1a', 0.4); fx.emit({ pos: p, count: 90, speed: 9, color: '#ffe0a0', color2: '#ff1000', size: 0.55, life: 0.8, up: 1 }); sfx.explode(); G.shake = Math.max(G.shake, 0.4); });
 net.on('strafe', (m) => {
   const y = (x, z) => G.zone.groundHeight(x, z);
   const A = new THREE.Vector3(m.ax, y(m.ax, m.az) + 0.06, m.az), B = new THREE.Vector3(m.bx, y(m.bx, m.bz) + 0.06, m.bz);
@@ -658,6 +663,8 @@ function frame(now) {
     for (const [id, e] of G.enemies) if (!e.update(dt, zone, camera)) { e.dispose(); G.enemies.delete(id); }
     for (const r of G.remotes.values()) r.update(dt, camera);
     for (const a of G.allies.values()) a.update(dt, camera, zone);
+    decals.update(dt);
+    if (player && !G.cinematic) footsteps.update(player, zone);
     for (const p of G.projectiles.values()) p.update(dt);
     for (const s of G.structures.values()) s.update(dt, camera);
     for (const h of G.hazardViews.values()) h.update(dt);

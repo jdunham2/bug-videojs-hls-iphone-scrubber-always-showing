@@ -1,5 +1,6 @@
 // Procedural stylized characters, enemies and weapons + a procedural animation system.
 import * as THREE from 'three';
+import { Animator } from './anim.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RARITIES } from '../shared/items.js';
 
@@ -289,7 +290,8 @@ export function applyGear(rig, gear, color) {
   rig.baseEmissive = rig.mats.map((m) => m.emissive.clone());
 }
 
-export function buildHero(color, cls = 'warden') {
+export function buildHero(color, cls = 'warden') { const rig = buildHeroRig(color, cls); rig.animator = new Animator(); return rig; }
+function buildHeroRig(color, cls) {
   if (cls === 'emberblade') {
     const rig = buildHumanoid({ cloth: '#2a2024', leather: '#3a2618', cape: color, armor: '#6a5a50', weapon: 'dagger', dual: true, hair: '#c23a1a' });
     const scarf = mesh(new THREE.TorusGeometry(0.2, 0.07, 6, 14), std(color, { rough: 0.9 }), 0, 0.78, 0, rig.P.spine); scarf.rotation.x = Math.PI / 2;
@@ -400,8 +402,18 @@ function poseAt(p, B, C) {
   return out;
 }
 
+// cloth, shields and other secondary motion layered on top of the keyframed pose
+function secondaryMotion(rig, s) {
+  const P = rig.P, t = s.t, mv = Math.min(1, s.move || 0);
+  if (rig.offhand?.userData.face) rig.offhand.rotation.set(Math.PI / 2 - (P.armL.rotation.x + P.foreL.rotation.x + P.spine.rotation.x) * (s.block ? 1 : 0.4), 0, 0);
+  if (P.cape) { const tgt = 0.15 + mv * 0.55 + (s.sprint ? 0.35 : 0) + Math.sin(t * 3.1) * 0.06 + (s.dash || s.roll > 0 ? 0.6 : 0); P.cape.rotation.x += (tgt - P.cape.rotation.x) * 0.25; }
+  if (P.robe && rig.opts.legs === 'robe') P.robe.rotation.x = -0.08 * mv;
+  if (P.hood) P.hood.rotation.x = -0.05 * mv;
+}
+
 /** s: { t, move, atk (-1|0..1), combo, slam(-1|0..1), dash, air, dead(0..1), hurt(0..1), float, cast } */
 export function animateRig(rig, s) {
+  if (rig.animator) { rig.animator.update(rig, s); secondaryMotion(rig, s); return; }
   const P = rig.P, t = s.t, mv = Math.min(1, s.move || 0);
   const w = t * (s.float ? 3 : 10.5);
   const floaty = rig.opts.legs === 'none';
