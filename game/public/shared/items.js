@@ -82,14 +82,14 @@ export function generateItem(rng, level, opts = {}) {
     if (!mainAffix) mainAffix = k;
   }
   item.name = `${rng.pick(PREFIX[rarity])} ${base}${mainAffix && rarity >= 2 ? ' ' + AFFIXES[mainAffix].suffix : ''}`;
-  item.power = itemPower(item);
-  item.price = Math.round(item.power * (rarity + 1) * 0.4 + 3); // sell value
-  return item;
+  return decorateItem(item, rng);
 }
 
 export function itemPower(it) {
   let p = (it.dmg || 0) * (it.speed || 1) * 2.2 + (it.armor || 0) * 2 + (it.hp || 0) * 0.5;
   const a = it.affixes || {};
+  if (it.leg) p += 60;
+  if (it.set) p += 25;
   p += (a.dmgPct || 0) * 120 + (a.hp || 0) * 0.5 + (a.crit || 0) * 300 + (a.speed || 0) * 200 + (a.gold || 0) * 60 + (a.leech || 0) * 500;
   return Math.round(p);
 }
@@ -97,3 +97,77 @@ export function itemPower(it) {
 export function affixLines(it) {
   return Object.entries(it.affixes || {}).map(([k, v]) => AFFIXES[k].fmt(v));
 }
+
+// ---------- Legendary powers & item sets ----------
+export const LEGENDARIES = {
+  // Warden
+  w_shockbash: { cls: 'warden', name: 'Shockwave Bash', desc: 'Shield Bash releases a shockwave that hits everything in a wide cone ahead.' },
+  w_furycry: { cls: 'warden', name: 'Battle Fury', desc: 'War Cry grants +30% damage for 6 seconds.' },
+  w_aftershock: { cls: 'warden', name: 'Aftershock', desc: 'Earthshatter strikes again 0.8s later for 60% damage.' },
+  w_reflect: { cls: 'warden', name: 'Mirror Shield', desc: 'Blocking reflects 50% of the blocked damage back at the attacker.' },
+  // Emberblade
+  e_twinblink: { cls: 'emberblade', name: 'Twin Shadows', desc: 'Blink Strike also hits a second nearby enemy.' },
+  e_vortex: { cls: 'emberblade', name: 'Ember Vortex', desc: 'Fire Whirl pulls enemies toward you.' },
+  e_cinderflurry: { cls: 'emberblade', name: 'Cinder Flurry', desc: 'Blade Flurry stabs set enemies ablaze for 40% extra damage over time.' },
+  e_reaper: { cls: 'emberblade', name: 'Reaper', desc: 'Kills with Execution reset its cooldown.' },
+  // Hexcaller
+  h_fork: { cls: 'hexcaller', name: 'Forked Storm', desc: 'Chain Lightning forks, striking two targets per jump.' },
+  h_trinity: { cls: 'hexcaller', name: 'Trinity Bolt', desc: 'Fire Bolt launches three bolts in a fan.' },
+  h_martyr: { cls: 'hexcaller', name: 'Martyr Spirits', desc: 'Ember Spirits explode for 300% damage when they expire.' },
+  h_shower: { cls: 'hexcaller', name: 'Starfall', desc: 'Meteor calls three smaller meteors around the target.' },
+  // Generic
+  g_bloodcrit: { cls: null, name: 'Sanguine Edge', desc: 'Critical hits heal you for 1.5% of your maximum health.' },
+  g_thunder: { cls: null, name: 'Thunderlord', desc: 'Every 10th hit calls down lightning for 250% damage.' },
+  g_phoenix: { cls: null, name: 'Phoenix Heart', desc: 'Once every 120s, lethal damage revives you at 40% health.' },
+  g_tailwind: { cls: null, name: 'Tailwind', desc: 'Dodge rolls grant +35% move speed for 2 seconds.' },
+  g_combust: { cls: null, name: 'Combustion', desc: 'Enemies you kill explode for 60% damage around them.' },
+  g_greed: { cls: null, name: "Goblin's Greed", desc: '+50% gold find.', stats: { goldFind: 0.5 } },
+};
+
+export const SETS = {
+  bastion: { cls: 'warden', name: 'Bastion of the Unbroken', pieces: ['Blade', 'Greathelm', 'Bulwark Plate', 'Ironshod Boots'], b2: { armorPct: 0.25 }, b4: { block: 0.15, flag: 'bastion4' }, d2: '+25% armor', d4: 'Block −15% more damage; War Cry cooldown halved' },
+  warlord: { cls: 'warden', name: "Warlord's Regalia", pieces: ['Cleaver', 'Crown', 'Warplate', 'Marching Greaves'], b2: { dmgPct: 0.12 }, b4: { skillDmg: 0.4 }, d2: '+12% damage', d4: '+40% skill damage' },
+  earthshaker: { cls: 'warden', name: "Earthshaker's Mantle", pieces: ['Maul', 'Horned Helm', 'Stonehide', 'Quakestompers'], b2: { cdr: 0.15 }, b4: { flag: 'quakeFree' }, d2: '15% cooldown reduction', d4: 'Earthshatter costs no Rage' },
+  ashdancer: { cls: 'emberblade', name: "Ashdancer's Garb", pieces: ['Fang', 'Hood', 'Silk Jerkin', 'Soft Boots'], b2: { crit: 0.08 }, b4: { flag: 'dodgeHeal' }, d2: '+8% crit chance', d4: 'Perfect dodges heal 25% health' },
+  cinder: { cls: 'emberblade', name: 'Cinderstorm', pieces: ['Kris', 'Mask', 'Ember Coat', 'Ash Treads'], b2: { moveSpeed: 0.12 }, b4: { skillDmg: 0.4 }, d2: '+12% move speed', d4: '+40% skill damage' },
+  nightblade: { cls: 'emberblade', name: "Nightblade's Edge", pieces: ['Edge', 'Cowl', 'Shadowmail', 'Stalkers'], b2: { critDmg: 0.5 }, b4: { costMul: -0.35 }, d2: '+50% crit damage', d4: 'Skills cost 35% less Focus' },
+  stormcaller: { cls: 'hexcaller', name: "Stormcaller's Vestments", pieces: ['Rod', 'Circlet', 'Stormrobe', 'Sandals'], b2: { resRegen: 0.25 }, b4: { skillDmg: 0.4 }, d2: '+25% Mana regeneration', d4: '+40% skill damage' },
+  pyromancer: { cls: 'hexcaller', name: "Pyromancer's Robes", pieces: ['Brand', 'Cowl', 'Firerobe', 'Cinderslippers'], b2: { dmgPct: 0.12 }, b4: { costMul: -0.35 }, d2: '+12% damage', d4: 'Skills cost 35% less Mana' },
+  soulbinder: { cls: 'hexcaller', name: "Soulbinder's Wraps", pieces: ['Spiritstaff', 'Veil', 'Wraps', 'Footwraps'], b2: { hpPct: 0.15 }, b4: { flag: 'spiritPerm' }, d2: '+15% health', d4: 'Ember Spirits never expire' },
+};
+const SLOT_IDX = { weapon: 0, helm: 1, chest: 2, boots: 3 };
+export const WEAPON_CLASSES = { sword: ['warden', 'emberblade'], axe: ['warden'], hammer: ['warden'], dagger: ['emberblade'], staff: ['hexcaller'] };
+
+export function decorateItem(item, rng) {
+  if (item.rarity === 4) {
+    const pool = Object.entries(LEGENDARIES).filter(([, L]) => item.slot === 'weapon' ? (L.cls === null ? rng.chance(0.3) : WEAPON_CLASSES[item.type].includes(L.cls)) : (L.cls === null || rng.chance(0.4)));
+    if (pool.length) item.leg = rng.pick(pool)[0];
+  } else if (item.rarity >= 3 && rng.chance(0.2)) {
+    const sets = Object.entries(SETS).filter(([, S]) => item.slot !== 'weapon' || WEAPON_CLASSES[item.type].includes(S.cls));
+    if (sets.length) {
+      const [id, S] = rng.pick(sets);
+      item.set = id; item.name = `${S.name.replace(/^(The )/, '')} ${S.pieces[SLOT_IDX[item.slot]]}`;
+    }
+  }
+  item.power = itemPower(item); item.price = Math.round(item.power * (item.rarity + 1) * 0.4 + 3);
+  return item;
+}
+
+// raise an item's level by one, rescaling its base stats
+export function levelUpItem(it) {
+  const k = (1 + 0.2 * it.level) / (1 + 0.2 * (it.level - 1));
+  for (const s of ['dmg', 'armor', 'hp']) if (it[s]) it[s] = Math.round(it[s] * k);
+  for (const [a, v] of Object.entries(it.affixes || {})) if (a === 'hp' || a === 'dmgPct') it.affixes[a] = v * (a === 'hp' ? k : 1.03);
+  it.level++;
+  it.power = itemPower(it); it.price = Math.round(it.power * (it.rarity + 1) * 0.4 + 3);
+}
+export function rerollAffix(it, key, rng, level) {
+  if (!it.affixes || !(key in it.affixes)) return false;
+  delete it.affixes[key];
+  const keys = Object.keys(AFFIXES).filter((k) => !(it.slot !== 'weapon' && k === 'leech'));
+  const k = rng.pick(keys);
+  it.affixes[k] = (it.affixes[k] || 0) + AFFIXES[k].roll(rng, level);
+  it.power = itemPower(it); it.price = Math.round(it.power * (it.rarity + 1) * 0.4 + 3);
+  return true;
+}
+export const SALVAGE = [1, 3, 8, 20, 45];

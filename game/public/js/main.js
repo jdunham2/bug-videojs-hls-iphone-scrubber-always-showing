@@ -13,7 +13,7 @@ import { ui } from './ui.js';
 import { Lobby } from './lobby.js';
 import { loadSettings, saveSettings, QUALITY, getToken, setToken } from './settings.js';
 import { LocalPlayer, CameraRig, gearOf } from './player.js';
-import { fxPlay } from './skills.js';
+import { fxPlay, enemiesInRadius } from './skills.js';
 import { Cinematic, introShots, bossShots } from './cinematic.js';
 import { entityRoot, EnemyView, RemoteView, LootView, ProjView, StructView, HazardView, buildStructure, EMOTES } from './entities.js';
 import { TownZone } from './zones/town.js';
@@ -202,6 +202,7 @@ G.actions = {
   openShop() { ui.openPanel('shop'); },
   openTalents(atTrainer) { ui._atTrainer = !!atTrainer; ui.openPanel('talents'); },
   openStash() { ui.openPanel('stash'); },
+  openSmith() { ui.openPanel('smith'); },
   openChest(ch) { if (!ch.open) net.send({ t: 'chest', id: ch.id }); },
   applySettings, playIntro: () => { if (player) playIntro(); },
   respawn() {
@@ -284,6 +285,7 @@ net.on('edie', (m) => {
   fx.boneBurst(pos, m.type === 'wraith' ? '#b26bff' : m.type === 'imp' ? '#ff6a3a' : m.type === 'brute' ? '#8a9a6a' : m.type.includes('spider') || m.type === 'matriarch' ? '#5a2a20' : m.type === 'goblin' ? '#ffd34d' : '#e8e0cc');
   sfx.enemyDie();
   if (player) { player.addStyle(m.affix ? 18 : 10, 'kill'); }
+  if (player && e && player.stats.flags.g_combust && e.hitByMe && G.time - e.hitByMe < 3) { for (const o of enemiesInRadius(e.pos, 3)) if (o !== e) player.dealDamage(o, player.stats.dmg * 0.6, { kb: 1 }, true); fxPlay('explode', { x: e.pos.x, z: e.pos.z, r: 3 }); }
   if (m.type === 'goblin') { ui.toast('Treasure Goblin slain!', '#ffd34d', 'It spilled its hoard'); fx.goldBurst(pos); fx.emit({ pos, count: 120, speed: 8, color: '#ffe066', color2: '#ffaa00', size: 0.3, life: 1.5, gravity: 12, up: 1.5 }); sfx.coin(); sfx.coin(); }
   if (ENEMY_BOSS.has(m.type)) { G.shake = 1; fx.shockwave(pos, 10, '#ff6a3a', 1); fx.emit({ pos, count: 200, speed: 10, color: '#ffcf6a', color2: '#ff2000', size: 0.5, life: 1.6, up: 1 }); }
 });

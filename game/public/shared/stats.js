@@ -1,5 +1,5 @@
 // Derived hero stats from class + level + gear + talents + temporary buffs. Shared by server and client.
-import { WEAPONS } from './items.js';
+import { WEAPONS, LEGENDARIES, SETS } from './items.js';
 import { CLASSES, talentTotals } from './classes.js';
 
 export const xpForLevel = (l) => Math.round(100 * Math.pow(l, 1.5));
@@ -8,6 +8,19 @@ export function computeStats(char, cls, buffs = {}) {
   const C = CLASSES[cls] || CLASSES.warden;
   const eq = char.equipped || {}, w = eq.weapon, W = w ? WEAPONS[w.type] : null;
   const T = talentTotals(cls, char.talents);
+  // legendary powers + set bonuses fold into the talent totals (T) and flags
+  const setCount = {};
+  for (const it of Object.values(eq)) {
+    if (!it) continue;
+    if (it.leg && LEGENDARIES[it.leg]) { T.flags[it.leg] = true; for (const [k, v] of Object.entries(LEGENDARIES[it.leg].stats || {})) T[k] = (T[k] || 0) + v; }
+    if (it.set) setCount[it.set] = (setCount[it.set] || 0) + 1;
+  }
+  const sets = [];
+  for (const [id, n] of Object.entries(setCount)) {
+    const S = SETS[id]; if (!S) continue;
+    sets.push({ id, n });
+    for (const b of [n >= 2 ? S.b2 : null, n >= 4 ? S.b4 : null]) if (b) for (const [k, v] of Object.entries(b)) { if (k === 'flag') T.flags[v] = true; else T[k] = (T[k] || 0) + v; }
+  }
   let hp = C.baseHp + (char.level - 1) * C.hpPerLevel, armor = C.armor, dmgPct = 0, crit = 0.05 + (W?.crit || 0), speed = 0, gold = 0, leech = 0;
   for (const it of Object.values(eq)) {
     if (!it) continue;
@@ -22,11 +35,12 @@ export function computeStats(char, cls, buffs = {}) {
     maxHp: Math.round(hp), armor: Math.round(armor), dmg,
     crit: Math.min(0.8, crit + (T.crit || 0)), critDmg: 2 + (T.critDmg || 0),
     moveSpeed: 1 + speed + (T.moveSpeed || 0) + (buffs.swift ? 0.3 : 0),
-    goldFind: gold + (buffs.fortune ? 1 : 0), leech: leech + (T.leech || 0),
+    goldFind: gold + (T.goldFind || 0) + (buffs.fortune ? 1 : 0), leech: leech + (T.leech || 0),
     atkSpeed: (W ? W.speed : 1) * (1 + (T.atkSpeed || 0)), range: W ? W.range : 2.2, arc: W ? W.arc : 1.8,
     weaponType: w ? w.type : C.starter, cleave: !!W?.cleave, ranged: !!W?.ranged,
     cdr: Math.min(0.5, (T.cdr || 0) + (buffs.swift ? 0.25 : 0)),
     resMax: C.resource.max + (T.resMax || 0), resRegen: C.resource.regen * (C.resource.regen > 0 ? 1 + (T.resRegen || 0) : 1),
+    skillDmg: T.skillDmg || 0, costMul: Math.max(0.3, 1 + (T.costMul || 0)), sets,
     T, flags: T.flags,
   };
 }

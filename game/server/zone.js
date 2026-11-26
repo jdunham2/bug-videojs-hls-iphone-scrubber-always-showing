@@ -309,9 +309,10 @@ export class Zone {
     e.hp -= dmg; e.aggro = true;
     const poise = e.def.poise * (e.affix ? 0.5 : 1);
     if (poise > 0) {
-      if (kb > 0 && fx !== undefined) {
+      if (kb !== 0 && fx !== undefined) {
         const dx = e.x - fx, dz = e.z - fz, l = Math.hypot(dx, dz) || 1;
-        e.x += (dx / l) * kb * poise; e.z += (dz / l) * kb * poise;
+        const k = kb < 0 ? Math.max(kb, -(l - 1.8)) : kb; // pulls stop short of the player
+        if (k) { e.x += (dx / l) * k * poise; e.z += (dz / l) * k * poise; }
         this.collide(e, e.radius);
       }
       if (stun > 0) { e.stunT = Math.max(e.stunT, stun * Math.min(1, poise)); e.windT = 0; }

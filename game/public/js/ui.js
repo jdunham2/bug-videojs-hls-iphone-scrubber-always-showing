@@ -1,7 +1,7 @@
 // DOM user interface: HUD, minimap, inventory/shop/stash/trade, talents, emote wheel, settings, dialogs.
 import * as THREE from 'three';
 import { G } from './state.js';
-import { RARITIES, affixLines, WEAPONS } from '../shared/items.js';
+import { RARITIES, affixLines, WEAPONS, LEGENDARIES, SETS, SALVAGE } from '../shared/items.js';
 import { STRUCTURES, TOWN, upgradeCost, repairCost } from '../shared/world.js';
 import { CLASSES, TIER_REQ, talentPoints, spentPoints, canLearn } from '../shared/classes.js';
 import { xpForLevel, computeStats } from '../shared/stats.js';
@@ -130,7 +130,8 @@ class UI {
     const cd = (id, v, max, label) => { const el = $(id); if (!el) return; el.querySelector('.cd').style.height = Math.max(0, Math.min(1, v / max)) * 100 + '%'; el.querySelector('.cdt').textContent = v > 0.05 && max > 1.5 ? Math.ceil(v) : ''; };
     C.skills.forEach((s, i) => {
       cd('sk' + (i + 1), p.kit.cds[i], p.kit.cdMax(i) || 1);
-      $('sk' + (i + 1)).classList.toggle('nores', p.resource < s.cost);
+      $('sk' + (i + 1)).classList.toggle('nores', p.resource < p.kit.cost(i));
+      const ce = $('sk' + (i + 1)).querySelector('.cost'); if (ce) ce.textContent = p.kit.cost(i) || '';
       $('sk' + (i + 1)).classList.toggle('active', (s.hold && p.blocking) || (s.id === 'whirl' && p.kit.whirlT > 0));
     });
     cd('skDodge', p.rollCd, ROLL_CD); cd('skPot', Math.max(p.potCd, c.potions ? 0 : 1), 1);
@@ -239,7 +240,7 @@ class UI {
   }
 
   // ---------- panels ----------
-  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings'].some((id) => !$(id).classList.contains('hidden')); }
+  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith'].some((id) => !$(id).classList.contains('hidden')); }
   togglePanel(id) { if ($(id).classList.contains('hidden')) this.openPanel(id); else this.closePanel(id); }
   openPanel(id) {
     $(id).classList.remove('hidden');
@@ -249,6 +250,7 @@ class UI {
     if (id === 'stash') { $('inventory').classList.add('hidden'); this.renderStash(); }
     if (id === 'talents') this.renderTalents();
     if (id === 'settings') this.renderSettings();
+    if (id === 'smith') { this.smithSel = null; this.renderSmith(); }
   }
   closePanel(id) {
     $(id).classList.add('hidden');
@@ -257,7 +259,7 @@ class UI {
     this.hideTip();
     G.uiOpen = this.anyPanel;
   }
-  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
+  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
   sideBySide(id, on) {
     const inv = $('inventory'), other = $(id);
     if (on && innerWidth > 1400) { other.style.left = 'calc(50% - 400px)'; inv.style.left = 'calc(50% + 330px)'; }
@@ -271,6 +273,7 @@ class UI {
     if (!$('stash').classList.contains('hidden')) this.renderStash();
     if (this.shopOpen()) this.renderShop();
     if (this.trade) this.renderTradeBag();
+    if (!$('smith').classList.contains('hidden')) this.renderSmith();
   }
 
   bagCells(container, items, size, onClick, onRight, cmp = true) {
@@ -309,7 +312,7 @@ class UI {
     $('statsBox').innerHTML = `<div><span>Class</span><b style="color:${C.color}">${C.name}</b></div>` + [
       ['Damage', Math.round(st.dmg)], ['Attack speed', st.atkSpeed.toFixed(2)], ['Health', st.maxHp], ['Armor', `${st.armor} (−${Math.round((1 - 100 / (100 + st.armor)) * 100)}%)`],
       ['Crit', `${(st.crit * 100).toFixed(1)}% ×${st.critDmg.toFixed(1)}`], ['Cooldowns', '−' + Math.round(st.cdr * 100) + '%'], ['Move speed', Math.round(st.moveSpeed * 100) + '%'], ['Gold find', '+' + Math.round(st.goldFind * 100) + '%'], ['Lifesteal', (st.leech * 100).toFixed(1) + '%'],
-    ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
+    ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('') + (st.sets || []).map((s) => `<div><span style="color:#5eea8a">${SETS[s.id].name}</span><b style="color:#5eea8a">${s.n}/4</b></div>`).join('') + Object.keys(st.flags).filter((f) => LEGENDARIES[f]).map((f) => `<div><span style="color:#ff9a3c">✦ ${LEGENDARIES[f].name}</span><b></b></div>`).join('');
     this.bagCells($('bag'), ch.bag, BAG, (i, it) => { if (this._tradeMode) return this.toggleOffer(it); G.net.send({ t: 'equip', i }); G.audio.click(); }, (i) => (this.shopOpen() ? G.net.send({ t: 'sell', i }) : this.confirmDiscard(i)));
     $('invHint').textContent = this.shopOpen() ? 'Click to equip · Right-click to SELL' : 'Click to equip · Right-click to discard · Sell at the Dark World merchant';
   }
@@ -346,6 +349,38 @@ class UI {
     $('stashGold').textContent = `◉ ${pr.gold.toLocaleString()} (shared by all your heroes)`;
     this.bagCells($('stashGrid'), pr.stash, STASH, (i) => G.net.send({ t: 'stash', op: 'take', i }), null, false);
     this.bagCells($('stashBag'), pr.char.bag, BAG, (i) => G.net.send({ t: 'stash', op: 'put', i }), null, false);
+  }
+
+  // ---------- blacksmith ----------
+  renderSmith() {
+    const pr = G.prof, ch = pr.char, m = pr.mats || { shards: 0, cores: 0 };
+    $('smithMats').textContent = `· ${m.shards} Ember Shards · ${m.cores} Ember Cores · ◉ ${pr.gold}`;
+    const eqEl = $('smithEq'); eqEl.innerHTML = '';
+    for (const slot of ['weapon', 'helm', 'chest', 'boots']) {
+      const it = ch.equipped[slot]; const c = document.createElement('div'); c.className = 'bcell' + (it ? ' filled' : '');
+      if (it) { c.style.color = RARITIES[it.rarity].color; c.textContent = itemIcon(it); this.bindTip(c, it, null); c.onclick = () => { this.smithSel = { src: 'eq', ref: slot }; this.renderSmith(); }; if (this.smithSel?.src === 'eq' && this.smithSel.ref === slot) c.classList.add('sel'); }
+      eqEl.appendChild(c);
+    }
+    this.bagCells($('smithBag'), ch.bag, BAG, (i) => { this.smithSel = { src: 'bag', ref: i }; this.renderSmith(); }, null, false);
+    if (this.smithSel?.src === 'bag') $('smithBag').children[this.smithSel.ref]?.classList.add('sel');
+    const sel = this.smithSel, it = sel && (sel.src === 'eq' ? ch.equipped[sel.ref] : ch.bag[sel.ref]);
+    const d = $('smithDetail');
+    if (!it) { d.innerHTML = '<div class="muted">Select an item to work on it.</div>'; return; }
+    const R = RARITIES[it.rarity];
+    const rc = { shards: 6 * (it.rarity + 1), gold: 15 * G.roomLevel }, uc = { shards: 10 * (it.rarity + 1) + it.level * 2, cores: it.rarity === 4 ? 1 : 0 };
+    let html = `<div class="tn" style="color:${R.color}">${escapeHtml(it.name)}</div><div class="muted">${R.name} · Item level ${it.level} · Power ${it.power}</div>`;
+    html += `<div class="sub-h" style="margin-top:10px">Upgrade</div><div>Raise item level to ${it.level + 1} (${uc.shards} shards${uc.cores ? ', 1 core' : ''})</div><button class="btn" data-a="up">Upgrade</button>`;
+    const keys = Object.keys(it.affixes || {});
+    html += `<div class="sub-h" style="margin-top:10px">Reroll an affix <span class="muted small">(${rc.shards} shards, ${rc.gold}g)</span></div>` + (keys.length ? keys.map((k, i) => `<div>${affixLines({ affixes: { [k]: it.affixes[k] } })[0]} <button class="btn" data-a="rr" data-k="${k}">Reroll</button></div>`).join('') : '<div class="muted">No affixes to reroll.</div>');
+    if (sel.src === 'bag') html += `<div class="sub-h" style="margin-top:10px">Salvage</div><div>Break it down for ${Math.round(SALVAGE[it.rarity] * (1 + it.level * 0.1))} shards${it.rarity === 4 ? ' and 1 Ember Core' : ''}.</div><button class="btn" data-a="salv">Salvage</button>`;
+    d.innerHTML = html;
+    d.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+      const a = b.dataset.a;
+      if (a === 'up') G.net.send({ t: 'upgradeItem', src: sel.src, ref: sel.ref });
+      if (a === 'rr') G.net.send({ t: 'reroll', src: sel.src, ref: sel.ref, key: b.dataset.k });
+      if (a === 'salv') { G.net.send({ t: 'salvage', i: sel.ref }); this.smithSel = null; }
+      G.audio.build();
+    }));
   }
 
   // ---------- talents ----------
@@ -496,6 +531,8 @@ class UI {
     const main = it.slot === 'weapon' ? `${it.dmg} Damage · ${it.speed.toFixed(2)} speed<br><span class="muted">${WEAPONS[it.type].name}${WEAPONS[it.type].cleave ? ' · wide cleave' : ''}${WEAPONS[it.type].ranged ? ' · ranged' : ''}</span>` : `${it.armor} Armor · +${it.hp} Health`;
     let html = `<div class="tn">${escapeHtml(it.name)}</div><div class="tr">${R.name} ${SLOT_NAMES[it.slot]} · Item Level ${it.level}</div><div class="tm">${main}</div>`;
     html += affixLines(it).map((l) => `<div class="ta">${l}</div>`).join('');
+    if (it.leg && LEGENDARIES[it.leg]) { const L = LEGENDARIES[it.leg]; html += `<div class="tleg">✦ ${L.name}${L.cls ? ` <span class="muted">(${CLASSES[L.cls].name})</span>` : ''}<br><span style="font-weight:600">${L.desc}</span></div>`; }
+    if (it.set && SETS[it.set]) { const S = SETS[it.set], n = G.prof ? Object.values(G.prof.char.equipped).filter((x) => x && x.set === it.set).length : 0; html += `<div class="tset"><b>${S.name}</b> (${n}/4)<br><span class="${n >= 2 ? '' : 'off'}">(2) ${S.d2}</span><br><span class="${n >= 4 ? '' : 'off'}">(4) ${S.d4}</span></div>`; }
     if (it.slot === 'weapon' && G.prof && !CLASSES[G.prof.cls].weapons.includes(it.type)) html += `<div class="cmp neg">Your ${CLASSES[G.prof.cls].name} cannot wield this</div>`;
     else if (cmp && cmp !== it) { const diff = it.power - cmp.power; html += `<div class="cmp">vs equipped: <span class="${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '▲ +' : '▼ '}${diff} power</span></div>`; }
     else if (cmp === null && G.prof && !G.prof.char.equipped[it.slot]) html += `<div class="cmp pos">Empty slot — equip it!</div>`;

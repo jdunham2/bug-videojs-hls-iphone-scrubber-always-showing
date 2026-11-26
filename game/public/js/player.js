@@ -33,7 +33,7 @@ export class LocalPlayer {
     this.comboT = 0; this.slamT = -1; this.rollCd = 0; this.roll = 0; this.rollT = 0; this.rollDir = new THREE.Vector3();
     this.potCd = 0; this.invuln = 0; this.hurtT = 0; this.lastHurt = 99; this.dead = false; this.deadT = 0; this.deadAnim = 0;
     this.combatT = 99; this.castT = 0; this.blocking = false; this.blockT = 0; this.tauntBuffT = 0;
-    this.slowT = 0; this.burnT = 0; this.burnDps = 0; this.unbreakCd = 0; this.dotAcc = 0; this.trapCd = 0; this.lavaAcc = 0;
+    this.slowT = 0; this.burnT = 0; this.furyT = 0; this.tailT = 0; this.phoenixCd = 0; this.thunderN = 0; this.burnDps = 0; this.unbreakCd = 0; this.dotAcc = 0; this.trapCd = 0; this.lavaAcc = 0;
     this.style = 0; this.styleIdle = 0; this.styleKeys = []; this.comboCount = 0; this.comboTimer = 0; this.lastRank = 0;
     this.emote = null; this.emoteT = 0; this.emoteDur = 0;
     this.anim = 0;
@@ -104,7 +104,7 @@ export class LocalPlayer {
     this.t += dt;
     const S = this.stats, R = this.R;
     this.rollCd -= dt; this.slamT >= 0 || (this.slamT = -1); this.potCd -= dt; this.invuln -= dt; this.comboT -= dt; this.lastHurt += dt; this.combatT += dt;
-    this.castT = Math.max(0, this.castT - dt); this.tauntBuffT -= dt; this.slowT -= dt; this.burnT -= dt; this.unbreakCd -= dt; this.trapCd -= dt;
+    this.castT = Math.max(0, this.castT - dt); this.tauntBuffT -= dt; this.furyT -= dt; this.tailT -= dt; this.phoenixCd -= dt; this.slowT -= dt; this.burnT -= dt; this.unbreakCd -= dt; this.trapCd -= dt;
     this.hurtT = Math.max(0, this.hurtT - dt * 4);
     // style decay
     this.styleIdle += dt; this.comboTimer -= dt;
@@ -170,6 +170,7 @@ export class LocalPlayer {
     if (this.slamT >= 0 || kit.exec) speed *= 0.15;
     if (kit.whirlT > 0) speed *= 0.9;
     if (this.slowT > 0) speed *= 0.5;
+    if (this.tailT > 0) speed *= 1.35;
     const tile = zone.d ? tileAt(zone.d, this.pos.x, this.pos.z) : 0;
     const accel = tile === 4 ? 1.6 : 14;
     if (this.roll) {
@@ -237,6 +238,7 @@ export class LocalPlayer {
     this.rollDir.copy(dir ? dir.clone().normalize() : new THREE.Vector3(Math.sin(this.ry), 0, Math.cos(this.ry)));
     this.ry = Math.atan2(this.rollDir.x, this.rollDir.z);
     this.invuln = Math.max(this.invuln, 0.38);
+    if (this.stats.flags.g_tailwind) this.tailT = 2.5;
     if (this.stats.flags.afterimage) {
       const at = this.pos.clone();
       setTimeout(() => {
@@ -277,8 +279,11 @@ export class LocalPlayer {
   dealDamage(e, base, o = {}, quiet = false) {
     const S = this.stats;
     const crit = o.crit || Math.random() < S.crit;
-    const dmg = Math.max(1, Math.round(base * (0.9 + Math.random() * 0.2) * (crit ? S.critDmg : 1) * (1 + 0.04 * this.rank)));
+    const dmg = Math.max(1, Math.round(base * (0.9 + Math.random() * 0.2) * (crit ? S.critDmg : 1) * (1 + 0.04 * this.rank) * (this.furyT > 0 ? 1.3 : 1)));
     G.net.send({ t: 'hit', id: e.id, dmg, crit, kb: o.kb || 0, stun: o.stun || 0 });
+    e.hitByMe = G.time;
+    if (crit && S.flags.g_bloodcrit) this.hp = Math.min(S.maxHp, this.hp + S.maxHp * 0.015);
+    if (S.flags.g_thunder && !o.thunder && ++this.thunderN % 10 === 0) { fxPlay('chain', { x: e.pos.x, z: e.pos.z, pts: [[e.pos.x + 2, e.pos.z - 2], [e.pos.x, e.pos.z]] }); setTimeout(() => !e.dead && this.dealDamage(e, S.dmg * 2.5, { thunder: true, stun: 0.4 }), 80); }
     e.hit(crit);
     if (o.kb && e.def.poise > 0) { const dx = e.pos.x - this.pos.x, dz = e.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1; e.target.x += (dx / l) * o.kb * 0.5; e.target.z += (dz / l) * o.kb * 0.5; }
     const hp = e.pos.clone(); hp.y += e.height * 0.6;
@@ -290,6 +295,7 @@ export class LocalPlayer {
     this.combatT = 0;
     this.comboCount++; this.comboTimer = 2.5;
     this.addStyle(crit ? 3 : 2, 'hit');
+    return dmg;
   }
 
   drinkPotion() {
@@ -308,6 +314,7 @@ export class LocalPlayer {
     G.audio.perfect();
     G.ui.perfect();
     G.fx.emit({ pos: this.pos.clone().setY(this.pos.y + 1), count: 60, speed: 4, color: '#bfe8ff', color2: '#4a8cff', size: 0.35, life: 0.8 });
+    if (this.stats.flags.dodgeHeal) this.heal(this.stats.maxHp * 0.25);
     if (this.stats.flags.dance) { this.kit.resetCooldowns(); G.ui.toast('Ember Dance! Cooldowns reset', '#ffb347'); }
   }
 
@@ -328,6 +335,7 @@ export class LocalPlayer {
           if (this.stats.flags.aegis) { for (const e of enemiesInRadius(this.pos, 4)) this.dealDamage(e, this.stats.dmg * 1.5, { kb: 2.5, stun: 0.6 }, true); fxPlay('quake', { x: this.pos.x, z: this.pos.z, r: 4 }); }
           return;
         }
+        if (this.stats.flags.w_reflect) G.net.send({ t: 'hit', id: src.id, dmg: Math.round(dmg * 0.5), crit: false, kb: 0.5, stun: 0 });
         dmg *= Math.max(0.05, 0.25 - (this.stats.T.block || 0));
         G.audio.block(false);
         this.resource = Math.min(this.stats.resMax, this.resource + 6);
@@ -348,6 +356,7 @@ export class LocalPlayer {
       if (o.kb && src) { const dx = this.pos.x - src.pos.x, dz = this.pos.z - src.pos.z, l = Math.hypot(dx, dz) || 1; this.vel.x += (dx / l) * 9; this.vel.z += (dz / l) * 9; }
     }
     G.fx.text(this.pos.clone().setY(this.pos.y + 2.2), `-${final}`, 'hurt', o.dot ? 0.6 : 1);
+    if (this.hp <= 0 && this.stats.flags.g_phoenix && this.phoenixCd <= 0) { this.hp = this.stats.maxHp * 0.4; this.phoenixCd = 120; this.invuln = 2; G.ui.toast('Phoenix Heart! You rise from the ashes', '#ff9a3c'); fxPlay('explode', { x: this.pos.x, z: this.pos.z, r: 4 }); return; }
     if (this.hp <= 0 && this.stats.flags.unbreakable && this.unbreakCd <= 0) { this.hp = 1; this.unbreakCd = 90; this.invuln = 1.5; G.ui.toast('Unbreakable!', '#ffd34d'); G.audio.block(true); return; }
     if (this.hp <= 0) {
       this.hp = 0; this.dead = true; this.deadT = 6; this.deadAnim = 0; this.atk.t = -1; this.slamT = -1; this.roll = 0; this.style = 0;

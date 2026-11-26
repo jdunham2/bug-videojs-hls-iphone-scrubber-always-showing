@@ -1,7 +1,7 @@
 // Server-authoritative hero profiles: characters per class, gold, bag, stash, talents, shop, trades.
 import { CLASSES, canLearn } from '../public/shared/classes.js';
 import { computeStats, xpForLevel } from '../public/shared/stats.js';
-import { generateItem, WEAPONS } from '../public/shared/items.js';
+import { generateItem, WEAPONS, SALVAGE, levelUpItem, rerollAffix } from '../public/shared/items.js';
 import { RNG } from '../public/shared/rng.js';
 
 export const BAG_SIZE = 24, STASH_SIZE = 48, MAX_POTIONS = 9;
@@ -21,7 +21,8 @@ export const getChar = (prof, cls) => (prof.chars[cls] ||= starterChar(cls));
 
 export function profileView(p) {
   const pr = p.prof;
-  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
+  pr.mats ||= { shards: 0, cores: 0 };
+  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
 }
 
 export function activeBuffs(p) {
@@ -129,4 +130,30 @@ export function executeTrade(tr) {
   b.prof.gold += tr.offer.a.gold - tr.offer.b.gold;
   a.dirty = b.dirty = true;
   return null;
+}
+
+// ---- blacksmith ----
+const rng = new RNG(Date.now() & 0xffffff);
+function itemRef(p, src, ref) { return src === 'eq' ? p.char.equipped[ref] : p.char.bag[ref | 0]; }
+export const smithCosts = (it, level) => ({ reroll: { shards: 6 * (it.rarity + 1), gold: 15 * level }, upgrade: { shards: 10 * (it.rarity + 1) + it.level * 2, cores: it.rarity === 4 ? 1 : 0 } });
+export function salvage(p, i) {
+  const it = p.char.bag[i]; if (!it) return 'No item there.';
+  const m = (p.prof.mats ||= { shards: 0, cores: 0 });
+  m.shards += Math.round(SALVAGE[it.rarity] * (1 + it.level * 0.1));
+  if (it.rarity === 4) m.cores++;
+  p.char.bag.splice(i, 1); p.dirty = true; return null;
+}
+export function reroll(p, src, ref, key, level) {
+  const it = itemRef(p, src, ref); if (!it) return 'No item there.';
+  const c = smithCosts(it, level).reroll, m = (p.prof.mats ||= { shards: 0, cores: 0 });
+  if (m.shards < c.shards || p.prof.gold < c.gold) return `Rerolling costs ${c.shards} shards and ${c.gold} gold.`;
+  if (!rerollAffix(it, key, rng, it.level)) return 'That affix cannot be rerolled.';
+  m.shards -= c.shards; p.prof.gold -= c.gold; p.dirty = true; return null;
+}
+export function upgradeItem(p, src, ref) {
+  const it = itemRef(p, src, ref); if (!it) return 'No item there.';
+  if (it.level >= p.char.level + 5) return 'The item cannot exceed your level by more than 5.';
+  const c = smithCosts(it, 0).upgrade, m = (p.prof.mats ||= { shards: 0, cores: 0 });
+  if (m.shards < c.shards || m.cores < c.cores) return `Upgrading costs ${c.shards} shards${c.cores ? ' and 1 Ember Core' : ''}.`;
+  m.shards -= c.shards; m.cores -= c.cores; levelUpItem(it); p.dirty = true; return null;
 }

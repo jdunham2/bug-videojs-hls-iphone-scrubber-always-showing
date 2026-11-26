@@ -4,6 +4,7 @@ import { TOWN, DARK, townLayout } from '../public/shared/world.js';
 import { Zone, send } from './zone.js';
 import { Defense } from './defense.js';
 import * as P from './profile.js';
+import { SETS } from '../public/shared/items.js';
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 export { TOKEN_RE };
@@ -168,7 +169,7 @@ function attach(ws) {
       case 'readyResp': room.readyResp(p, !!m.yes); break;
       case 'hit': {
         const e = zone?.enemies.get(m.id);
-        if (e && dist(e, p) < 24) zone.damageEnemy(e, Math.min(100000, Math.max(0, +m.dmg || 0)), p.id, m.crit, Math.min(4, +m.kb || 0), Math.min(4, +m.stun || 0), p.x, p.z);
+        if (e && dist(e, p) < 24) zone.damageEnemy(e, Math.min(100000, Math.max(0, +m.dmg || 0)), p.id, m.crit, Math.max(-2, Math.min(4, +m.kb || 0)), Math.min(4, +m.stun || 0), p.x, p.z);
         break;
       }
       case 'taunt': zone?.taunt(p, Math.min(14, +m.r || 10), Math.min(8, +m.dur || 6)); break;
@@ -179,11 +180,17 @@ function attach(ws) {
       case 'repair': ok(room.defense.repair(p, m.id)); break;
       case 'startNight': if (p.zone === 'town') room.defense.startNight(); break;
       case 'chat':
-        if (dev && /^\/(depth|gold|xp|wave) \d+$/.test(m.text || '')) {
+        if (dev && /^\/(depth|gold|xp|wave|loot) \d+$/.test(m.text || '')) {
           const [cmd, n] = m.text.slice(1).split(' ');
           if (cmd === 'depth') { room.level = Math.max(1, +n); room.currentDungeon = null; room.broadcast({ t: 'roomLevel', level: room.level }); }
           if (cmd === 'gold') { p.prof.gold += +n; p.dirty = true; }
           if (cmd === 'xp') P.addXp(p, +n, (mm) => send(ws, mm));
+          if (cmd === 'loot') {
+            const S = Object.entries(SETS).find(([, s]) => s.cls === p.cls);
+            for (const slot of ['weapon', 'helm', 'chest', 'boots']) { const it = P.rollItem(p, room.level, { slot, rarity: 3, types: CLASSES[p.cls].weapons }); it.set = S[0]; it.name = S[1].name + ' ' + S[1].pieces[['weapon', 'helm', 'chest', 'boots'].indexOf(slot)]; p.char.bag.push(it); }
+            for (let k = 0; k < +n; k++) p.char.bag.push(P.rollItem(p, room.level, { rarity: 4 }));
+            p.dirty = true;
+          }
           if (cmd === 'wave') { const d = room.defense.state; if (d.phase === 'day') room.defense.startNight(); d.wave = Math.max(0, +n - 1); d.phase = 'intermission'; d.timer = 2; }
           break;
         }
@@ -226,6 +233,9 @@ function attach(ws) {
       case 'sell': if (p.zone === 'dark' && near(p, DARK.merchant, 9)) ok(P.sell(p, m.i | 0)); else notice('Find the Hollow Merchant in the Dark World to sell.', '#c77dff'); break;
       case 'talent': ok(P.learn(p, String(m.id))); break;
       case 'talentReset': if (p.zone === 'town' && near(p, TOWN.trainer, 7)) ok(P.resetTalents(p), 'Talents reset.'); break;
+      case 'salvage': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.salvage(p, m.i | 0)); break;
+      case 'reroll': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.reroll(p, m.src, m.ref, String(m.key), room.level), 'The runes shift…', '#c77dff'); break;
+      case 'upgradeItem': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.upgradeItem(p, m.src, m.ref), 'Item level increased!', '#ffd34d'); break;
       case 'stash': if (p.zone === 'town' && near(p, TOWN.stash, 6)) ok(P.stashOp(p, m.op === 'put' ? 'put' : 'take', m.i | 0)); break;
       // ---- dungeon events ----
       case 'lever': if (zone?.dungeon) zone.pullLever(p, m.i | 0); break;

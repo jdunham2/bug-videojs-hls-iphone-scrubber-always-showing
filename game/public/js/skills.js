@@ -134,7 +134,8 @@ export class SkillKit {
   }
   get cls() { return CLASSES[this.p.cls]; }
   def(i) { return this.cls.skills[i]; }
-  cdMax(i) { return this.def(i).cd * (1 - this.p.stats.cdr); }
+  cdMax(i) { const d = this.def(i); return d.cd * (1 - this.p.stats.cdr) * (d.id === 'taunt' && this.p.stats.flags.bastion4 ? 0.5 : 1); }
+  cost(i) { const d = this.def(i); return d.id === 'quake' && this.p.stats.flags.quakeFree ? 0 : Math.round(d.cost * this.p.stats.costMul); }
   busy() { return this.whirlT > 0 || this.flurry || this.bash || this.exec; }
   resetCooldowns() { this.cds = [0, 0, 0, 0]; }
 
@@ -142,18 +143,20 @@ export class SkillKit {
     const p = this.p, S = this.def(i);
     if (S.hold) return false;
     if (this.cds[i] > 0) { G.ui.flashSkill(i, 'cd'); return false; }
-    if (p.resource < S.cost) { G.ui.flashSkill(i, 'res'); G.ui.toast(`Not enough ${this.cls.resource.name}`, this.cls.resource.color); return false; }
+    const cost = this.cost(i);
+    if (p.resource < cost) { G.ui.flashSkill(i, 'res'); G.ui.toast(`Not enough ${this.cls.resource.name}`, this.cls.resource.color); return false; }
     if (this.busy() || p.roll || p.slamT >= 0) return false;
     const ok = this[S.id]?.(aimYaw);
     if (ok === false) return false;
-    p.resource -= S.cost;
+    p.resource -= cost;
     this.cds[i] = this.cdMax(i);
     p.addStyle(8, S.id);
     p.combatT = 0;
     return true;
   }
   send(kind, d) { fxPlay(kind, d); G.net.send({ t: 'fx', kind, ...d }); }
-  mods(k) { return 1 + (this.p.stats.T[k] || 0); }
+  mods(k) { return 1 + (this.p.stats.T[k] || 0) + this.p.stats.skillDmg; }
+  has(f) { return !!this.p.stats.flags[f]; }
 
   // ===== Warden =====
   bash(yaw) {
@@ -167,6 +170,7 @@ export class SkillKit {
     const p = this.p;
     G.net.send({ t: 'taunt', r: 11, dur: 6 });
     p.tauntBuffT = 6;
+    if (this.has('w_furycry')) { p.furyT = 6; G.ui.toast('Battle Fury! +30% damage', '#ff6a4a'); }
     const heal = p.stats.maxHp * (p.stats.T.cryHeal || 0);
     if (heal > 0) { p.heal(heal); }
     p.resource = Math.min(p.stats.resMax, p.resource + 25);
@@ -179,9 +183,10 @@ export class SkillKit {
     p.slamT = 0; p.vy = 7; p.onGround = false; p.atk.t = -1; p.ry = p.aimDir(yaw);
     G.audio.swing(true);
   }
-  quakeImpact() {
+  quakeImpact(mul = 1) {
     const p = this.p, R = 4.8 + (p.stats.T.quakeR || 0);
-    for (const e of enemiesInRadius(p.pos, R)) p.dealDamage(e, p.stats.dmg * 2.3 * this.mods('s3'), { kb: 2, stun: 0.6 });
+    for (const e of enemiesInRadius(p.pos, R)) p.dealDamage(e, p.stats.dmg * 2.3 * this.mods('s3') * mul, { kb: 2, stun: 0.6 });
+    if (mul === 1 && this.has('w_aftershock')) this.pending.push({ t: 0.8, fn: () => this.quakeImpact(0.6) });
     this.send('quake', { x: p.pos.x, z: p.pos.z, r: R });
     G.shake = Math.max(G.shake, 0.6); G.hitstop = 0.06;
   }
@@ -197,6 +202,7 @@ export class SkillKit {
       p.pos.x = np.x; p.pos.z = np.z;
       p.ry = Math.atan2(target.pos.x - p.pos.x, target.pos.z - p.pos.z);
       p.dealDamage(target, p.stats.dmg * 2 * this.mods('s0'), { crit: true, kb: 1, stun: 0.5 });
+      if (this.has('e_twinblink')) { const t2 = nearestEnemy(target.pos, 7, new Set([target])); if (t2) { p.dealDamage(t2, p.stats.dmg * 2 * this.mods('s0'), { crit: true, kb: 1 }); fxPlay('blink', { x: target.pos.x, z: target.pos.z, tx: t2.pos.x, tz: t2.pos.z }); } }
       p.atk.combo = 1; p.atk.t = 0.4; p.atk.dur = 0.3; p.atk.hit = true; p.atk.face = p.ry;
     } else {
       const np = { x: p.pos.x + Math.sin(p.ry) * 6, z: p.pos.z + Math.cos(p.ry) * 6 };
@@ -211,7 +217,8 @@ export class SkillKit {
   // ===== Hexcaller =====
   firebolt(yaw) {
     const p = this.p; p.ry = p.aimDir(yaw); p.castT = 0.35;
-    this.shoot({ speed: 22, mul: 2.2 * this.mods('s0'), aoe: 2.6 + (p.stats.T.boltR || 0), big: true, kb: 1.5 });
+    const o = { speed: 22, mul: 2.2 * this.mods('s0'), aoe: 2.6 + (p.stats.T.boltR || 0), big: true, kb: 1.5 };
+    if (this.has('h_trinity')) { const r0 = p.ry; for (const d of [-0.28, 0, 0.28]) { p.ry = r0 + d; this.shoot(o); } p.ry = r0; } else this.shoot(o);
     G.audio.fire();
   }
   chain(yaw) {
@@ -225,7 +232,9 @@ export class SkillKit {
       hit.add(cur); pts.push([cur.pos.x, cur.pos.z]);
       p.dealDamage(cur, p.stats.dmg * mul, { stun: p.stats.flags.overload ? 1.2 : 0.15 });
       mul *= 0.85;
-      cur = nearestEnemy(cur.pos, 7, hit);
+      const prev = cur;
+      cur = nearestEnemy(prev.pos, 7, hit);
+      if (this.has('h_fork') && cur) { const f = nearestEnemy(prev.pos, 7, new Set([...hit, cur])); if (f) { hit.add(f); p.dealDamage(f, p.stats.dmg * mul, { stun: p.stats.flags.overload ? 1.2 : 0.15 }); pts.push([f.pos.x, f.pos.z], [prev.pos.x, prev.pos.z]); } }
     }
     this.send('chain', { x: p.pos.x, z: p.pos.z, pts });
   }
@@ -234,7 +243,7 @@ export class SkillKit {
     const n = p.stats.flags.twin ? 2 : 1;
     for (const s of this.spirits) s.dispose();
     this.spirits = [];
-    for (let i = 0; i < n; i++) this.spirits.push(new Spirit(p, i, 20 + (p.stats.T.spiritDur || 0)));
+    for (let i = 0; i < n; i++) this.spirits.push(new Spirit(p, i, this.has('spiritPerm') ? 1e9 : 20 + (p.stats.T.spiritDur || 0)));
     this.send('spirit', { x: p.pos.x, z: p.pos.z });
   }
   meteor(yaw) {
@@ -245,6 +254,11 @@ export class SkillKit {
     const R = 4.2;
     this.send('meteor', { x: pt.x, z: pt.z, r: R, delay: 1.1 });
     this.pending.push({ t: 1.1, fn: () => { for (const e of enemiesInRadius(V(pt.x, 0, pt.z), R)) p.dealDamage(e, p.stats.dmg * 3.5 * this.mods('s3'), { kb: 2.5, stun: 0.8 }); } });
+    if (this.has('h_shower')) for (let k = 0; k < 3; k++) {
+      const a = k * 2.1 + Math.random(), q = { x: pt.x + Math.cos(a) * 4, z: pt.z + Math.sin(a) * 4 }, delay = 1.3 + k * 0.2;
+      this.send('meteor', { x: q.x, z: q.z, r: 2.6, delay });
+      this.pending.push({ t: delay, fn: () => { for (const e of enemiesInRadius(V(q.x, 0, q.z), 2.6)) p.dealDamage(e, p.stats.dmg * 1.5 * this.mods('s3'), { kb: 1.5 }); } });
+    }
   }
   basicBolt(yaw) {
     const p = this.p; p.ry = p.aimDir(yaw); p.castT = 0.25;
@@ -278,13 +292,16 @@ export class SkillKit {
         p.dealDamage(e, p.stats.dmg * 1.6 * this.mods('s0'), { kb: 2.5, stun: 1.5 + (p.stats.T.stun || 0) });
         this.send('bash', { x: e.pos.x, z: e.pos.z, ry: p.ry }); G.hitstop = 0.07; G.shake = Math.max(G.shake, 0.35);
       }
-      if (b.t > 0.28) { this.bash = null; p.vel.multiplyScalar(0.2); }
+      if (b.t > 0.28) {
+        this.bash = null; p.vel.multiplyScalar(0.2);
+        if (this.has('w_shockbash')) { for (const e of enemiesInArc(p.pos, p.ry, 7, 1.4)) p.dealDamage(e, p.stats.dmg * 1.2 * this.mods('s0'), { kb: 2, stun: 0.6 }, true); const ahead = p.pos.clone().add(V(Math.sin(p.ry) * 3, 0, Math.cos(p.ry) * 3)); this.send('quake', { x: ahead.x, z: ahead.z, r: 4 }); }
+      }
     }
     if (this.whirlT > 0) {
       this.whirlT -= dt; this.whirlTick -= dt;
       if (this.whirlTick <= 0) {
         this.whirlTick = 0.25;
-        for (const e of enemiesInRadius(p.pos, 3.2)) p.dealDamage(e, p.stats.dmg * 0.55 * this.mods('s1'), { kb: 0.6 }, true);
+        for (const e of enemiesInRadius(p.pos, this.has('e_vortex') ? 6 : 3.2)) p.dealDamage(e, p.stats.dmg * 0.55 * this.mods('s1'), { kb: this.has('e_vortex') ? -1.2 : 0.6 }, true);
         this.send('whirl', { x: p.pos.x, z: p.pos.z });
       }
     }
@@ -292,7 +309,7 @@ export class SkillKit {
       const f = this.flurry; f.t += dt;
       while (f.done < f.n && f.t > f.done * 0.09) {
         f.done++;
-        for (const e of enemiesInArc(p.pos, p.ry, 2.7, 1.5)) p.dealDamage(e, p.stats.dmg * 0.45, { kb: 0.2 }, true);
+        for (const e of enemiesInArc(p.pos, p.ry, 2.7, 1.5)) { p.dealDamage(e, p.stats.dmg * 0.45 * this.mods('s2'), { kb: 0.2 }, true); if (this.has('e_cinderflurry')) for (const t of [0.5, 1.0]) this.pending.push({ t, fn: () => { if (!e.dead) p.dealDamage(e, p.stats.dmg * 0.09, {}, true); } }); }
         G.fx.slash(p.pos.clone().setY(p.pos.y + 1.1), p.ry + (Math.random() - 0.5) * 0.6, '#ffb070', 2.6, f.done % 2, 1.2);
         G.audio.swing(false);
         p.atk.combo = f.done % 2; p.atk.t = 0.45; p.atk.dur = 0.12; p.atk.hit = true; p.atk.face = p.ry;
@@ -303,14 +320,18 @@ export class SkillKit {
       this.exec.t += dt;
       if (this.exec.t >= 0.33 && !this.exec.done) {
         this.exec.done = true;
-        for (const e of enemiesInArc(p.pos, p.ry, 3.1, 1.7)) p.dealDamage(e, p.stats.dmg * 4 * this.mods('s3') * (e.hp / e.maxHp < 0.35 ? 2 : 1), { kb: 3, stun: 0.8 });
+        for (const e of enemiesInArc(p.pos, p.ry, 3.1, 1.7)) { const d = p.dealDamage(e, p.stats.dmg * 4 * this.mods('s3') * (e.hp / e.maxHp < 0.35 ? 2 : 1), { kb: 3, stun: 0.8 }); if (this.has('e_reaper') && d >= e.hp) { this.cds[3] = 0; G.ui.toast('Reaper! Execution ready', '#ff3a1a'); } }
         this.send('execute', { x: p.pos.x, z: p.pos.z, ry: p.ry });
         G.hitstop = 0.1; G.shake = Math.max(G.shake, 0.55);
       }
       if (this.exec.t > 0.6) this.exec = null;
     }
     for (let i = this.projectiles.length - 1; i >= 0; i--) if (!this.projectiles[i].update(dt)) this.projectiles.splice(i, 1);
-    for (let i = this.spirits.length - 1; i >= 0; i--) if (!this.spirits[i].update(dt, this)) { this.spirits[i].dispose(); this.spirits.splice(i, 1); }
+    for (let i = this.spirits.length - 1; i >= 0; i--) if (!this.spirits[i].update(dt, this)) {
+      const s = this.spirits[i];
+      if (this.has('h_martyr')) { for (const e of enemiesInRadius(s.pos, 3.5)) p.dealDamage(e, p.stats.dmg * 3, { kb: 2 }); this.send('explode', { x: s.pos.x, z: s.pos.z, r: 3.5 }); }
+      s.dispose(); this.spirits.splice(i, 1);
+    }
   }
   clear() {
     for (const b of this.projectiles) b.dispose();

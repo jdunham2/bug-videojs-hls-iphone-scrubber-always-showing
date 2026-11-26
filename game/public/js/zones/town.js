@@ -302,6 +302,22 @@ export class TownZone {
       g.rotation.y = Math.atan2(-TOWN.stash.x, -TOWN.stash.z);
       s.add(g); this.stashG = g;
     }
+    // blacksmith: forge, anvil and smith
+    {
+      const S = TOWN.smith, y0 = townHeight(S.x, S.z);
+      const g = new THREE.Group(); g.position.set(S.x, y0, S.z); g.rotation.y = Math.atan2(-S.x, -S.z);
+      const forge = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 1.6), darkStone); forge.position.set(-1.2, 0.8, -0.6); forge.castShadow = true; g.add(forge);
+      const coals = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 1.1), new THREE.MeshStandardMaterial({ color: '#ff5a1a', emissive: '#ff3a00', emissiveIntensity: 2.6 })); coals.position.set(-1.2, 1.62, -0.6); g.add(coals);
+      const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 2.6, 8), darkStone); chim.position.set(-1.6, 2.9, -1.0); chim.castShadow = true; g.add(chim);
+      const anvil = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.35, 0.4), iron); anvil.position.set(1.0, 0.9, 0.3); anvil.castShadow = true; g.add(anvil);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 0.75, 8), woodMat); base.position.set(1.0, 0.37, 0.3); g.add(base);
+      this.forgeLight = new THREE.PointLight('#ff6a20', 10, 9, 2); this.forgeLight.position.set(S.x, y0 + 2.2, S.z); s.add(this.forgeLight);
+      s.add(g); this.forgeCoals = new THREE.Vector3(); coals.getWorldPosition(this.forgeCoals);
+      this.smith = buildHumanoid({ bulk: 1.25, cloth: '#5a3a24', leather: '#2a1a10', skin: '#c89070', weapon: 'hammer', rarity: 0, hair: '#1a1008', chestPlate: false });
+      this.smith.root.position.set(S.x + 0.6, y0, S.z + 0.9); this.smith.root.rotation.y = g.rotation.y + 1.8;
+      this.smith.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      s.add(this.smith.root);
+    }
     this.buildMinimap();
     this.setupInteractables();
   }
@@ -311,6 +327,7 @@ export class TownZone {
       { x: TOWN.dungeonPortal.x, z: TOWN.dungeonPortal.z, r: 4, mark: 'DUNGEON', label: () => `Enter the Dungeon — Depth ${G.roomLevel}`, action: () => G.actions.travel('dungeon') },
       { x: TOWN.darkPortal.x, z: TOWN.darkPortal.z, r: 4, mark: 'DARK WORLD', label: () => 'Enter the Dark World', action: () => G.actions.travel('dark') },
       { x: TOWN.trainer.x, z: TOWN.trainer.z, r: 3, mark: 'TRAINER', label: () => 'Talk to the Trainer (talents)', action: () => G.actions.openTalents(true) },
+      { x: TOWN.smith.x, z: TOWN.smith.z, r: 3.4, mark: 'BLACKSMITH', label: () => 'Visit the Blacksmith (salvage, reroll, upgrade)', action: () => G.actions.openSmith() },
       { x: TOWN.stash.x, z: TOWN.stash.z, r: 3, mark: 'STASH', label: () => 'Open the shared stash', action: () => G.actions.openStash() },
       { x: TOWN.bell.x, z: TOWN.bell.z, r: 3.2, mark: 'NIGHT BELL', label: () => (G.defense.phase === 'day' ? 'Ring the Night Bell — Defend the City' : null), action: () => G.actions.startNight() },
       ...this.chests.map((ch) => ({ x: ch.x, z: ch.z, r: 2.6, mark: null, label: () => (ch.open ? null : 'Open Ancient Chest'), action: () => G.actions.openChest(ch) })),
@@ -354,6 +371,7 @@ export class TownZone {
       { x: TOWN.bell.x, z: TOWN.bell.z, color: '#e0b040', icon: 'bell' },
       { x: TOWN.trainer.x, z: TOWN.trainer.z, color: '#5ab0ff', icon: 'npc' },
       { x: TOWN.stash.x, z: TOWN.stash.z, color: '#8fd0ff', icon: 'stash' },
+      { x: TOWN.smith.x, z: TOWN.smith.z, color: '#ff8a3a', icon: 'npc' },
     ];
   }
 
@@ -419,6 +437,10 @@ export class TownZone {
     if (this.bellSwing > 0) { this.bellSwing = Math.max(0, this.bellSwing - dt * 0.3); this.bellPivot.rotation.x = Math.sin(t * 6) * 0.5 * this.bellSwing; }
     for (const b of this.banners) b.rotation.x = Math.sin(t * 2 + b.position.x) * 0.08;
     animateRig(this.trainer, { t, move: 0, atk: -1, slam: -1 });
+    const hm = (t * 0.9) % 1; animateRig(this.smith, { t, move: 0, atk: hm < 0.6 ? hm / 0.6 : -1, combo: 2, slam: -1 });
+    if (hm > 0.32 && hm < 0.36 && Math.random() < 0.7) G.fx.emit({ pos: this.smith.root.position.clone().add(new THREE.Vector3(0, 1, 0)), count: 10, speed: 4, color: '#ffe0a0', color2: '#ff4a00', size: 0.18, life: 0.4, gravity: 10 });
+    this.forgeLight.intensity = 9 + Math.sin(t * 9) * 2;
+    if (Math.random() < dt * 14) G.fx.emit({ pos: this.forgeCoals, count: 1, speed: 1, color: '#ffc060', color2: '#ff2000', size: 0.3, life: 0.8, up: 2, radius: 0.5 });
     this.trainer.root.rotation.y = Math.atan2(playerPos.x - TOWN.trainer.x, playerPos.z - TOWN.trainer.z);
     for (const ch of this.chests) if (ch.open && ch.lidP.rotation.x > -1.9) ch.lidP.rotation.x -= dt * 4;
     // night blend
