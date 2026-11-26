@@ -14080,6 +14080,13 @@ const GX56 = { t: 0 };
   const back = new V3(-Math.sin(S.heading || 0), 0, -Math.cos(S.heading || 0)); const p = BK.pos.clone().addScaledVector(back, -1.6); p.y = Math.max(hgt(p.x, p.z), (S.water && S.water.visible) ? S.water.position.y : -999);
   gx7Puff(p, sp > 40 ? 4 : 3, 1.2 + Math.min(2.2, sp / 25), col); GX56.n = (GX56.n || 0) + 1; }; }
 
+/* ============ graphics round 58: a badly damaged ship trails smoke and throws the odd spark ============ */
+const GX58 = { fx: [], t: 0, tex: null };
+function gx58Tick(dt) { const dmg = clamp(1 - G.hull / Math.max(1, D.maxHull), 0, 1), on = GFX.hd && G.state === 'fly' && renderScene === scene && dmg > 0.55;
+  if (on) { GX58.t -= dt; if (GX58.t <= 0) { GX58.t = 0.07 - (dmg - 0.55) * 0.08; if (!GX58.tex) GX58.tex = typeof GX7_PUFF !== 'undefined' ? GX7_PUFF : TEX_GLOW; const back = new V3(0, 0, 1).applyQuaternion(player.quaternion), s = new THREE.Sprite(new THREE.SpriteMaterial({ map: GX58.tex, color: dmg > 0.8 ? 0x5a5450 : 0x8a8480, transparent: true, depthWrite: false, opacity: 0.75 })); s.position.copy(player.position).addScaledVector(back, (P.r || 6) * 0.3).add(new V3(0, (P.r || 6) * 0.35, 0).applyQuaternion(player.quaternion)).add(randDir().multiplyScalar((P.r || 6) * 0.25)); const sz = (P.r || 6) * 0.5; s.scale.setScalar(sz); scene.add(s); GX58.fx.push({ o: s, v: P.vel.clone().multiplyScalar(0.3).add(new V3(0, 4, 0).applyQuaternion(player.quaternion)).add(randDir().multiplyScalar(3)), t: 0, life: 1.6, g: sz * 2.2 }); if (Math.random() < 0.1) spark(s.position, 0xffa040, 3); } }
+  GX58.fx.slice().forEach(f => { f.t += dt; const k = f.t / f.life; f.o.position.addScaledVector(f.v, dt); f.o.scale.setScalar(f.o.scale.x + f.g * dt); f.o.material.opacity = 0.75 * (1 - k); if (k >= 1) { scene.remove(f.o); f.o.material.dispose(); GX58.fx.splice(GX58.fx.indexOf(f), 1); } }); }
+{ const _ub34 = updateBoss; updateBoss = function (dt) { _ub34(dt); gx58Tick(dt); }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
