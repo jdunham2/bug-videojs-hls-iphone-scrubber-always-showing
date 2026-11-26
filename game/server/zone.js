@@ -7,6 +7,7 @@ import { RNG } from '../public/shared/rng.js';
 import { RIFT_MOD_KEYS, riftEnemyLevel, riftHpMul, RIFT_TIME } from '../public/shared/rifts.js';
 import { REGIONS, EVENTS, QUESTS, ACT1_END } from '../public/shared/regions.js';
 const HERALD_Q = QUESTS.findIndex((q) => q.kind === 'herald');
+import { WEATHER_TABLE, weatherFx, hourAt, isNight } from '../public/shared/life.js';
 
 const rng = new RNG(Date.now() & 0xffffffff);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -19,6 +20,7 @@ export class Zone {
     this.enemies = new Map(); this.projectiles = new Map(); this.hazards = new Map(); this.allies = new Map();
     this.cleared = false; this.emptyT = 0; this.respawnT = 0;
     if (type === 'region') { this.region = REGIONS[key]; this.eventT = 25; this.event = null; }
+    this.weather = 'clear'; this.weatherT = WEATHER_TABLE[key] ? rng.range(40, 90) : 1e9;
     if (type === 'dungeon' || type === 'rift') {
       this.seed = (Math.random() * 1e9) | 0;
       if (type === 'rift') {
@@ -44,6 +46,16 @@ export class Zone {
   players() { return [...this.room.players.values()].filter((p) => p.zone === this.key); }
   alive() { return this.players().filter((p) => !p.dead); }
   broadcast(msg) { const s = JSON.stringify(msg); for (const p of this.players()) if (p.ws.readyState === 1) p.ws.send(s); }
+  get W() { return weatherFx(this.weather); }
+  get night() { return (this.region || this.type === 'dark') && isNight(hourAt(this.room.clock)); }
+  tickWeather(dt) {
+    this.weatherT -= dt;
+    if (this.weatherT > 0) return;
+    const T = WEATHER_TABLE[this.key]; let next = rng.weighted(T);
+    if (next === this.weather) next = rng.weighted(T);
+    this.weather = next; this.weatherT = rng.range(this.weather === 'clear' ? 90 : 70, this.weather === 'clear' ? 180 : 140);
+    this.broadcast({ t: 'weather', kind: this.weather, zone: this.key });
+  }
   get lvl() { return this.dungeon ? this.level : this.room.level; }
   riftValue(e) { return e.def.flee ? 0 : (e.type === 'brute' ? 3 : 1) * (e.affix ? 4 : 1); }
 
@@ -93,6 +105,7 @@ export class Zone {
       if (h.life <= 0) { this.hazards.delete(h.id); this.broadcast({ t: 'hazardEnd', id: h.id }); }
     }
     if (this.region && this.players().length) this.tickRegion(dt);
+    if (WEATHER_TABLE[this.key] && this.players().length) this.tickWeather(dt);
     if (this.type === 'dark') {
       this.respawnT -= dt;
       if (this.respawnT <= 0 && this.enemies.size < 9 && this.players().length) {
@@ -106,7 +119,7 @@ export class Zone {
   findTarget(e, alive) {
     if (e.tauntT > 0) { const t = alive.find((p) => p.id === e.tauntBy); if (t) return t; }
     let best = null, bd = 1e9;
-    const range = e.aggro ? e.def.aggro * 2.2 : e.def.aggro;
+    const range = (e.aggro ? e.def.aggro * 2.2 : e.def.aggro * (this.W.aggro || 1)) * (this.night && !e.aggro ? 1.1 : 1);
     for (const p of alive) {
       const d = dist(e, p);
       if (d < range && d < bd) {
@@ -186,7 +199,7 @@ export class Zone {
     const enr = e.enraged ? 1.35 : 1;
     let moving = false;
     if (d > reach) {
-      const sp = def.speed * enr * (e.speedMul || 1) * (e.burrowed ? 1.5 : 1) * (e.slow > 0 ? 0.5 : 1) * (target || defense ? 1 : 0.45);
+      const sp = def.speed * enr * (e.speedMul || 1) * (e.burrowed ? 1.5 : 1) * (e.slow > 0 ? 0.5 : 1) * (target || defense ? 1 : 0.45) * (this.W.slow || 1);
       const step = Math.min(pathing ? d : d - reach * 0.8, sp * dt);
       e.x += (dx / d) * step; e.z += (dz / d) * step;
       moving = true;
@@ -535,7 +548,7 @@ export class Zone {
       if (t.kind === 'player') { tx = t.p.x; tz = t.p.z; } else if (t.kind === 'struct') { tx = t.s.x; tz = t.s.z; }
       const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz) || 1;
       const id = this.room.nextId++;
-      const pr = { id, x: e.x + (dx / d) * 0.8, z: e.z + (dz / d) * 0.8, vx: (dx / d) * 13, vz: (dz / d) * 13, dmg: e.dmg, life: 2, kind: 'bolt', affix: e.affix };
+      const pr = { id, x: e.x + (dx / d) * 0.8, z: e.z + (dz / d) * 0.8, vx: (dx / d) * 13, vz: (dz / d) * 13, dmg: Math.round(e.dmg * (this.W.dmg || 1)), life: 2, kind: 'bolt', affix: e.affix };
       this.projectiles.set(id, pr);
       this.broadcast({ t: 'proj', id, kind: 'bolt', x: r2(pr.x), z: r2(pr.z), vx: r2(pr.vx), vz: r2(pr.vz) });
       return;
@@ -544,7 +557,7 @@ export class Zone {
     if (t.kind === 'player') {
       if (t.p.ally) { if (!t.p.dead && this.allies.has(t.p.id) && dist(t.p, e) < reach) this.hurtAlly(t.p, e.dmg); }
       else if (!t.p.dead && t.p.zone === this.key && dist(t.p, e) < reach) {
-        send(t.p.ws, { t: 'hurt', dmg: e.dmg, from: e.id, affix: e.affix, kb: def.siege ? 1 : 0 });
+        send(t.p.ws, { t: 'hurt', dmg: Math.round(e.dmg * (this.W.dmg || 1)), from: e.id, affix: e.affix, kb: def.siege ? 1 : 0 });
         if (e.affix === 'vampiric') e.hp = Math.min(e.maxHp, e.hp + e.dmg * 0.6);
       }
     } else if (t.kind === 'struct') this.room.defense.damageStruct(t.s, e.dmg * (def.siege ? 4 : 1.5));
@@ -628,9 +641,9 @@ export class Zone {
       }
     }
     for (const p of this.players()) {
-      let gold = e.gold * rng.range(0.8, 1.25);
+      let gold = e.gold * rng.range(0.8, 1.25) * (this.W.gold || 1);
       if (def.flee) gold *= 2.5;
-      this.room.reward(p, gold, def.xp * (1 + 0.15 * (e.level - 1)) * e.xpMul, e.x, e.z);
+      this.room.reward(p, gold, def.xp * (1 + 0.15 * (e.level - 1)) * e.xpMul * (this.night ? 1.25 : 1), e.x, e.z);
       if (!e.noLoot && rng.chance(def.boss ? 1 : e.affix ? 0.3 : 0.05)) send(p.ws, { t: 'gem', k: this.room.dropGem(p, e.level) });
       const chance = e.noLoot ? 0 : def.boss || def.flee ? 1 : e.affix ? 0.6 : this.type === 'town' ? 0.05 : e.type === 'brute' ? 0.4 : e.type === 'wraith' ? 0.22 : 0.13;
       if (rng.chance(chance)) {
@@ -668,7 +681,7 @@ export class Zone {
       this.respawnT = 4;
       const a = rng.range(0, Math.PI * 2), r = rng.range(18, R.bound - 12);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (Math.hypot(x - R.spawn.x, z - R.spawn.z) > 16) this.spawn(rng.weighted(R.spawns), x, z);
+      if (Math.hypot(x - R.spawn.x, z - R.spawn.z) > 16) this.spawn(rng.weighted(R.spawns), x, z, this.night && rng.chance(0.14) ? { elite: rng.pick(AFFIX_KEYS) } : {});
     }
     if (this.event) {
       const ev = this.event; ev.t -= dt;

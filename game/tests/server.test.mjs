@@ -180,3 +180,32 @@ test('act II: companion joins, relics, and the 4-phase Storm Herald binds the Dr
   assert.ok(c.last.actComplete, 'act complete');
   assert.equal(p.char.quest.i, QUESTS.length, 'act II finished');
 });
+
+test('world clock and weather reach the client; fishing is validated server-side', async () => {
+  const { TOWN } = await import('../public/shared/world.js');
+  const game = G(), c = client(game);
+  await wait(30);
+  assert.ok(typeof c.zone.clock === 'number', 'clock sent on zone entry');
+  assert.equal(c.zone.weather, 'clear');
+  const room = game.rooms.get(c.room);
+  // weather changes are broadcast and alter the zone's rules
+  c.send({ t: 'zone', to: 'marsh' }); await wait(60);
+  const marsh = room.zones.get('marsh'); marsh.weatherT = 0; await wait(120);
+  assert.ok(c.last.weather, 'weather broadcast');
+  marsh.weather = 'ash'; assert.equal(marsh.W.dmg, 1.15);
+  c.send({ t: 'zone', to: 'town' }); await wait(60);
+  // fishing: too far from the lake does nothing
+  c.send({ t: 'fishStart' }); await wait(30);
+  assert.equal(c.count('fishBite'), 0);
+  const L = TOWN.lake;
+  c.send({ t: 'state', x: L.x - 12, y: 0, z: L.z, hp: 100, maxHp: 100 });
+  c.send({ t: 'fishStart' }); await wait(30);
+  assert.equal(c.count('fishBite'), 1);
+  c.send({ t: 'fishEnd', ok: true }); await wait(30); // instantly "reeled in": rejected
+  assert.equal(c.count('fishCaught'), 0); assert.match(c.last.fishLost.text, /snapped/);
+  c.send({ t: 'fishStart' }); await wait(30);
+  const p = [...room.players.values()][0]; p.fish.bite = Date.now() - 2000; // pretend the bite happened 2s ago
+  c.send({ t: 'fishEnd', ok: true }); await wait(120);
+  assert.equal(c.count('fishCaught'), 1);
+  assert.equal(Object.values(c.prof.fish).reduce((a, b) => a + b, 0), 1);
+});

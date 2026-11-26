@@ -7,6 +7,7 @@ import * as P from './profile.js';
 import { SETS } from '../public/shared/items.js';
 import { RIFT_TIME, season } from '../public/shared/rifts.js';
 import { REGIONS, QUESTS, CAPTAIN, questDone, ACT1_END } from '../public/shared/regions.js';
+import { FISH, rollFish, nearLake, MIN_REEL, hourAt, isNight } from '../public/shared/life.js';
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 export { TOKEN_RE };
@@ -40,13 +41,14 @@ function makeCode() {
 class Room {
   constructor(code) {
     this.code = code; this.players = new Map(); this.level = 1; this.nextId = 1; this.zones = new Map();
-    this.currentDungeon = null; this.ready = null; this.tickN = 0;
+    this.currentDungeon = null; this.ready = null; this.tickN = 0; this.clock0 = Date.now();
     this.zones.set('town', new Zone(this, 'town', 'town', 1));
     this.zones.set('dark', new Zone(this, 'dark', 'dark', 1));
     this.defense = new Defense(this);
   }
   broadcast(msg) { const s = JSON.stringify(msg); for (const p of this.players.values()) if (p.ws.readyState === 1) p.ws.send(s); }
   get town() { return this.zones.get('town'); }
+  get clock() { return (Date.now() - this.clock0) / 1000 + (this.clockOffset || 0); }
 
   reward(p, gold, xp, x, z, big = false) {
     const st = P.statsOf(p);
@@ -129,7 +131,7 @@ class Room {
     if (zone.type !== 'town' && (p.char.quest?.i || 0) > ACT1_END && p.companion !== false) zone.addAlly(p);
     p.zone = zone.key;
     p.loot.clear();
-    const msg = { t: 'enterZone', zone: zone.key, type: zone.type, level: zone.dungeon ? zone.level : this.level };
+    const msg = { t: 'enterZone', zone: zone.key, type: zone.type, level: zone.dungeon ? zone.level : this.level, clock: Math.round(this.clock * 10) / 10, weather: zone.weather };
     if (zone.dungeon) { msg.seed = zone.seed; msg.cleared = zone.cleared; }
     if (zone.rift) msg.rift = zone.riftState();
     if (zone.type === 'town') { msg.structs = this.defense.list(); msg.defense = this.defense.view(); }
@@ -258,6 +260,27 @@ function attach(ws) {
         else if (p.zone === 'peaks' && near(p, REGIONS.peaks.camp, 6) && (p.char.quest?.i || 0) === ACT1_END) { send(ws, { t: 'dialog', who: 'Scout Ilsa', i: ACT1_END }); room.questEvent(p, 'talk2'); }
         break;
       case 'relic': if (p.zone === 'peaks') zone.takeRelic(p, m.i | 0); break;
+      // ---- fishing (server rolls the fish and validates the reel time) ----
+      case 'fishStart': {
+        if (p.zone !== 'town' || !nearLake(p.x, p.z) || p.fish) break;
+        const delay = 1.8 + Math.random() * 4.2, k = rollFish(Math.random, isNight(hourAt(room.clock)));
+        p.fish = { k, bite: Date.now() + delay * 1000 };
+        send(ws, { t: 'fishBite', delay: Math.round(delay * 100) / 100, diff: FISH[k].diff });
+        break;
+      }
+      case 'fishEnd': {
+        const f = p.fish; p.fish = null;
+        if (!f || !m.ok) { if (f) send(ws, { t: 'fishLost' }); break; }
+        const since = (Date.now() - f.bite) / 1000;
+        if (since < MIN_REEL || since > 40 || !nearLake(p.x, p.z)) { send(ws, { t: 'fishLost', text: 'The line snapped!' }); break; }
+        const F = FISH[f.k], pf = (p.prof.fish ||= {});
+        pf[f.k] = (pf[f.k] || 0) + 1;
+        room.reward(p, F.gold, 10 + F.gold * 0.5, p.x, p.z, true);
+        let gem = null; if (F.gem) gem = P.dropGem(p, room.level + 4);
+        send(ws, { t: 'fishCaught', k: f.k, n: pf[f.k], gem });
+        p.dirty = true;
+        break;
+      }
       case 'companion': p.companion = !!m.on; if (zone && zone.type !== 'town') { zone.removeAllies(p.id); if (p.companion && (p.char.quest?.i || 0) > ACT1_END) zone.addAlly(p); } break;
       case 'paragon': ok(P.spendParagon(p, String(m.key))); break;
       case 'readyResp': room.readyResp(p, !!m.yes); break;
@@ -279,7 +302,8 @@ function attach(ws) {
       case 'repair': ok(room.defense.repair(p, m.id)); break;
       case 'startNight': if (p.zone === 'town') room.defense.startNight(); break;
       case 'chat':
-        if (dev && /^\/(depth|gold|xp|wave|loot|gems|quest) \d+$/.test(m.text || '')) {
+        if (dev && zone && /^\/weather (clear|rain|snow|ash)$/.test(m.text || '')) { zone.weather = m.text.split(' ')[1]; zone.weatherT = 600; zone.broadcast({ t: 'weather', kind: zone.weather, zone: zone.key }); break; }
+        if (dev && /^\/(depth|gold|xp|wave|loot|gems|quest|hour) \d+$/.test(m.text || '')) {
           const [cmd, n] = m.text.slice(1).split(' ');
           if (cmd === 'depth') { room.level = Math.max(1, +n); room.currentDungeon = null; room.broadcast({ t: 'roomLevel', level: room.level }); }
           if (cmd === 'gold') { p.prof.gold += +n; p.dirty = true; }
@@ -291,6 +315,7 @@ function attach(ws) {
             p.dirty = true;
           }
           if (cmd === 'quest') { p.char.quest = { i: Math.min(+n, QUESTS.length), n: 0 }; if (+n >= ACT1_END) p.prof.peaks = true; p.dirty = true; }
+          if (cmd === 'hour') { room.clockOffset = (room.clockOffset || 0) + ((((+n - hourAt(room.clock)) % 24) + 24) % 24) / 24 * 480; room.broadcast({ t: 'clock', clock: room.clock }); }
           if (cmd === 'gems') for (let k = 0; k < +n; k++) P.dropGem(p, room.level + 8);
           if (cmd === 'wave') { const d = room.defense.state; if (d.phase === 'day') room.defense.startNight(); d.wave = Math.max(0, +n - 1); d.phase = 'intermission'; d.timer = 2; }
           break;

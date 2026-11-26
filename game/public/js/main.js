@@ -17,6 +17,21 @@ import { fxPlay, enemiesInRadius } from './skills.js';
 import { Cinematic, introShots, bossShots, storyShots } from './cinematic.js';
 import { Footsteps, decals, recoil, rumble, SPLAT } from './feel.js';
 const footsteps = new Footsteps();
+import { WeatherView } from './weather.js';
+import { Wildlife } from './wildlife.js';
+import { Townsfolk } from './townsfolk.js';
+import { Fishing } from './fishing.js';
+import { hourAt, weatherFx, nearLake } from '../shared/life.js';
+const weather = new WeatherView(), fishing = new Fishing();
+G.fishingUI = fishing;
+let clockStart = performance.now() / 1000;
+const weatherChip = document.createElement('div'); weatherChip.className = 'weatherChip'; weatherChip.style.cssText = 'right:16px;left:auto;top:338px;text-align:right'; document.getElementById('hud')?.appendChild(weatherChip);
+function setWeather(kind, announce) {
+  G.weather = kind || 'clear'; weather.set(G.weather);
+  const W = weatherFx(G.weather);
+  if (announce && G.weather !== 'clear') ui.toast(`${W.icon} ${W.name}`, '#bcd4ec', W.desc);
+  else if (announce) ui.toast('☀ The weather clears', '#ffe6a0');
+}
 G.decals = decals;
 import { entityRoot, EnemyView, AllyView, RemoteView, LootView, ProjView, StructView, HazardView, buildStructure, EMOTES } from './entities.js';
 import { TownZone } from './zones/town.js';
@@ -104,6 +119,10 @@ applySettings();
 
 function setActiveZone(zone) {
   zone.scene.add(fx.root, entityRoot, decals.root);
+  weather.attach(zone.scene);
+  if ((zone.type === 'region' || zone === town) && !zone.wildlife) zone.wildlife = new Wildlife(zone, zone.type === 'region' ? zone.key : 'town');
+  if (zone === town && !town.folk) town.folk = new Townsfolk(town);
+  if (zone !== town) town.folk?.setVisible(false);
   if (player) zone.scene.add(player.root);
   renderPass.scene = zone.scene;
   G.zone = zone;
@@ -155,6 +174,8 @@ async function switchZone(m) {
   }
   G.zoneKey = m.zone;
   G.event = null;
+  if (typeof m.clock === 'number') clockStart = performance.now() / 1000 - m.clock;
+  setWeather(m.weather, false); fishing.stop(false, true);
   G.rift = m.rift ? { ...m.rift, t0: performance.now() / 1000 - m.rift.elapsed } : null;
   setActiveZone(zone);
   if (oldDungeon) oldDungeon.dispose();
@@ -272,6 +293,11 @@ net.on('levelUp', (m) => {
   ui.bigBanner('LEVEL UP', `Level ${m.level} — you earned a talent point (${input.bindings.talents.replace('Key', '')})`);
 });
 net.on('enterZone', (m) => { zoneQueue = zoneQueue.then(() => switchZone(m)); });
+net.on('weather', (m) => { if (m.zone === G.zoneKey) setWeather(m.kind, true); });
+net.on('clock', (m) => { clockStart = performance.now() / 1000 - m.clock; });
+net.on('fishBite', (m) => fishing.onBite(m));
+net.on('fishCaught', (m) => fishing.caught(m));
+net.on('fishLost', (m) => { if (m.text) ui.toast(m.text, '#ff9a7a'); });
 net.on('players', (m) => {
   const seen = new Set();
   for (const p of m.list) {
@@ -554,6 +580,7 @@ function showOwnEmote(k) { ownBubble.textContent = EMOTES[k]; ownBubble.style.di
 function interactables() {
   const list = [...(G.zone.interactables || [])];
   for (const r of G.remotes.values()) if (!r.p.dead) list.push({ x: r.pos.x, z: r.pos.z, r: 3, label: () => `Trade with ${r.p.name}`, action: () => net.send({ t: 'tradeReq', to: r.id }) });
+  if (G.zone === town && player && !fishing.active && nearLake(player.pos.x, player.pos.z)) list.push({ x: player.pos.x, z: player.pos.z, r: 1, label: () => (G.defense.phase === 'day' ? 'Fish in the lake' : null), action: () => fishing.start(player) });
   return list;
 }
 function nearestInteractable() {
@@ -664,6 +691,14 @@ function frame(now) {
     for (const r of G.remotes.values()) r.update(dt, camera);
     for (const a of G.allies.values()) a.update(dt, camera, zone);
     decals.update(dt);
+    G.clock = performance.now() / 1000 - clockStart; G.hour = hourAt(G.clock);
+    weather.update(dt, zone, camera);
+    zone.wildlife?.update(dt, G.time, player ? player.pos : camera.position);
+    if (zone === town && town.folk) town.folk.update(dt, player ? player.pos : camera.position, camera);
+    if (player) fishing.update(dt, input);
+    { const hh = Math.floor(G.hour), mm = Math.floor((G.hour % 1) * 60), W = weatherFx(G.weather), outdoors = zone.type === 'region' || zone.type === 'dark' || zone === town;
+      const txt = outdoors ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} ${G.hour >= 20 || G.hour < 6 ? '☾' : '☀'}${zone.type !== 'town' && G.weather !== 'clear' ? ` · ${W.icon} ${W.name}<br><small>${W.desc}</small>` : ''}` : '';
+      if (txt !== weatherChip._t) { weatherChip.innerHTML = txt; weatherChip._t = txt; } }
     if (player && !G.cinematic) footsteps.update(player, zone);
     for (const p of G.projectiles.values()) p.update(dt);
     for (const s of G.structures.values()) s.update(dt, camera);

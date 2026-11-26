@@ -24,7 +24,7 @@ export function profileView(p) {
   const pr = p.prof;
   pr.mats ||= { shards: 0, cores: 0 };
   pr.gems ||= {};
-  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, gems: pr.gems, looks: pr.looks || [], riftMax: pr.riftMax || 1, research: pr.research || {}, peaks: !!pr.peaks, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
+  return { t: 'profile', fish: pr.fish || {}, name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, gems: pr.gems, looks: pr.looks || [], riftMax: pr.riftMax || 1, research: pr.research || {}, peaks: !!pr.peaks, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
 }
 
 export function activeBuffs(p) {

@@ -7,6 +7,7 @@ import { CLASSES } from '../shared/classes.js';
 import { RARITIES } from '../shared/items.js';
 import { tileAt } from '../shared/dungeon.js';
 import { recoil, rumble, decals } from './feel.js';
+import { weatherFx } from '../shared/life.js';
 import { levelMul } from '../shared/enemies.js';
 import { SkillKit, enemiesInArc, enemiesInRadius, fxPlay } from './skills.js';
 
@@ -123,7 +124,7 @@ export class LocalPlayer {
       this.finish(dt, zone);
       return;
     }
-    const active = G.inGame && !G.uiOpen && !G.cinematic && !G.emoteWheel;
+    const active = G.inGame && !G.uiOpen && !G.cinematic && !G.emoteWheel && !G.fishing;
     const yaw = cam.yaw;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
     const ax = active ? input.moveAxes() : { x: 0, y: 0 };
@@ -183,6 +184,7 @@ export class LocalPlayer {
     if (this.slowT > 0) speed *= 0.5;
     if (this.tailT > 0) speed *= 1.35;
     if (this.mounted) speed *= 1.8;
+    if (G.zone && G.zone.type !== 'town' && G.weather) speed *= weatherFx(G.weather).slow || 1;
     // out-of-combat sprint ramps in after a moment of uninterrupted running
     const canSprint = moving && !this.mounted && this.onGround && this.combatT > 3 && this.atk.t < 0 && this.castT <= 0 && !this.blocking && !this.roll;
     this.sprintT = canSprint ? (this.sprintT || 0) + dt : 0;

@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { REGIONS, QUESTS, ACT1_END } from '../../shared/regions.js';
 import { buildEnemy, animateRig } from '../models.js';
+import { nightAmount } from '../../shared/life.js';
+const NIGHT_SKY = { top: new THREE.Color('#04060f'), horizon: new THREE.Color('#141c30'), bottom: new THREE.Color('#080a14') }, DUSK = new THREE.Color('#ff8a4a'), MOON = new THREE.Color('#b8ccff'), _c = new THREE.Color();
 const qi = () => G.prof?.char?.quest?.i || 0, qk = () => QUESTS[qi()]?.kind;
 const HERALD_Q = QUESTS.findIndex((q) => q.kind === 'herald');
 import { RNG, fbm, smoothstep } from '../../shared/rng.js';
@@ -29,7 +31,7 @@ export class RegionZone {
     this.scene = new THREE.Scene();
     this.spawn = { ...this.R.spawn }; this.spawnYaw = 0;
     this.bloom = this.S.bloom; this.exposure = this.S.exposure;
-    this.colliders = [];
+    this.colliders = []; this.flash = 0;
     this.build();
   }
   groundHeight(x, z) { const h = this.R.height(x, z); return this.R.water > -50 ? Math.max(h, this.R.water - 0.5) : h; }
@@ -155,10 +157,32 @@ export class RegionZone {
       R.relics.forEach((p, i) => this.mapIcons.push({ x: p.x, z: p.z, color: '#5ab8ff', icon: 'portal', show: () => qk() === 'relic' && !((G.prof?.char?.quest?.r || 0) & (1 << i)) }));
     }
   }
+  // day/night from the shared world clock: sun arc, moon, stars, dusk tint, fog and light levels
+  dayNight(hour) {
+    const n = nightAmount(hour), S = this.S, u = this.sky.material.uniforms;
+    if (this._n !== undefined && Math.abs(n - this._n) < 0.002 && Math.abs(hour - this._h) < 0.02) return;
+    this._n = n; this._h = hour;
+    const day = hour >= 5 && hour < 20.5, a = ((hour - 6) / 12) * Math.PI; // 06:00 sunrise .. 18:00 sunset
+    const el = Math.sin(a), az = Math.cos(a);
+    const dir = day ? new THREE.Vector3(az * 0.9, Math.max(0.08, el), -0.45) : new THREE.Vector3(-0.4, 0.55, -0.6);
+    u.sunDir.value.copy(dir.normalize()); this.sunOffset = { x: dir.x * 55, y: Math.max(10, dir.y * 55), z: dir.z * 55 };
+    const dusk = Math.max(0, 1 - Math.abs(n - 0.45) * 2.6) * (hour > 12 || hour < 8 ? 1 : 0);
+    u.top.value.set(S.sky.top).lerp(NIGHT_SKY.top, n);
+    u.horizon.value.set(S.sky.horizon).lerp(DUSK, dusk * 0.55).lerp(NIGHT_SKY.horizon, n);
+    u.bottom.value.set(S.sky.bottom).lerp(NIGHT_SKY.bottom, n);
+    u.sunColor.value.set(S.sky.sunColor).lerp(DUSK, dusk * 0.7).lerp(MOON, day ? 0 : 1);
+    u.moon.value = day ? 0 : 1; u.stars.value = n; u.sunSize.value = day ? S.sky.sunSize : 0.9985;
+    this.sun.color.set(S.sun[0]).lerp(DUSK, dusk * 0.6).lerp(MOON, n); this.sun.intensity = S.sun[1] * (1 - n * 0.82);
+    this.hemiBase = S.hemi[2] * (1 - n * 0.7); this.hemi.color.set(S.hemi[0]).lerp(_c.set('#3a4a7a'), n);
+    this.scene.fog.color.set(S.fog[0]).lerp(DUSK, dusk * 0.25).lerp(_c.set('#0c1220'), n * 0.85);
+    this.exposure = S.exposure * (1 - n * 0.18); G.renderer.toneMappingExposure = this.exposure;
+    this.nightF = n;
+  }
   update(dt, t, playerPos) {
+    this.dayNight(G.hour ?? 12);
     this.sky.position.copy(G.camera.position);
     this.sky.material.uniforms.time.value = t;
-    followSun(this.sun, playerPos, { x: 30, y: 50, z: -30 });
+    followSun(this.sun, playerPos, this.sunOffset || { x: 30, y: 50, z: -30 });
     this.wpRune.rotation.y = t; this.wpRune.rotation.x = Math.sin(t) * 0.3;
     this.altarRune.rotation.z = t * 0.4;
     if (this.ilsa) {
@@ -177,9 +201,9 @@ export class RegionZone {
       if (Math.random() < dt * 20) { const a = Math.random() * 6.28, r = Math.random() * 22; const x = playerPos.x + Math.cos(a) * r, z = playerPos.z + Math.sin(a) * r; G.fx.emit({ pos: new THREE.Vector3(x, this.groundHeight(x, z) + 0.6 + Math.random() * 2, z), count: 1, speed: 0.3, color: '#c8ff6a', color2: '#2aff6a', size: 0.16, life: 3, drag: 0.2 }); }
     } else {
       if (Math.random() < dt * 40) { const a = Math.random() * 6.28, r = Math.random() * 20; G.fx.emit({ pos: new THREE.Vector3(playerPos.x + Math.cos(a) * r, playerPos.y + 8, playerPos.z + Math.sin(a) * r), count: 1, speed: 0.5, color: '#ffffff', color2: '#d8e8ff', size: 0.14, life: 5, gravity: 0.8, drag: 0.6 }); }
-      this.flash = Math.max(0, (this.flash || 0) - dt * 3);
       if (Math.random() < dt * 0.06) { this.flash = 1; setTimeout(() => G.audio.slam(), 400 + Math.random() * 800); }
-      this.hemi.intensity = this.S.hemi[2] + this.flash * 2.5;
     }
+    this.flash = Math.max(0, (this.flash || 0) - dt * 3);
+    this.hemi.intensity = (this.hemiBase ?? this.S.hemi[2]) + this.flash * 2.5;
   }
 }
