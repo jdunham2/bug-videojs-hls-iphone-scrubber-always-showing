@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Emberfall</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "/lib/three/build/three.module.js", "three/addons/": "/lib/three/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="labels"></div>
+  <div id="vignette"></div>
+  <div id="fade"></div>
+
+  <!-- LOBBY -->
+  <div id="lobby">
+    <div class="lobby-card">
+      <div class="logo">EMBERFALL</div>
+      <div class="tagline">Delve. Loot. Defend the last city.</div>
+      <label>Hero name</label>
+      <input id="nameInput" maxlength="16" placeholder="Hero" />
+      <label>Banner color</label>
+      <div id="colors"></div>
+      <label>Party code <span class="muted">(leave empty to start a new party)</span></label>
+      <input id="roomInput" maxlength="6" placeholder="e.g. KXQR" />
+      <button id="playBtn" class="btn primary">Enter Emberhold</button>
+      <div id="lobbyMsg" class="muted"></div>
+      <div class="controls-mini">
+        <b>WASD</b> move · <b>Mouse</b> look · <b>LMB</b> attack combo · <b>Q</b> Ember Slam · <b>Shift</b> dash · <b>Space</b> jump · <b>R</b> potion · <b>E</b> interact · <b>I</b> inventory · <b>B</b> build · <b>Enter</b> chat · <b>H</b> help
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="party"></div>
+    <div id="topRight">
+      <canvas id="minimap" width="180" height="180"></canvas>
+      <div id="roomInfo"></div>
+    </div>
+    <div id="zoneBanner"><div class="zb-title"></div><div class="zb-sub"></div></div>
+    <div id="bossBar" class="hidden"><div class="bb-name"></div><div class="bb-track"><div class="bb-fill"></div></div></div>
+    <div id="defenseHud" class="hidden">
+      <div class="dh-title"></div>
+      <div class="dh-sub"></div>
+      <div class="dh-core"><span>Ember Heart</span><div class="bb-track small"><div class="dh-fill"></div></div></div>
+    </div>
+    <div id="prompt" class="hidden"></div>
+    <div id="toasts"></div>
+    <div id="chat"><div id="chatLog"></div><input id="chatInput" class="hidden" maxlength="160" placeholder="Say something…" /></div>
+    <div id="buildBar" class="hidden"></div>
+    <div id="bottom">
+      <div class="stat-row">
+        <div class="lvl-badge" id="lvlBadge">1</div>
+        <div class="bars">
+          <div class="hpbar"><div id="hpFill"></div><span id="hpText"></span></div>
+          <div class="xpbar"><div id="xpFill"></div></div>
+        </div>
+        <div class="gold" id="goldText">0</div>
+      </div>
+      <div class="skills">
+        <div class="skill" data-k="LMB"><div class="ico">⚔</div><div class="key">LMB</div><div class="cd"></div></div>
+        <div class="skill" id="skQ" data-k="Q"><div class="ico">💥</div><div class="key">Q</div><div class="cd"></div></div>
+        <div class="skill" id="skDash" data-k="Shift"><div class="ico">💨</div><div class="key">⇧</div><div class="cd"></div></div>
+        <div class="skill" id="skPot" data-k="R"><div class="ico">🧪</div><div class="key">R</div><div class="cnt" id="potCount">3</div><div class="cd"></div></div>
+      </div>
+    </div>
+    <div id="clickToPlay" class="hidden">Click to look around</div>
+  </div>
+
+  <div id="inventory" class="panel hidden">
+    <div class="panel-head"><span>Inventory</span><button class="x" data-close="inventory">✕</button></div>
+    <div class="inv-body">
+      <div class="inv-left">
+        <div class="equip" id="equipSlots"></div>
+        <div class="stats" id="statsBox"></div>
+      </div>
+      <div class="inv-right">
+        <div class="bag" id="bag"></div>
+        <div class="muted small" id="invHint">Click to equip · Right-click to sell at a merchant</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="shop" class="panel hidden">
+    <div class="panel-head"><span>The Hollow Merchant</span><button class="x" data-close="shop">✕</button></div>
+    <div class="shop-quote">"Gold for power, traveller. The dark keeps no receipts."</div>
+    <div id="shopItems"></div>
+    <div class="shop-foot"><button class="btn" id="rerollBtn">Restock (25g)</button><span class="muted small">Right-click items in your bag to sell</span></div>
+  </div>
+
+  <div id="tooltip" class="hidden"></div>
+  <div id="death" class="hidden"><div class="d-title">YOU HAVE FALLEN</div><div class="d-sub" id="deathSub"></div></div>
+  <div id="bigBanner" class="hidden"><div class="bb-t"></div><div class="bb-s"></div></div>
+  <div id="help" class="panel hidden">
+    <div class="panel-head"><span>How to play</span><button class="x" data-close="help">✕</button></div>
+    <div class="help-body">
+      <p><b>Emberhold</b> is the last city. Explore the valley, find hidden chests, and step through the <span class="o">orange portal</span> to delve into the <b>Dungeon</b>. Slay the Bone Tyrant to clear it — every clear makes enemies <i>and</i> loot stronger.</p>
+      <p>The <span class="p">violet portal</span> leads to the <b>Dark World</b>, where the Hollow Merchant sells powerful gear for gold.</p>
+      <p>Ring the <b>Night Bell</b> beside the Ember Heart to start <b>Defend the City</b>. Press <b>B</b> to build barricades, towers, braziers and frost totems. Survive 5 waves for a big gold payout.</p>
+      <p>Share your party code so a friend can join you online.</p>
+      <table>
+        <tr><td>WASD</td><td>Move</td><td>Mouse</td><td>Camera (click to lock)</td></tr>
+        <tr><td>LMB</td><td>Attack combo</td><td>Q / RMB</td><td>Ember Slam</td></tr>
+        <tr><td>Shift</td><td>Dash (invulnerable)</td><td>Space</td><td>Jump</td></tr>
+        <tr><td>R</td><td>Drink potion</td><td>E</td><td>Interact</td></tr>
+        <tr><td>I / Tab</td><td>Inventory</td><td>B</td><td>Build mode (1-4 select)</td></tr>
+        <tr><td>Enter</td><td>Chat</td><td>Wheel</td><td>Zoom</td></tr>
+      </table>
+    </div>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

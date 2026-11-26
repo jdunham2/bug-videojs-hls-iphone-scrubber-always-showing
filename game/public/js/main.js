@@ -1,0 +1,440 @@
+// Emberfall client entry: renderer, post-processing, zone management, networking glue, game loop.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { G } from './state.js';
+import { Input } from './input.js';
+import { sfx } from './audio.js';
+import { Net } from './net.js';
+import { fx } from './fx.js';
+import { ui } from './ui.js';
+import { loadSave, writeSave, xpForLevel, gearVisual, BAG_SIZE } from './save.js';
+import { LocalPlayer, CameraRig } from './player.js';
+import { entityRoot, EnemyView, RemoteView, LootView, ProjView, StructView, buildStructure } from './entities.js';
+import { TownZone } from './zones/town.js';
+import { DungeonZone } from './zones/dungeon.js';
+import { DarkZone } from './zones/dark.js';
+import { STRUCTURES, TOWN, DARK } from '../shared/world.js';
+import { RARITIES, generateItem } from '../shared/items.js';
+
+// ---------- renderer ----------
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 900);
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(new THREE.Scene(), camera);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.5, 0.85);
+composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new OutputPass());
+
+function resize() {
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  fx.p.mat.uniforms.scale.value = (innerHeight * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+}
+addEventListener('resize', resize);
+resize();
+
+// ---------- globals ----------
+const save = loadSave();
+const input = new Input(canvas);
+const net = new Net();
+Object.assign(G, { renderer, camera, fx, audio: sfx, ui, net, input, save, party: new Map() });
+ui.init(save);
+
+const town = new TownZone(renderer);
+let dark = null, dungeon = null;
+const camRig = new CameraRig(camera);
+let player = null;
+const killed = new Map();
+let traveling = false;
+let ghost = null, ghostKind = null;
+
+function setActiveZone(zone) {
+  zone.scene.add(fx.root, entityRoot);
+  if (player) zone.scene.add(player.root);
+  renderPass.scene = zone.scene;
+  G.zone = zone;
+  bloom.strength = zone.bloom.strength; bloom.radius = zone.bloom.radius; bloom.threshold = zone.bloom.threshold;
+  renderer.toneMappingExposure = zone.exposure;
+  ui.setMarks(zone);
+}
+setActiveZone(town);
+ui.fade(false);
+
+function clearEntities() {
+  for (const m of [G.enemies, G.loots, G.projectiles, G.structures]) { for (const v of m.values()) v.dispose(); m.clear(); }
+  for (const r of G.remotes.values()) r.dispose();
+  G.remotes.clear();
+  killed.clear();
+  fx.clear();
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let zoneQueue = Promise.resolve();
+
+async function switchZone(m) {
+  const prevKey = G.zoneKey;
+  if (G.inGame && prevKey) { ui.fade(true); await sleep(380); }
+  clearEntities();
+  if (ghost) { ghost.parent?.remove(ghost); ghost = null; }
+  G.buildMode = false;
+  let zone, oldDungeon = null;
+  if (m.type === 'town') zone = town;
+  else if (m.type === 'dark') zone = dark ||= new DarkZone(renderer);
+  else {
+    if (dungeon && dungeon.key !== m.zone) { oldDungeon = dungeon; dungeon = null; }
+    if (!dungeon) { dungeon = new DungeonZone(renderer, m.seed, m.level, m.cleared); dungeon.key = m.zone; }
+    zone = dungeon;
+  }
+  G.zoneKey = m.zone;
+  setActiveZone(zone);
+  if (oldDungeon) oldDungeon.dispose();
+  // spawn point
+  let sx = zone.spawn.x, sz = zone.spawn.z, face = { x: 0, z: -1 };
+  if (m.type === 'town') {
+    const from = prevKey.startsWith('dungeon') ? TOWN.dungeonPortal : prevKey === 'dark' ? TOWN.darkPortal : null;
+    if (from) { const l = Math.hypot(from.x, from.z); face = { x: -from.x / l, z: -from.z / l }; sx = from.x + face.x * 11; sz = from.z + face.z * 11; }
+    for (const ch of town.chests) { const t = save.chests[ch.id]; ch.open = !!t && Date.now() - t < 10 * 60 * 1000; ch.lidP.rotation.x = ch.open ? -1.9 : 0; }
+    G.roomLevel = m.level;
+    if (m.defense) applyDefense(m.defense, true);
+    if (m.structs) applyStructs({ list: m.structs });
+  } else face = { x: 0, z: -1 };
+  player.teleport(sx, sz, zone);
+  player.ry = Math.atan2(face.x, face.z);
+  camRig.yaw = Math.atan2(-face.x, -face.z);
+  camRig.snap(player);
+  const banners = { town: ['EMBERHOLD', G.defense.phase === 'day' ? 'The Last City' : 'The night is upon us'], dark: ['THE DARK WORLD', 'Where gold buys power'], dungeon: [`DEPTH ${m.level}`, m.cleared ? 'The crypt lies silent' : 'The Bone Crypts'] };
+  ui.zoneBanner(...banners[m.type]);
+  sfx.ambience(m.type === 'town' ? (G.defense.phase === 'day' ? 'town' : 'night') : m.type);
+  if (prevKey) sfx.portal();
+  if (m.type === 'dungeon' && !m.cleared) setTimeout(() => ui.toast('Find and slay the Bone Tyrant', '#ff9a7a', 'Clearing the dungeon raises the depth for the whole party'), 1500);
+  traveling = false;
+  ui.fade(false);
+}
+
+// ---------- defense & structures ----------
+function applyDefense(m, silent) {
+  const prev = G.defense.phase;
+  Object.assign(G.defense, m);
+  if (m.structHp) for (const [id, hp] of m.structHp) { const v = G.structures.get(id); if (v) v.s.hp = hp; }
+  if (silent || prev === m.phase || G.zone !== town) return;
+  if (m.phase === 'build') { ui.bigBanner('NIGHTFALL', 'The horde gathers — press B to build defenses', 4500); sfx.bell(); sfx.ambience('night'); town.ringBell(); }
+  if (m.phase === 'dawn') {
+    if (m.result === 'victory') { ui.bigBanner('DAWN BREAKS', 'Emberhold stands! Gold has been paid to the defenders.', 5000); sfx.victory(); }
+    else { ui.bigBanner('THE HEART DIMS', 'Emberhold was overrun… but it endures.', 5000); sfx.boss(); }
+  }
+  if (m.phase === 'day') sfx.ambience('town');
+}
+function applyStructs(m) {
+  if (G.zone !== town) return;
+  const ids = new Set(m.list.map((s) => s.id));
+  for (const [id, v] of G.structures) if (!ids.has(id)) {
+    const p = v.g.position.clone(); p.y += 1;
+    fx.emit({ pos: p, count: 40, speed: 6, color: '#c8a070', color2: '#3a2a1a', size: 0.4, life: 1, up: 1, gravity: 10 });
+    sfx.enemyDie(); v.dispose(); G.structures.delete(id);
+  }
+  for (const s of m.list) {
+    const v = G.structures.get(s.id);
+    if (v) v.s = s;
+    else {
+      G.structures.set(s.id, new StructView(s, town));
+      if (m.built === s.id) { fx.emit({ pos: new THREE.Vector3(s.x, town.groundHeight(s.x, s.z) + 0.5, s.z), count: 30, speed: 4, color: '#ffe0a0', color2: '#a07040', size: 0.3, life: 0.8, up: 1 }); sfx.build(); }
+    }
+  }
+}
+
+// ---------- progression ----------
+function addXp(n) {
+  save.xp += n;
+  let leveled = false;
+  while (save.xp >= xpForLevel(save.level)) { save.xp -= xpForLevel(save.level); save.level++; leveled = true; }
+  if (leveled && player) {
+    player.refreshStats(true);
+    fx.levelUp(player.pos.clone());
+    sfx.levelUp();
+    ui.bigBanner('LEVEL UP', `You are now level ${save.level} — stronger, tougher, deadlier`);
+    writeSave(save);
+  }
+}
+
+// ---------- actions (called from zones / UI) ----------
+G.actions = {
+  travel(to) { if (traveling) return; traveling = true; net.send({ t: 'zone', to }); setTimeout(() => (traveling = false), 4000); },
+  startNight() { net.send({ t: 'startNight' }); },
+  openShop() { ui.openPanel('shop'); },
+  saveNow() { writeSave(save); },
+  respawn() {
+    player.dead = false; player.hp = player.stats.maxHp; player.invuln = 2; player.deadAnim = 0;
+    player.teleport(G.zone.spawn.x, G.zone.spawn.z, G.zone);
+    camRig.snap(player);
+    ui.showDeath(false);
+    fx.emit({ pos: player.pos.clone().setY(player.pos.y + 1), count: 60, speed: 3, color: '#fff2c0', color2: '#ffaa30', size: 0.3, life: 1.2, up: 1 });
+  },
+  openChest(ch) {
+    if (ch.open) return;
+    town.openChest(ch);
+    save.chests[ch.id] = Date.now();
+    const lvl = G.roomLevel;
+    const item = generateItem(null, lvl, { minRarity: 1, luck: 1.6 });
+    const ang = Math.random() * 6.28;
+    const lv = new LootView(item, ch.x + Math.cos(ang) * 1.6, ch.z + Math.sin(ang) * 1.6, town);
+    G.loots.set(item.id, lv);
+    const gold = 25 + 15 * lvl;
+    save.gold += gold;
+    fx.goldBurst(new THREE.Vector3(ch.x, town.groundHeight(ch.x, ch.z) + 1, ch.z));
+    fx.text(new THREE.Vector3(ch.x, town.groundHeight(ch.x, ch.z) + 2, ch.z), `+${gold}g`, 'gold', 1.4);
+    sfx.coin(); sfx.loot(2);
+    ui.toast('Ancient chest opened!', '#ffd34d', `+${gold} gold`);
+    writeSave(save);
+  },
+};
+
+// ---------- networking ----------
+net.on('welcome', (m) => {
+  G.myId = m.id; G.roomCode = m.room; G.roomLevel = m.level;
+  ui.setRoom(m.room);
+  player = new LocalPlayer(save);
+  G.player = player;
+  ui.hideLobby();
+  G.inGame = true;
+  setTimeout(() => ui.chat('★', 'Press H for help. Share your party code to play with friends!'), 800);
+});
+net.on('enterZone', (m) => { zoneQueue = zoneQueue.then(() => switchZone(m)); });
+net.on('players', (m) => {
+  const seen = new Set();
+  for (const p of m.list) {
+    if (p.id === G.myId) continue;
+    seen.add(p.id);
+    G.party.set(p.id, p);
+    const v = G.remotes.get(p.id);
+    if (p.zone === G.zoneKey && !traveling) { if (v) v.apply(p); else G.remotes.set(p.id, new RemoteView(p)); }
+    else if (v) { v.dispose(); G.remotes.delete(p.id); }
+  }
+  for (const id of G.party.keys()) if (!seen.has(id)) G.party.delete(id);
+});
+net.on('left', (m) => { G.party.delete(m.id); const v = G.remotes.get(m.id); if (v) { v.dispose(); G.remotes.delete(m.id); } });
+net.on('ents', (m) => {
+  if (m.zone !== G.zoneKey || !G.zone) return;
+  const ids = new Set();
+  for (const a of m.list) {
+    ids.add(a[0]);
+    const v = G.enemies.get(a[0]);
+    if (v) { if (!v.dead) v.apply(a); }
+    else if (!killed.has(a[0])) G.enemies.set(a[0], new EnemyView(a));
+  }
+  for (const [id, v] of G.enemies) if (!ids.has(id) && !v.dead) { v.dispose(); G.enemies.delete(id); }
+});
+net.on('eatk', (m) => G.enemies.get(m.id)?.attack());
+net.on('ehit', (m) => {
+  if (m.by === G.myId) return;
+  const e = G.enemies.get(m.id);
+  if (!e) return;
+  e.hit(m.crit);
+  const p = e.pos.clone(); p.y += e.height * 0.6;
+  fx.hitSpark(p, m.crit);
+  if (m.by) fx.text(p, String(m.dmg), m.crit ? 'crit' : '', 0.8);
+});
+net.on('edie', (m) => {
+  killed.set(m.id, G.time);
+  const e = G.enemies.get(m.id);
+  const pos = e ? e.pos.clone() : new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z), m.z);
+  pos.y += 1;
+  if (e) e.die();
+  fx.boneBurst(pos, m.type === 'wraith' ? '#b26bff' : m.type === 'imp' ? '#ff6a3a' : m.type === 'brute' ? '#8a9a6a' : '#e8e0cc');
+  sfx.enemyDie();
+  if (m.type === 'boss') { G.shake = 1; fx.shockwave(pos, 10, '#ff6a3a', 1); fx.emit({ pos, count: 200, speed: 10, color: '#ffcf6a', color2: '#ff2000', size: 0.5, life: 1.6, up: 1 }); }
+});
+net.on('hurt', (m) => { if (player) player.hurt(m.dmg); });
+net.on('reward', (m) => {
+  save.gold += m.gold;
+  addXp(m.xp);
+  if (player && !m.big) {
+    const p = new THREE.Vector3(m.x, G.zone.groundHeight(m.x, m.z) + 1.5, m.z);
+    if (p.distanceTo(player.pos) < 40) { fx.text(p.clone().setY(p.y + 0.6), `+${m.gold}g`, 'gold', 1.1); fx.goldBurst(p); }
+    sfx.coin();
+  } else if (m.big) { ui.toast(`+${m.gold} gold`, '#ffd34d', `+${m.xp} XP`); sfx.coin(); sfx.coin(); }
+});
+net.on('loot', (m) => {
+  if (!G.zone) return;
+  const v = new LootView(m.item, m.x, m.z, G.zone);
+  G.loots.set(m.item.id, v);
+  if (m.item.rarity >= 3) ui.toast(`${RARITIES[m.item.rarity].name} drop!`, RARITIES[m.item.rarity].color, m.item.name);
+});
+net.on('proj', (m) => { if (G.zone) G.projectiles.set(m.id, new ProjView(m, G.zone)); });
+net.on('projEnd', (m) => {
+  const v = G.projectiles.get(m.id);
+  if (!v) return;
+  if (m.hit || v.kind === 'bolt') fx.emit({ pos: v.pos.clone(), count: 14, speed: 4, color: v.kind === 'bolt' ? '#ff8cf5' : '#ffe6a0', color2: v.kind === 'bolt' ? '#5a00a0' : '#ff8a30', size: 0.3, life: 0.4 });
+  v.dispose(); G.projectiles.delete(m.id);
+});
+net.on('slam', (m) => {
+  const y = G.zone.groundHeight(m.x, m.z);
+  fx.telegraph(new THREE.Vector3(m.x, y, m.z), m.r, m.delay);
+  sfx.horn();
+  setTimeout(() => {
+    if (!G.zone) return;
+    const p = new THREE.Vector3(m.x, y, m.z);
+    fx.shockwave(p, m.r, '#ff4a20', 0.5);
+    fx.emit({ pos: p.clone().setY(y + 0.3), count: 90, speed: 10, color: '#ffb060', color2: '#ff1000', size: 0.5, life: 0.8, flat: true, drag: 2.5 });
+    G.shake = Math.max(G.shake, 0.8); sfx.slam();
+  }, m.delay * 1000);
+});
+net.on('summon', (m) => { ui.toast('The Bone Tyrant summons its servants!', '#ff7a5a'); sfx.boss(); fx.emit({ pos: new THREE.Vector3(m.x, 1, m.z), count: 80, speed: 7, color: '#ff4020', color2: '#200000', size: 0.5, life: 1, up: 1 }); });
+net.on('cleared', (m) => {
+  G.roomLevel = m.level;
+  if (dungeon && G.zone === dungeon) dungeon.setCleared();
+  ui.bigBanner('DUNGEON CLEARED', `Depth ${m.level} awaits — enemies and loot grow stronger`, 5500);
+  sfx.victory();
+  ui.setDepth(m.level);
+});
+net.on('roomLevel', (m) => { G.roomLevel = m.level; ui.setDepth(m.level); });
+net.on('structs', applyStructs);
+net.on('defense', (m) => applyDefense(m, false));
+net.on('wave', (m) => { if (G.zone === town) { ui.bigBanner(`WAVE ${m.wave}`, m.wave === 5 ? 'The final wave — hold the line!' : 'Defend the Ember Heart!', 3000); sfx.horn(); } });
+net.on('coreHit', (m) => { G.defense.coreHp = m.hp; });
+net.on('chat', (m) => ui.chat(m.from, m.text, m.color));
+net.on('error', (m) => ui.lobbyMsg(m.text));
+net.on('close', () => { if (G.inGame) { ui.bigBanner('DISCONNECTED', 'Lost connection to the server — refresh to rejoin', 1e9); G.inGame = false; } });
+
+document.getElementById('playBtn').onclick = async () => {
+  sfx.init();
+  const v = ui.lobbyValues();
+  save.name = v.name; writeSave(save);
+  ui.lobbyMsg('Connecting…');
+  document.getElementById('playBtn').disabled = true;
+  try {
+    await net.connect();
+    net.send({ t: 'hello', name: v.name, color: save.color, room: v.room, gear: gearVisual(save), level: save.level });
+  } catch (e) {
+    ui.lobbyMsg(e.message + ' Start it with: npm start');
+    document.getElementById('playBtn').disabled = false;
+  }
+};
+
+// ---------- per-frame gameplay glue ----------
+function handleInput() {
+  if (ui.chatting) return;
+  if (input.hit('Enter') && !G.uiOpen) { ui.openChat(); return; }
+  if (input.hit('KeyI') || input.hit('Tab')) ui.togglePanel('inventory');
+  if (input.hit('KeyH')) ui.togglePanel('help');
+  if (input.hit('Escape')) { ui.closeAll(); G.buildMode = false; }
+  if (input.hit('KeyB')) {
+    if (G.zone === town) { G.buildMode = !G.buildMode; if (G.buildMode) ui.toast('Build mode: 1-4 to choose, click to place, B to exit', '#5ab0ff'); }
+    else ui.toast('You can only build in Emberhold.', '#ff6a5a');
+  }
+  if (G.buildMode) for (const [k, S] of Object.entries(STRUCTURES)) if (input.hit('Digit' + S.key)) ui.selectedBuild = k;
+}
+
+function nearestInteractable() {
+  let best = null, bd = 1e9;
+  for (const it of G.zone.interactables || []) {
+    const d = Math.hypot(it.x - player.pos.x, it.z - player.pos.z);
+    if (d < it.r && d < bd) { const label = it.label(); if (label) { bd = d; best = { it, label }; } }
+  }
+  return best;
+}
+
+function updateBuild() {
+  const show = G.buildMode && G.zone === town && !player.dead;
+  if (!show) { if (ghost) { ghost.parent?.remove(ghost); ghost = null; } return; }
+  const kind = ui.selectedBuild;
+  if (!ghost || ghostKind !== kind) { if (ghost) ghost.parent?.remove(ghost); ghost = buildStructure(kind, true); ghostKind = kind; entityRoot.add(ghost); }
+  const fwdX = -Math.sin(camRig.yaw), fwdZ = -Math.cos(camRig.yaw);
+  const x = Math.round((player.pos.x + fwdX * 4.5) * 2) / 2, z = Math.round((player.pos.z + fwdZ * 4.5) * 2) / 2;
+  ghost.position.set(x, town.groundHeight(x, z), z);
+  ghost.rotation.y = Math.atan2(-x, -z);
+  const r = Math.hypot(x, z);
+  const S = STRUCTURES[kind];
+  const blocked = r < TOWN.core.r + 2.5 || r > TOWN.wallR + 28 || [...G.structures.values()].some((v) => Math.hypot(v.s.x - x, v.s.z - z) < 1.8) ||
+    [TOWN.dungeonPortal, TOWN.darkPortal].some((p) => Math.hypot(p.x - x, p.z - z) < 4.5);
+  const ok = !blocked && save.gold >= S.cost;
+  ghost.traverse((o) => { if (o.isMesh) o.material.color.set(ok ? '#5eea8a' : '#ff5a4a'); });
+  if (input.click(0) && !G.uiOpen) {
+    if (blocked) ui.toast('Cannot build there.', '#ff6a5a');
+    else if (save.gold < S.cost) ui.toast(`Need ${S.cost} gold for a ${S.name}.`, '#ff6a5a');
+    else { save.gold -= S.cost; net.send({ t: 'build', kind, x, z }); writeSave(save); }
+  }
+}
+
+let lootFullT = 0;
+function updateLoot(dt) {
+  lootFullT -= dt;
+  for (const [id, l] of G.loots) {
+    l.update(dt, camera);
+    if (player.dead) continue;
+    const d = Math.hypot(l.g.position.x - player.pos.x, l.g.position.z - player.pos.z);
+    if (d < 1.7) {
+      if (save.bag.length >= BAG_SIZE) { if (lootFullT <= 0) { ui.toast('Your bag is full! Sell items at the Dark World merchant.', '#ff6a5a'); lootFullT = 4; } continue; }
+      save.bag.push(l.item);
+      const R = RARITIES[l.item.rarity];
+      const cur = save.equipped[l.item.slot];
+      ui.toast(l.item.name, R.color, `${R.name}${!cur || l.item.power > cur.power ? ' · ▲ Upgrade! (press I)' : ''}`);
+      sfx.loot(l.item.rarity);
+      fx.emit({ pos: l.g.position.clone().setY(l.g.position.y + 0.8), count: 25, speed: 3, color: R.color, color2: '#ffffff', size: 0.25, life: 0.6, up: 1 });
+      l.dispose(); G.loots.delete(id);
+      writeSave(save);
+      if (!document.getElementById('inventory').classList.contains('hidden')) ui.renderInventory();
+    }
+  }
+}
+
+let sendT = 0, saveT = 0, last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const realDt = dt;
+  if (G.hitstop > 0) { G.hitstop -= realDt; dt *= 0.1; }
+  G.time += dt;
+  const zone = G.zone;
+  input.wantLock = G.inGame && !G.uiOpen && !ui.chatting;
+  if (G.inGame && player && zone) {
+    handleInput();
+    player.update(dt, input, camRig, zone);
+    camRig.update(realDt, input, player, zone);
+    G.camYaw = camRig.yaw;
+    const near = !player.dead && !G.uiOpen ? nearestInteractable() : null;
+    ui.prompt(near ? near.label : null);
+    if (near && input.hit('KeyE') && !ui.chatting) near.it.action();
+    updateBuild();
+    for (const [id, e] of G.enemies) if (!e.update(dt, zone, camera)) { e.dispose(); G.enemies.delete(id); }
+    for (const r of G.remotes.values()) r.update(dt, camera);
+    for (const p of G.projectiles.values()) p.update(dt);
+    for (const s of G.structures.values()) s.update(dt, camera);
+    updateLoot(dt);
+    zone.update(dt, G.time, player.pos);
+    for (const [id, t] of killed) if (G.time - t > 10) killed.delete(id);
+    sendT -= realDt;
+    if (sendT <= 0) {
+      sendT = 1 / 15;
+      net.send({ t: 'state', x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), ry: +player.ry.toFixed(2), anim: player.anim, hp: Math.ceil(player.hp), maxHp: player.stats.maxHp, dead: player.dead, gear: gearVisual(save), level: save.level, goldFind: player.stats.goldFind });
+    }
+    saveT -= realDt;
+    if (saveT <= 0) { saveT = 10; writeSave(save); }
+    ui.updateHUD(dt);
+    ui.updateMarks(camera);
+    ui.drawMinimap(zone, player, camRig.yaw);
+  } else {
+    // lobby: cinematic orbit over Emberhold
+    const t = now / 1000;
+    const a = t * 0.05 + 0.8;
+    camera.position.set(Math.cos(a) * 46, 20 + Math.sin(t * 0.2) * 3, Math.sin(a) * 46);
+    camera.lookAt(0, 4, 0);
+    town.update(dt, G.time, new THREE.Vector3(0, 0, 0));
+  }
+  fx.update(dt, camera);
+  composer.render();
+  input.endFrame();
+}
+requestAnimationFrame(frame);
+
+// debugging hook for automated tests
+window.__emberfall = { G, save, town };
