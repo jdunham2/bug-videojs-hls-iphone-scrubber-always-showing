@@ -15223,6 +15223,11 @@ $('#parkBtn').addEventListener('click', pkEnter);
 /* ============ park polish: visitors line up in queues at rides ============ */
 function pkQueueSpot(id, it) { const kd = PK_ITEMS[it.k].kind; if (kd !== 'ride' && kd !== 'food') return { x: it.x + rand(-6, 6), z: it.z + rand(-6, 6), it, id }; const n = PK.visitors.filter(q => q.tgt && q.tgt.id === id).length; const rad = ({ coaster: 6, slide: 8, bumper: 10, haunted: 7, wheel: 6, saucers: 9 }[it.k] || 3.5); const fx = Math.sin(it.r || 0), fz = Math.cos(it.r || 0), sx = fz, sz = -fx; const d = rad + 1.5 + Math.floor(n / 2) * 1.4, side = (n % 2 ? 1 : -1) * 0.7; return { x: it.x + fx * d + sx * side, z: it.z + fz * d + sz * side, it, id, q: n }; }
 { const _pu153 = PARK_W.update; PARK_W.update = function (dt) { _pu153(dt); for (const v of PK.visitors) { if (v.st === 'enjoy' && v.tgt && v.tgt.it && v.tgt.q !== undefined) { const it = v.tgt.it; v.g.rotation.y = Math.atan2(it.x - v.g.position.x, it.z - v.g.position.z); } } }; }
+/* ============ park polish: chasing string lights along the paths ============ */
+{ const _pu154 = PARK_W.update; PARK_W.update = function (dt) { _pu154(dt); if (!PK.lights && PK.g) { const mats = [mGlow(0xff5a8a), mGlow(0xffd25a), mGlow(0x6fd8ff)], geo = new THREE.SphereGeometry(0.28, 8, 6), g = new THREE.Group(); let n = 0; const bulb = (x, z) => { const m = new THREE.Mesh(geo, mats[n++ % 3]); m.position.set(x, 0.45, z); g.add(m); };
+    for (let t = -118; t <= 118; t += 4) { if (Math.abs(t) < 8) continue; for (const sd of [-4.6, 4.6]) { bulb(sd, t); bulb(t, sd); } } for (let i = 0; i < 96; i++) { const a = i / 96 * TAU; for (const r of [57.4, 64.6]) bulb(Math.cos(a) * r, Math.sin(a) * r); }
+    surf.add(g); PK.lights = { g, mats, cols: [0xff5a8a, 0xffd25a, 0x6fd8ff], t: 0, i: 0 }; }
+  const L = PK.lights; if (!L) return; L.t -= dt; if (L.t <= 0) { L.t = 0.28; L.i = (L.i + 1) % 3; L.mats.forEach((m, k) => m.color.setHex(L.cols[(k + L.i) % 3])); } }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
