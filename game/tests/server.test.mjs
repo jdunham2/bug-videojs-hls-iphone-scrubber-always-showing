@@ -178,7 +178,7 @@ test('act II: companion joins, relics, and the 4-phase Storm Herald binds the Dr
   assert.ok(!h.invuln && h.hp < h.maxHp * 0.5, 'bond broken');
   while (zone.enemies.has(h.id)) { h.flying = false; h.strafe = null; c.send({ t: 'state', x: h.x + 2, y: 0, z: h.z, hp: 100, maxHp: 100 }); for (let k = 0; k < 4; k++) c.send({ t: 'hit', id: h.id, dmg: 1000 }); await wait(1050); }
   assert.ok(c.last.actComplete, 'act complete');
-  assert.equal(p.char.quest.i, QUESTS.length, 'act II finished');
+  assert.equal(p.char.quest.i, QUESTS.findIndex((q) => q.kind === 'herald') + 1, 'act II finished');
 });
 
 test('world clock and weather reach the client; fishing is validated server-side', async () => {
