@@ -13043,6 +13043,7 @@ const GUIDE = [
   ['Crew', 'Each deckhand has their own manner and chatter, and levels up with every crossing, Kraken and hour at sea. Higher levels make your boat faster.'],
   ['Diving', 'Bubbles on the deep water near coasts mark dive spots. Dive from your boat, collect treasure and surface before your air runs out; mind the jellyfish. Spots refill after a few days.'],
   ['Map poster', 'Your journal can make a poster of your explored world, with the places you’ve found, to save and keep.'],
+  ['Crafting search', 'Type in the search box at the top of the crafting screen (C) to look up any item: how to make it, where to find or buy it, and what it’s used in.'],
   ['Hedge maze', 'Lady Rosalind in Crownfall lets you into the royal hedge maze. Walk with the arrow keys, WASD, the stick, or by holding a finger toward a direction. You only see a few paces, but remember where you have been; the blue arrow points to the fountain at the centre. Find the three golden roses for extra pay, and all three in the great labyrinth for a Topiary Peacock.'],
   ['Rafting', 'Clem the Rafter in Greenstem takes you down the river. Steer with left and right (or hold a finger where you want to go), paddle faster with up. Three knocks on rocks or banks and the raft breaks; pass through flag gates for points and beware whirlpools. Finish Thunder gorge without a knock for Clem’s Carved Paddle.'],
   ['Juggling', 'Jolly Jem the jester in Maplehold teaches juggling. Press left (← or A) as a ball lands in your left hand and right (→ or D) for your right; on a touch screen, tap that half. Three drops ends the show. You speed up, then get a fourth and fifth ball. 100 catches earns Jem’s Juggling Clubs.'],
@@ -16417,7 +16418,29 @@ function quickEat() {
 }
 
 /* ================= crafting ================= */
-let craftTab = 0;
+let craftTab = 0, craftQ = '';
+// crafting search: how to make a thing, where to get it, and what it's used for
+function craftSources(g) {
+  const out = [];
+  for (const k in NODES) { const N = NODES[k]; if (N.give === g) out.push(`${N.verb} ${N.name.toLowerCase()} out in the wild`); }
+  for (const n of NPCS) if (n.trader && n.stock && n.stock[g]) out.push(`Sold by ${n.name}${TOWNS[n.town] ? ` in ${TOWNS[n.town].name}` : ''}`);
+  for (const k in TOWNS) if (TOWNS[k].produce && TOWNS[k].produce.includes(g)) out.push(`Cheap at the market in ${TOWNS[k].name}`);
+  for (const k in ENEMIES) { const E = ENEMIES[k]; if ((E.drops || []).some(d => d[0] === g)) out.push(`Dropped by: ${E.name}`); }
+  if (typeof PEDDLE_POOL !== 'undefined' && PEDDLE_POOL.includes(g)) out.push('Sometimes sold by wandering peddlers');
+  return [...new Set(out)].slice(0, 8);
+}
+function craftSearchHTML(q, card) {
+  const s = q.trim().toLowerCase(); if (!s) return '';
+  const goods = GK.filter(k => GOODS[k].name.toLowerCase().includes(s) || k.replace(/_/g, ' ').includes(s)).sort((a, b) => (GOODS[a].name.toLowerCase().startsWith(s) ? 0 : 1) - (GOODS[b].name.toLowerCase().startsWith(s) ? 0 : 1)).slice(0, 10);
+  if (!goods.length) return `<div class="none" style="margin-top:10px">Nothing called “${esc(q.trim())}”. Try another word.</div>`;
+  return `<h3>Search results</h3><div class="jgrid">` + goods.map(g => {
+    const make = RECIPES.filter(r => (r.out || r.id) === g), used = RECIPES.filter(r => r.need && r.need[g]).slice(0, 8), src = craftSources(g);
+    return `<div class="jcard" style="grid-column:1/-1"><div class="irow"><span class="nm">${swatch(g)}<span class="t">${esc(GOODS[g].name)}</span>${have(g) ? ` <span class="s">(you have ${have(g)})</span>` : ''}</span></div>
+      ${make.length ? `<div class="s" style="margin:6px 0 4px"><b>How to make it</b></div><div class="jgrid">${make.map(card).join('')}</div>` : '<div class="s" style="margin-top:4px">There’s no recipe for this; you have to find or buy it.</div>'}
+      ${src.length ? `<div class="s" style="margin-top:6px"><b>Where to get it</b><br>${src.map(esc).join('<br>')}</div>` : ''}
+      ${used.length ? `<div class="s" style="margin-top:6px"><b>Used to make</b> ${used.map(r => esc(r.label || GOODS[r.out || r.id].name)).join(', ')}</div>` : ''}</div>`;
+  }).join('') + '</div>';
+}
 function stations() {
   const t = townAt(S.x, S.y, 8), home = t === 'home';
   const anvil = placedNear(['anvil'], 3.5), table = anvil || placedNear(['crafting_table'], 3.5);
@@ -16450,10 +16473,13 @@ function renderCraft() {
   const knownN = RECIPES.filter(r => isKnown(r.id)).length;
   $('craftSheet').innerHTML = `
     <div class="sheet-head"><h2>Crafting</h2><button class="btn" data-x="craft">Close<kbd>C</kbd></button></div>
+    <input id="craftQ" type="search" value="${esc(craftQ)}" placeholder="Search: how do I make or find… (e.g. gunpowder)" autocomplete="off" style="margin-top:8px;width:100%;padding:8px 10px;border-radius:6px;border:1px solid #445;background:#141a24;color:inherit;font:inherit">
     <div class="station" style="margin-top:8px"><span class="on">Hands</span><span class="${st.bench ? 'on' : ''}">Workbench${st.bench ? '' : ' · in any settlement or at a crafting table'}</span><span class="${st.forge ? 'on' : ''}">Forge${st.forge ? '' : ' · forge towns or a placed anvil'}</span><span>${knownN}/${RECIPES.length} recipes known</span></div>
     <div class="ctabs">${CRAFT_GROUPS.map((cg, i) => `<button class="btn sm" data-tab="${i}" aria-pressed="${i === craftTab}">${cg[0]}</button>`).join('')}</div>
-    <h3>${title}</h3>
-    <div class="jgrid">${list.map(card).join('')}</div>`;
+    <div id="craftRes">${craftQ.trim() ? craftSearchHTML(craftQ, card) : `<h3>${title}</h3><div class="jgrid">${list.map(card).join('')}</div>`}</div>`;
+  const qi = $('craftQ');
+  if (qi) { qi.addEventListener('input', () => { craftQ = qi.value; $('craftRes').innerHTML = craftQ.trim() ? craftSearchHTML(craftQ, card) : `<h3>${title}</h3><div class="jgrid">${list.map(card).join('')}</div>`; });
+    qi.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') qi.blur(); }); }
 }
 $('craftSheet').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -19144,8 +19170,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 56;
+const WN_VER = 57;
 const WHATS_NEW = [
+  ['Crafting search', 'Search the crafting screen to see how to make or find anything, like gunpowder.'],
   ['Racing league', 'Race your own horse in Sunreach for prize money and a trophy.'],
   ['Kraken’s Trident', 'A rare trident that hurls water bolts, from the Kraken.'],
   ['Your harbour', 'Buy and upgrade a dock, and send trade runs across the sea.'],
