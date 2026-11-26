@@ -14994,6 +14994,12 @@ function gspHand(parent) { const sp = new THREE.Sprite(new THREE.SpriteMaterial(
     if (wn > st.wn) { st.wn = wn; st.t = 1.8; say(`👋 ${F.name || 'Your friend'} waves at you! Press Z to wave back.`, 'good'); }
     if (st.t > 0) { st.t -= dt; gspArmWave(a, T); if (!a.hand) a.hand = gspHand(a.g); a.hand.visible = true; } else if (a.hand) a.hand.visible = false; }
   for (const peer of [...GSP.seen.keys()]) if (!GSP.av.has(peer)) GSP.seen.delete(peer); }; }
+/* ============ friends on planets: their ship parks beside yours ============ */
+GSP.ships = new Map();
+{ const _usc144 = updateSurfCamera; updateSurfCamera = function (dt) { _usc144(dt); const here = G.state === 'surface' && W && W !== SHIP_W && !W.interior; const want = new Set(); let slot = 0;
+  if (here) for (const [peer, a] of GSP.av) { const F = NET.friends.get(peer); if (!F || !F.p || F.p.st === 'crew' || F.p.crewOf) continue; want.add(peer); const key = gxcKey(F.p); let q = GSP.ships.get(peer); if (!q || q.key !== key || q.g.parent !== surf) { if (q && q.g.parent) q.g.parent.remove(q.g); const sh = gxcShipFor(F.p); let m; try { m = sh.make(); } catch (_) { m = makeFighter(STYLE_PLAYER); } const box = new THREE.Box3().setFromObject(m), sz = box.getSize(new V3()); m.scale.multiplyScalar(13 / Math.max(sz.x, sz.y, sz.z, 0.001)); const g = new THREE.Group(); g.add(m); surf.add(g); q = { g, m, key }; GSP.ships.set(peer, q); }
+    const side = slot++ % 2 ? -1 : 1, off = 15 + Math.floor(slot / 2) * 14; const px = PAD.x + Math.cos(SHIP_YAW) * off * side, pz = PAD.z - Math.sin(SHIP_YAW) * off * side; q.g.position.set(px, PAD_H + 1.6 + Math.sin(T * 1.5 + slot) * 0.05, pz); q.g.rotation.y = SHIP_YAW; if (q.m.userData.gxAnim) q.m.userData.gxAnim(T, dt); }
+  for (const [peer, q] of GSP.ships) if (!want.has(peer)) { if (q.g.parent) q.g.parent.remove(q.g); GSP.ships.delete(peer); } }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
