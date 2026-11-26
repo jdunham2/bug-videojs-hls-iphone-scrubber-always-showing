@@ -1,5 +1,5 @@
 // Derived hero stats from class + level + gear + talents + temporary buffs. Shared by server and client.
-import { WEAPONS, LEGENDARIES, SETS } from './items.js';
+import { WEAPONS, LEGENDARIES, SETS, GEMS, parseGem, gemValue } from './items.js';
 import { CLASSES, talentTotals } from './classes.js';
 import { PARAGON } from './rifts.js';
 
@@ -15,6 +15,7 @@ export function computeStats(char, cls, buffs = {}) {
     if (!it) continue;
     if (it.leg && LEGENDARIES[it.leg]) { T.flags[it.leg] = true; for (const [k, v] of Object.entries(LEGENDARIES[it.leg].stats || {})) T[k] = (T[k] || 0) + v; }
     if (it.set) setCount[it.set] = (setCount[it.set] || 0) + 1;
+    for (const g of it.sockets || []) if (g) { const st = GEMS[parseGem(g).type].stat; T[st] = (T[st] || 0) + gemValue(g); }
   }
   for (const [k, n] of Object.entries(char.paragon?.alloc || {})) {
     const D = PARAGON[k]; if (!D) continue;

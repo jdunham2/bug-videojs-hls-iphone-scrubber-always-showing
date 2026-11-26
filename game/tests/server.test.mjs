@@ -108,3 +108,27 @@ test('message floods are throttled', async () => {
   await wait(40);
   assert.ok(c.count('chat') < 200, `only ${c.count('chat')} chat messages relayed`);
 });
+
+test('ranger starts with a bow; gems socket, combine and unsocket server-side', async () => {
+  const c = client(G(), { cls: 'ranger' });
+  await wait(20);
+  assert.equal(c.prof.char.equipped.weapon.type, 'bow');
+  c.send({ t: 'chat', text: '/gold 5000' }); c.send({ t: 'chat', text: '/loot 1' });
+  await wait(30);
+  const p = [...games.at(-1).rooms.values()][0].players.values().next().value;
+  p.prof.gems = { ruby1: 3, emerald2: 1 }; p.dirty = true;
+  c.send({ t: 'state', x: -9, y: 0, z: -2, hp: 100, maxHp: 100 });
+  const i = c.prof.char.bag.findIndex((x) => x.sockets?.length);
+  c.send({ t: 'combine', k: 'ruby1' }); await wait(40);
+  assert.equal(c.prof.gems.ruby2, 1);
+  if (i >= 0) {
+    c.send({ t: 'socket', src: 'bag', ref: i, idx: 0, k: 'emerald2' }); await wait(40);
+    assert.equal(c.prof.char.bag[i].sockets[0], 'emerald2');
+    c.send({ t: 'socket', src: 'bag', ref: i, idx: 0, k: 'ruby2' }); await wait(40);
+    assert.match(c.last.notice.text, /not empty/);
+  }
+  c.send({ t: 'look', look: { dye: '#2a3a8a', hideHelm: true, ap: 4 } }); await wait(30);
+  assert.deepEqual(c.prof.char.look, { dye: '#2a3a8a', hideHelm: true, ap: 4 });
+  c.send({ t: 'look', look: { dye: 'javascript:alert(1)' } }); await wait(30);
+  assert.equal(c.prof.char.look.dye, null);
+});

@@ -87,6 +87,7 @@ class Room {
     }
     this.joinZone(p, zone);
   }
+  dropGem(p, level) { return P.dropGem(p, level); }
   questEvent(p, kind, n = 1) {
     const q = (p.char.quest ||= { i: 0, n: 0 });
     const Q = QUESTS[q.i]; if (!Q || Q.kind !== kind) return;
@@ -241,6 +242,11 @@ function attach(ws) {
         break;
       }
       case 'leaderboard': { const S = (db.data.leaderboard || {})[season()] || {}; send(ws, { t: 'leaderboard', season: season(), data: S }); break; }
+      case 'socket': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.socket(p, m.src, m.ref, m.idx | 0, String(m.k)), 'Gem socketed!', '#5ab0ff'); break;
+      case 'unsocket': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.unsocket(p, m.src, m.ref, m.idx | 0)); break;
+      case 'combine': if (p.zone === 'town' && near(p, TOWN.smith, 7)) ok(P.combineGem(p, String(m.k)), 'The gems fuse into something finer.', '#ffd34d'); break;
+      case 'look': ok(P.setLook(p, m.look || {})); break;
+      case 'saveLook': ok(P.saveLook(p, m.slot | 0), 'Look saved.', '#5eea8a'); break;
       case 'research': if (p.zone === 'town' && near(p, TOWN.wartable, 7)) ok(research(p, String(m.key)), 'Research complete!', '#5ab0ff'); break;
       case 'challenge': if (zone?.type === 'dark') zone.challengeKing(p); else if (zone?.region) zone.summonColossus(p); break;
       case 'talk': if (p.zone === 'town' && near(p, CAPTAIN, 6)) { send(ws, { t: 'dialog', who: 'Captain Bryn', i: (p.char.quest?.i || 0) }); room.questEvent(p, 'talk'); } break;
@@ -264,7 +270,7 @@ function attach(ws) {
       case 'repair': ok(room.defense.repair(p, m.id)); break;
       case 'startNight': if (p.zone === 'town') room.defense.startNight(); break;
       case 'chat':
-        if (dev && /^\/(depth|gold|xp|wave|loot) \d+$/.test(m.text || '')) {
+        if (dev && /^\/(depth|gold|xp|wave|loot|gems) \d+$/.test(m.text || '')) {
           const [cmd, n] = m.text.slice(1).split(' ');
           if (cmd === 'depth') { room.level = Math.max(1, +n); room.currentDungeon = null; room.broadcast({ t: 'roomLevel', level: room.level }); }
           if (cmd === 'gold') { p.prof.gold += +n; p.dirty = true; }
@@ -275,6 +281,7 @@ function attach(ws) {
             for (let k = 0; k < +n; k++) p.char.bag.push(P.rollItem(p, room.level, { rarity: 4 }));
             p.dirty = true;
           }
+          if (cmd === 'gems') for (let k = 0; k < +n; k++) P.dropGem(p, room.level + 8);
           if (cmd === 'wave') { const d = room.defense.state; if (d.phase === 'day') room.defense.startNight(); d.wave = Math.max(0, +n - 1); d.phase = 'intermission'; d.timer = 2; }
           break;
         }

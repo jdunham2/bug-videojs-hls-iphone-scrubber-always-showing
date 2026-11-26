@@ -83,6 +83,34 @@ export const CLASSES = {
   },
 };
 
+CLASSES.ranger = {
+  name: 'Stormcaller Ranger', role: 'Marksman · Bow', color: '#5eea8a',
+  desc: 'A hunter of the high passes. Rains arrows, lays snares and fights beside a storm hawk.',
+  weapons: ['bow'], starter: 'bow',
+  baseHp: 100, hpPerLevel: 11, armor: 5,
+  resource: { name: 'Wind', color: '#7ff0d0', max: 100, regen: 11, start: 100, onHit: 3 },
+  skills: [
+    { id: 'volley', name: 'Volley', icon: '🏹', cost: 25, cd: 3, desc: 'Loose five arrows in a wide fan.' },
+    { id: 'trap', name: 'Snare Trap', icon: '🪤', cost: 30, cd: 7, desc: 'Plant a trap that explodes and roots the first enemies to step near it.' },
+    { id: 'hawk', name: 'Storm Hawk', icon: '🦅', cost: 40, cd: 18, desc: 'Call a storm hawk that dives at your enemies for 25s.' },
+    { id: 'rain', name: 'Arrow Rain', icon: '🌧️', cost: 55, cd: 11, desc: 'Darken the sky: arrows pound an area for 2.5 seconds.' },
+  ],
+  talents: [
+    { id: 'r_eye', tier: 0, name: 'Hawk Eye', icon: '👁️', max: 3, eff: { crit: 0.03 }, desc: '+3% Crit chance per rank' },
+    { id: 'r_draw', tier: 0, name: 'Quick Draw', icon: '🏹', max: 3, eff: { atkSpeed: 0.07 }, desc: '+7% Attack speed per rank' },
+    { id: 'r_trail', tier: 0, name: 'Trailblazer', icon: '🥾', max: 3, eff: { moveSpeed: 0.04 }, desc: '+4% Move speed per rank' },
+    { id: 'r_volley', tier: 1, name: 'Wide Volley', icon: '🎯', max: 2, eff: { volley: 2, s0: 0.15 }, desc: 'Volley +2 arrows and +15% damage per rank' },
+    { id: 'r_snare', tier: 1, name: 'Barbed Snares', icon: '🪤', max: 2, eff: { s1: 0.3, stun: 0.5 }, desc: 'Snare Trap +30% damage, +0.5s root per rank' },
+    { id: 'r_hawk', tier: 1, name: 'Bonded Hawk', icon: '🦅', max: 2, eff: { s2: 0.3, spiritDur: 8 }, desc: 'Storm Hawk +30% damage, +8s duration per rank' },
+    { id: 'r_rain', tier: 2, name: 'Monsoon', icon: '🌧️', max: 2, eff: { s3: 0.25, rainR: 1 }, desc: 'Arrow Rain +25% damage, +1 radius per rank' },
+    { id: 'r_wind', tier: 2, name: 'Second Wind', icon: '🌬️', max: 2, eff: { resRegen: 0.2 }, desc: '+20% Wind regeneration per rank' },
+    { id: 'r_lethal', tier: 2, name: 'Deadly Aim', icon: '💀', max: 2, eff: { critDmg: 0.3 }, desc: '+30% Critical damage per rank' },
+    { id: 'r_pierce', tier: 3, name: 'Piercing Shots', icon: '➶', max: 1, flag: 'pierce', desc: 'Basic arrows pierce through every enemy in their path' },
+    { id: 'r_pack', tier: 3, name: 'Hunting Pack', icon: '🐦', max: 1, flag: 'twin', desc: 'Storm Hawk summons two hawks' },
+    { id: 'r_tempest', tier: 3, name: 'Tempest', icon: '🌀', max: 1, eff: { cdr: 0.18 }, desc: '18% cooldown reduction' },
+  ],
+};
+
 export const TIER_REQ = [0, 3, 6, 9]; // talent points spent required to unlock a tier
 
 export const talentPoints = (level) => Math.max(0, level - 1);

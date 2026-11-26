@@ -15,6 +15,7 @@ export const WEAPONS = {
   hammer: { name: 'Warhammer', dmg: 25, speed: 0.62, range: 3.0, arc: 2.6, cleave: true },
   dagger: { name: 'Twin Daggers', dmg: 8, speed: 1.6, range: 2.2, arc: 1.6, crit: 0.1 },
   staff: { name: 'Staff', dmg: 13, speed: 1.1, range: 16, arc: 0.6, ranged: true },
+  bow: { name: 'Longbow', dmg: 12, speed: 1.25, range: 18, arc: 0.5, ranged: true, crit: 0.04 },
 };
 
 export const ARMOR = {
@@ -89,13 +90,15 @@ export function itemPower(it) {
   let p = (it.dmg || 0) * (it.speed || 1) * 2.2 + (it.armor || 0) * 2 + (it.hp || 0) * 0.5;
   const a = it.affixes || {};
   if (it.leg) p += 60;
+  for (const g of it.sockets || []) if (g) p += 15 * parseGem(g).tier;
+  p += (it.sockets?.length || 0) * 6;
   if (it.set) p += 25;
   p += (a.dmgPct || 0) * 120 + (a.hp || 0) * 0.5 + (a.crit || 0) * 300 + (a.speed || 0) * 200 + (a.gold || 0) * 60 + (a.leech || 0) * 500;
   return Math.round(p);
 }
 
 export function affixLines(it) {
-  return Object.entries(it.affixes || {}).map(([k, v]) => AFFIXES[k].fmt(v));
+  return Object.entries(it.affixes || {}).map(([k, v]) => AFFIXES[k].fmt(v)).concat((it.sockets || []).map((g) => (g ? `◆ ${gemName(g)}: ${GEMS[parseGem(g).type].fmt(+gemValue(g).toFixed(3))}` : '◇ Empty socket')));
 }
 
 // ---------- Legendary powers & item sets ----------
@@ -115,6 +118,11 @@ export const LEGENDARIES = {
   h_trinity: { cls: 'hexcaller', name: 'Trinity Bolt', desc: 'Fire Bolt launches three bolts in a fan.' },
   h_martyr: { cls: 'hexcaller', name: 'Martyr Spirits', desc: 'Ember Spirits explode for 300% damage when they expire.' },
   h_shower: { cls: 'hexcaller', name: 'Starfall', desc: 'Meteor calls three smaller meteors around the target.' },
+  // Ranger
+  r_split: { cls: 'ranger', name: 'Splintershot', desc: 'Volley arrows split into two more on impact.' },
+  r_cluster: { cls: 'ranger', name: 'Cluster Snares', desc: 'Snare Trap scatters three extra traps around it.' },
+  r_raptor: { cls: 'ranger', name: 'Raptor Strike', desc: 'Storm Hawk dives stun enemies and call lightning.' },
+  r_deluge: { cls: 'ranger', name: 'Deluge', desc: 'Arrow Rain lasts 2s longer and slows enemies caught in it.' },
   // Generic
   g_bloodcrit: { cls: null, name: 'Sanguine Edge', desc: 'Critical hits heal you for 1.5% of your maximum health.' },
   g_thunder: { cls: null, name: 'Thunderlord', desc: 'Every 10th hit calls down lightning for 250% damage.' },
@@ -133,12 +141,29 @@ export const SETS = {
   nightblade: { cls: 'emberblade', name: "Nightblade's Edge", pieces: ['Edge', 'Cowl', 'Shadowmail', 'Stalkers'], b2: { critDmg: 0.5 }, b4: { costMul: -0.35 }, d2: '+50% crit damage', d4: 'Skills cost 35% less Focus' },
   stormcaller: { cls: 'hexcaller', name: "Stormcaller's Vestments", pieces: ['Rod', 'Circlet', 'Stormrobe', 'Sandals'], b2: { resRegen: 0.25 }, b4: { skillDmg: 0.4 }, d2: '+25% Mana regeneration', d4: '+40% skill damage' },
   pyromancer: { cls: 'hexcaller', name: "Pyromancer's Robes", pieces: ['Brand', 'Cowl', 'Firerobe', 'Cinderslippers'], b2: { dmgPct: 0.12 }, b4: { costMul: -0.35 }, d2: '+12% damage', d4: 'Skills cost 35% less Mana' },
+  windwalker: { cls: 'ranger', name: "Windwalker's Leathers", pieces: ['Recurve', 'Hood', 'Jerkin', 'Striders'], b2: { moveSpeed: 0.12 }, b4: { costMul: -0.35 }, d2: '+12% move speed', d4: 'Skills cost 35% less Wind' },
+  falconer: { cls: 'ranger', name: "Falconer's Regalia", pieces: ['Warbow', 'Feathered Cap', 'Mantle', 'Gauntleted Boots'], b2: { crit: 0.08 }, b4: { flag: 'spiritPerm' }, d2: '+8% crit chance', d4: 'Storm Hawks never leave' },
+  deadeye: { cls: 'ranger', name: "Deadeye's Vigil", pieces: ['Longbow', 'Visor', 'Brigandine', 'Boots'], b2: { critDmg: 0.5 }, b4: { skillDmg: 0.4 }, d2: '+50% crit damage', d4: '+40% skill damage' },
   soulbinder: { cls: 'hexcaller', name: "Soulbinder's Wraps", pieces: ['Spiritstaff', 'Veil', 'Wraps', 'Footwraps'], b2: { hpPct: 0.15 }, b4: { flag: 'spiritPerm' }, d2: '+15% health', d4: 'Ember Spirits never expire' },
 };
 const SLOT_IDX = { weapon: 0, helm: 1, chest: 2, boots: 3 };
-export const WEAPON_CLASSES = { sword: ['warden', 'emberblade'], axe: ['warden'], hammer: ['warden'], dagger: ['emberblade'], staff: ['hexcaller'] };
+export const WEAPON_CLASSES = { sword: ['warden', 'emberblade'], axe: ['warden'], hammer: ['warden'], dagger: ['emberblade'], staff: ['hexcaller'], bow: ['ranger'] };
+
+export const GEMS = {
+  ruby: { name: 'Ruby', color: '#ff3a4a', stat: 'dmgPct', per: 0.025, fmt: (v) => `+${(v * 100).toFixed(1)}% damage` },
+  sapphire: { name: 'Sapphire', color: '#3a7aff', stat: 'armor', per: 6, fmt: (v) => `+${v} armor` },
+  emerald: { name: 'Emerald', color: '#3aff8a', stat: 'crit', per: 0.008, fmt: (v) => `+${(v * 100).toFixed(1)}% crit` },
+};
+export const GEM_TIERS = ['Chipped', 'Flawed', 'Polished', 'Flawless', 'Royal'];
+export const gemKey = (type, tier) => `${type}${tier}`;
+export const parseGem = (k) => ({ type: k.replace(/\d+$/, ''), tier: +k.match(/\d+$/)[0] });
+export const gemValue = (k) => { const g = parseGem(k), G = GEMS[g.type]; return G ? G.per * g.tier * (1 + (g.tier - 1) * 0.25) : 0; };
+export const gemName = (k) => { const g = parseGem(k); return `${GEM_TIERS[g.tier - 1]} ${GEMS[g.type].name}`; };
+const SOCKETS = { weapon: [0, 0, 1, 1, 2], helm: [0, 0, 0, 1, 1], chest: [0, 1, 1, 2, 2], boots: [0, 0, 0, 0, 1] };
 
 export function decorateItem(item, rng) {
+  const ns = SOCKETS[item.slot]?.[item.rarity] || 0;
+  if (ns) item.sockets = Array(ns).fill(null);
   if (item.rarity === 4) {
     const pool = Object.entries(LEGENDARIES).filter(([, L]) => item.slot === 'weapon' ? (L.cls === null ? rng.chance(0.3) : WEAPON_CLASSES[item.type].includes(L.cls)) : (L.cls === null || rng.chance(0.4)));
     if (pool.length) item.leg = rng.pick(pool)[0];

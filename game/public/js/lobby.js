@@ -66,7 +66,7 @@ export class Lobby {
     }).catch(() => {});
   }
   buildCards() {
-    $('classCards').innerHTML = Object.entries(CLASSES).map(([k, C]) => `<div class="ccard ${k === this.cls ? 'on' : ''}" data-k="${k}" style="--c:${C.color}"><div class="cicon">${{ warden: '🛡️', emberblade: '🔥', hexcaller: '🔮' }[k]}</div><div class="cname">${C.name}</div><div class="crole">${C.role}</div>${this.levels[k] ? `<div class="clvl">Lv ${this.levels[k]}</div>` : ''}</div>`).join('');
+    $('classCards').innerHTML = Object.entries(CLASSES).map(([k, C]) => `<div class="ccard ${k === this.cls ? 'on' : ''}" data-k="${k}" style="--c:${C.color}"><div class="cicon">${{ warden: '🛡️', emberblade: '🔥', hexcaller: '🔮', ranger: '🏹' }[k]}</div><div class="cname">${C.name}</div><div class="crole">${C.role}</div>${this.levels[k] ? `<div class="clvl">Lv ${this.levels[k]}</div>` : ''}</div>`).join('');
     document.querySelectorAll('.ccard').forEach((c) => (c.onclick = () => this.setClass(c.dataset.k)));
   }
   buildColors() {

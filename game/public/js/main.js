@@ -23,7 +23,7 @@ import { RegionZone } from './zones/region.js';
 import { setupTouch } from './touch.js';
 import { REGIONS, QUESTS, EVENTS } from '../shared/regions.js';
 import { STRUCTURES, TOWN } from '../shared/world.js';
-import { RARITIES } from '../shared/items.js';
+import { RARITIES, GEMS, gemName, parseGem } from '../shared/items.js';
 const RARITY_BASE = RARITIES.map((r) => r.color);
 const RARITY_CB = ['#d0d0d0', '#f0e442', '#56b4e9', '#cc79a7', '#e69f00'];
 import { CLASSES } from '../shared/classes.js';
@@ -225,6 +225,7 @@ G.actions = {
   openTalents(atTrainer) { ui._atTrainer = !!atTrainer; ui.openPanel('talents'); },
   openStash() { ui.openPanel('stash'); },
   openSmith() { ui.openPanel('smith'); },
+  openWardrobe() { ui.openPanel('wardrobe'); },
   openResearch() { ui.openPanel('research'); },
   openWaypoint() { ui.openPanel('waypoint'); },
   talk() { net.send({ t: 'talk' }); },
@@ -424,6 +425,7 @@ net.on('eventLeft', (m) => { if (G.event) G.event.left = m.left; });
 net.on('eventDone', (m) => { G.event = null; ui.bigBanner(m.ok ? 'EVENT COMPLETE' : 'EVENT FAILED', m.ok ? 'The region is safer — rewards granted' : 'The threat faded away…', 3000); if (m.ok) sfx.victory(); });
 net.on('questDone', (m) => { const Q = QUESTS[m.i]; sfx.levelUp(); ui.npcDialog('Captain Bryn', Q.done, () => ui.bigBanner('QUEST COMPLETE', Q.title, 3000)); });
 net.on('dialog', (m) => { const Q = QUESTS[m.i]; if (m.i === 0) ui.npcDialog(m.who, Q.intro); else if (!Q) ui.npcDialog(m.who, 'The Peaks await, hero. Emberhold owes you its life.'); else ui.npcDialog(m.who, `${Q.title}: ${Q.goal}. Don't keep the dark waiting.`); });
+net.on('gem', (m) => { ui.toast(`Gem found: ${gemName(m.k)}`, GEMS[parseGem(m.k).type].color, 'Socket it at the Blacksmith'); sfx.loot(2); });
 net.on('riftProgress', (m) => { if (G.rift) G.rift.p = m.p; });
 net.on('guardian', () => { if (G.rift) { G.rift.p = 1; G.rift.guardian = true; } ui.bigBanner('THE GUARDIAN AWAKENS', 'The rift collapses around its master', 3000); sfx.roar(); });
 net.on('riftDone', (m) => {

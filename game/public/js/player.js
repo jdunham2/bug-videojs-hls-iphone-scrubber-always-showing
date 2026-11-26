@@ -19,7 +19,8 @@ export const STYLE_RANKS = [
 
 export function gearOf(char) {
   const e = char.equipped;
-  return { w: e.weapon?.type || 'sword', wr: e.weapon?.rarity ?? 0, h: e.helm ? e.helm.rarity : -1, c: e.chest ? e.chest.rarity : -1, b: e.boots ? e.boots.rarity : -1 };
+  const L = char.look || {};
+  return { w: e.weapon?.type || 'sword', wr: e.weapon?.rarity ?? 0, h: e.helm ? e.helm.rarity : -1, c: e.chest ? e.chest.rarity : -1, b: e.boots ? e.boots.rarity : -1, d: L.dye || null, hh: L.hideHelm ? 1 : 0, ap: L.ap ?? -1 };
 }
 
 export class LocalPlayer {
@@ -282,7 +283,7 @@ export class LocalPlayer {
   }
 
   doHit(yaw) {
-    if (this.stats.ranged) { this.ry = this.atk.face; this.kit.basicBolt(yaw); return; }
+    if (this.stats.ranged) { this.ry = this.atk.face; if (this.cls === 'ranger') this.kit.basicArrow(yaw); else this.kit.basicBolt(yaw); return; }
     const S = this.stats, c = this.atk.combo;
     const range = S.range + (c === 2 ? 0.5 : 0), arc = S.arc + (c === 2 ? 0.7 : 0) + (S.cleave ? 0.4 : 0);
     const mul = [1, 1.15, 1.7][c];

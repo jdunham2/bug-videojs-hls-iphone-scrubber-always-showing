@@ -2,7 +2,7 @@
 import { CLASSES, canLearn } from '../public/shared/classes.js';
 import { computeStats, xpForLevel } from '../public/shared/stats.js';
 import { LEVEL_CAP, PARAGON, paragonXp } from '../public/shared/rifts.js';
-import { generateItem, WEAPONS, SALVAGE, levelUpItem, rerollAffix } from '../public/shared/items.js';
+import { generateItem, WEAPONS, SALVAGE, levelUpItem, rerollAffix, GEMS, gemKey, parseGem, itemPower } from '../public/shared/items.js';
 import { RNG } from '../public/shared/rng.js';
 
 export const BAG_SIZE = 24, STASH_SIZE = 48, MAX_POTIONS = 9;
@@ -14,7 +14,7 @@ export function newProfile(token) {
 export function starterChar(cls) {
   const C = CLASSES[cls];
   const w = generateItem(new RNG(7), 1, { slot: 'weapon', type: C.starter, rarity: 0 });
-  w.name = { sword: 'Worn Sword', dagger: 'Worn Daggers', staff: 'Worn Staff' }[C.starter];
+  w.name = { sword: 'Worn Sword', dagger: 'Worn Daggers', staff: 'Worn Staff', bow: 'Worn Bow' }[C.starter];
   return { level: 1, xp: 0, potions: 3, equipped: { weapon: w, helm: null, chest: null, boots: null }, bag: [], talents: {} };
 }
 
@@ -23,7 +23,8 @@ export const getChar = (prof, cls) => (prof.chars[cls] ||= starterChar(cls));
 export function profileView(p) {
   const pr = p.prof;
   pr.mats ||= { shards: 0, cores: 0 };
-  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, riftMax: pr.riftMax || 1, research: pr.research || {}, peaks: !!pr.peaks, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
+  pr.gems ||= {};
+  return { t: 'profile', name: pr.name, color: pr.color, gold: pr.gold, stash: pr.stash, mats: pr.mats, gems: pr.gems, looks: pr.looks || [], riftMax: pr.riftMax || 1, research: pr.research || {}, peaks: !!pr.peaks, cls: p.cls, char: p.char, buffs: activeBuffs(p) };
 }
 
 export function activeBuffs(p) {
@@ -173,3 +174,38 @@ export function spendParagon(p, key) {
   if (PARAGON[key].max && (c.paragon.alloc[key] || 0) >= PARAGON[key].max) return 'That stat is maxed.';
   c.paragon.alloc[key] = (c.paragon.alloc[key] || 0) + 1; p.dirty = true; return null;
 }
+
+// ---- gems & sockets ----
+export function dropGem(p, level) {
+  const tier = Math.max(1, Math.min(5, 1 + Math.floor(Math.random() * (1 + level / 4))));
+  const k = gemKey(Object.keys(GEMS)[Math.floor(Math.random() * 3)], tier);
+  const g = (p.prof.gems ||= {}); g[k] = (g[k] || 0) + 1; p.dirty = true; return k;
+}
+const repower = (it) => { it.power = itemPower(it); it.price = Math.round(it.power * (it.rarity + 1) * 0.4 + 3); };
+export function socket(p, src, ref, idx, k) {
+  const it = itemRef(p, src, ref); if (!it?.sockets) return 'That item has no sockets.';
+  if (!(idx in it.sockets) || it.sockets[idx]) return 'That socket is not empty.';
+  const g = (p.prof.gems ||= {}); if (!g[k]) return 'You do not have that gem.';
+  g[k]--; if (!g[k]) delete g[k];
+  it.sockets[idx] = k; repower(it); p.dirty = true; return null;
+}
+export function unsocket(p, src, ref, idx) {
+  const it = itemRef(p, src, ref); const k = it?.sockets?.[idx]; if (!k) return 'Nothing to remove.';
+  const cost = 20 * parseGem(k).tier;
+  if (p.prof.gold < cost) return `Removing it costs ${cost} gold.`;
+  p.prof.gold -= cost; it.sockets[idx] = null; const g = (p.prof.gems ||= {}); g[k] = (g[k] || 0) + 1; repower(it); p.dirty = true; return null;
+}
+export function combineGem(p, k) {
+  const g = (p.prof.gems ||= {}), { type, tier } = parseGem(k);
+  if (!GEMS[type] || tier >= 5) return 'That gem cannot be improved.';
+  if ((g[k] || 0) < 3) return 'You need 3 of that gem.';
+  const cost = 30 * tier; if (p.prof.gold < cost) return `Combining costs ${cost} gold.`;
+  g[k] -= 3; if (!g[k]) delete g[k]; const n = gemKey(type, tier + 1); g[n] = (g[n] || 0) + 1; p.prof.gold -= cost; p.dirty = true; return null;
+}
+// ---- wardrobe ----
+const DYES = /^#[0-9a-f]{6}$/i;
+export function setLook(p, look) {
+  const l = { dye: DYES.test(look.dye || '') ? look.dye : null, hideHelm: !!look.hideHelm, ap: Math.max(-1, Math.min(4, look.ap | 0)) };
+  p.char.look = l; p.dirty = true; return null;
+}
+export function saveLook(p, slot) { const L = (p.prof.looks ||= []); if (slot < 0 || slot > 2) return 'Invalid slot.'; L[slot] = { ...(p.char.look || {}) }; p.dirty = true; return null; }

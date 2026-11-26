@@ -93,6 +93,11 @@ export function buildWeapon(type, rarity = 0) {
     mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 24), gold, 0, 0.09, 0.05, g).rotation.x = Math.PI / 2;
     mesh(sphere(0.1, 10, 8), gold, 0, 0.1, 0.05, g);
     g.userData.face = face;
+  } else if (type === 'bow') {
+    const limb = mesh(new THREE.TorusGeometry(0.62, 0.035, 6, 20, Math.PI * 0.9), wood, 0, 0.3, 0, g); limb.rotation.z = Math.PI / 2 + Math.PI * 0.05; limb.position.x = -0.1;
+    for (const s of [-1, 1]) mesh(sphere(0.05, 6, 5), metal, -0.1 + Math.cos(Math.PI * 0.45) * 0.62 * 0, 0.3 + s * 0.62, 0, g);
+    const str = mesh(cyl(0.006, 0.006, 1.22, 3), std('#e8e0d0', { emissive: col, ei: RARITY_GLOW[rarity] * 0.5 }), 0.18, 0.3, 0, g); mats.push(str.material);
+    mesh(box(0.06, 0.2, 0.06), gold, -0.12, 0.3, 0, g);
   } else if (type === 'lifeorb') {
     mesh(cyl(0.025, 0.03, 0.9), wood, 0, 0.2, 0, g);
     mesh(sphere(0.14, 14, 10), std('#7dffb0', { emissive: '#2aff7a', ei: 3 }), 0, 0.72, 0, g);
@@ -245,6 +250,7 @@ export function setWeapon(rig, type, rarity = 0, offhand) {
   if (rig.offhand) { P.handL.remove(rig.offhand); rig.offhand = null; }
   const w = buildWeapon(type, rarity);
   w.rotation.x = Math.PI / 2; w.position.z = 0.02;
+  if (type === 'bow') { w.rotation.set(Math.PI, Math.PI / 2, 0); w.position.y = 0.25; }
   P.handR.add(w); rig.weapon = w;
   if (type === 'dagger' || offhand) {
     const w2 = buildWeapon(offhand || type, rarity);
@@ -257,8 +263,12 @@ export function applyGear(rig, gear, color) {
   const P = rig.P;
   if (!rig.gearKey || rig.gearKey.w !== gear.w || rig.gearKey.wr !== gear.wr) setWeapon(rig, gear.w, gear.wr);
   rig.gearKey = { ...gear };
+  if (gear.ap >= 0) { if (gear.h >= 0) gear = { ...gear, h: gear.ap }; if (gear.c >= 0) gear = { ...gear, c: gear.ap }; if (gear.b >= 0) gear = { ...gear, b: gear.ap }; }
+  if (gear.d) { if (P.torso && !rig.opts.bones) P.torso.material.color.set(gear.d); if (P.cape) P.cape.children[0].material.color.set(gear.d); if (P.robe && rig.opts.legs === 'robe') P.robe.material.color.set(gear.d); }
+  if (gear.hh) gear = { ...gear, h: -1 };
   P.helm.visible = gear.h >= 0;
   if (P.hair) P.hair.visible = gear.h < 0;
+  if (P.hood) P.hood.visible = gear.h < 0;
   if (gear.h >= 0) {
     P.helmMat.color.set(RARITY_TINT[gear.h]);
     P.crest.visible = gear.h >= 2;
@@ -296,6 +306,15 @@ export function buildHero(color, cls = 'warden') {
     const band = mesh(cyl(0.25, 0.25, 0.07, 14), std(color, { emissive: color, ei: 0.6 }), 0, 0.22, 0, rig.P.head); rig.mats.push(band.material);
     rig.P.hat = [brim, tip, band];
     rig.baseEmissive = rig.mats.map((m) => m.emissive.clone());
+    return rig;
+  }
+  if (cls === 'ranger') {
+    const rig = buildHumanoid({ cloth: '#2e4a2a', leather: '#4a3420', cape: color, armor: '#6a6050', weapon: 'bow', head: 'human', hair: '#6a4a2a' });
+    const hoodMat = std('#2a3a24', { rough: 0.9 }); rig.mats.push(hoodMat);
+    const hood = mesh(sphere(0.27, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), hoodMat, 0, 0.08, -0.03, rig.P.head); hood.scale.set(1, 1.05, 1.15); rig.P.hood = hood;
+    const quiver = mesh(cyl(0.11, 0.09, 0.62, 8), std('#5a3a20'), 0.12, 0.45, -0.26, rig.P.spine); quiver.rotation.z = 0.35; rig.mats.push(quiver.material);
+    for (let i = 0; i < 4; i++) mesh(cyl(0.012, 0.012, 0.3, 3), std('#e8e0d0', { emissive: color, ei: 0.8 }), 0.2 + (i % 2) * 0.05, 0.85, -0.26 + (i - 1.5) * 0.04, rig.P.spine).rotation.z = 0.35;
+    rig.baseEmissive = rig.mats.map((x) => x.emissive.clone());
     return rig;
   }
   return buildHumanoid({ cloth: color, cape: color, armor: '#9aa3ad', weapon: 'sword', rarity: 0, offhand: 'shield', shieldColor: color, chestPlate: true });

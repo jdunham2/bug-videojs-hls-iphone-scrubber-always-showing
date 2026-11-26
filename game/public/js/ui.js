@@ -1,7 +1,7 @@
 // DOM user interface: HUD, minimap, inventory/shop/stash/trade, talents, emote wheel, settings, dialogs.
 import * as THREE from 'three';
 import { G } from './state.js';
-import { RARITIES, affixLines, WEAPONS, LEGENDARIES, SETS, SALVAGE } from '../shared/items.js';
+import { RARITIES, affixLines, WEAPONS, LEGENDARIES, SETS, SALVAGE, GEMS, gemName, parseGem } from '../shared/items.js';
 import { STRUCTURES, TOWN, upgradeCost, repairCost, MUTATORS, RESEARCH, researchCost } from '../shared/world.js';
 import { CLASSES, TIER_REQ, talentPoints, spentPoints, canLearn } from '../shared/classes.js';
 import { xpForLevel, computeStats } from '../shared/stats.js';
@@ -16,7 +16,7 @@ import { QUALITY, saveSettings, getToken, setToken } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 export const COLORS = ['#e8a33d', '#e0453a', '#3a8ee0', '#4ac46a', '#b05ae0', '#e05aa8', '#3ad0c8', '#f2f2f2'];
-const ICON = { sword: '🗡️', axe: '🪓', hammer: '🔨', dagger: '🔪', staff: '🪄', helm: '⛑️', chest: '🛡️', boots: '🥾' };
+const ICON = { bow: '🏹', sword: '🗡️', axe: '🪓', hammer: '🔨', dagger: '🔪', staff: '🪄', helm: '⛑️', chest: '🛡️', boots: '🥾' };
 const SLOT_NAMES = { weapon: 'Weapon', helm: 'Helm', chest: 'Chest', boots: 'Boots' };
 export const itemIcon = (it) => ICON[it.type] || ICON[it.slot] || '❔';
 const BAG = 24, STASH = 48;
@@ -34,6 +34,7 @@ class UI {
     });
     document.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => this.closePanel(b.dataset.close)));
     $('rerollBtn').onclick = () => G.net.send({ t: 'reroll' });
+    $('wardrobeBtn').onclick = () => this.openPanel('wardrobe');
     $('gearBtn').onclick = () => this.togglePanel('settings');
     this.mm = $('minimap').getContext('2d');
     this.tooltip = $('tooltip');
@@ -108,7 +109,7 @@ class UI {
     const C = cls ? CLASSES[cls] : null;
     const b = G.input?.bindings || DEFAULT_BINDINGS;
     const skill = (id, ico, key, extra = '') => `<div class="skill" id="${id}"><div class="ico">${ico}</div><div class="key">${key}</div>${extra}<div class="cd"></div><div class="cdt"></div></div>`;
-    let html = skill('skLMB', cls === 'hexcaller' ? '🔥' : '⚔️', 'LMB');
+    let html = skill('skLMB', cls === 'hexcaller' ? '🔥' : cls === 'ranger' ? '➶' : '⚔️', 'LMB');
     if (C) C.skills.forEach((s, i) => { html += skill('sk' + (i + 1), s.icon, keyName(b['skill' + (i + 1)]), s.cost ? `<div class="cost">${s.cost}</div>` : ''); });
     html += skill('skDodge', '🌀', keyName(b.dodge)) + skill('skPot', '🧪', keyName(b.potion), '<div class="cnt" id="potCount">3</div>');
     $('skills').innerHTML = html;
@@ -152,7 +153,7 @@ class UI {
     $('comboNum').textContent = p.comboCount > 1 ? `${p.comboCount} HIT COMBO` : '';
     // party
     const all = [{ name: pr.name, color: pr.color, hp: p.hp, maxHp: S.maxHp, level: c.level, zone: G.zoneKey, dead: p.dead, me: true, cls: p.cls }, ...G.party.values()];
-    const html = all.map((m) => `<div class="pf ${m.dead ? 'dead' : ''}" style="--c:${m.color}"><div class="n">${CLASSES[m.cls]?.skills ? `<i class="ci">${{ warden: '🛡️', emberblade: '🔥', hexcaller: '🔮' }[m.cls]}</i>` : ''}${escapeHtml(m.name)}${m.me ? ' (you)' : ''}<span>Lv${m.level} · ${zoneName(m.zone)}</span></div><div class="t"><i style="width:${Math.max(0, (m.hp / m.maxHp) * 100)}%"></i></div></div>`).join('');
+    const html = all.map((m) => `<div class="pf ${m.dead ? 'dead' : ''}" style="--c:${m.color}"><div class="n">${CLASSES[m.cls]?.skills ? `<i class="ci">${{ warden: '🛡️', emberblade: '🔥', hexcaller: '🔮', ranger: '🏹' }[m.cls]}</i>` : ''}${escapeHtml(m.name)}${m.me ? ' (you)' : ''}<span>Lv${m.level} · ${zoneName(m.zone)}</span></div><div class="t"><i style="width:${Math.max(0, (m.hp / m.maxHp) * 100)}%"></i></div></div>`).join('');
     if (html !== this._party) { $('party').innerHTML = html; this._party = html; }
     // boss bar
     let boss = null;
@@ -261,7 +262,7 @@ class UI {
   }
 
   // ---------- panels ----------
-  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests'].some((id) => !$(id).classList.contains('hidden')); }
+  get anyPanel() { return ['inventory', 'shop', 'help', 'talents', 'stash', 'trade', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe'].some((id) => !$(id).classList.contains('hidden')); }
   togglePanel(id) { if ($(id).classList.contains('hidden')) this.openPanel(id); else this.closePanel(id); }
   openPanel(id) {
     $(id).classList.remove('hidden');
@@ -276,6 +277,7 @@ class UI {
     if (id === 'research') this.renderResearch();
     if (id === 'waypoint') this.renderWaypoint();
     if (id === 'quests') this.renderQuests();
+    if (id === 'wardrobe') this.renderWardrobe();
   }
   closePanel(id) {
     $(id).classList.add('hidden');
@@ -284,7 +286,7 @@ class UI {
     this.hideTip();
     G.uiOpen = this.anyPanel;
   }
-  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
+  closeAll() { ['inventory', 'shop', 'help', 'talents', 'stash', 'settings', 'smith', 'riftPanel', 'board', 'research', 'waypoint', 'quests', 'wardrobe'].forEach((id) => this.closePanel(id)); if (!$('trade').classList.contains('hidden')) this.closePanel('trade'); }
   sideBySide(id, on) {
     const inv = $('inventory'), other = $(id);
     if (on && innerWidth > 1400) { other.style.left = 'calc(50% - 400px)'; inv.style.left = 'calc(50% + 330px)'; }
@@ -300,6 +302,7 @@ class UI {
     if (this.trade) this.renderTradeBag();
     if (!$('smith').classList.contains('hidden')) this.renderSmith();
     if (!$('research').classList.contains('hidden')) this.renderResearch();
+    if (!$('wardrobe').classList.contains('hidden')) this.renderWardrobe();
   }
 
   bagCells(container, items, size, onClick, onRight, cmp = true) {
@@ -392,6 +395,21 @@ class UI {
     $('wpList').innerHTML = dests.map(([k, n, s]) => `<button class="btn wpb" data-k="${k}" ${(k === 'peaks' && !peaksOpen) || k === G.zoneKey ? 'disabled' : ''}><b>${n}</b><br><span class="small muted">${k === G.zoneKey ? 'You are here' : s}</span></button>`).join('');
     $('wpList').querySelectorAll('button').forEach((b) => (b.onclick = () => { this.closePanel('waypoint'); G.actions.travel(b.dataset.k); }));
   }
+  renderWardrobe() {
+    const pr = G.prof, L = { dye: null, hideHelm: false, ap: -1, ...(pr.char.look || {}) };
+    const dyes = [null, '#8a1c1c', '#c2501a', '#d8a635', '#2f6a2a', '#1a5a6a', '#2a3a8a', '#5a2a7a', '#1a1a1e', '#e8e4dc'];
+    const send = (patch) => G.net.send({ t: 'look', look: { ...L, ...patch } });
+    $('wardrobeBody').innerHTML = `<div class="sub-h">Dye</div><div class="dyes">${dyes.map((c) => `<button class="dye ${L.dye === c ? 'on' : ''}" data-c="${c || ''}" style="background:${c || 'linear-gradient(135deg,#888 45%,#c22 50%,#888 55%)'}" title="${c ? c : 'Banner colour'}"></button>`).join('')}</div>
+      <div class="sub-h">Armour appearance</div><div class="dyes">${['As equipped', ...RARITIES.map((r) => r.name)].map((n, i) => `<button class="btn apb ${L.ap === i - 1 ? 'on' : ''}" data-ap="${i - 1}">${n}</button>`).join('')}</div>
+      <label class="chk"><input type="checkbox" id="hideHelm" ${L.hideHelm ? 'checked' : ''}/> Hide helmet</label>
+      <div class="sub-h">Saved looks</div><div class="dyes">${[0, 1, 2].map((i) => { const s = (pr.looks || [])[i]; return `<span class="lookslot">${s ? `<button class="btn" data-load="${i}">Wear look ${i + 1}</button>` : `<span class="muted small">Empty</span>`} <button class="btn" data-save="${i}">Save here</button></span>`; }).join('')}</div>`;
+    const W = $('wardrobeBody');
+    W.querySelectorAll('.dye').forEach((b) => (b.onclick = () => send({ dye: b.dataset.c || null })));
+    W.querySelectorAll('.apb').forEach((b) => (b.onclick = () => send({ ap: +b.dataset.ap })));
+    W.querySelector('#hideHelm').onchange = (e) => send({ hideHelm: e.target.checked });
+    W.querySelectorAll('[data-save]').forEach((b) => (b.onclick = () => G.net.send({ t: 'saveLook', slot: +b.dataset.save })));
+    W.querySelectorAll('[data-load]').forEach((b) => (b.onclick = () => G.net.send({ t: 'look', look: pr.looks[+b.dataset.load] })));
+  }
   renderQuests() {
     const q = G.prof.char.quest || { i: 0, n: 0 };
     $('questList').innerHTML = QUESTS.map((Q, i) => `<div class="qrow ${i < q.i ? 'done' : i === q.i ? 'cur' : 'locked'}"><b>${i < q.i ? '✔' : i === q.i ? '➤' : '•'} ${Q.title}</b><div class="small muted">${i <= q.i ? Q.goal : '???'}${i === q.i && Q.need > 1 ? ` (${q.n}/${Q.need})` : ''}</div></div>`).join('');
@@ -434,6 +452,9 @@ class UI {
     if (this.smithSel?.src === 'bag') $('smithBag').children[this.smithSel.ref]?.classList.add('sel');
     const sel = this.smithSel, it = sel && (sel.src === 'eq' ? ch.equipped[sel.ref] : ch.bag[sel.ref]);
     const d = $('smithDetail');
+    const gemList = Object.entries(pr.gems || {}).filter(([, n]) => n > 0).sort();
+    $('gemPouch').innerHTML = gemList.length ? gemList.map(([k, n]) => `<span class="gemchip" style="--g:${GEMS[parseGem(k).type].color}">◆ ${gemName(k)} ×${n}${n >= 3 && parseGem(k).tier < 5 ? ` <button class="btn" data-k="${k}">Combine 3 (${30 * parseGem(k).tier}g)</button>` : ''}</span>`).join('') : '<span class="muted small">Gem pouch is empty.</span>';
+    $('gemPouch').querySelectorAll('button').forEach((b) => (b.onclick = () => G.net.send({ t: 'combine', k: b.dataset.k })));
     if (!it) { d.innerHTML = '<div class="muted">Select an item to work on it.</div>'; return; }
     const R = RARITIES[it.rarity];
     const rc = { shards: 6 * (it.rarity + 1), gold: 15 * G.roomLevel }, uc = { shards: 10 * (it.rarity + 1) + it.level * 2, cores: it.rarity === 4 ? 1 : 0 };
@@ -441,6 +462,8 @@ class UI {
     html += `<div class="sub-h" style="margin-top:10px">Upgrade</div><div>Raise item level to ${it.level + 1} (${uc.shards} shards${uc.cores ? ', 1 core' : ''})</div><button class="btn" data-a="up">Upgrade</button>`;
     const keys = Object.keys(it.affixes || {});
     html += `<div class="sub-h" style="margin-top:10px">Reroll an affix <span class="muted small">(${rc.shards} shards, ${rc.gold}g)</span></div>` + (keys.length ? keys.map((k, i) => `<div>${affixLines({ affixes: { [k]: it.affixes[k] } })[0]} <button class="btn" data-a="rr" data-k="${k}">Reroll</button></div>`).join('') : '<div class="muted">No affixes to reroll.</div>');
+    const gems = Object.entries(pr.gems || {}).filter(([, n]) => n > 0);
+    if (it.sockets?.length) html += `<div class="sub-h" style="margin-top:10px">Sockets</div>` + it.sockets.map((g, si) => g ? `<div>◆ <span style="color:${GEMS[parseGem(g).type].color}">${gemName(g)}</span> <button class="btn" data-a="unsock" data-i="${si}">Remove (${20 * parseGem(g).tier}g)</button></div>` : `<div>◇ Empty ${gems.length ? `<select data-i="${si}" class="gemsel">${gems.map(([k, n]) => `<option value="${k}">${gemName(k)} ×${n}</option>`).join('')}</select> <button class="btn" data-a="sock" data-i="${si}">Socket</button>` : '<span class="muted">— no gems (they drop from elites and bosses)</span>'}</div>`).join('');
     if (sel.src === 'bag') html += `<div class="sub-h" style="margin-top:10px">Salvage</div><div>Break it down for ${Math.round(SALVAGE[it.rarity] * (1 + it.level * 0.1))} shards${it.rarity === 4 ? ' and 1 Ember Core' : ''}.</div><button class="btn" data-a="salv">Salvage</button>`;
     d.innerHTML = html;
     d.querySelectorAll('button').forEach((b) => (b.onclick = () => {
@@ -448,6 +471,8 @@ class UI {
       if (a === 'up') G.net.send({ t: 'upgradeItem', src: sel.src, ref: sel.ref });
       if (a === 'rr') G.net.send({ t: 'reroll', src: sel.src, ref: sel.ref, key: b.dataset.k });
       if (a === 'salv') { G.net.send({ t: 'salvage', i: sel.ref }); this.smithSel = null; }
+      if (a === 'sock') G.net.send({ t: 'socket', src: sel.src, ref: sel.ref, idx: +b.dataset.i, k: d.querySelector(`select[data-i="${b.dataset.i}"]`).value });
+      if (a === 'unsock') G.net.send({ t: 'unsocket', src: sel.src, ref: sel.ref, idx: +b.dataset.i });
       G.audio.build();
     }));
   }

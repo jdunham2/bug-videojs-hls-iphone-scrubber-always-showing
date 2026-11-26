@@ -471,6 +471,7 @@ export class Zone {
       let gold = e.gold * rng.range(0.8, 1.25);
       if (def.flee) gold *= 2.5;
       this.room.reward(p, gold, def.xp * (1 + 0.15 * (e.level - 1)) * e.xpMul, e.x, e.z);
+      if (!e.noLoot && rng.chance(def.boss ? 1 : e.affix ? 0.3 : 0.05)) send(p.ws, { t: 'gem', k: this.room.dropGem(p, e.level) });
       const chance = e.noLoot ? 0 : def.boss || def.flee ? 1 : e.affix ? 0.6 : this.type === 'town' ? 0.05 : e.type === 'brute' ? 0.4 : e.type === 'wraith' ? 0.22 : 0.13;
       if (rng.chance(chance)) {
         const n = def.boss ? 3 : def.flee ? 3 : 1;

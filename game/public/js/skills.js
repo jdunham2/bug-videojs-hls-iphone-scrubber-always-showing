@@ -73,6 +73,13 @@ export function fxPlay(kind, d) {
       fx.emit({ pos: P.clone().setY(P.y + 0.8), count: 70, speed: 7, color: '#ffe0a0', color2: '#ff2000', size: 0.5, life: 0.7 });
       G.audio.explode(); break;
     }
+    case 'arrowfx': spawnVisualBolt(P, V(d.tx, 0, d.tz), false); break;
+    case 'rain': {
+      fx.telegraph(P, d.r, 0.4, '#7ff0d0');
+      const t0 = performance.now();
+      const tick = () => { const k = (performance.now() - t0) / 1000; if (k > d.dur || !G.zone) return; for (let i = 0; i < 6; i++) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * d.r; G.fx.emit({ pos: V(d.x + Math.cos(a) * r, gy(d.x, d.z) + 7, d.z + Math.sin(a) * r), count: 1, speed: 26, dir: V(0.15, -1, 0), spread: 0.02, color: '#e8fff6', color2: '#3a8a6a', size: 0.22, life: 0.3 }); } if (Math.random() < 0.3) G.audio.arrow(); requestAnimationFrame(tick); };
+      tick(); break;
+    }
     case 'chain': lightning(d.pts.map(([x, z]) => V(x, gy(x, z) + 1.2, z))); G.audio.zap(); break;
     case 'meteor': meteorFx(P, d.r || 4.2, d.delay || 1.1); break;
     case 'spirit': fx.emit({ pos: P.clone().setY(P.y + 2), count: 60, speed: 3, color: '#ffe8a0', color2: '#ff6a1a', size: 0.35, life: 1, up: 1 }); G.audio.summon(); break;
@@ -129,6 +136,7 @@ export class SkillKit {
     this.cds = [0, 0, 0, 0];
     this.projectiles = [];
     this.spirits = [];
+    this.traps = [];
     this.pending = []; // delayed effects { t, fn }
     this.whirlT = 0; this.whirlTick = 0; this.flurry = null; this.bash = null; this.exec = null;
   }
@@ -260,6 +268,43 @@ export class SkillKit {
       this.pending.push({ t: delay, fn: () => { for (const e of enemiesInRadius(V(q.x, 0, q.z), 2.6)) p.dealDamage(e, p.stats.dmg * 1.5 * this.mods('s3'), { kb: 1.5 }); } });
     }
   }
+  // ===== Ranger =====
+  basicArrow() {
+    const p = this.p; p.castT = 0.2;
+    this.shoot({ speed: 36, mul: 1, aoe: 0, arrow: true, pierce: p.stats.flags.pierce, range: 20 });
+    G.audio.arrow();
+  }
+  volley(yaw) {
+    const p = this.p; p.ry = p.aimDir(yaw); p.castT = 0.3;
+    const n = 5 + (p.stats.T.volley || 0), r0 = p.ry;
+    for (let i = 0; i < n; i++) { p.ry = r0 + (i / (n - 1) - 0.5) * 0.9; this.shoot({ speed: 32, mul: 0.8 * this.mods('s0'), aoe: 0, arrow: true, split: this.has('r_split'), range: 18 }); }
+    p.ry = r0; G.audio.arrow(); G.audio.swing(false);
+  }
+  trap(yaw) {
+    const p = this.p;
+    const t = (G.lock && !G.lock.dead ? G.lock : null) || p.aimTarget(yaw, 12);
+    const at = t ? V(t.pos.x, 0, t.pos.z) : p.pos.clone().add(V(-Math.sin(yaw) * 5, 0, -Math.cos(yaw) * 5));
+    this.traps.push(new Trap(at, this));
+    if (this.has('r_cluster')) for (let k = 0; k < 3; k++) { const a = k * 2.1; this.traps.push(new Trap(at.clone().add(V(Math.cos(a) * 3, 0, Math.sin(a) * 3)), this, 0.6)); }
+    G.audio.build();
+  }
+  hawk() {
+    const p = this.p, n = p.stats.flags.twin ? 2 : 1;
+    for (const s of this.spirits) s.dispose();
+    this.spirits = [];
+    for (let i = 0; i < n; i++) this.spirits.push(new Spirit(p, i, this.has('spiritPerm') ? 1e9 : 25 + (p.stats.T.spiritDur || 0), 'hawk'));
+    this.send('spirit', { x: p.pos.x, z: p.pos.z });
+  }
+  rain(yaw) {
+    const p = this.p;
+    const t = (G.lock && !G.lock.dead ? G.lock : null) || p.aimTarget(yaw, 18);
+    const pt = t ? { x: t.pos.x, z: t.pos.z } : { x: p.pos.x - Math.sin(yaw) * 9, z: p.pos.z - Math.cos(yaw) * 9 };
+    const R = 4.5 + (p.stats.T.rainR || 0), dur = 2.5 + (this.has('r_deluge') ? 2 : 0);
+    p.castT = 0.5; p.ry = Math.atan2(pt.x - p.pos.x, pt.z - p.pos.z);
+    this.send('rain', { x: pt.x, z: pt.z, r: R, dur });
+    for (let k = 0.3; k < dur; k += 0.3) this.pending.push({ t: k, fn: () => { for (const e of enemiesInRadius(V(pt.x, 0, pt.z), R)) p.dealDamage(e, p.stats.dmg * 0.42 * this.mods('s3'), { stun: this.has('r_deluge') ? 0.15 : 0 }, true); } });
+    G.audio.arrow();
+  }
   basicBolt(yaw) {
     const p = this.p; p.ry = p.aimDir(yaw); p.castT = 0.25;
     this.shoot({ speed: 28, mul: 1, aoe: 0 });
@@ -270,14 +315,17 @@ export class SkillKit {
     const dir = V(Math.sin(p.ry), 0, Math.cos(p.ry));
     const pos = p.pos.clone().add(dir.clone().multiplyScalar(0.8)); pos.y += 1.3;
     this.projectiles.push(new Bolt(pos, dir, o, (e, at) => this.boltHit(e, at, o)));
-    G.net.send({ t: 'fx', kind: o.big ? 'firebolt' : 'bolt', x: p.pos.x, z: p.pos.z, tx: p.pos.x + dir.x * 16, tz: p.pos.z + dir.z * 16 });
+    G.net.send({ t: 'fx', kind: o.arrow ? 'arrowfx' : o.big ? 'firebolt' : 'bolt', x: p.pos.x, z: p.pos.z, tx: p.pos.x + dir.x * 16, tz: p.pos.z + dir.z * 16 });
   }
   boltHit(e, at, o) {
     const p = this.p;
     if (o.aoe) {
       for (const x of enemiesInRadius(at, o.aoe)) p.dealDamage(x, p.stats.dmg * o.mul, { kb: o.kb || 0 });
       this.send('explode', { x: at.x, z: at.z, r: o.aoe });
-    } else if (e) p.dealDamage(e, p.stats.dmg * o.mul * (o.spirit ? 1 : 1), { kb: 0.3 });
+    } else if (e) {
+      p.dealDamage(e, p.stats.dmg * o.mul, { kb: 0.3 });
+      if (o.split) { const base = Math.atan2(at.x - p.pos.x, at.z - p.pos.z); for (const d of [-0.6, 0.6]) { const dir = V(Math.sin(base + d), 0, Math.cos(base + d)); const so = { speed: 30, mul: o.mul * 0.5, aoe: 0, arrow: true, range: 8, ignore: e }; this.projectiles.push(new Bolt(at.clone().add(dir.clone().multiplyScalar(e.radius + 0.4)), dir, so, (h, a2) => this.boltHit(h, a2, so))); } }
+    }
   }
 
   update(dt, yaw) {
@@ -327,6 +375,7 @@ export class SkillKit {
       if (this.exec.t > 0.6) this.exec = null;
     }
     for (let i = this.projectiles.length - 1; i >= 0; i--) if (!this.projectiles[i].update(dt)) this.projectiles.splice(i, 1);
+    for (let i = this.traps.length - 1; i >= 0; i--) if (!this.traps[i].update(dt)) this.traps.splice(i, 1);
     for (let i = this.spirits.length - 1; i >= 0; i--) if (!this.spirits[i].update(dt, this)) {
       const s = this.spirits[i];
       if (this.has('h_martyr')) { for (const e of enemiesInRadius(s.pos, 3.5)) p.dealDamage(e, p.stats.dmg * 3, { kb: 2 }); this.send('explode', { x: s.pos.x, z: s.pos.z, r: 3.5 }); }
@@ -336,7 +385,8 @@ export class SkillKit {
   clear() {
     for (const b of this.projectiles) b.dispose();
     for (const s of this.spirits) s.dispose();
-    this.projectiles = []; this.spirits = []; this.pending = [];
+    for (const t of this.traps) t.dispose();
+    this.projectiles = []; this.spirits = []; this.pending = []; this.traps = [];
     this.whirlT = 0; this.flurry = this.bash = this.exec = null;
   }
 }
@@ -344,8 +394,10 @@ export class SkillKit {
 class Bolt {
   constructor(pos, dir, o, onHit) {
     this.pos = pos; this.vel = dir.clone().multiplyScalar(o.speed); this.o = o; this.onHit = onHit; this.life = (o.range || 17) / o.speed;
-    const col = o.spirit ? '#ffe08a' : o.big ? '#ff7a2a' : '#ffb35a';
-    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(o.big ? 0.32 : 0.17, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(3) }));
+    const col = o.arrow ? '#d8fff0' : o.spirit ? '#ffe08a' : o.big ? '#ff7a2a' : '#ffb35a';
+    this.mesh = o.arrow ? new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(2) })) : new THREE.Mesh(new THREE.SphereGeometry(o.big ? 0.32 : 0.17, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(3) }));
+    if (o.arrow) { this.mesh.rotation.order = 'YXZ'; this.mesh.rotation.set(Math.PI / 2, Math.atan2(dir.x, dir.z), 0); }
+    this.hitSet = new Set(o.ignore ? [o.ignore] : []);
     this.mesh.position.copy(pos);
     G.fx.root.add(this.mesh);
   }
@@ -353,11 +405,13 @@ class Bolt {
     this.life -= dt;
     this.pos.addScaledVector(this.vel, dt);
     this.mesh.position.copy(this.pos);
-    G.fx.emit({ pos: this.pos, count: 2, speed: 0.4, color: this.o.spirit ? '#fff2b0' : '#ffc060', color2: '#ff2a00', size: this.o.big ? 0.5 : 0.28, life: 0.3 });
+    if (this.o.arrow) { if (Math.random() < 0.5) G.fx.emit({ pos: this.pos, count: 1, speed: 0.2, color: '#bfffe8', color2: '#2a8a6a', size: 0.18, life: 0.25 }); }
+    else G.fx.emit({ pos: this.pos, count: 2, speed: 0.4, color: this.o.spirit ? '#fff2b0' : '#ffc060', color2: '#ff2a00', size: this.o.big ? 0.5 : 0.28, life: 0.3 });
     const z = G.zone;
     const wall = z.d ? !isFloor(z.d, this.pos.x, this.pos.z) : false;
     let hit = null;
-    for (const e of G.enemies.values()) { if (e.dead) continue; if (Math.hypot(e.pos.x - this.pos.x, e.pos.z - this.pos.z) < e.radius + 0.35) { hit = e; break; } }
+    for (const e of G.enemies.values()) { if (e.dead || this.hitSet.has(e)) continue; if (Math.hypot(e.pos.x - this.pos.x, e.pos.z - this.pos.z) < e.radius + 0.35) { hit = e; break; } }
+    if (hit && this.o.pierce) { this.hitSet.add(hit); this.onHit(hit, this.pos.clone()); hit = null; }
     if (hit || wall || this.life <= 0) {
       if (hit || (this.o.aoe && (wall || this.life <= 0))) this.onHit(hit, this.pos.clone());
       else G.fx.emit({ pos: this.pos, count: 8, speed: 2, color: '#ffc060', color2: '#ff2a00', size: 0.25, life: 0.3 });
@@ -367,6 +421,42 @@ class Bolt {
     return true;
   }
   dispose() { this.mesh.parent?.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
+}
+
+export function buildHawkMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.6, 6), new THREE.MeshStandardMaterial({ color: '#6a5a4a', emissive: '#3a8aff', emissiveIntensity: 0.4 }));
+  body.rotation.x = Math.PI / 2; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), body.material); head.position.z = 0.3; g.add(head);
+  const wm = new THREE.MeshStandardMaterial({ color: '#8a7a6a', emissive: '#4ab0ff', emissiveIntensity: 0.6, side: THREE.DoubleSide });
+  for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.25), wm); w.geometry.translate(0.3 * s, 0, 0); g.add(w); g.userData['w' + s] = w; w.rotation.order = 'ZYX'; }
+  g.userData['w-1'].rotation.y = 0; g.userData.w1.rotation.y = 0;
+  return g;
+}
+
+class Trap {
+  constructor(pos, kit, mul = 1) {
+    this.kit = kit; this.mul = mul; this.armT = 0.5; this.life = 20;
+    this.pos = pos.clone(); this.pos.y = G.zone.groundHeight(pos.x, pos.z) + 0.05;
+    this.mesh = new THREE.Group(); this.mesh.position.copy(this.pos);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.06, 6, 16), new THREE.MeshStandardMaterial({ color: '#4a4a50', metalness: 0.8, roughness: 0.4 })); ring.rotation.x = Math.PI / 2; this.mesh.add(ring);
+    for (let i = 0; i < 8; i++) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.25, 4), ring.material); const a = (i / 8) * 6.28; sp.position.set(Math.cos(a) * 0.45, 0.1, Math.sin(a) * 0.45); this.mesh.add(sp); }
+    this.glow = new THREE.Mesh(new THREE.CircleGeometry(0.4, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color('#7ff0d0').multiplyScalar(2), transparent: true, opacity: 0.5 })); this.glow.rotation.x = -Math.PI / 2; this.glow.position.y = 0.02; this.mesh.add(this.glow);
+    G.fx.root.add(this.mesh);
+  }
+  update(dt) {
+    this.life -= dt; this.armT -= dt;
+    this.glow.material.opacity = 0.3 + Math.sin(performance.now() / 150) * 0.2;
+    if (this.armT <= 0 && enemiesInRadius(this.pos, 2.2).length) {
+      const p = this.kit.p;
+      for (const e of enemiesInRadius(this.pos, 3)) p.dealDamage(e, p.stats.dmg * 2.5 * this.mul * this.kit.mods('s1'), { stun: 2 + (p.stats.T.stun || 0), kb: 0.5 });
+      this.kit.send('explode', { x: this.pos.x, z: this.pos.z, r: 3 });
+      this.dispose(); return false;
+    }
+    if (this.life <= 0) { this.dispose(); return false; }
+    return true;
+  }
+  dispose() { this.mesh.parent?.remove(this.mesh); }
 }
 
 export function buildSpiritMesh() {
@@ -383,9 +473,9 @@ export function buildSpiritMesh() {
 }
 
 class Spirit {
-  constructor(p, i, dur) {
-    this.p = p; this.i = i; this.life = dur; this.cd = 0.5 + i * 0.3; this.t = Math.random() * 5;
-    this.mesh = buildSpiritMesh();
+  constructor(p, i, dur, kind = 'spirit') {
+    this.p = p; this.i = i; this.life = dur; this.cd = 0.5 + i * 0.3; this.t = Math.random() * 5; this.kind = kind;
+    this.mesh = kind === 'hawk' ? buildHawkMesh() : buildSpiritMesh();
     this.pos = p.pos.clone().add(V(0, 2.2, 0));
     this.mesh.position.copy(this.pos);
     G.fx.root.add(this.mesh);
@@ -394,15 +484,28 @@ class Spirit {
     this.life -= dt; this.t += dt;
     const p = this.p, a = this.t * 1.6 + this.i * Math.PI;
     const target = V(p.pos.x + Math.cos(a) * 1.4, p.pos.y + 2.3 + Math.sin(this.t * 3) * 0.2, p.pos.z + Math.sin(a) * 1.4);
-    this.pos.lerp(target, 1 - Math.exp(-6 * dt));
+    if (this.dive) {
+      const d = this.dive; d.t += dt;
+      const tp = V(d.e.pos.x, d.e.pos.y + 1, d.e.pos.z);
+      this.pos.lerp(tp, 1 - Math.exp(-14 * dt));
+      if (d.t > 0.25 && !d.hit) {
+        d.hit = true;
+        if (!d.e.dead) { const raptor = !!p.stats.flags.r_raptor; p.dealDamage(d.e, p.stats.dmg * 0.9 * (1 + (p.stats.T.s2 || 0) + p.stats.skillDmg), { stun: raptor ? 0.8 : 0, kb: 0.5 }, true); if (raptor) fxPlay('chain', { x: d.e.pos.x, z: d.e.pos.z, pts: [[d.e.pos.x, d.e.pos.z - 3], [d.e.pos.x, d.e.pos.z]] }); }
+        G.fx.emit({ pos: tp, count: 14, speed: 4, color: '#dffcff', color2: '#3a8aff', size: 0.25, life: 0.4 });
+      }
+      if (d.t > 0.45) this.dive = null;
+    } else this.pos.lerp(target, 1 - Math.exp(-6 * dt));
     this.mesh.position.copy(this.pos);
-    const f = Math.sin(this.t * 20) * 0.6;
+    const f = Math.sin(this.t * (this.kind === 'hawk' ? 10 : 20)) * 0.6;
     this.mesh.userData['w-1'].rotation.y = -0.6 - f; this.mesh.userData.w1.rotation.y = 0.6 + f;
+    if (this.kind === 'hawk') this.mesh.rotation.y = Math.atan2(target.x - this.pos.x, target.z - this.pos.z);
     if (Math.random() < dt * 20) G.fx.emit({ pos: this.pos, count: 1, speed: 0.3, color: '#ffe8a0', color2: '#ff6a1a', size: 0.25, life: 0.6 });
     this.cd -= dt;
     if (this.cd <= 0) {
       const e = nearestEnemy(this.pos, 14);
-      if (e) {
+      if (e && this.kind === 'hawk') {
+        this.cd = 1.1; this.dive = { e, t: 0 };
+      } else if (e) {
         this.cd = 0.8;
         const dir = V(e.pos.x - this.pos.x, 0, e.pos.z - this.pos.z).normalize();
         const o = { speed: 24, mul: 0.5 * (1 + (p.stats.T.s2 || 0)), aoe: 0, spirit: true };
