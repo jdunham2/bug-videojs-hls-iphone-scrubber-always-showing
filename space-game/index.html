@@ -15250,6 +15250,11 @@ const PK_CART = { x: -12, z: 104 };
 { const _use158 = pkUse; pkUse = function () { if (!PK.ride && Math.hypot(S.pos.x - PK_CART.x, S.pos.z - PK_CART.z) < 5) { if (G.credits < 50) { say('Balloons cost 50 cr.', 'bad'); return; } G.credits -= 50; if (PK.myBal) S.astro.g.remove(PK.myBal); const col = pick(PK_BCOLS); PK.myBal = pkBalloon(col); PK.myBal.position.set(0.35, 1.2, -0.1); S.astro.g.add(PK.myBal); sfx('pickup'); say('🎈 You got a balloon! It floats along with you.', 'good'); return; } _use158(); }; }
 { const _ush158 = updateSurfHUD; updateSurfHUD = function () { _ush158.apply(this, arguments); if (W === PARK_W && !PK.ride && Math.hypot(S.pos.x - PK_CART.x, S.pos.z - PK_CART.z) < 5) setPrompt(`${isTouch ? 'Tap GRAB' : 'Press <kbd>E</kbd>'} to buy a balloon 🎈 (50 cr)`); }; }
 { const _lv158 = pkLeave; pkLeave = function () { if (PK.myBal && S.astro) { S.astro.g.remove(PK.myBal); PK.myBal = null; } _lv158(); }; }
+/* ============ park polish: visitors carry balloons, and a music box tinkles near the wheel and saucers ============ */
+{ const _pv159 = pkVisitor; pkVisitor = function () { const v = _pv159(); if (Math.random() < 0.35) { const b = pkBalloon(pick(PK_BCOLS)); b.position.set(0.45, 0.9, 0); b.scale.setScalar(0.8); v.g.add(b); v.bal = b; } return v; }; }
+const PK_TUNE = [659, 784, 880, 784, 659, 587, 523, 587, 659, 0, 659, 784, 988, 880, 784, 0];
+{ const _pu159 = PARK_W.update; PARK_W.update = function (dt) { _pu159(dt); for (const v of PK.visitors) if (v.bal) { v.bal.rotation.z = Math.sin(T * 1.6 + v.g.position.x) * 0.2; }
+  if (!AC || PK.ride) return; let best = 99; for (const it of Object.values(PK.items)) if (it.k === 'wheel' || it.k === 'saucers') best = Math.min(best, Math.hypot(S.pos.x - it.x, S.pos.z - it.z)); if (best > 26) return; PK.tuneT = (PK.tuneT || 0) - dt; if (PK.tuneT > 0) return; PK.tuneT = 0.32; PK.tuneI = ((PK.tuneI || 0) + 1) % PK_TUNE.length; const f = PK_TUNE[PK.tuneI]; if (!f) return; const vol = 0.035 * clamp(1 - best / 26, 0, 1); try { tone('triangle', f, f * 1.005, 0.28, vol); tone('sine', f * 2, f * 2.01, 0.18, vol * 0.4); } catch (_) {} }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
