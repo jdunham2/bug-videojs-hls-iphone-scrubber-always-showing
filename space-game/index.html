@@ -879,6 +879,10 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 #gxNew { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 8px; max-width: 580px; }
 #gxNew b { font-size: 11px; letter-spacing: .14em; padding: 4px 8px; border-radius: 6px; background: #ff8a3d; color: #1a0e08; }
 #gxNew span { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,190,130,.35); color: #ffe6cc; }
+.gxFloat { position: fixed; z-index: 30; transform: translate(-50%, 0); pointer-events: none; font-weight: 800; font-size: 18px; color: #ffd25a; text-shadow: 0 0 10px rgba(255,190,60,.8), 0 2px 0 rgba(60,30,0,.7); animation: gxFloatUp 1.4s ease-out forwards; }
+.gxFloat.big { font-size: 26px; color: #7dff9a; text-shadow: 0 0 12px rgba(125,255,154,.8), 0 2px 0 rgba(0,40,10,.7); }
+@keyframes gxFloatUp { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -70px) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .gxFloat { animation: none; opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -15383,6 +15387,9 @@ function pkReview() { if (T - (PK.revT || 0) < 25 || Math.random() > 0.5) return
 /* ============ pets: your pet runs up with hearts when you land ============ */
 { const _ss186 = setState; setState = function (st) { const prev = G.state; _ss186.apply(this, arguments); if (st === 'surface' && (prev === 'landing' || prev === 'descent')) PET.greetT = 3; }; }
 { const _up186 = updatePet; updatePet = function (dt) { _up186(dt); if (!(PET.greetT > 0) || !PET.obj || !PET.obj.visible) return; const p = activePet(); if (!p) return; if (!PET.greetDone) { PET.greetDone = true; say(`💖 ${p.name || 'Your pet'} is SO happy you are back!`, 'good'); if (AC) { tone('sine', 880, 1320, 0.15, 0.04); setTimeout(() => { try { tone('sine', 1100, 1650, 0.18, 0.04); } catch (_) {} }, 140); } } PET.greetT -= dt; PET.obj.position.y += Math.abs(Math.sin(T * 9)) * 0.6; PET.heartT = (PET.heartT || 0) - dt; if (PET.heartT <= 0) { PET.heartT = 0.25; const h = pkEmo(pick(['💖', '💕', '❤️']), 0.7); h.position.copy(PET.obj.position).add(new V3(rand(-0.3, 0.3), 1.2, rand(-0.3, 0.3))); surf.add(h); const t0 = T; const tick = () => { if (!h.parent) return; const a = T - t0; h.position.y += 0.03; h.material.opacity = Math.max(0, 1 - a / 1.2); if (a > 1.2) h.parent.remove(h); else requestAnimationFrame(tick); }; tick(); } if (PET.greetT <= 0) PET.greetDone = false; }; }
+/* ============ feel: floating +credits numbers from your ship ============ */
+const GXF = { last: null };
+(function gxfLoop() { requestAnimationFrame(gxfLoop); if (GXF.last === null || G.state === 'title') { GXF.last = G.credits; return; } const d = G.credits - GXF.last; GXF.last = G.credits; if (d <= 0 || d > 100000 || (G.state !== 'fly' && G.state !== 'surface')) return; const src = G.state === 'fly' ? player.position : (S.astro && S.astro.g.position); if (!src) return; const v = src.clone(); if (G.state === 'surface') v.y += 2.4; v.project(camera); if (v.z > 1) return; const el = document.createElement('div'); el.className = 'gxFloat'; el.textContent = `+${d.toLocaleString()} cr`; el.style.left = ((v.x * 0.5 + 0.5) * innerWidth + rand(-50, 50)) + 'px'; el.style.top = ((-v.y * 0.5 + 0.5) * innerHeight - 30 - rand(0, 30)) + 'px'; if (d >= 1000) el.classList.add('big'); document.body.appendChild(el); setTimeout(() => el.remove(), 1400); })();
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
