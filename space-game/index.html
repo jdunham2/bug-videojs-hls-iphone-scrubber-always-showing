@@ -14981,6 +14981,19 @@ function gxStarBg(scene) { const grp = new THREE.Group(); scene.add(grp); scene 
 { const _so142 = gxShowOpen; gxShowOpen = function () { _so142(); if (GXSH.scene) { GXSH.bg = gxStarBg(GXSH.scene); } }; }
 { const _sf142 = gxShowFrame; gxShowFrame = function (dt) { if (GXSH.bg) { GXSH.bg.pts.rotation.y += dt * 0.01; GXSH.bg.grp.scale.setScalar(Math.max(1, (GXSH.R || 6) / 6)); } _sf142(dt); }; }
 { const _bo142 = gxbOpen; gxbOpen = function (slot) { _bo142(slot); if (GXB.scene && !GXB.scene.userData.bg) { GXB.scene.userData.bg = gxStarBg(GXB.scene); } }; }
+/* ============ friends on planets: wave (Z) and a hello chime when a friend arrives ============ */
+GSP.waveN = 0; GSP.waveT = 0; GSP.seen = new Map();
+function gspWave() { if (G.state !== 'surface' || W === SHIP_W) return; GSP.waveN++; GSP.waveT = 1.8; NET.sendT = 0; sfx('ui', 0.6); }
+addEventListener('keydown', e => { if (e.code === 'KeyZ' && !e.repeat && G.state === 'surface' && !(e.target.matches && e.target.matches('input, textarea'))) gspWave(); });
+{ const b = document.createElement('button'); b.id = 'tWave'; b.textContent = 'WAVE'; const row = document.querySelector('.tbtns.sf'); if (row) row.appendChild(b); b.addEventListener('touchstart', e => { e.preventDefault(); gspWave(); }, { passive: false }); b.addEventListener('click', gspWave); }
+function gspArmWave(a, t) { const arm = a.arms && a.arms[1]; if (!arm) return; arm.rotation.z = -2.6 + Math.sin(t * 14) * 0.45; arm.rotation.x = 0; }
+function gspHand(parent) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(64, 64, (c, w, h) => { c.font = '48px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('👋', w / 2, h / 2 + 2); }), transparent: true, depthTest: false })); sp.scale.setScalar(0.8); sp.position.set(0.7, 2.4, 0); parent.add(sp); return sp; }
+{ const _ns143 = netSnap; netSnap = function () { const o = _ns143(); if (o && Array.isArray(o.gsp)) o.gsp[7] = GSP.waveN; return o; }; }
+{ const _usc143 = updateSurfCamera; updateSurfCamera = function (dt) { _usc143(dt); if (GSP.waveT > 0 && S.astro) { GSP.waveT -= dt; gspArmWave(S.astro, T); if (!GSP.myHand) GSP.myHand = gspHand(S.astro.g); GSP.myHand.visible = true; GSP.myHand.position.y = 2.4 + Math.sin(T * 6) * 0.08; } else if (GSP.myHand) GSP.myHand.visible = false;
+  for (const [peer, a] of GSP.av) { const F = NET.friends.get(peer), g = F && F.p && F.p.gsp; if (!g) continue; const wn = +g[7] || 0; let st = GSP.seen.get(peer); if (!st) { st = { wn, t: 0, hello: false }; GSP.seen.set(peer, st); } if (!st.hello) { st.hello = true; if (AC) { tone('sine', 660, 990, 0.18, 0.08); setTimeout(() => { try { tone('sine', 880, 1320, 0.25, 0.07); } catch (_) {} }, 140); } say(`👋 ${F.name || 'Your friend'} is here on this planet with you!`, 'good'); }
+    if (wn > st.wn) { st.wn = wn; st.t = 1.8; say(`👋 ${F.name || 'Your friend'} waves at you! Press Z to wave back.`, 'good'); }
+    if (st.t > 0) { st.t -= dt; gspArmWave(a, T); if (!a.hand) a.hand = gspHand(a.g); a.hand.visible = true; } else if (a.hand) a.hand.visible = false; }
+  for (const peer of [...GSP.seen.keys()]) if (!GSP.av.has(peer)) GSP.seen.delete(peer); }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
