@@ -26,7 +26,10 @@ h1,h2,h3,.disp{font-family:'Lilita One',Impact,sans-serif;font-weight:400;letter
 .stats{display:flex;gap:14px;font-weight:800;white-space:nowrap}
 .stats span{display:flex;align-items:center;gap:5px}
 .cap{display:inline-block;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#b9c3d9 45%,#6f7a94);box-shadow:0 0 0 2px #8792ad inset}
-.amber{color:var(--amber)}.dim{color:var(--dim)}
+.amber{color:var(--amber)}.dim{color:var(--dim)}.mint{color:var(--mint)}
+.chk{display:flex;flex-direction:column;gap:4px;margin:0 0 14px;padding:0;list-style:none}
+.chk li{display:flex;gap:8px}
+.chk .ok{color:var(--mint)}.chk .no{color:#59628c}
 #stage{position:relative;flex:1;min-height:0;border-radius:14px}
 #cv{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:10px;box-shadow:0 0 0 2px var(--line),0 0 40px rgba(255,79,154,.12);touch-action:none}
 #toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);max-width:min(92%,560px);background:rgba(14,18,34,.92);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-weight:800;text-align:center;pointer-events:none;opacity:0;transition:opacity .25s}
@@ -102,11 +105,11 @@ h1,h2,h3,.disp{font-family:'Lilita One',Impact,sans-serif;font-weight:400;letter
  <header class="hud" id="hud" hidden>
   <span class="name" id="lvname">Gas-n-Go</span>
   <div class="meter"><label for="nb">Noise</label><div class="bar" id="nb" title="Over the line wakes a sleeping clerk"><i id="noise"></i><b></b></div></div>
-  <div class="stats"><span class="amber" id="haul">$0 / $80</span><span id="time">Dawn 2:30</span><span><i class="cap"></i><span id="caps">0</span></span></div>
+  <div class="stats"><span class="amber" id="haul">$0 / $80</span><span id="time">Dawn 2:30</span><span><i class="cap"></i><span id="caps">0</span></span><span class="mint" id="jobs">Jobs 0/3</span></div>
  </header>
  <div id="stage"><canvas id="cv"></canvas><div id="toast"></div><div id="overlay"></div></div>
  <div id="casebar" hidden>
-  <p><b>Case the joint.</b> Tap a glowing window or vent to peek inside before the doors lock. <span class="amber" id="peeks"></span><br><span class="dim" id="spotted">Nothing spotted yet.</span></p>
+  <p><b>Case the joint.</b> Tap a glowing window or vent to peek inside before the doors lock. <span class="amber" id="peeks"></span><br><span class="dim" id="spotted">Nothing spotted yet.</span><br><span class="mint" id="jobline"></span></p>
   <button class="go" id="go">Start the heist</button>
  </div>
  <div id="controls" hidden>
@@ -124,7 +127,7 @@ h1,h2,h3,.disp{font-family:'Lilita One',Impact,sans-serif;font-weight:400;letter
    </div>
   </div>
  </div>
- <p class="keys" id="keys" hidden>WASD or arrows to sneak. E grabs, loads, washes, hides, climbs shelves and swings from ceiling fans. Q tosses loot to the cart. F grabs the cart. 1 2 3 call the crew.</p>
+ <p class="keys" id="keys" hidden>WASD or arrows to sneak. E grabs, loads, washes, hides, shakes vending machines, climbs shelves and swings from ceiling fans. Q tosses loot to the cart. F grabs the cart. 1 2 3 call the crew.</p>
 </div>
 
 <script>
@@ -132,7 +135,7 @@ h1,h2,h3,.disp{font-family:'Lilita One',Impact,sans-serif;font-weight:400;letter
 const $=s=>document.querySelector(s);
 const cv=$('#cv'),ctx=cv.getContext('2d'),stage=$('#stage'),overlay=$('#overlay');
 const COLS=20,ROWS=14,TAU=Math.PI*2;
-const SOLID='#wvcKkS=TLW',OPAQUE='#wvcKkSL';
+const SOLID='#wvcKkS=TLWEF',OPAQUE='#wvcKkSLE';
 const D4=[[1,0],[-1,0],[0,1],[0,-1]];
 const LOOT={
  h:{name:'Rotisserie chicken',v:50,w:3},
@@ -158,6 +161,14 @@ const LOOT={
  U:{name:'Soft pretzel',v:25,w:1},
  Y:{name:'Boba tea',v:20,w:1,fragile:true},
  J:{name:'Golden gala cake',v:120,w:3},
+ q:{name:'Croissant basket',v:30,w:1},
+ '&':{name:'Wedding cake',v:90,w:3},
+ '*':{name:'Ice cream tub',v:40,w:2},
+ '%':{name:'Popsicle box',v:25,w:1},
+ '+':{name:'Hot dog crate',v:40,w:2},
+ '!':{name:'Hot dog',v:20,w:1},
+ '@':{name:'Shrimp tower',v:90,w:3},
+ H:{name:'Candy bar',v:15,w:1},
 };
 const LEVELS=[
  {id:'gas',name:'Gas-n-Go Station',blurb:'One half-asleep clerk and a single camera. Tutorial.',quota:80,time:150,peeks:3,chase:2.7,unlock:0,top:[[11,9,'j']],map:[
@@ -280,7 +291,7 @@ const LEVELS=[
  '#..P.....T......C..#',
  '#R.................#',
  '#######DDD####v#####']},
- {id:'mall',name:'Mall Food Court',blurb:'Everything at once: two guards, a dog, a robot vacuum, three cameras and freshly mopped tiles.',quota:260,time:210,peeks:3,chase:3.1,unlock:15,floor:['#2b3046','#30364f'],prod:['#ff6b6b','#ffd166','#4ecdc4','#ff9ed2'],top:[[3,7,'Y'],[17,7,'U']],map:[
+ {id:'mall',name:'Mall Food Court',blurb:'Everything at once: two guards, a dog, a robot vacuum, three cameras and freshly mopped tiles.',quota:220,time:210,peeks:3,chase:3.1,unlock:15,floor:['#2b3046','#30364f'],prod:['#ff6b6b','#ffd166','#4ecdc4','#ff9ed2'],top:[[3,7,'Y'],[17,7,'U']],map:[
  '######w##c###c##K#c#',
  '#hUY#..~~~~...~~...#',
  '#b..#..SSS..===..T.#',
@@ -310,7 +321,70 @@ const LEVELS=[
  '#.B..........O..C..#',
  '#R.....T...........#',
  '#######DDD####v#####']},
+ {id:'bakery',name:'Sunrise Bakery',blurb:'The baker is already up kneading at 4am. Bump a flour sack and it bursts into a blinding, coughing cloud. Two vending machines to shake.',quota:240,time:200,peeks:3,chase:3.0,unlock:21,light:3.6,floor:['#3a3026','#342b22'],prod:['#d9a65b','#c98a4b','#f2d29b','#a8642c'],top:[[3,4,'q'],[13,6,'q']],map:[
+ '######w##c####c##K##',
+ '#&&$#...F..q...F...#',
+ '#q..#..WW..====..G.#',
+ '##L##.........F....w',
+ '#..SS..SSS..SSS..E.#',
+ '#..q...O..q...O....#',
+ '#.SSS..SSS..SSS..F.#',
+ 'w..F....g.....q....#',
+ '#.===..===..===..M.#',
+ '#...q....$.....F...#',
+ '#.B...T.....E....W.#',
+ '#..P............C..#',
+ '#R.................#',
+ '#######DDD####v#####']},
+ {id:'icecream',name:'Ice Cream Factory',blurb:'Conveyor belts drag you along, the floors are frozen slick, and a security drone sweeps overhead. Drones can see you on top of shelves.',quota:210,time:200,peeks:3,chase:3.0,unlock:24,floor:['#25384a','#2a3f52'],prod:['#ff9ed2','#7ad1ff','#fff1a8','#c77dff'],top:[[8,3,'%'],[13,6,'*']],map:[
+ '######w##c####c##K##',
+ '#**$#...>>>>>>>....#',
+ '#*%.#..~~~~~~~~..G.#',
+ '##L##..SSS..SSS....w',
+ '#..*...%...Q...E...#',
+ '#.<<<<<<<..<<<<<<<.#',
+ '#..%..SS....SS..*..#',
+ 'w.~~~~SS.O..SS~~~~.#',
+ '#..T..SS....SS..M..#',
+ '#.>>>>>>>..>>>>>>>.#',
+ '#...y....$....G..W.#',
+ '#.B..E..........C..#',
+ '#R..P..............#',
+ '#######DDD####v#####']},
+ {id:'stadium',name:'Stadium Concessions',blurb:'Two drones, a guard, a dog and a robot vacuum work the concourse. Hot dogs by the crate.',quota:220,time:210,peeks:3,chase:3.1,unlock:27,floor:['#2c3138','#30353d'],prod:['#ff5a4e','#3fa8ff','#ffd166','#3ef0b5'],top:[[5,4,'!'],[12,6,'U']],map:[
+ '######w##c####c##K##',
+ '#++$#..!.....!.....#',
+ '#+..#..===E===...d.#',
+ '##L##..........Q...w',
+ '#..S.SS.SS.SS.SS.SS#',
+ '#..u....b....U...T.#',
+ '#.SS.SS.SS.SS.SS.SS#',
+ 'w..!..O....G....O..#',
+ '#Q.......$.....+...#',
+ '#.===.===.===.===..#',
+ '#..!...V......E..W.#',
+ '#.B..T..........C..#',
+ '#R..P..............#',
+ '#######DDD####v#####']},
+ {id:'cruise',name:'Midnight Cruise Buffet',blurb:'The grand finale at sea: the deck rolls with the waves, the floors are wet, and a drone, a dog and a guard keep watch over the shrimp tower.',quota:300,time:220,peeks:3,chase:3.1,unlock:30,lurch:true,floor:['#1f3a4a','#23404f'],prod:['#ffffff','#7ad1ff','#ff6b6b','#ffd166'],top:[[4,4,'e'],[12,6,'a']],map:[
+ '######w##c####c##K##',
+ '#@@$#...~~~~~~.....#',
+ '#a..#..===@===..d..#',
+ '##L##.....O.....T..w',
+ '#..SS..SS..SS..SS..#',
+ '#~~e~~~~~r~~~~~e~~.#',
+ '#..SS..SS.QSS..SS..#',
+ 'w..a..O...G...O..T.#',
+ '#.===..===..===..M.#',
+ '#..e....$....r.....#',
+ '#~~~~~~...E...~~W~.#',
+ '#.B..T..........C..#',
+ '#R..P..............#',
+ '#######DDD####v#####']},
 ];
+const JOBS={gas:['caps','wash','toss'],grocery:['top','trip','trinket'],diner:['swing','crow','quiet'],cinema:['skunk','top','trinket'],vault:['quiet','trip','caps'],train:['toss','swing','trinket'],market:['wash','trip','top'],pizza:['caps','swing','crow'],mall:['skunk','toss','trinket'],gala:['quiet','trip','top'],bakery:['flour','vend','trinket'],icecream:['top','quiet','vend'],stadium:['vend','trip','trinket'],cruise:['swing','skunk','trinket']};
+const JOBTXT={caps:'Pocket every bottle cap',wash:'Wash a snack for a sugar rush',toss:'Toss loot into the cart from 4+ tiles away',top:'Grab loot from a shelf top',trip:'Trip someone with the possum',trinket:'Find the lost trinket',swing:'Swing from a ceiling fan',crow:'Have the crow snatch a snack',quiet:'Never let the noise pass the red line',skunk:'Skunk a clerk',flour:'Flour-bomb a clerk',vend:'Shake a vending machine'};
+const TRINKETS={gas:'Lost gold watch',grocery:'Diamond earring',diner:'Vintage bottle opener',cinema:'Fancy 3D glasses',vault:'Silver cheese knife',train:"Conductor's pocket watch",market:'Lucky horseshoe',pizza:'Golden pizza cutter',mall:'Lost car keys',gala:"The Mayor's cufflink",bakery:'Antique whisk',icecream:'Sparkly sundae spoon',stadium:'Championship ring',cruise:"Captain's compass"};
 const SHOP=[
  {id:'coat',name:'Trench coat',cost:12,desc:'Disguise. Cameras take twice as long to spot you.'},
  {id:'stache',name:'Tiny fake mustache',cost:10,desc:'Disguise. Clerks take twice as long to recognise you.'},
@@ -319,6 +393,10 @@ const SHOP=[
  {id:'roof',name:'Pizza-box roof',cost:6,desc:'Dumpster upgrade. Sleep in: 20 more seconds before dawn.'},
  {id:'couch',name:'Curbside couch',cost:16,desc:'Dumpster upgrade. Rested crew recharge 25% faster.'},
  {id:'lights',name:'Fairy lights',cost:5,desc:'Dumpster upgrade. Purely fabulous.'},
+ {id:'drama',name:'Possum acting classes',cost:15,desc:'Crew upgrade. The possum plays dead for 20s and trips people for longer.'},
+ {id:'wings',name:'Crow flight school',cost:18,desc:'Crew upgrade. The crow recharges twice as fast and can lift weight-2 snacks.'},
+ {id:'perfume',name:'Extra-strength skunk musk',cost:15,desc:'Crew upgrade. Bigger, longer-lasting stink clouds.'},
+ {id:'velvet',name:'Velvet paws',cost:20,desc:'Toppled can towers and flour sacks make half the noise.'},
 ];
 
 let meta={shinies:0,owned:{},stars:{}};
@@ -339,7 +417,7 @@ function inward(x,y){for(const [dx,dy] of D4){const c=cell(x+dx,y+dy);if(!SOLID.
 function flood(sx,sy){const seen=new Set([sy*COLS+sx]),q=[[sx,sy]];while(q.length){const [x,y]=q.shift();for(const [dx,dy] of D4){const nx=x+dx,ny=y+dy,k=ny*COLS+nx;if(!seen.has(k)&&walk(nx,ny)){seen.add(k);q.push([nx,ny])}}}return seen}
 
 function load(lv){
- G={lv,T:[],revealed:[],vis:[],loot:[],caps:[],clerks:[],vacs:[],cams:[],cart:null,p:null,noise:0,time:lv.time+(meta.owned.roof?20:0),hasKey:false,
+ G={lv,T:[],revealed:[],vis:[],loot:[],caps:[],clerks:[],vacs:[],drones:[],vend:{},maxNoise:0,cams:[],cart:null,p:null,noise:0,time:lv.time+(meta.owned.roof?20:0),hasKey:false,
   lurchT:11,laserCd:0,crew:{possum:{cd:0,act:null},crow:{cd:0,task:null},skunk:{cd:0}},clouds:[],fly:[],fx:[],texts:[],spotted:false,alarm:false,peeks:lv.peeks,peekPts:[],t:0,msgT:0,trail:[],capsGot:0};
  lv.map.forEach((row,y)=>{G.T[y]=[];G.revealed[y]=[];G.vis[y]=[];[...row].forEach((ch,x)=>{
   let b=ch;const cx=x+.5,cy=y+.5;
@@ -348,6 +426,7 @@ function load(lv){
   else if(ch==='R'){G.p={x:cx,y:cy,vx:0,vy:0,a:-Math.PI/2,carry:null,hidden:false,push:false,rush:0,wash:0,high:false,swing:null,slideT:0};b='.'}
   else if(ch==='C'){G.cart={x:cx,y:cy,a:Math.PI,items:[]};b='.'}
   else if(ch==='d'){G.clerks.push({x:cx,y:cy,hx:cx,hy:cy,type:'dog',st:'patrol',path:[],face:0,sus:0,timer:1,lost:0,repath:0,say:null,bark:0});b='.'}
+  else if(ch==='Q'){G.drones.push({x:cx,y:cy,dir:1,alert:0,cool:0});b='.'}
   else if(ch==='V'){G.vacs.push({x:cx,y:cy,a:Math.random()*TAU,cd:0});b='.'}
   else if(ch==='g'||ch==='G'){G.clerks.push({x:cx,y:cy,hx:cx,hy:cy,type:ch==='g'?'sleepy':'patrol',st:ch==='g'?'sleep':'patrol',path:[],face:Math.PI/2,sus:0,timer:1,lost:0,repath:0,say:null});b='.'}
   else if(ch==='c')G.cams.push({x,y});
@@ -359,6 +438,10 @@ function load(lv){
  G.fans=[];for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(G.T[y][x]==='O')G.fans.push({x:x+.5,y:y+.5});
  const reach=flood(G.p.x|0,G.p.y|0);
  G.loot.forEach(l=>l.locked=!l.top&&!reach.has((l.y|0)*COLS+(l.x|0)));
+ G.jobs=(JOBS[lv.id]||[]).map(id=>({id,done:false}));
+ {const occ=new Set([...G.loot,...G.caps].map(o=>(o.y|0)*COLS+(o.x|0)));const sx=G.p.x|0,sy=G.p.y|0,dd=new Map([[sy*COLS+sx,0]]),q=[[sx,sy]];let far=null,fd=-1;
+  while(q.length){const [x,y]=q.shift(),d=dd.get(y*COLS+x);if('.~'.includes(G.T[y][x])&&!occ.has(y*COLS+x)&&d>fd){fd=d;far=[x,y]}for(const [ax,ay] of D4){const nx=x+ax,ny=y+ay,k=ny*COLS+nx;if(!dd.has(k)&&(walk(nx,ny)||cell(nx,ny)==='L')){dd.set(k,d+1);q.push([nx,ny])}}}
+  G.trinket=far?{x:far[0]+.5,y:far[1]+.5,got:false,name:TRINKETS[lv.id]||'Shiny trinket'}:null}
  const home=G.clerks[0];
  G.patrol=[...(home?flood(home.x|0,home.y|0):reach)].map(k=>[k%COLS,Math.floor(k/COLS)]);
 }
@@ -384,8 +467,9 @@ function bfs(fx,fy,tx,ty){
 let toastT=0;
 function toast(s){if(!s)return;const t=$('#toast');t.textContent=s;t.classList.add('on');toastT=3.4}
 const say=(x,y,s,col='#fff')=>G.texts.push({x,y,s,col,t:0});
+function jobDone(id){const j=G.jobs.find(j=>j.id===id&&!j.done);if(!j)return;j.done=true;toast('Bonus job done: '+JOBTXT[id]+'!');say(G.p.x,G.p.y-.8,'BONUS ✓','#3ef0b5')}
 function makeNoise(a,x,y){
- G.noise=Math.min(100,G.noise+a);
+ G.noise=Math.min(100,G.noise+a);G.maxNoise=Math.max(G.maxNoise,G.noise);
  if(a>=8){G.fx.push({x,y,t:0,big:a>=30});
   for(const c of G.clerks){if(c.type==='dog'||['stun','flee','chase'].includes(c.st))continue;
    if(c.st==='sleep'){if(G.noise>=55)investigate(c,x,y,"Huh?! Who's there?")}
@@ -399,7 +483,8 @@ function blocked(x,y,r){
  let hit=false;
  for(let cy=Math.floor(y-r);cy<=Math.floor(y+r);cy++)for(let cx=Math.floor(x-r);cx<=Math.floor(x+r);cx++){
   const c=cell(cx,cy);
-  if(c==='T'){G.T[cy][cx]='x';makeNoise(55,cx+.5,cy+.5);say(cx+.5,cy,'CRASH!','#ff8a7a');shake=.35;toast('You toppled the can tower! Hide or hurry.');continue}
+  if(c==='F'){G.T[cy][cx]=',';G.clouds.push({x:cx+.5,y:cy+.5,r:1.9,t:7,max:7,flour:true});makeNoise(meta.owned.velvet?13:25,cx+.5,cy+.5);say(cx+.5,cy,'POOF!','#fff');toast('A flour sack burst! Nobody can see through that, and anyone inside it will be coughing.');continue}
+  if(c==='T'){G.T[cy][cx]='x';makeNoise(meta.owned.velvet?28:55,cx+.5,cy+.5);say(cx+.5,cy,'CRASH!','#ff8a7a');shake=.35;toast('You toppled the can tower! Hide or hurry.');continue}
   if(c==='L'&&G.hasKey){G.T[cy][cx]='l';G.loot.forEach(l=>l.locked=false);say(cx+.5,cy,'Unlocked','#3ef0b5');hit=true;continue}
   if(SOLID.includes(c))hit=true;
  }
@@ -418,14 +503,16 @@ function ctxAction(){
  if(p.carry){
   if(nearCart(1.4))return{label:'Load cart',fn:()=>{G.cart.items.push(p.carry);p.carry.st='cart';say(G.cart.x,G.cart.y-.5,'+$'+p.carry.v,'#ffc542');p.carry=null;makeNoise(3,p.x,p.y)}};
   const w=!p.high&&washSpot();if(w)return{label:(p.carry.dissolves?'Wash cotton candy?':'Wash snack'),fn:()=>{p.wash=1.1;p.vx=p.vy=0;say(p.x,p.y-.6,'scrub scrub','#9fd8ff')}};
- }else if(!p.push){const l=nearestLoot(.95);if(l)return{label:'Grab '+lc(l.name),fn:()=>{l.st='carried';p.carry=l;l.top=false;if(l.w>=3)toast(l.name+' is heavy. You move slower while carrying it.')}}}
+ }else if(!p.push){const l=nearestLoot(.95);if(l)return{label:'Grab '+lc(l.name),fn:()=>{if(l.top)jobDone('top');l.st='carried';p.carry=l;l.top=false;if(l.w>=3)toast(l.name+' is heavy. You move slower while carrying it.')}}}
  if(p.high){const f=G.fans.find(f=>dist(f,p)<1.8);if(f&&!p.carry?.w||f&&p.carry.w<2)return{label:'Swing from ceiling fan',fn:()=>swing(f)};return{label:'Hop down',fn:hopDown}}
+ if(!p.high&&!p.push){const vm=adjCell('E');if(vm){const k=vm[1]*COLS+vm[0],u=G.vend[k]??2;return{label:u?'Shake vending machine':'Vending machine (empty)',fn:u?()=>{G.vend[k]=u-1;shake=.25;makeNoise(22,vm[0]+.5,vm[1]+.5);say(vm[0]+.5,vm[1]-.1,'CLUNK','#7ad1ff');const l={k:'H',...LOOT.H,x:p.x,y:p.y,st:'carried'};if(p.carry){l.st='floor'}G.loot.push(l);if(!p.carry)p.carry=l;jobDone('vend')}:null}}}
  const h=hideSpot();
  if(h&&!p.push)return{label:h.c==='M'?'Hide in slushie machine':'Hide in box',fn:()=>{p.hidden=true;p.x=h.x+.5;p.y=h.y+.5;p.vx=p.vy=0;p.seenHiding=G.clerks.some(c=>c.st==='chase'&&Math.hypot(c.x-p.x,c.y-p.y)<4&&los(c.x,c.y,p.x,p.y))}};
  if(!p.push&&(!p.carry||p.carry.w<2)){const sh=adjShelf();if(sh)return{label:'Climb shelf',fn:()=>{p.high=true;p.x=sh[0]+.5;p.y=sh[1]+.5;p.vx=p.vy=0;if(!G.climbTip){G.climbTip=1;toast('Up top, clerks can\'t see you unless they\'re right beside you. Cameras still can.')}}}}
  if(p.carry)return{label:'Drop',fn:()=>{const l=p.carry;l.st='floor';l.x=p.x;l.y=p.y;p.carry=null}};
  return{label:p.push?'Let go of cart (F)':'Grab'};
 }
+function adjCell(ch){const p=G.p,x=p.x|0,y=p.y|0;for(const [dx,dy] of D4)if(cell(x+dx,y+dy)===ch&&Math.hypot(x+dx+.5-p.x,y+dy+.5-p.y)<1.2)return[x+dx,y+dy];return null}
 function adjShelf(){const p=G.p,x=p.x|0,y=p.y|0;let best=null,bd=1.05;for(const [dx,dy] of D4){if(cell(x+dx,y+dy)!=='S')continue;const d=Math.hypot(x+dx+.5-p.x,y+dy+.5-p.y);if(d<bd){bd=d;best=[x+dx,y+dy]}}return best}
 function hopDown(){const p=G.p,x=p.x|0,y=p.y|0;const c=D4.filter(([dx,dy])=>walk(x+dx,y+dy)&&cell(x+dx,y+dy)!=='D').sort((a,b)=>(b[0]*Math.cos(p.a)+b[1]*Math.sin(p.a))-(a[0]*Math.cos(p.a)+a[1]*Math.sin(p.a)))[0];if(!c){toast('Nowhere to land from here.');return}p.high=false;p.x=x+c[0]+.5;p.y=y+c[1]+.5;makeNoise(4,p.x,p.y)}
 function swing(f){const p=G.p;let ux=f.x-p.x,uy=f.y-p.y;const l=Math.hypot(ux,uy)||1;ux/=l;uy/=l;
@@ -447,15 +534,15 @@ function toggleCart(){
 function followCart(){let need=.85,px=G.p.x,py=G.p.y;for(let i=G.trail.length-1;i>=0;i--){const t=G.trail[i],d=Math.hypot(t.x-px,t.y-py);if(d>=need&&d>0){const f=need/d;G.cart.x=px+(t.x-px)*f;G.cart.y=py+(t.y-py)*f;G.cart.a=Math.atan2(G.p.y-G.cart.y,G.p.x-G.cart.x);return}need-=d;px=t.x;py=t.y}}
 function useCrew(n){
  if(mode!=='heist')return;const C=G.crew,p=G.p;
- if(n==='possum'){if(C.possum.cd>0||C.possum.act)return;C.possum.act={x:p.x,y:p.y,t:12};C.possum.cd=18;toast('Possum is playing dead. Lead a clerk over it.')}
+ if(n==='possum'){if(C.possum.cd>0||C.possum.act)return;C.possum.act={x:p.x,y:p.y,t:meta.owned.drama?20:12};C.possum.cd=18;toast('Possum is playing dead. Lead a clerk over it.')}
  if(n==='crow'){if(C.crow.cd>0||C.crow.task)return;
   const hk=findCell('K');
   if(hk&&!G.hasKey){C.crow.task={kind:'key',hk,pos:{x:G.cart.x,y:G.cart.y},seg:1,to:{x:hk[0]+.5,y:hk[1]+.5}};toast('Crow is going for the key on the high hook.')}
-  else{const c=G.loot.filter(l=>l.st==='floor'&&l.w<=1&&!l.locked&&dist(l,p)<7).sort((a,b)=>dist(a,p)-dist(b,p))[0];
+  else{const c=G.loot.filter(l=>l.st==='floor'&&l.w<=(meta.owned.wings?2:1)&&!l.locked&&dist(l,p)<7).sort((a,b)=>dist(a,p)-dist(b,p))[0];
    if(!c){toast('Crow can only snatch light snacks (jerky, cotton candy) within 7 tiles of you.');return}
    c.st='crow';C.crow.task={kind:'loot',l:c,pos:{x:G.cart.x,y:G.cart.y},seg:1,to:{x:c.x,y:c.y}};toast('Crow swoops for the '+lc(c.name)+'.')}
-  C.crow.cd=14}
- if(n==='skunk'){if(C.skunk.cd>0)return;G.clouds.push({x:p.x,y:p.y,r:2.3,t:9,max:9});C.skunk.cd=24;toast('Skunk cleared the aisle. No human will walk through that.')}
+  C.crow.cd=meta.owned.wings?7:14}
+ if(n==='skunk'){if(C.skunk.cd>0)return;G.clouds.push({x:p.x,y:p.y,r:meta.owned.perfume?3.1:2.3,t:meta.owned.perfume?13:9,max:9});C.skunk.cd=24;toast('Skunk cleared the aisle. No human will walk through that.')}
 }
 const findCell=ch=>{for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(G.T[y][x]===ch)return[x,y];return null};
 
@@ -469,7 +556,7 @@ function update(dt){
  if(p.hidden&&m>.5){p.hidden=false;p.seenHiding=false}
  if(p.hidden||p.wash>0||p.swing){ix=iy=0}
  if(p.swing){const w=p.swing;w.t+=dt/.6;const k=Math.min(1,w.t),an=w.a0+(w.a1-w.a0)*k,rr_=w.r0+(w.r1-w.r0)*k;p.x=w.fx+Math.cos(an)*rr_;p.y=w.fy+Math.sin(an)*rr_;p.a=an+Math.PI/2;
-  if(k>=1){p.x=w.x1;p.y=w.y1;p.swing=null;p.high=cell(p.x|0,p.y|0)==='S';if(!p.high){makeNoise(6,p.x,p.y);say(p.x,p.y-.4,'thud','#c9d1e8')}}}
+  if(k>=1){p.x=w.x1;p.y=w.y1;p.swing=null;jobDone('swing');p.high=cell(p.x|0,p.y|0)==='S';if(!p.high){makeNoise(6,p.x,p.y);say(p.x,p.y-.4,'thud','#c9d1e8')}}}
  const sp=3.4*(1-.1*(p.carry?p.carry.w:0))*(p.rush>0?1.5:1)*(p.push?.8:1);
  if(p.slideT>0)p.slideT-=dt;
  const slip=(!p.high&&cell(p.x|0,p.y|0)==='~')||p.slideT>0,k=slip?2.2:16;
@@ -484,8 +571,12 @@ function update(dt){
  const lt=G.trail[G.trail.length-1];if(!lt||Math.hypot(lt.x-p.x,lt.y-p.y)>.05){G.trail.push({x:p.x,y:p.y});if(G.trail.length>200)G.trail.shift()}
  if(p.push){followCart();if(spd>.5&&!meta.owned.wheels){G.noise=Math.min(100,G.noise+8*dt);if(Math.random()<dt*1.5)say(G.cart.x,G.cart.y-.4,'squeak','#c9d1e8')}}
  if(p.rush>0)p.rush-=dt;
- if(p.wash>0){p.wash-=dt;if(p.wash<=0){const l=p.carry;if(l&&l.dissolves){l.st='gone';p.carry=null;say(p.x,p.y-.5,'poof','#ff9ed2');toast('You washed the cotton candy. It dissolved. Every single time.')}else if(l){p.rush=10;toast('Squeaky-clean snack! Sugar rush: faster raccoon and crew for 10s.')}}}
- for(const c of G.caps)if(!c.got&&dist(c,p)<.5){c.got=true;G.capsGot++;say(c.x,c.y-.4,'+2','#dfe6ff')}
+ if(p.wash>0){p.wash-=dt;if(p.wash<=0){const l=p.carry;if(l&&l.dissolves){l.st='gone';p.carry=null;say(p.x,p.y-.5,'poof','#ff9ed2');toast('You washed the cotton candy. It dissolved. Every single time.')}else if(l){p.rush=10;jobDone('wash');toast('Squeaky-clean snack! Sugar rush: faster raccoon and crew for 10s.')}}}
+ for(const c of G.caps)if(!c.got&&dist(c,p)<.5){c.got=true;G.capsGot++;say(c.x,c.y-.4,'+2','#dfe6ff');if(G.capsGot===G.caps.length)jobDone('caps')}
+ if(G.trinket&&!G.trinket.got&&dist(G.trinket,p)<.5){G.trinket.got=true;say(p.x,p.y-.6,'+10','#ffd34d');toast('Found the '+G.trinket.name+'! It goes on the trophy shelf.');jobDone('trinket')}
+ G.maxNoise=Math.max(G.maxNoise,G.noise);
+ if(!p.high&&!p.hidden&&!p.swing){const cc=cell(p.x|0,p.y|0);if(cc==='>'||cc==='<'){const nx=p.x+(cc==='>'?1.7:-1.7)*dt;if(!blocked(nx,p.y,.27))p.x=nx}}
+ for(const l of G.loot)if(l.st==='floor'&&!l.top){const cc=cell(l.x|0,l.y|0);if(cc==='>'||cc==='<'){const nx=l.x+(cc==='>'?1.7:-1.7)*dt;if(walk(Math.floor(nx+(cc==='>'?.3:-.3)),l.y|0))l.x=nx}}
  if(p.push){const cc=cell(G.cart.x|0,G.cart.y|0),pc=cell(p.x|0,p.y|0);if(cc==='D'||pc==='D'){const v=haul();if(v>=G.lv.quota)return endRun(true);if(G.msgT<=0){toast(`The crew won't leave with less than $${G.lv.quota}. Cart holds $${v}.`);G.msgT=3}}}
  const rate=(p.rush>0?2:1)*(meta.owned.couch?1.25:1);
  for(const n of ['possum','crow','skunk'])C[n].cd=Math.max(0,C[n].cd-dt*rate);
@@ -494,17 +585,19 @@ function update(dt){
  if(ct){const to=ct.seg===2?(ct.kind==='key'?p:G.cart):ct.to,dx=to.x-ct.pos.x,dy=to.y-ct.pos.y,d=Math.hypot(dx,dy),mv=7*dt;ct.ang=Math.atan2(dy,dx);
   if(d<=mv){ct.pos.x=to.x;ct.pos.y=to.y;
    if(ct.seg===1){ct.seg=2;ct.has=true;if(ct.kind==='key')G.T[ct.hk[1]][ct.hk[0]]='k'}
-   else{if(ct.kind==='key'){G.hasKey=true;toast('Crow dropped the back-room key in your paws. Walk into the orange door.')}else{G.cart.items.push(ct.l);ct.l.st='cart';say(G.cart.x,G.cart.y-.5,'+$'+ct.l.v,'#ffc542')}C.crow.task=null}}
+   else{if(ct.kind==='key'){G.hasKey=true;toast('Crow dropped the back-room key in your paws. Walk into the orange door.')}else{G.cart.items.push(ct.l);ct.l.st='cart';jobDone('crow');say(G.cart.x,G.cart.y-.5,'+$'+ct.l.v,'#ffc542')}C.crow.task=null}}
   else{ct.pos.x+=dx/d*mv;ct.pos.y+=dy/d*mv}}
  G.clouds=G.clouds.filter(c=>(c.t-=dt)>0);
  for(const c of G.clerks){updClerk(c,dt);if(mode!=='heist')return}
  for(const v of G.vacs)updVac(v,dt);
+ for(const d of G.drones){d.x+=d.dir*1.5*dt;if(d.x>COLS-1.6){d.x=COLS-1.6;d.dir=-1}if(d.x<1.6){d.x=1.6;d.dir=1}if(d.cool>0){d.cool-=dt;continue}
+  if(!p.hidden&&!p.swing&&!inCloud(p.x,p.y)&&Math.hypot(p.x-d.x,p.y-d.y)<1.5){d.alert+=dt/(.55*(meta.owned.coat?2:1));if(d.alert>=1){d.alert=0;d.cool=3.5;G.spotted=true;toast('A security drone spotted you! Its siren is loud.');makeNoise(50,p.x,p.y)}}else d.alert=Math.max(0,d.alert-dt)}
  for(const c of G.cams){c.a=c.base+Math.sin(G.t*1.05+c.ph)*.75;if(c.cool>0){c.cool-=dt;continue}
   if(seesP(c.cx,c.cy,c.a,6.5,.34,false)){c.alert+=dt/(.9*(meta.owned.coat?2:1));if(c.alert>=1){c.alert=0;c.cool=3.5;G.spotted=true;toast('A camera spotted you! The alert chime is loud.');makeNoise(48,p.x,p.y)}}
   else c.alert=Math.max(0,c.alert-dt*.6)}
  G.fly=G.fly.filter(f=>{f.t+=dt;if(f.t<f.dur)return true;
   if(f.l.fragile&&!meta.owned.mitts&&Math.random()<.5){f.l.st='gone';makeNoise(32,G.cart.x,G.cart.y);say(G.cart.x,G.cart.y-.5,'SMASH!','#ff8a7a');toast('The soda shattered on landing. Loud.')}
-  else{G.cart.items.push(f.l);f.l.st='cart';makeNoise(6,G.cart.x,G.cart.y);say(G.cart.x,G.cart.y-.5,'+$'+f.l.v,'#ffc542')}return false});
+  else{if(Math.hypot(f.x0-G.cart.x,f.y0-G.cart.y)>=4)jobDone('toss');G.cart.items.push(f.l);f.l.st='cart';makeNoise(6,G.cart.x,G.cart.y);say(G.cart.x,G.cart.y-.5,'+$'+f.l.v,'#ffc542')}return false});
  G.noise=Math.max(0,G.noise-7*dt);if(G.noise<60)G.alarm=false;
 }
 function blockedHigh(x,y,r){for(let cy=Math.floor(y-r);cy<=Math.floor(y+r);cy++)for(let cx=Math.floor(x-r);cx<=Math.floor(x+r);cx++)if(cell(cx,cy)!=='S')return true;return false}
@@ -520,8 +613,10 @@ function updDog(c,dt){
  const p=G.p;if(c.say&&(c.say.t-=dt)<=0)c.say=null;
  if(c.st==='stun'){if((c.timer-=dt)<=0){c.st='patrol';c.path=[];c.timer=0}return}
  const po=G.crew.possum.act;
- if(po&&c.st!=='flee'&&Math.hypot(c.x-po.x,c.y-po.y)<3.2){const dd=Math.hypot(c.x-po.x,c.y-po.y);if(dd<.6){c.st='stun';c.timer=6;c.say={t:2.5,s:'*sniff sniff sniff*'};G.crew.possum.act=null;toast('The dog is fascinated by the possum. Go!');return}c.path=[{x:po.x,y:po.y}];step(c,3,dt);return}
- if(c.st!=='flee'&&inCloud(c.x,c.y)){c.st='flee';c.timer=6;c.path=bfs(c.x,c.y,c.hx,c.hy);c.say={t:2,s:'*whimper*'};return}
+ if(po&&c.st!=='flee'&&Math.hypot(c.x-po.x,c.y-po.y)<3.2){const dd=Math.hypot(c.x-po.x,c.y-po.y);if(dd<.6){c.st='stun';c.timer=meta.owned.drama?8:6;c.say={t:2.5,s:'*sniff sniff sniff*'};jobDone('trip');G.crew.possum.act=null;toast('The dog is fascinated by the possum. Go!');return}c.path=[{x:po.x,y:po.y}];step(c,3,dt);return}
+ if(c.flourT>0)c.flourT-=dt;
+ {const fc=G.clouds.find(k=>k.flour&&Math.hypot(k.x-c.x,k.y-c.y)<k.r);if(fc&&!(c.flourT>0)){c.st='stun';c.timer=2.5;c.flourT=6;c.say={t:2,s:'*sneeze*'};jobDone('flour');return}}
+ if(c.st!=='flee'&&G.clouds.some(k=>!k.flour&&Math.hypot(k.x-c.x,k.y-c.y)<k.r)){c.st='flee';c.timer=6;c.path=bfs(c.x,c.y,c.hx,c.hy);c.say={t:2,s:'*whimper*'};return}
  if(c.st==='flee'){c.timer-=dt;step(c,3.4,dt);if(c.timer<=0){c.st='patrol';c.path=[]}return}
  const d=Math.hypot(p.x-c.x,p.y-c.y);
  const smell=d<1.9&&!inCloud(p.x,p.y)&&p.rush<=0&&!p.swing;
@@ -555,8 +650,10 @@ function updClerk(c,dt){
  if(c.st==='stun'){if((c.timer-=dt)<=0){c.st='inv';c.path=[];c.timer=0}return}
  if(c.st==='sleep')return;
  const po=G.crew.possum.act;
- if(po&&Math.hypot(c.x-po.x,c.y-po.y)<.75){c.st='stun';c.timer=4.5;c.sus=0;c.path=[];c.say={t:2,s:'Whoa—!'};G.crew.possum.act=null;makeNoise(12,c.x,c.y);toast('The possum tripped the clerk. Go, go, go!');return}
- if(c.st!=='flee'&&inCloud(c.x,c.y)){c.st='flee';c.timer=5;c.sus=0;c.path=bfs(c.x,c.y,c.hx,c.hy);c.say={t:2.5,s:'UGH, that SMELL!'};return}
+ if(po&&Math.hypot(c.x-po.x,c.y-po.y)<.75){c.st='stun';c.timer=meta.owned.drama?6.5:4.5;c.sus=0;c.path=[];c.say={t:2,s:'Whoa—!'};jobDone('trip');G.crew.possum.act=null;makeNoise(12,c.x,c.y);toast('The possum tripped the clerk. Go, go, go!');return}
+ if(c.flourT>0)c.flourT-=dt;
+ {const fc=G.clouds.find(k=>k.flour&&Math.hypot(k.x-c.x,k.y-c.y)<k.r);if(fc&&!(c.flourT>0)){c.st='stun';c.timer=2.5;c.flourT=6;c.sus=0;c.path=[];c.say={t:2,s:'*cough cough*'};jobDone('flour');return}}
+ if(c.st!=='flee'&&G.clouds.some(k=>!k.flour&&Math.hypot(k.x-c.x,k.y-c.y)<k.r)){jobDone('skunk');c.st='flee';c.timer=5;c.sus=0;c.path=bfs(c.x,c.y,c.hx,c.hy);c.say={t:2.5,s:'UGH, that SMELL!'};return}
  const sees=c.st!=='flee'&&seesP(c.x,c.y,c.face,G.lv.vision||5.5,.62,true);
  if(sees){c.lx=p.x;c.ly=p.y;if(c.st!=='chase'){c.sus+=dt/(.75*(meta.owned.stache?2:1));c.face=turn(c.face,Math.atan2(p.y-c.y,p.x-c.x),4*dt);if(c.sus>=1){c.st='chase';c.lost=0;c.repath=0;G.spotted=true;c.say={t:1.6,s:'HEY! A raccoon!'}}}else c.lost=0}
  else if(c.st!=='chase')c.sus=Math.max(0,c.sus-dt*.4);
@@ -597,6 +694,10 @@ function drawTile(x,y){
  rect(x,y,1,1,c==='~'?'#2b4d6c':fl);
  if(c==='~'){line(x+.15,y+.3,x+.55,y+.15,'rgba(190,230,255,.35)',.05);line(x+.4,y+.8,x+.85,y+.6,'rgba(190,230,255,.25)',.05)}
  if(c==='S'){if(G.lv.booth){rr(x+.02,y+.06,.96,.88,.18,'#9c2a36');rr(x+.12,y+.18,.76,.64,.14,'#c23b48');line(x+.5,y+.2,x+.5,y+.8,'#9c2a36',.04)}else{const P=G.lv.prod||SHELF;rr(x+.02,y+.04,.96,.92,.06,'#3d4a6b');rect(x+.02,y+.46,.96,.08,'#2c3654');const h=hash(x,y);for(let i=0;i<3;i++){rr(x+.08+i*.3,y+.1,.24,.32,.03,P[(h>>(i*3))%P.length]);rr(x+.08+i*.3,y+.58,.24,.32,.03,P[(h>>(i*3+9))%P.length])}}}
+ if(c==='E'){rect(x,y,1,1,'#0b0e1c');rr(x+.06,y+.04,.88,.92,.06,'#c0303f');rr(x+.14,y+.12,.5,.7,.04,'#1a2a40');for(let i=0;i<3;i++)for(let j=0;j<2;j++)rect(x+.18+j*.22,y+.17+i*.22,.16,.14,SHELF[(i*2+j+x)%6]);rect(x+.7,y+.2,.16,.3,'#ffd166');rect(x+.7,y+.6,.16,.08,'#111')}
+ if(c==='F'){rr(x+.14,y+.1,.72,.82,.18,'#e9dcc0');rect(x+.14,y+.2,.72,.08,'#c9b48a');txt('FLOUR',x+.5,y+.6,.18,'#8a6a3d')}
+ if(c===','){for(let i=0;i<5;i++)circ(x+.2+((hash(x,y)>>i)&7)/10,y+.2+((hash(x,y)>>(i+3))&7)/10,.12,'rgba(245,240,230,.55)')}
+ if(c==='>'||c==='<'){rect(x,y+.1,1,.8,'#1e232f');const o=((G.t*1.7*(c==='>'?1:-1))%.5+.5)%.5;for(let i=-1;i<3;i++){const cx=x+o+i*.5;if(cx<x||cx>x+1)continue;const sg=c==='>'?1:-1;ctx.beginPath();ctx.moveTo(cx-.08*sg,y+.3);ctx.lineTo(cx+.08*sg,y+.5);ctx.lineTo(cx-.08*sg,y+.7);ctx.strokeStyle='#ffc542';ctx.lineWidth=.05;ctx.stroke()}}
  if(c==='Z'){rect(x+.02,y+.4,.1,.2,'#5a1a1a');rect(x+.88,y+.4,.1,.2,'#5a1a1a');if(laserOn(x,y)){line(x,y+.5,x+1,y+.5,'rgba(255,40,60,.95)',.06);line(x,y+.5,x+1,y+.5,'rgba(255,40,60,.3)',.2)}}
  if(c==='='){rect(x,y+.1,1,.8,'#7a5233');rect(x,y+.1,1,.18,'#a06e45');if(G.T[y][x-1]==='='&&G.T[y][x+1]==='='){rr(x+.25,y+.3,.5,.45,.05,'#1b1f33');rect(x+.32,y+.36,.36,.16,'#3ef0b5')}}
  if(c==='T'){for(const [dx,dy] of [[.3,.3],[.7,.3],[.3,.7],[.7,.7],[.5,.5]]){circ(x+dx,y+dy,.17,'#c9ced9');circ(x+dx,y+dy,.13,'#d94848')}}
@@ -633,6 +734,14 @@ function drawLoot(k,x,y,s=1){
  if(k==='U'){ctx.beginPath();ctx.arc(-.07,-.02,.1,0,TAU);ctx.arc(.07,-.02,.1,0,TAU);ctx.strokeStyle='#a0581c';ctx.lineWidth=.07;ctx.stroke();for(let i=0;i<4;i++)circ(-.1+i*.07,-.1,.015,'#fff')}
  if(k==='Y'){rr(-.11,-.16,.22,.34,.05,'rgba(240,220,200,.9)');for(let i=0;i<4;i++)circ(-.05+(i%2)*.1,.1-(i>1?.06:0),.035,'#2a1d17');line(.04,-.16,.1,-.32,'#ff4f9a',.04)}
  if(k==='J'){circ(0,0,.25,'#c99a1c');circ(0,0,.2,'#ffd23f');circ(0,0,.1,'#fff1a8');for(let i=0;i<6;i++)circ(Math.cos(i)*.16,Math.sin(i)*.16,.03,'#ff4f9a')}
+ if(k==='q'){rr(-.2,-.02,.4,.2,.06,'#a8642c');for(const dx of [-.1,.05])ell(dx,-.04,.1,.06,'#e0a865',.3)}
+ if(k==='&'){circ(0,0,.25,'#f4ecdf');circ(0,0,.17,'#fff');circ(0,0,.08,'#ffc4e6');for(let i=0;i<8;i++)circ(Math.cos(i*.8)*.21,Math.sin(i*.8)*.21,.025,'#ff9ed2')}
+ if(k==='*'){circ(0,0,.2,'#7ad1ff');circ(0,0,.15,'#fff1f6');circ(-.05,-.03,.06,'#ff9ed2');circ(.05,.04,.06,'#8b5a2b')}
+ if(k==='%'){rr(-.18,-.12,.36,.24,.04,'#ff4f9a');for(let i=0;i<3;i++)rect(-.12+i*.1,-.06,.06,.12,'#fff1a8')}
+ if(k==='+'){rr(-.2,-.15,.4,.3,.03,'#b98a4e');for(let i=0;i<3;i++){ell(0,-.08+i*.08,.15,.035,'#c0503a');ell(0,-.08+i*.08,.17,.02,'rgba(240,200,120,.6)')}}
+ if(k==='!'){ell(0,0,.2,.07,'#e0b060',-.4);ell(0,0,.17,.04,'#c0503a',-.4);line(-.1,.04,.1,-.04,'#ffd23f',.02)}
+ if(k==='@'){circ(0,0,.24,'#d9dde6');for(let i=0;i<10;i++){const a=i*.63;ell(Math.cos(a)*.15,Math.sin(a)*.15,.06,.035,'#ff8a5c',a)}circ(0,0,.07,'#3fa34d')}
+ if(k==='H'){ctx.rotate(.4);rr(-.18,-.07,.36,.14,.03,'#6b3a1e');rect(-.05,-.07,.1,.14,'#ffd166')}
  if(k==='f'){ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,.22,.5,TAU-.1);ctx.closePath();ctx.fillStyle='#ffd23f';ctx.fill();circ(-.08,-.06,.035,'#d9a400');circ(.02,.1,.03,'#d9a400');circ(-.1,.08,.025,'#d9a400')}
  ctx.restore();
 }
@@ -718,11 +827,12 @@ function draw(){
  // neon sign over the doors
  const dx=G.T[ROWS-1].indexOf('D');if(dx>=0){rr(dx+.3,ROWS-.62,2.4,.42,.1,'rgba(255,79,154,.18)');txt('OPEN',dx+1.5,ROWS-.41,.36,'#ff7ab3')}
  for(const c of G.caps)if(!c.got&&shown(c.x,c.y)){circ(c.x,c.y,.14,'#8792ad');circ(c.x,c.y,.11,'#dfe6f5');if(Math.sin(G.t*3+c.x)>.85)txt('✦',c.x+.15,c.y-.15,.3,'#fff')}
+ {const t=G.trinket;if(t&&!t.got&&shown(t.x,t.y)){const pl=.5+Math.sin(G.t*4)*.5;circ(t.x,t.y,.22+pl*.06,`rgba(255,211,77,${.2+pl*.2})`);ctx.save();ctx.translate(t.x,t.y);ctx.rotate(G.t);for(let i=0;i<4;i++){ctx.rotate(TAU/4);ell(.1,0,.12,.035,'#ffd34d')}ctx.restore();circ(t.x,t.y,.07,'#fff6c8')}}
  for(const l of G.loot)if(l.st==='floor'&&shown(l.x,l.y)){glow(l.x,l.y-(l.top?.06:0));drawLoot(l.k,l.x,l.y-(l.top?.06:0))}
  if(!casing){
   drawCart();
   const po=G.crew.possum.act;if(po){drawPossum(po.x,po.y,true);txt('x_x',po.x,po.y-.35,.3,'#f2b8c6')}
-  for(const c of G.clouds){const a=Math.min(1,c.t/2)*.32;for(let i=0;i<7;i++){const an=i*.9+G.t*.3,r=c.r*.55;circ(c.x+Math.cos(an)*r*.6,c.y+Math.sin(an)*r*.6,c.r*.5,`rgba(140,220,90,${a*.5})`)}}
+  for(const c of G.clouds){const a=Math.min(1,c.t/2)*.32;for(let i=0;i<7;i++){const an=i*.9+G.t*.3,r=c.r*.55;circ(c.x+Math.cos(an)*r*.6,c.y+Math.sin(an)*r*.6,c.r*.5,(c.flour?`rgba(245,240,230,${a*1.6})`:`rgba(140,220,90,${a*.5})`))}}
   if(p.hidden){const h=cell(p.x|0,p.y|0)==='M';circ(p.x-.08,p.y+(h?-.35:-.05),.05,'#fff');circ(p.x+.08,p.y+(h?-.35:-.05),.05,'#fff');circ(p.x-.07,p.y+(h?-.35:-.05),.025,'#111');circ(p.x+.09,p.y+(h?-.35:-.05),.025,'#111')}
   else{if(p.swing)line(p.swing.fx,p.swing.fy,p.x,p.y,'#9aa3c2',.05);const up=p.high||p.swing;if(up)ell(p.x+.12,p.y+.14,.28,.2,'rgba(0,0,0,.35)');if(p.rush>0)circ(p.x,p.y,.42,'rgba(62,240,181,.18)');drawRaccoon(p.x,p.y,p.a,G.t,up?1.18:1);if(p.carry)drawLoot(p.carry.k,p.x,p.y-.42,.75)}
  }
@@ -736,6 +846,7 @@ function draw(){
  }
  for(const c of G.cams)if(shown(c.x,c.y)){ctx.save();ctx.translate(c.cx,c.cy);ctx.rotate(c.a);rr(-.12,-.1,.3,.2,.04,'#d6dbea');circ(.18,0,.07,'#1a1d2c');ctx.restore();circ(c.cx,c.cy,.04,Math.sin(G.t*6)>0?'#ff3b3b':'#5a1a1a')}
  for(const v of G.vacs)if(!casing||G.revealed[v.y|0][v.x|0])drawVac(v);
+ if(!casing)for(const d of G.drones){circ(d.x,d.y,1.5,d.alert>0?`rgba(255,90,78,${.12+d.alert*.25})`:'rgba(255,250,210,.12)');ctx.beginPath();ctx.arc(d.x,d.y,1.5,0,TAU);ctx.strokeStyle='rgba(255,250,210,.35)';ctx.lineWidth=.03;ctx.stroke();ell(d.x+.15,d.y+.2,.3,.15,'rgba(0,0,0,.3)');line(d.x-.22,d.y-.22,d.x+.22,d.y+.22,'#9aa3c2',.05);line(d.x-.22,d.y+.22,d.x+.22,d.y-.22,'#9aa3c2',.05);for(const [ax,ay] of [[-1,-1],[1,-1],[-1,1],[1,1]]){ctx.beginPath();ctx.ellipse(d.x+ax*.22,d.y+ay*.22,.11,.03,G.t*25*ax,0,TAU);ctx.fillStyle='rgba(220,230,255,.7)';ctx.fill()}circ(d.x,d.y,.1,'#2f3446');circ(d.x,d.y,.04,Math.sin(G.t*8)>0?'#ff3b3b':'#3fa8ff')}
  for(const c of G.clerks)if(!casing||G.revealed[c.y|0][c.x|0])drawClerk(c);
  for(const f of G.fans)if(shown(f.x,f.y)){const r=G.t*6;for(let i=0;i<4;i++)ell(f.x+Math.cos(r+i*TAU/4)*.3,f.y+Math.sin(r+i*TAU/4)*.3,.3,.07,'rgba(207,213,227,.55)',r+i*TAU/4);circ(f.x,f.y,.09,'#e8edf7')}
  if(!casing){
@@ -767,6 +878,9 @@ function caseUI(){
  const k=findCell('K');if(k&&R(k[0],k[1]))sp.push('a key on a high hook');
  [...new Set(G.clerks.filter(c=>R(c.x,c.y)).map(c=>c.type==='dog'?'a guard dog':c.st==='sleep'?'a dozing clerk':'a clerk on patrol'))].forEach(x=>sp.push(x));
  if(G.vacs.some(v=>R(v.x,v.y)))sp.push('a robot vacuum');
+ if(G.drones.length)sp.push(G.drones.length>1?G.drones.length+' security drones':'a security drone');
+ if(G.trinket&&R(G.trinket.x,G.trinket.y))sp.push('something glinting');
+ $('#jobline').textContent='Bonus jobs: '+G.jobs.map(j=>JOBTXT[j.id].toLowerCase()).join('; ')+'.';
  $('#spotted').textContent=sp.length?'Spotted: '+sp.join(', ')+'.':'Nothing spotted yet.';
 }
 cv.addEventListener('pointerdown',e=>{if(mode!=='case')return;const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/ts,y=(e.clientY-r.top)/ts;let best=null,bd=1.3;for(const pt of G.peekPts){const d=Math.hypot(pt.x+.5-x,pt.y+.5-y);if(d<bd){bd=d;best=pt}}if(best)peek(best)});
@@ -780,14 +894,20 @@ $('#go').onclick=()=>{setMode('heist');toast(`Load $${G.lv.quota} of snacks into
 function endRun(win,title,why){
  const v=win?haul():0,q=G.lv.quota;
  const stars=win?(v>=q*1.6?(G.spotted?2:3):1):0;
- const earned=G.capsGot*2+(win?Math.floor(v/10):0);
+ if(win&&G.maxNoise<55)jobDone('quiet');
+ meta.jobs=meta.jobs||{};meta.trophies=meta.trophies||{};
+ const claimed=meta.jobs[G.lv.id]||[],fresh=win?G.jobs.filter(j=>j.done&&!claimed.includes(j.id)).map(j=>j.id):[];
+ if(win)meta.jobs[G.lv.id]=[...claimed,...fresh];
+ const newTrophy=G.trinket&&G.trinket.got&&!meta.trophies[G.lv.id];if(newTrophy)meta.trophies[G.lv.id]=G.trinket.name;
+ const earned=G.capsGot*2+(win?Math.floor(v/10):0)+fresh.length*5+(newTrophy?10:0);
  meta.shinies+=earned;if(win)meta.stars[G.lv.id]=Math.max(meta.stars[G.lv.id]||0,stars);save();
  setMode('result');
  const st=[1,2,3].map(i=>`<span class="${i<=stars?'':'off'}">★</span>`).join('');
  overlay.innerHTML=`<div class="result"><div class="card"><h1>${win?'Clean getaway!':title}</h1>
  ${win?`<div class="stars">${st}</div>`:''}
  <p>${win?`The crew rolled out with <b class="amber">$${v}</b> of snacks (needed $${q}). ${stars<2?`Haul $${Math.ceil(q*1.6)} for a second star.`:stars<3?'Stay completely unseen for the third star.':'Not a single human saw you.'}`:why}</p>
- <p><i class="cap"></i> <b>+${earned} shinies</b> <span class="dim">(${G.capsGot} bottle caps${win?' and a cut of the haul':''})</span></p>
+ <ul class="chk">${G.jobs.map(j=>{const was=claimed.includes(j.id);return `<li class="${j.done||was?'ok':'no'}">${j.done||was?'✓':'○'} ${JOBTXT[j.id]}${fresh.includes(j.id)?' <b>+5</b>':was?' <span class="dim">(claimed before)</span>':j.done&&!win?' <span class="dim">(only pays on a getaway)</span>':''}</li>`}).join('')}${G.trinket?`<li class="${G.trinket.got||meta.trophies[G.lv.id]?'ok':'no'}">${G.trinket.got||meta.trophies[G.lv.id]?'✓':'○'} ${G.trinket.got||meta.trophies[G.lv.id]?G.trinket.name:'A lost trinket is hidden somewhere'}${newTrophy?' <b>+10</b>':''}</li>`:''}</ul>
+ <p><i class="cap"></i> <b>+${earned} shinies</b> <span class="dim">(${G.capsGot} bottle caps${win?', a cut of the haul':''}${fresh.length?', bonus jobs':''}${newTrophy?', a trinket':''})</span></p>
  <div class="row"><button class="go" id="r-hub">Back to the hideout</button><button class="go alt" id="r-again">Run it again</button></div></div></div>`;
  $('#r-hub').onclick=hub;const lv=G.lv;$('#r-again').onclick=()=>startLevel(lv);
 }
@@ -818,13 +938,15 @@ function baseSVG(){
 function hub(){
  setMode('hub');const n=notoriety();
  const lvls=LEVELS.map((l,i)=>{const open=n>=l.unlock,s=meta.stars[l.id]||0;
-  return `<button class="item" data-lv="${i}" ${open?'':'disabled'}><b>${l.name}</b><span class="price amber">${open?'★'.repeat(s)+'<span class="dim">'+'★'.repeat(3-s)+'</span>':'Needs '+l.unlock+'★'}</span><small>${l.blurb} Quota $${l.quota}.</small></button>`}).join('');
+  return `<button class="item" data-lv="${i}" ${open?'':'disabled'}><b>${l.name}</b><span class="price amber">${open?'★'.repeat(s)+'<span class="dim">'+'★'.repeat(3-s)+'</span>':'Needs '+l.unlock+'★'}</span><small>${l.blurb} Quota $${l.quota}.${open?` Bonus jobs ${((meta.jobs||{})[l.id]||[]).length}/3${(meta.trophies||{})[l.id]?', trinket found':''}.`:''}</small></button>`}).join('');
+ const tro=meta.trophies||{},tn=Object.keys(tro).length;
  const shop=SHOP.map(s=>{const own=meta.owned[s.id],can=meta.shinies>=s.cost;
   return `<button class="item ${own?'own':''}" data-buy="${s.id}" ${own||!can?'disabled':''}><b>${s.name}</b><span class="price">${own?'Owned':`<i class="cap"></i>${s.cost}`}</span><small>${s.desc}</small></button>`}).join('');
  overlay.innerHTML=`<div class="hub"><div class="hubtop"><h1>The Alley Hideout</h1><div class="purse"><span><i class="cap"></i> ${meta.shinies} shinies</span><span class="amber">★ ${n} notoriety</span></div></div>
  <div class="hubgrid"><div class="list"><figure class="base">${baseSVG()}<figcaption>Spend shinies from bottle caps and your cut of each haul. Disguises show up on the boss.</figcaption></figure>
+ <h2>Trophy shelf <span class="dim" style="font:800 15px Nunito">${tn}/${LEVELS.length}</span></h2><p class="tier" style="margin:0">${tn?Object.values(tro).join(', ')+'.':'Each location hides one lost trinket. Find them for the shelf.'}</p>
  <h2>Spend shinies</h2>${shop}</div>
- <div class="list"><h2>Pick the next job</h2>${lvls}<p class="tier">Notoriety comes from stars: one for making quota, two for 1.6× quota, three for doing it without ever being spotted.</p></div></div></div>`;
+ <div class="list"><h2>Pick the next job</h2>${lvls}<p class="tier">Notoriety comes from stars: one for making quota, two for 1.6× quota, three for doing it without ever being spotted. Every job also has three bonus jobs worth 5 shinies each, paid the first time you finish one and get away.</p></div></div></div>`;
  overlay.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>startLevel(LEVELS[+b.dataset.lv]));
  overlay.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const s=SHOP.find(x=>x.id===b.dataset.buy);if(meta.shinies>=s.cost&&!meta.owned[s.id]){meta.shinies-=s.cost;meta.owned[s.id]=true;save();hub()}});
  load(LEVELS[0]);pose();
@@ -855,11 +977,12 @@ function hudUpdate(){
  const n=$('#noise');n.style.width=G.noise+'%';n.style.background=G.noise>=55?'var(--red)':G.noise>=30?'var(--amber)':'var(--mint)';
  $('#haul').textContent=`$${haul()} / $${G.lv.quota}`;
  const s=Math.max(0,Math.ceil(G.time));$('#time').textContent=`Dawn ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;$('#time').style.color=s<30?'var(--red)':'';
- $('#caps').textContent=G.capsGot*2;
+ $('#caps').textContent=G.capsGot*2+(G.trinket&&G.trinket.got?10:0);
+ {const j=$('#jobs');j.textContent=`Jobs ${G.jobs.filter(x=>x.done).length}/${G.jobs.length}`;j.title=G.jobs.map(x=>(x.done?'✓ ':'· ')+JOBTXT[x.id]).join('\n')}
  if(mode!=='heist')return;
  $('#elabel').textContent=ctxAction().label;$('#flabel').textContent=G.p.push?'Let go':'Push cart';
  const C=G.crew,setCd=(n,max)=>document.querySelector(`[data-act="${n}"]`).style.setProperty('--cd',C[n].cd/max);
- setCd('possum',18);setCd('crow',14);setCd('skunk',24);
+ setCd('possum',18);setCd('crow',meta.owned.wings?7:14);setCd('skunk',24);
  $('#dpossum').textContent=C.possum.act?`Playing dead ${Math.ceil(C.possum.act.t)}s`:C.possum.cd>0?`Ready in ${Math.ceil(C.possum.cd)}s`:'Play dead to trip a clerk';
  $('#dcrow').textContent=C.crow.task?'On the wing…':C.crow.cd>0?`Ready in ${Math.ceil(C.crow.cd)}s`:(findCell('K')&&!G.hasKey?'Fetch the high key':'Snatch a light snack');
  $('#dskunk').textContent=C.skunk.cd>0?`Ready in ${Math.ceil(C.skunk.cd)}s`:'Clear the aisle';
