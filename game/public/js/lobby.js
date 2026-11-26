@@ -55,7 +55,7 @@ export class Lobby {
       this.buildCards();
     }).catch(() => {});
     this.active = true;
-    if (!window.EMBERFALL_OFFLINE) this.loadParties();
+    if (!window.EMBERFALL_OFFLINE) { this.loadParties(); this.loadServers(); }
   }
   loadParties() {
     fetch('/api/parties').then((r) => r.json()).then((list) => {
@@ -64,6 +64,15 @@ export class Lobby {
       el.innerHTML = list.length ? '<label>Public parties</label>' + list.map((p) => `<div class="pb-row"><span><b>${p.code}</b> · Depth ${p.depth} · ${p.players.map((x) => `${x.cls[0].toUpperCase()}${x.level}`).join(' ')}</span><button class="btn" data-c="${p.code}">Join</button></div>`).join('') : '';
       el.querySelectorAll('button').forEach((b) => (b.onclick = () => { $('roomInput').value = b.dataset.c; $('playBtn').click(); }));
       setTimeout(() => this.active && this.loadParties(), 5000);
+    }).catch(() => {});
+  }
+  // region browser: other Emberfall servers known to the directory service (if this server uses one)
+  loadServers() {
+    fetch('/api/servers').then((r) => r.json()).then((j) => {
+      if (!j.directory || !j.servers.length) return;
+      const el = $('serverBrowser'), here = location.origin;
+      el.innerHTML = '<label>Servers</label>' + j.servers.map((s) => `<div class="pb-row"><span><b>${s.name.replace(/[<>&]/g, '')}</b> · ${s.region.replace(/[<>&]/g, '')} · ${s.players} online <span class="muted" data-ping="${s.url}"></span></span>${s.url === here ? '<span class="muted">you are here</span>' : `<a class="btn" href="${encodeURI(s.url)}">Play</a>`}</div>`).join('');
+      el.querySelectorAll('[data-ping]').forEach((sp) => { const t0 = performance.now(); fetch(sp.dataset.ping + '/healthz', { mode: 'no-cors', cache: 'no-store' }).then(() => (sp.textContent = `· ${Math.round(performance.now() - t0)} ms`)).catch(() => (sp.textContent = '· unreachable')); });
     }).catch(() => {});
   }
   buildCards() {

@@ -83,11 +83,23 @@ class UI {
     setTimeout(() => d.remove(), 4200);
     while ($('toasts').children.length > 6) $('toasts').lastChild.remove();
   }
-  chat(from, text, color) {
+  chat(from, text, color, fromTag) {
+    if (fromTag && G.social?.muted?.includes(fromTag)) return; // muted players stay silent
     const d = document.createElement('div');
-    d.innerHTML = from === '★' ? `<span style="color:#ffd98a">${escapeHtml(text)}</span>` : `<b style="color:${color || '#fff'}">${escapeHtml(from)}:</b>${escapeHtml(text)}`;
+    d.innerHTML = from === '★' ? `<span style="color:#ffd98a">${escapeHtml(text)}</span>` : `<b class="cname" style="color:${color || '#fff'}">${escapeHtml(from)}:</b>${escapeHtml(text)}`;
+    if (fromTag && fromTag !== G.social?.tag) d.querySelector('.cname').onclick = (e) => this.chatMenu(from, fromTag, e);
     this.chatLog.appendChild(d);
     while (this.chatLog.children.length > 40) this.chatLog.firstChild.remove();
+  }
+  // click a name in chat: whisper, mute or report
+  chatMenu(name, tag, e) {
+    let m = $('chatMenu'); if (!m) { m = document.createElement('div'); m.id = 'chatMenu'; document.body.appendChild(m); }
+    m.innerHTML = `<b>${escapeHtml(name)}</b><button data-a="w">Whisper</button><button data-a="m">Mute</button><button data-a="r">Report…</button>`;
+    m.style.left = e.clientX + 'px'; m.style.top = e.clientY - 110 + 'px'; m.hidden = false;
+    m.querySelector('[data-a=w]').onclick = () => { m.hidden = true; this.openChat(); this.chatInput.value = `/w ${name} `; };
+    m.querySelector('[data-a=m]').onclick = () => { m.hidden = true; G.net.send({ t: 'chat', text: `/mute ${tag}` }); };
+    m.querySelector('[data-a=r]').onclick = () => { m.hidden = true; this.openChat(); this.chatInput.value = `/report ${name} `; this.toast('Add a short reason and press Enter', '#c8b890'); };
+    setTimeout(() => addEventListener('click', () => (m.hidden = true), { once: true }), 0);
   }
   openChat() { $('chat').classList.add('open'); this.chatInput.classList.remove('hidden'); this.chatInput.focus(); G.input.unlock(); }
   closeChat() { this.chatInput.value = ''; this.chatInput.blur(); this.chatInput.classList.add('hidden'); $('chat').classList.remove('open'); }
@@ -615,6 +627,10 @@ class UI {
     bind('setSens', 'sens', (v) => v.toFixed(2) + '×'); bind('setInvert', 'invertY'); bind('setIntro', 'intro');
     bind('setDynres', 'dynres'); $('setRenderer').onchange = (e) => { s.renderer = e.target.value; saveSettings(s); setTimeout(() => location.reload(), 150); }; bind('setRumble', 'rumble'); bind('setCb', 'cb'); bind('setUiScale', 'uiScale', (v) => Math.round(v * 100) + '%'); bind('setTouch', 'touch');
     $('acctCopy').onclick = () => { try { navigator.clipboard.writeText(getToken()); this.toast('Recovery code copied — keep it safe', '#ffd98a'); } catch (e) { this.toast('Select the code and copy it manually', '#ff9a7a'); } };
+    $('acctEmailBtn').onclick = () => {
+      if (G.net.offline) { this.toast('Email login needs an online server.', '#ff9a7a'); return; }
+      fetch('/api/login-email', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('acctEmail').value, token: getToken() }) }).then((r) => r.json()).then((j) => this.toast(j.error || 'Check your inbox — the link works for 15 minutes.', j.error ? '#ff6a5a' : '#5eea8a')).catch(() => this.toast('Could not reach the server.', '#ff6a5a'));
+    };
     $('acctRestore').onclick = () => { const v = $('acctInput').value.trim().toLowerCase(); if (!/^[a-f0-9]{32}$/.test(v)) { this.toast('That is not a valid recovery code', '#ff6a5a'); return; } setToken(v); location.reload(); };
     $('replayIntro').onclick = () => { this.closePanel('settings'); G.actions.playIntro(); };
     $('resetBinds').onclick = () => { s.bindings = { ...DEFAULT_BINDINGS }; saveSettings(s); G.actions.applySettings(); this.renderSettings(); };

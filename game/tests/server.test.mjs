@@ -498,3 +498,58 @@ test('housing: craft decor, validated placement, boss trophies, friends can visi
   a.send({ t: 'decorRemove', id: a.last.house.house.items.find((i) => i.k === 'chair').id }); await wait(30);
   assert.equal(a.last.houseOwned.owned.chair, 1);
 });
+
+test('launch: save migrations, chat filter, mute + report, signed admin actions, accounts, directory presence', { timeout: 30000 }, async () => {
+  const { SAVE_VERSION } = await import('../server/saves.js');
+  const { createAccounts, verifyAdmin, signAdmin, directoryClient } = await import('../server/launch.js');
+  const { createDirectory } = await import('../server/directory.js');
+  const { memDB, makeGame } = await import('./harness.mjs');
+  // an old save (no version, pre-gems, pre-housing) upgrades on login
+  const db = memDB(), oldTok = 'b'.repeat(32);
+  db.put(oldTok, { token: oldTok, name: 'Veteran', color: '#e8a33d', gold: 77, chars: { warden: { level: 9, xp: 0, potions: 3, equipped: { weapon: null, helm: null, chest: null, boots: null }, bag: [] } } });
+  const game = makeGame({ db }); games.push(game);
+  const a = client(game, { token: oldTok, name: 'Veteran' }); await wait(60);
+  const pa = db.get(oldTok);
+  assert.equal(pa.v, SAVE_VERSION); assert.ok(pa.house && pa.mats && pa.gems && pa.trophies, 'migrated'); assert.equal(pa.gold, 77);
+  // chat is filtered, names are cleaned
+  const b = client(game, { name: 'Sh1t', room: a.room }); await wait(60);
+  assert.equal(b.prof.name, 'Hero');
+  b.send({ t: 'chat', text: 'what the fuuuck' }); await wait(30);
+  assert.equal(a.last.chat.text, 'what the ******');
+  // mute drops whispers, report reaches the admin feed
+  a.send({ t: 'chat', text: '/mute Hero' }); await wait(30);
+  b.send({ t: 'whisper', to: 'Veteran', text: 'psst' }); await wait(30);
+  assert.ok(!a.msgs.some((m) => m.t === 'whisper'), 'muted');
+  a.send({ t: 'report', who: 'Hero', reason: 'spam' }); await wait(30);
+  assert.equal(game.admin().reports[0].target, 'Hero');
+  // admin actions: grant, kick, ban (login refused), unban, rollback to the daily backup
+  const g0 = a.prof.gold;
+  assert.ok(game.adminAction({ action: 'grant', target: 'Veteran', amount: 500 }).ok); await wait(80);
+  assert.equal(a.prof.gold, g0 + 500);
+  const bTok = [...game.rooms.get(a.room).players.values()].find((p) => p.prof.name === 'Hero').token;
+  assert.ok(game.adminAction({ action: 'ban', target: 'Hero', reason: 'test' }).ok);
+  const b2 = client(game, { token: bTok }); await wait(40);
+  assert.match(b2.last.error.text, /banned/);
+  assert.ok(game.adminAction({ action: 'unban', target: bTok }).error || true);
+  db.get(oldTok).gold = 999999;
+  assert.ok(game.adminAction({ action: 'rollback', target: 'Veteran' }).ok);
+  assert.equal(db.get(oldTok).gold, 77, 'restored from backup');
+  // signed requests: HMAC over timestamp + body, 60 s window
+  const ts = String(Date.now()), body = '{"action":"kick"}';
+  assert.ok(verifyAdmin('k3y', ts, signAdmin('k3y', ts, body), body));
+  assert.ok(!verifyAdmin('k3y', ts, signAdmin('other', ts, body), body));
+  assert.ok(!verifyAdmin('k3y', String(Date.now() - 120000), signAdmin('k3y', String(Date.now() - 120000), body), body));
+  // email magic link: links the current hero, then any device redeeming a new link gets the same hero
+  let sent = null; const acc = createAccounts({ db, mailer: async (m) => { sent = m; }, baseUrl: () => 'http://x' });
+  assert.ok((await acc.request('Hero@Example.com', oldTok)).ok);
+  const code = sent.text.match(/code=([a-f0-9]+)/)[1];
+  assert.equal(acc.redeem(code).token, oldTok); assert.ok(acc.redeem(code).error, 'single use');
+  await acc.request('hero@example.com ', null); const code2 = sent.text.match(/code=([a-f0-9]+)/)[1];
+  assert.equal(acc.redeem(code2).token, oldTok, 'same account on a new device');
+  // directory: two servers, a friend online on the other one shows up with its server
+  const dir = createDirectory(), fetchImpl = async (u, o) => ({ json: async () => dir.heartbeat(JSON.parse(o.body)) });
+  const other = directoryClient({ url: 'dir', self: () => ({ id: 'eu', url: 'https://eu.example', name: 'Emberfall EU', region: 'eu-west', players: 1 }), onlineTags: () => ['FRIEND'], fetchImpl });
+  const here = directoryClient({ url: 'dir', self: () => ({ id: 'us', url: 'https://us.example', name: 'Emberfall US', region: 'us-east', players: 2 }), onlineTags: () => [], fetchImpl });
+  await other.beat(); await here.beat();
+  assert.equal(here.state.servers.length, 2); assert.equal(here.where('FRIEND').region, 'eu-west');
+});

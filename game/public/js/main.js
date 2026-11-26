@@ -82,6 +82,10 @@ import { CLASSES } from '../shared/classes.js';
 import { SHRINES, LEVER_NAMES } from '../shared/dungeon.js';
 import { RIFT_MODS, RIFT_TIME } from '../shared/rifts.js';
 
+// ---------- client error reporting (rate-limited, online only) ----------
+{ let sent = 0; const report = (msg, src, line) => { if (window.EMBERFALL_OFFLINE || ++sent > 8) return; try { fetch('/api/client-error', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ msg: String(msg).slice(0, 300), src: String(src || '').slice(0, 160), line, ua: navigator.userAgent.slice(0, 120) }), keepalive: true }); } catch (e) { /* ignore */ } };
+  addEventListener('error', (e) => report(e.message, e.filename, e.lineno)); addEventListener('unhandledrejection', (e) => report('Unhandled: ' + (e.reason?.message || e.reason), e.reason?.stack?.split('\n')[1], 0)); }
+
 // ---------- renderer ----------
 const settings = loadSettings();
 const canvas = document.getElementById('c');
@@ -655,7 +659,7 @@ net.on('tradeInvite', (m) => { ui.tradeInvite(m.from, m.name); sfx.pop(); });
 net.on('tradeState', (m) => ui.tradeState(m));
 net.on('tradeClosed', (m) => { ui.tradeClosed(m.text); if (/complete/i.test(m.text)) sfx.buy(); });
 net.on('plevel', (m) => { const r = G.remotes.get(m.id); if (r && m.id !== G.myId) fx.levelUp(r.pos.clone()); });
-net.on('chat', (m) => ui.chat(m.from, m.text, m.color));
+net.on('chat', (m) => ui.chat(m.from, m.text, m.color, m.fromTag));
 net.on('house', (m) => { if (G.zone === house) { house.setHouse(m.house); drawDecorDock(); } });
 net.on('houseOwned', (m) => { G.houseOwned = m; drawDecorDock(); });
 // ---- endgame ----

@@ -5,7 +5,8 @@ import { season } from '../public/shared/rifts.js';
 
 const CODE_A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-export function createSocial({ db, online, send, P }) {
+import { filterText } from './saves.js';
+export function createSocial({ db, online, send, P, where = () => null }) {
   const tagIndex = new Map();
   const index = () => { if (tagIndex.size) return; for (const [tok, pr] of Object.entries(db.data.profiles || {})) if (pr.tag) tagIndex.set(pr.tag, tok); };
   const guilds = () => (db.data.guilds ||= {});
@@ -29,13 +30,13 @@ export function createSocial({ db, online, send, P }) {
 
   function view(p) {
     const pr = ensure(p.prof), G = pr.guild ? guilds()[pr.guild] : null;
-    const friend = (tag) => { const f = byTag(tag), o = onlineByTag(tag); return { tag, name: f?.name || '?', online: !!o, room: o?.roomCode || null, zone: o?.zone || null, cls: o?.cls || null, level: o?.char.level || null }; };
+    const friend = (tag) => { const f = byTag(tag), o = onlineByTag(tag), r = !o && where(tag); return { tag, name: f?.name || '?', online: !!o || !!r, room: o?.roomCode || null, zone: o?.zone || null, cls: o?.cls || null, level: o?.char.level || null, server: r ? `${r.server} (${r.region})` : null, url: r?.url || null }; };
     return {
       t: 'social', tag: pr.tag, friends: pr.friends.map(friend), requests: pr.friendReq.map((tag) => ({ tag, name: byTag(tag)?.name || '?' })),
       guild: G && { id: G.id, name: G.name, tag: G.tag, leader: G.leader, members: G.members.map(friend), stash: G.stash },
       guildInvites: pr.guildInv.map((id) => guilds()[id]).filter(Boolean).map((g) => ({ id: g.id, name: g.name, tag: g.tag })),
       bounties: allBounties().map((b) => ({ ...b, prog: Math.min(b.n, pr.bounty.prog[b.id] || 0), claimed: pr.bounty.done.includes(b.id) })),
-      season: pr.season, cosmetics: pr.cosmetics, cos: pr.cos,
+      season: pr.season, cosmetics: pr.cosmetics, cos: pr.cos, muted: pr.muted || [],
     };
   }
   const push = (p) => p && send(p.ws, view(p));
@@ -91,9 +92,10 @@ export function createSocial({ db, online, send, P }) {
         db.touch(); push(p); pushTag(tag); return true;
       }
       case 'whisper': {
-        const text = String(m.text || '').slice(0, 200).trim(); if (!text) return true;
+        const text = filterText(String(m.text || '').slice(0, 200).trim()); if (!text) return true;
         const to = onlineByTag(String(m.to || '').toUpperCase()) || onlineByName(m.to);
         if (!to || to === p) return `${m.to} is not online.`;
+        if ((to.prof.muted || []).includes(pr.tag)) return true; // silently dropped: they muted you
         send(to.ws, { t: 'whisper', from: pr.name, fromTag: pr.tag, text });
         send(p.ws, { t: 'whisper', to: to.prof.name, toTag: to.prof.tag, text, self: true });
         return true;
@@ -175,7 +177,7 @@ export function createSocial({ db, online, send, P }) {
 
   function guildChat(p, text) {
     const G = guilds()[p.prof.guild]; if (!G) return 'You are not in a guild.';
-    for (const t of G.members) { const o = onlineByTag(t); if (o) send(o.ws, { t: 'chat', from: `<${G.tag}> ${p.prof.name}`, color: '#7affb0', text: String(text).slice(0, 160) }); }
+    for (const t of G.members) { const o = onlineByTag(t); if (o) send(o.ws, { t: 'chat', from: `<${G.tag}> ${p.prof.name}`, color: '#7affb0', text: filterText(String(text).slice(0, 160)), fromTag: p.prof.tag }); }
     return true;
   }
   const notifyFriends = (p) => { for (const t of p.prof.friends || []) pushTag(t); };

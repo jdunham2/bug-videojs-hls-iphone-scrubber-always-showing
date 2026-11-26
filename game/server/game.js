@@ -11,6 +11,7 @@ import { REGIONS, QUESTS, CAPTAIN, questDone, ACT1_END, ACT2_END, COMPANIONS } f
 const companionOf = (p) => { const qi = p.char.quest?.i || 0; if (p.companion === false) return null; if (p.companion && COMPANIONS[p.companion] && qi >= COMPANIONS[p.companion].unlock) return p.companion; return qi >= COMPANIONS.corvin.unlock ? 'corvin' : qi >= COMPANIONS.ilsa.unlock ? 'ilsa' : null; };
 import { FISH, rollFish, nearLake, MIN_REEL, hourAt, isNight } from '../public/shared/life.js';
 import { createSocial } from './social.js';
+import { migrate, filterText, cleanName } from './saves.js';
 import { DIFFICULTY, trialOf, TRIAL_LIMIT, NIGHTMARE_LEGS, NIGHTMARE_DROP } from '../public/shared/endgame.js';
 import { weekKey } from '../public/shared/social.js';
 import { LEGENDARIES } from '../public/shared/items.js';
@@ -31,7 +32,7 @@ function damageCap(p) {
   return p.cap;
 }
 
-export function createGame({ db, makeToken, dev = false, crowd = null, moveCheck = !dev }) {
+export function createGame({ db, makeToken, dev = false, crowd = null, moveCheck = !dev, where = () => null }) {
 const rooms = new Map();
 const online = new Map(); // token -> player
 const DT = 0.05;
@@ -39,7 +40,8 @@ const MOVE_SPEED = 26, BURST_MAX = 18, BURST_REFILL = 8; // m/s, m, m/s
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const r2 = (v) => Math.round(v * 100) / 100;
 const CHESTS = new Map(townLayout().chests.map((c) => [c.id, c]));
-const social = createSocial({ db, online, send, P });
+const social = createSocial({ db, online, send, P, where });
+const reports = [], clientErrors = [];
 const acLog = []; const started = Date.now();
 function logCheat(e) { acLog.push({ at: Date.now(), ...e }); if (acLog.length > 200) acLog.shift(); }
 
@@ -245,6 +247,42 @@ class Room {
 let nextPlayer = 1;
 const near = (p, pos, r) => dist(p, pos) < r;
 
+// ---- moderation + live-ops actions ----
+function handleReport(p, who, reason) {
+  const q = [...online.values()].find((o) => o.prof.name.toLowerCase() === String(who).toLowerCase() || o.prof.tag === String(who).toUpperCase());
+  if (!q || q === p) { send(p.ws, { t: 'notice', text: `${who} is not online.`, color: '#ff9a7a' }); return; }
+  if ((p.reportN = (p.reportN || 0) + 1) > 10) return;
+  reports.push({ at: Date.now(), by: p.prof.name, target: q.prof.name, tag: q.prof.tag, reason: filterText(reason).slice(0, 200), room: q.roomCode });
+  if (reports.length > 200) reports.shift();
+  send(p.ws, { t: 'notice', text: `Thanks — ${q.prof.name} was reported to the moderators.`, color: '#5eea8a' });
+}
+/** admin actions (dashboard): kick, ban, unban, grant gold / a legendary, roll back to the newest daily backup */
+function adminAction(a) {
+  const find = () => { const t = String(a.target || '').trim(); return [...online.values()].find((o) => o.prof.name.toLowerCase() === t.toLowerCase() || o.prof.tag === t.toUpperCase()); };
+  const findToken = () => { const o = find(); if (o) return o.token; const t = String(a.target || '').toUpperCase(); return Object.entries(db.data.profiles || {}).find(([, pr]) => pr.tag === t || pr.name?.toLowerCase() === String(a.target).toLowerCase())?.[0]; };
+  const o = find(), tok = findToken();
+  switch (a.action) {
+    case 'kick': if (!o) return { error: 'Not online.' }; send(o.ws, { t: 'error', text: 'You were disconnected by a moderator.' }); o.ws.close(); return { ok: `Kicked ${o.prof.name}.` };
+    case 'ban': if (!tok) return { error: 'Unknown hero.' }; (db.data.bans ||= {})[tok] = { reason: String(a.reason || '').slice(0, 120), at: Date.now() }; db.touch(); if (o) { send(o.ws, { t: 'error', text: 'You were banned by a moderator.' }); o.ws.close(); } return { ok: 'Banned.' };
+    case 'unban': if (!tok || !db.data.bans?.[tok]) return { error: 'Not banned.' }; delete db.data.bans[tok]; db.touch(); return { ok: 'Unbanned.' };
+    case 'grant': {
+      if (!o) return { error: 'Not online.' };
+      if (a.what === 'legendary') o.char.bag.push(P.rollItem(o, Math.max(o.char.level, 1), { rarity: 4 })); else o.prof.gold += Math.max(0, Math.min(1e6, a.amount | 0));
+      o.dirty = true; send(o.ws, { t: 'notice', text: 'A moderator sent you a gift!', color: '#ffd34d' }); return { ok: 'Granted.' };
+    }
+    case 'rollback': {
+      if (!tok) return { error: 'Unknown hero.' }; const B = (db.data.backups || {})[tok]; if (!B?.length) return { error: 'No backup.' };
+      if (o) { send(o.ws, { t: 'error', text: 'Your hero was restored from a backup — please reconnect.' }); o.ws.close(); }
+      db.put(tok, JSON.parse(B.at(-1).prof)); db.touch(); return { ok: `Restored the backup from ${new Date(B.at(-1).at).toISOString().slice(0, 16)}.` };
+    }
+  }
+  return { error: 'Unknown action.' };
+}
+function clientError(e, ip) {
+  clientErrors.push({ at: Date.now(), msg: String(e.msg || '').slice(0, 300), src: String(e.src || '').slice(0, 160), line: e.line | 0, ua: String(e.ua || '').slice(0, 120), ip: String(ip || '').slice(0, 40) });
+  if (clientErrors.length > 100) clientErrors.shift();
+}
+
 // ---- housing helpers ----
 function houseOf(prof) { return (prof.house ||= { items: [], owned: {}, next: 1 }); }
 function houseView(tag, viewer) {
@@ -264,8 +302,12 @@ function attach(ws) {
       let token = TOKEN_RE.test(m.token || '') ? m.token : makeToken();
       let prof = db.get(token);
       if (!prof) { prof = P.newProfile(token); db.put(token, prof); }
+      const ban = (db.data.bans || {})[token];
+      if (ban) { send(ws, { t: 'error', text: `This hero is banned${ban.reason ? `: ${ban.reason}` : ''}.` }); ws.close(); return; }
+      migrate(prof); // bring older saves up to the current version
+      { const B = ((db.data.backups ||= {})[token] ||= []), day = Math.floor(Date.now() / 86400000); if (!B.length || B.at(-1).day !== day) { B.push({ day, at: Date.now(), prof: JSON.stringify(prof) }); if (B.length > 3) B.shift(); } }
       if (online.has(token)) { const old = online.get(token); send(old.ws, { t: 'error', text: 'Signed in from another tab.' }); old.ws.close(); }
-      prof.name = String(m.name || prof.name || 'Hero').slice(0, 16);
+      prof.name = cleanName(m.name || prof.name || 'Hero');
       if (/^#[0-9a-f]{6}$/i.test(m.color || '')) prof.color = m.color;
       const cls = CLASSES[m.cls] ? m.cls : 'warden';
       const char = P.getChar(prof, cls);
@@ -459,7 +501,10 @@ function attach(ws) {
           if (cmd === 'wave') { const d = room.defense.state; if (d.phase === 'day') room.defense.startNight(); d.wave = Math.max(0, +n - 1); d.phase = 'intermission'; d.timer = 2; }
           break;
         }
-        room.broadcast({ t: 'chat', from: p.prof.name, color: p.prof.color, text: String(m.text || '').slice(0, 160) }); break;
+        if (/^\/(mute|unmute) \S+/.test(m.text || '')) { const [cmd, who] = m.text.slice(1).split(' '), q = [...online.values()].find((o) => o.prof.name.toLowerCase() === who.toLowerCase() || o.prof.tag === who.toUpperCase()); const tag = q?.prof.tag || who.toUpperCase(); p.prof.muted ||= []; p.prof.muted = cmd === 'mute' ? [...new Set([...p.prof.muted, tag])] : p.prof.muted.filter((t) => t !== tag); p.dirty = true; social.push(p); notice(cmd === 'mute' ? `Muted ${who}.` : `Unmuted ${who}.`, '#c8b890'); break; }
+        if (/^\/report \S+/.test(m.text || '')) { const [, who, ...why] = m.text.split(' '); handleReport(p, who, why.join(' ')); break; }
+        room.broadcast({ t: 'chat', from: p.prof.name, fromTag: p.prof.tag, color: p.prof.color, text: filterText(String(m.text || '').slice(0, 160)) }); break;
+      case 'report': handleReport(p, String(m.who || ''), String(m.reason || '')); break;
       // ---- inventory & economy (server authoritative) ----
       case 'pickup': {
         const l = p.loot.get(m.id);
@@ -564,8 +609,9 @@ function attach(ws) {
     rooms: [...rooms.values()].map((r) => ({ code: r.code, depth: r.level, public: !!r.public, hour: Math.round(hourAt(r.clock) * 10) / 10, night: r.defense.state.phase !== 'day' ? { phase: r.defense.state.phase, wave: r.defense.state.wave } : null,
       zones: [...r.zones.values()].filter((z) => z.players().length || z.type === 'town').map((z) => ({ key: z.key, type: z.type, enemies: z.enemies.size, players: z.players().length, weather: z.weather })),
       players: [...r.players.values()].map((p) => ({ name: p.prof.name, cls: p.cls, level: p.char.level, zone: p.zone, hp: p.hp, maxHp: p.maxHp, dead: p.dead, rejected: p.rejected || 0, guild: social.guildOf(p.prof)?.tag || null })) })),
-    anticheat: acLog.slice(-60).reverse(),
+    anticheat: acLog.slice(-60).reverse(), reports: reports.slice(-40).reverse(), clientErrors: clientErrors.slice(-30).reverse(), bans: Object.keys(db.data.bans || {}).length,
     guilds: Object.keys(db.data.guilds || {}).length, profiles: Object.keys(db.data.profiles || {}).length,
   });
-  return { attach, rooms, parties, admin, stop: () => clearInterval(timer) };
+  const onlineTags = () => [...online.values()].map((o) => o.prof.tag).filter(Boolean);
+  return { attach, rooms, parties, admin, adminAction, clientError, onlineTags, stop: () => clearInterval(timer) };
 }

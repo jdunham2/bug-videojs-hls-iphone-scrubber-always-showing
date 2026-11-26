@@ -20,6 +20,8 @@ function render(s) {
   const ac = s.anticheat.slice(0, 14);
   $('ac').innerHTML = ac.map((a) => `<tr><td>${new Date(a.at).toLocaleTimeString()}</td><td>${esc(a.room)}</td><td><b>${esc(a.name)}</b></td><td class="hide-s">${CLS[a.cls] || esc(a.cls)} ${a.level}</td><td class="x">${a.dmg.toLocaleString()}</td><td>${a.cap.toLocaleString()}</td><td class="hide-s">${a.total}</td></tr>`).join('');
   $('acEmpty').hidden = ac.length > 0;
+  $('reports').innerHTML = (s.reports || []).slice(0, 8).map((r) => `<div class="rep"><b>${esc(r.target)}</b> by ${esc(r.by)} · ${new Date(r.at).toLocaleTimeString()}<br>${esc(r.reason || '(no reason)')}</div>`).join('') || 'None.';
+  $('cerrs').innerHTML = (s.clientErrors || []).slice(0, 8).map((e) => `<div class="rep">${new Date(e.at).toLocaleTimeString()} · ${esc(e.msg)}<br><span>${esc(e.src)}:${e.line}</span></div>`).join('') || 'None.';
   draw();
 }
 const chart = $('chart'), svg = chart.querySelector('svg');
@@ -111,10 +113,26 @@ async function startDemo() {
     if (live.length > 6 && Math.random() < 0.5) { const b = live[Math.floor(Math.random() * live.length)]; b.leave(); used.delete(b.name); }
     else if (live.length < 11) spawn(['EMBR', 'ASHE', 'GALE', 'FROS'][Math.floor(Math.random() * 4)]);
   }, 9000);
-  demo = { stop() { clearInterval(tickT); clearInterval(churn); bots.forEach((b) => b.alive && b.leave()); game.stop(); } };
+  demo = { game, stop() { clearInterval(tickT); clearInterval(churn); bots.forEach((b) => b.alive && b.leave()); game.stop(); } };
   const snap = () => { if (mode === 'demo') { render(game.admin()); status('Demo · live simulation'); } };
   snap(); timer = setInterval(snap, 1000);
 }
+
+// ---------- moderation actions: signed HMAC-SHA256(key, ts + '.' + body) in live mode, direct in the demo ----------
+async function sign(key, ts, body) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(`${ts}.${body}`)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+$('actForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const type = $('actType').value, a = { action: type === 'grantLeg' ? 'grant' : type, what: type === 'grantLeg' ? 'legendary' : 'gold', target: $('actTarget').value.trim(), amount: +$('actAmount').value || 0, reason: 'dashboard' };
+  const out = (r) => { $('actResult').textContent = r.ok || r.error || 'Done.'; $('actResult').style.color = r.error ? 'var(--red)' : 'var(--ok)'; };
+  if (mode === 'demo') { if (!demo?.game) return out({ error: 'Simulation not running.' }); return out(demo.game.adminAction(a)); }
+  const key = $('key').value.trim(); if (!key) return out({ error: 'Enter the admin key first.' });
+  const body = JSON.stringify(a), ts = String(Date.now());
+  try { const r = await fetch('/api/admin/action', { method: 'POST', headers: { 'content-type': 'application/json', 'x-admin-ts': ts, 'x-admin-sig': await sign(key, ts, body) }, body }); out(await r.json()); }
+  catch (e) { out({ error: 'Could not reach the server.' }); }
+});
 
 function setMode(m) {
   mode = m; clearInterval(timer); timer = null; hist.length = 0;
