@@ -725,6 +725,12 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 @keyframes gx127out { to { opacity: 0; transform: translateX(-50%) translateY(-14px); } }
 @keyframes gx127c { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 55% { opacity: 1; transform: translate(var(--x), var(--y)) rotate(var(--r)); } 100% { opacity: 0; transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 170px)) rotate(calc(var(--r) * 1.6)); } }
 @media (prefers-reduced-motion: reduce) { #gx127, #gx127 i { animation: none; } #gx127 i { display: none; } }
+/* feel round 129: empty materials fade back, new ones pop */
+.mats div.z { opacity: .32; }
+.mats div.z b { font-size: 12px; }
+.mats div { transition: opacity .3s; }
+.mats div.up b { display: inline-block; animation: gx124pop .45s cubic-bezier(.2,.9,.3,1.4), gx125g 1.2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .mats div.up b { animation: none; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -2669,8 +2675,8 @@ function updateSurfCamera(dt) {
 }
 function updateSurfHUD() {
   $('#sCredits').textContent = G.credits.toLocaleString();
-  const mh = Object.keys(MATS).map(k => `<div><b>${G.mats[k]}</b><span>${MATS[k].name}</span></div>`).join('');
-  const me = $('#sMats'); if (me._h !== mh) { me.innerHTML = mh; me._h = mh; }
+  const mh = Object.keys(MATS).map(k => `<div data-k="${k}"${G.mats[k] ? '' : ' class="z"'}><b>${G.mats[k]}</b><span>${MATS[k].name}</span></div>`).join('');
+  const me = $('#sMats'); if (me._h !== mh) { const prev = me._v || {}; me.innerHTML = mh; me._h = mh; me._v = Object.assign({}, G.mats); if (me._seen) Object.keys(MATS).forEach(k => { if ((G.mats[k] || 0) > (prev[k] || 0)) { const r = me.querySelector('[data-k="' + k + '"]'); if (r) r.classList.add('up'); } }); me._seen = true; }
   $('#bFuel').style.width = (S.fuel / fuelMax() * 100) + '%'; $('#tFuel').textContent = Math.round(S.fuel);
   $('#bScan').style.width = ((1 - S.scanCd / 5) * 100) + '%'; $('#tScan').textContent = S.scanCd > 0 ? S.scanCd.toFixed(1) + 's' : 'Ready';
   const hint = isTouch ? 'Stick to walk. Drag the right side to look. JET to fly, SCAN to find things, GRAB to harvest, BUILD to make a base, SHIP to leave.' : 'WASD walk · Shift run · Space jetpack · Drag mouse to look · C scan · E harvest · B build · F board ship';
