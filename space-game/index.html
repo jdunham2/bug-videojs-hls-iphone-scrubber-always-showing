@@ -741,6 +741,37 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 #gxAbil.ready { border-color: rgba(255,210,90,.7); box-shadow: 0 0 14px rgba(255,210,90,.35); }
 #gxAbil.ready .s { color: #ffd25a; }
 @media (max-width: 700px) { #gxAbil { bottom: 170px; } }
+/* ships part 2: showroom + upgrade pips */
+.gx131pips { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.gx131pips i { width: 10px; height: 10px; border-radius: 3px; background: rgba(255,255,255,.14); }
+.gx131pips i.on { background: #ffd25a; box-shadow: 0 0 6px rgba(255,210,90,.6); }
+.gx131show { border: 1px solid rgba(111,216,255,.35); background: linear-gradient(90deg, rgba(111,216,255,.10), rgba(200,154,255,.08)); }
+#gxShow { position: fixed; inset: 0; z-index: 80; display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); background: radial-gradient(ellipse at 35% 45%, #2a2f5a 0%, #12142a 55%, #07080f 100%); color: #e6ecff; }
+#gxShow[hidden] { display: none; }
+#gxShow .gxs-stage { position: relative; min-height: 0; }
+#gxShow canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#gxShow canvas:active { cursor: grabbing; }
+#gxShow .gxs-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 52px; height: 52px; border-radius: 50%; border: 1px solid rgba(255,255,255,.2); background: rgba(10,14,28,.55); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; }
+#gxShow .gxs-nav:hover { background: rgba(111,216,255,.25); }
+#gxShow .prev { left: 16px; } #gxShow .next { right: 16px; }
+#gxShow .gxs-hint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: rgba(230,236,255,.55); }
+#gxShow .gxs-info { padding: 22px 22px 24px; background: rgba(8,10,22,.72); border-left: 1px solid rgba(255,255,255,.08); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+#gxShow .gxs-top { display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9aa6c8; }
+#gxShow .gxs-close { background: none; border: 1px solid rgba(255,255,255,.2); color: #fff; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; }
+#gxShow .gxs-name { margin: 4px 0 0; font-size: 30px; line-height: 1.1; color: #ffd25a; text-shadow: 0 0 16px rgba(255,190,80,.45); }
+#gxShow.gxs-pop .gxs-name { animation: gx124pop .45s cubic-bezier(.2,.9,.3,1.4); transform-origin: left center; }
+#gxShow .gxs-cls { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #8fe4ff; }
+#gxShow .gxs-desc { font-size: 14px; line-height: 1.5; color: #c8d2ee; margin: 2px 0; }
+#gxShow .gxs-bar { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 10px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #9aa6c8; margin: 5px 0; }
+#gxShow .gxs-bar b { height: 8px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+#gxShow .gxs-bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #6fd8ff, #c89aff); transition: width .4s cubic-bezier(.2,.9,.3,1.2); }
+#gxShow .gxs-sp { padding: 10px 12px; border-radius: 10px; background: rgba(255,210,90,.1); border: 1px solid rgba(255,210,90,.35); font-size: 13px; }
+#gxShow .gxs-sp kbd { padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,.14); font-weight: 700; }
+#gxShow .gxs-buy .btn { width: 100%; padding: 12px; font-size: 15px; }
+#gxShow .gxs-tag { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.06); font-size: 13px; color: #c8d2ee; text-align: center; }
+#gxShow .gxs-note { margin-top: 6px; font-size: 12px; color: #ff9a8a; text-align: center; }
+@media (max-width: 760px) { #gxShow { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } #gxShow .gxs-info { max-height: 52vh; border-left: 0; border-top: 1px solid rgba(255,255,255,.08); padding: 16px; } #gxShow .gxs-name { font-size: 24px; } }
+@media (prefers-reduced-motion: reduce) { #gxShow.gxs-pop .gxs-name { animation: none; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -14483,14 +14514,22 @@ function gxsMuzzle(gp) { return new V3(gp[0], gp[1], gp[2]).applyQuaternion(play
   if (GXS.act === 'mirror') for (const b of bolts) { if (b.owner !== 'enemy') continue; if (b.m.position.distanceTo(player.position) < P.r * 2.4 + 18) { b.owner = 'player'; b.vel.negate().multiplyScalar(1.4); b.dmg *= 2; b.life = 1.5; b.m.material = gxsMat(0xbfe8ff); spark(b.m.position, 0xbfe8ff, 12); sfx('thud', 0.5); } }
   const booms = bolts.filter(b => b.boom); _ubo130(dt);
   booms.forEach(b => { if (bolts.includes(b)) return; const p = b.m.position.clone(); explode(p, 1.3, 0xff9a3a); gxsRing(p, 0xffb060, b.boom, 0.5); sfx('boom', 0.6); enemies.slice().forEach(e => { if (e.obj.position.distanceTo(p) < b.boom + e.r) gxsHurt(e, b.dmg * 0.8); }); asteroids.slice().forEach(a => { if (a.mesh.position.distanceTo(p) < b.boom + a.r) { a.hp -= b.dmg; if (a.hp <= 0) breakRock(a); } }); }); }; }
+// ---- special-move upgrade levels (saved separately) ----
+const GXS_UPKEY = SAVE_KEY + '_gxsUp';
+GXS.up = (() => { try { return JSON.parse(localStorage.getItem(GXS_UPKEY) || '{}') || {}; } catch (_) { return {}; } })();
+function gxsLv(k) { return Math.max(0, Math.min(3, GXS.up[k] | 0)); }
+function gxsCdOf(k) { const s = SHIPS[k]; return s && s.gxCd ? s.gxCd * (1 - 0.1 * gxsLv(k)) : 10; }
+function gxsUpCost(k) { const s = SHIPS[k]; return Math.round((s.price * 0.35 + 1500) * (gxsLv(k) + 1) / 100) * 100; }
+const GXS_UPTXT = { bubble: ['bigger bubbles', 'bubbles last longer', 'faster recharge'], nova: ['wider blast', 'more zap damage', 'longer fizz'], blink: ['longer blink', 'longer safe time', 'faster recharge'], swarm: ['+2 drones', 'drones stay longer', 'faster recharge'], ram: ['longer charge', 'harder hits', 'faster recharge'], mirror: ['shield lasts longer', 'faster recharge', 'even longer shield'] };
+function gxsSaveUp() { try { localStorage.setItem(GXS_UPKEY, JSON.stringify(GXS.up)); } catch (_) {} }
 // ---- specials ----
-function gxsSpecial() { const sh = SH(); if (G.state !== 'fly' || !sh.gxSpec) return; if (GXS.cd > 0) { sfx('fail', 0.4); return; } GXS.cd = sh.gxCd; const pos = player.position.clone();
-  if (sh.gxSpec === 'nova') { gxsRing(pos, 0x7ff0ff, 380, 0.6); gxsRing(pos, 0xffffff, 300, 0.45); shake = Math.min(1, shake + 0.4); sfx('elaser', 1.2); enemies.slice().forEach(e => { if (e.obj.position.distanceTo(pos) < 380) { e.slowT = 4.5; spark(e.obj.position, 0x7ff0ff, 24); gxsHurt(e, 40); } }); say('SHOCK NOVA!', 'good'); }
-  else if (sh.gxSpec === 'blink') { const f = gxsFwd(), d = 480; explode(pos, 0.6, 0xc89aff); player.position.addScaledVector(f, d); camPos.addScaledVector(f, d * 0.85); explode(player.position, 0.6, 0xc89aff); gxsRing(player.position, 0xc89aff, 60, 0.35); GXS.inv = T + 1.2; sfx('whoosh', 1.2); }
-  else if (sh.gxSpec === 'swarm') { GXS.drones.forEach(dr => scene.remove(dr.m)); GXS.drones = []; for (let i = 0; i < 6; i++) { const m = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), mStd(0xffc21a, 0.4, 0.4)); b.scale.z = 1.5; m.add(b); const st = new THREE.Mesh(new THREE.TorusGeometry(1, 0.2, 6, 14), mStd(0x1a1410)); m.add(st); const eye = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), mGlow(0x7affff)); eye.position.z = -1.3; m.add(eye); m.position.copy(pos); scene.add(m); GXS.drones.push({ m, a: i / 6 * TAU, cd: rand(0, 0.6), t: 14 }); } sfx('build', 1); say('Drone swarm launched!', 'good'); }
-  else if (sh.gxSpec === 'ram') { GXS.act = 'ram'; GXS.t = 2.2; GXS.inv = T + 2.4; shake = Math.min(1, shake + 0.5); sfx('whoosh', 1.4); say('MEGA RAM!', 'good'); }
-  else if (sh.gxSpec === 'mirror') { GXS.act = 'mirror'; GXS.t = 6; gx120Bubble(); sfx('scan', 1); say('Mirror shield up!', 'good'); }
-  else if (sh.gxSpec === 'bubble') { let n = 0; enemies.forEach(e => { if (e.obj.position.distanceTo(pos) > 520 || e.gxBub > 0 || e.core || e.turret) return; n++; e.gxBub = 6; e.gxBubPos = e.obj.position.clone(); const bm = new THREE.Mesh(new THREE.SphereGeometry(e.r * 1.7, 20, 14), new THREE.MeshStandardMaterial({ color: 0xffb8f0, transparent: true, opacity: 0.32, metalness: 0.1, roughness: 0.05, emissive: 0xff7ad8, emissiveIntensity: 0.3, depthWrite: false })); scene.add(bm); GXS.bubbles.push({ e, m: bm }); }); gxsRing(pos, 0xff8ad8, 520, 0.6); sfx('pickup', 1.2); say(n ? `Bubbled ${n} enem${n > 1 ? 'ies' : 'y'}!` : 'No enemies close enough to bubble.', n ? 'good' : ''); if (!n) GXS.cd = 1.5; } }
+function gxsSpecial() { const sh = SH(); if (G.state !== 'fly' || !sh.gxSpec) return; if (GXS.cd > 0) { sfx('fail', 0.4); return; } const L = gxsLv(G.ship); GXS.cd = gxsCdOf(G.ship); const pos = player.position.clone();
+  if (sh.gxSpec === 'nova') { const NR = 380 + 90 * L; gxsRing(pos, 0x7ff0ff, NR, 0.6); gxsRing(pos, 0xffffff, NR * 0.8, 0.45); shake = Math.min(1, shake + 0.4); sfx('elaser', 1.2); enemies.slice().forEach(e => { if (e.obj.position.distanceTo(pos) < NR) { e.slowT = 4.5 + L; spark(e.obj.position, 0x7ff0ff, 24); gxsHurt(e, 40 + 25 * L); } }); say('SHOCK NOVA!', 'good'); }
+  else if (sh.gxSpec === 'blink') { const f = gxsFwd(), d = 480 + 160 * L; explode(pos, 0.6, 0xc89aff); player.position.addScaledVector(f, d); camPos.addScaledVector(f, d * 0.85); explode(player.position, 0.6, 0xc89aff); gxsRing(player.position, 0xc89aff, 60, 0.35); GXS.inv = T + 1.2 + 0.4 * L; sfx('whoosh', 1.2); }
+  else if (sh.gxSpec === 'swarm') { GXS.drones.forEach(dr => scene.remove(dr.m)); GXS.drones = []; const ND = 6 + 2 * L; for (let i = 0; i < ND; i++) { const m = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), mStd(0xffc21a, 0.4, 0.4)); b.scale.z = 1.5; m.add(b); const st = new THREE.Mesh(new THREE.TorusGeometry(1, 0.2, 6, 14), mStd(0x1a1410)); m.add(st); const eye = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), mGlow(0x7affff)); eye.position.z = -1.3; m.add(eye); m.position.copy(pos); scene.add(m); GXS.drones.push({ m, a: i / ND * TAU, cd: rand(0, 0.6), t: 14 + 4 * L }); } sfx('build', 1); say('Drone swarm launched!', 'good'); }
+  else if (sh.gxSpec === 'ram') { GXS.act = 'ram'; GXS.t = 2.2 + 0.8 * L; GXS.inv = T + 2.4 + 0.8 * L; GXS.ramDmg = 140 + 60 * L; shake = Math.min(1, shake + 0.5); sfx('whoosh', 1.4); say('MEGA RAM!', 'good'); }
+  else if (sh.gxSpec === 'mirror') { GXS.act = 'mirror'; GXS.t = 6 + 2 * L; gx120Bubble(); sfx('scan', 1); say('Mirror shield up!', 'good'); }
+  else if (sh.gxSpec === 'bubble') { const BR = 520 + 130 * L; let n = 0; enemies.forEach(e => { if (e.obj.position.distanceTo(pos) > BR || e.gxBub > 0 || e.core || e.turret) return; n++; e.gxBub = 6 + 2 * L; e.gxBubPos = e.obj.position.clone(); const bm = new THREE.Mesh(new THREE.SphereGeometry(e.r * (1.7 + 0.25 * L), 20, 14), new THREE.MeshStandardMaterial({ color: 0xffb8f0, transparent: true, opacity: 0.32, metalness: 0.1, roughness: 0.05, emissive: 0xff7ad8, emissiveIntensity: 0.3, depthWrite: false })); scene.add(bm); GXS.bubbles.push({ e, m: bm }); }); gxsRing(pos, 0xff8ad8, BR, 0.6); sfx('pickup', 1.2); say(n ? `Bubbled ${n} enem${n > 1 ? 'ies' : 'y'}!` : 'No enemies close enough to bubble.', n ? 'good' : ''); if (!n) GXS.cd = 1.5; } }
 addEventListener('keydown', e => { if (e.code === 'KeyQ' && !e.repeat && G.state === 'fly' && !(e.target.matches && e.target.matches('input, textarea'))) gxsSpecial(); });
 { const _dp130 = damagePlayer; damagePlayer = function (amt) { if (T < GXS.inv) { spark(player.position, 0xc89aff, 10); return; } return _dp130.apply(this, arguments); }; }
 { const _ss130 = switchShip; switchShip = function () { _ss130.apply(this, arguments); GXS.cd = 0; GXS.act = null; GXS.drones.forEach(d => scene.remove(d.m)); GXS.drones = []; }; }
@@ -14499,7 +14538,7 @@ addEventListener('keydown', e => { if (e.code === 'KeyQ' && !e.repeat && G.state
 // per-frame: cooldowns, ram, drones, beams, rings, ship animation
 { const _ub130 = updateBoss; updateBoss = function (dt) { _ub130(dt); if (GXS.cd > 0) GXS.cd = Math.max(0, GXS.cd - dt);
   if (playerModel && playerModel.userData.gxAnim) playerModel.userData.gxAnim(T, dt);
-  if (GXS.act) { GXS.t -= dt; if (GXS.act === 'ram' && G.state === 'fly') { const f = gxsFwd(); player.position.addScaledVector(f, 520 * dt); P.vel.copy(f).multiplyScalar(Math.max(P.vel.length(), 120)); const front = player.position.clone().addScaledVector(f, P.r); enemies.slice().forEach(e => { if (e.obj.position.distanceTo(front) < e.r + P.r * 1.4) { gxsHurt(e, 140); explode(e.obj.position, 0.5, 0xffb060); shake = Math.min(1, shake + 0.3); } }); asteroids.slice().forEach(a => { if (a.mesh.position.distanceTo(front) < a.r + P.r * 1.2) breakRock(a); }); if (Math.random() < 0.5) spark(front, 0xffc080, 18); }
+  if (GXS.act) { GXS.t -= dt; if (GXS.act === 'ram' && G.state === 'fly') { const f = gxsFwd(); player.position.addScaledVector(f, 520 * dt); P.vel.copy(f).multiplyScalar(Math.max(P.vel.length(), 120)); const front = player.position.clone().addScaledVector(f, P.r); enemies.slice().forEach(e => { if (e.obj.position.distanceTo(front) < e.r + P.r * 1.4) { gxsHurt(e, GXS.ramDmg || 140); explode(e.obj.position, 0.5, 0xffb060); shake = Math.min(1, shake + 0.3); } }); asteroids.slice().forEach(a => { if (a.mesh.position.distanceTo(front) < a.r + P.r * 1.2) breakRock(a); }); if (Math.random() < 0.5) spark(front, 0xffc080, 18); }
     if (GXS.act === 'mirror' && GX120.bub) { GX120.t = 0.5; GX120.bub.material.uniforms.col.value.setHex(0xbfe8ff); }
     if (GXS.t <= 0) { if (GXS.act === 'mirror' && GX120.bub) GX120.bub.material.uniforms.col.value.setHex(0x6fd8ff); GXS.act = null; } }
   for (let i = GXS.drones.length - 1; i >= 0; i--) { const d = GXS.drones[i]; d.t -= dt; if (d.t <= 0 || G.state !== 'fly') { explode(d.m.position, 0.25, 0xffd24a); scene.remove(d.m); GXS.drones.splice(i, 1); continue; } d.a += dt * 1.6; const R = P.r * 3 + 14; const want = player.position.clone().add(new V3(Math.cos(d.a) * R, Math.sin(d.a * 2) * 6, Math.sin(d.a) * R).applyQuaternion(player.quaternion)); d.m.position.lerp(want, Math.min(1, dt * 6));
@@ -14509,7 +14548,89 @@ addEventListener('keydown', e => { if (e.code === 'KeyQ' && !e.repeat && G.state
 // HUD: special move pill + touch button
 { const el = document.createElement('div'); el.id = 'gxAbil'; el.hidden = true; el.innerHTML = '<kbd>Q</kbd><span class="n"></span><span class="s"></span><i></i>'; document.body.appendChild(el); el.addEventListener('click', gxsSpecial);
   const tb = document.createElement('button'); tb.id = 'tAbil'; tb.textContent = 'SPECIAL'; const row = document.querySelector('.tbtns.sp'); if (row) row.appendChild(tb); tb.addEventListener('touchstart', e => { e.preventDefault(); gxsSpecial(); }, { passive: false }); tb.addEventListener('click', gxsSpecial);
-  (function gxsHud() { requestAnimationFrame(gxsHud); const sh = SH(), show = G.state === 'fly' && !!sh.gxSpec; el.hidden = !show; tb.hidden = !sh.gxSpec; if (!show) return; el.querySelector('.n').textContent = sh.gxSpecName; const ready = GXS.cd <= 0; el.classList.toggle('ready', ready); el.querySelector('.s').textContent = GXS.act ? 'ACTIVE' : ready ? 'READY' : Math.ceil(GXS.cd) + 's'; el.querySelector('i').style.width = (ready ? 100 : (1 - GXS.cd / sh.gxCd) * 100) + '%'; })(); }
+  (function gxsHud() { requestAnimationFrame(gxsHud); const sh = SH(), show = G.state === 'fly' && !!sh.gxSpec; el.hidden = !show; tb.hidden = !sh.gxSpec; if (!show) return; el.querySelector('.n').textContent = sh.gxSpecName + (gxsLv(G.ship) ? ' ' + 'I'.repeat(gxsLv(G.ship) + 1) : ''); const ready = GXS.cd <= 0; el.classList.toggle('ready', ready); el.querySelector('.s').textContent = GXS.act ? 'ACTIVE' : ready ? 'READY' : Math.ceil(GXS.cd) + 's'; el.querySelector('i').style.width = (ready ? 100 : (1 - GXS.cd / gxsCdOf(G.ship)) * 100) + '%'; })(); }
+/* ============ ships part 2: special-move upgrades, a 3D ship showroom, and pirate aces that fly the special ships ============ */
+// --- dock: upgrade workshop + showroom button on the Ships tab ---
+{ const _rs131 = renderShips; renderShips = function (st) { let h = _rs131(st);
+  const top = `<div class="item gx131show"><div><h4>Ship showroom</h4><p>Spin every ship around in 3D, compare their stats and special moves, then buy the one you love.</p></div><div><button class="btn" data-act="gxshow">Open showroom</button></div></div>`;
+  const owned = G.ships.filter(k => SHIPS[k] && SHIPS[k].gxSpec);
+  let up = '';
+  if (owned.length) { up = `<div class="item"><div><h4>Special-move workshop</h4><p>Power up the special move (Q) of ships you own. Each ship goes up to level 4.</p></div><div></div></div>`;
+    owned.forEach(k => { const s = SHIPS[k], L = gxsLv(k), max = L >= 3, cost = gxsUpCost(k), next = GXS_UPTXT[s.gxSpec][L] || '';
+      const pips = [0, 1, 2, 3].map(i => `<i class="${i <= L ? 'on' : ''}"></i>`).join('');
+      up += `<div class="item"><div><h4>${s.name}: ${s.gxSpecName} <span class="gx131pips">${pips}</span></h4><p>${max ? 'Fully powered up!' : 'Next level: ' + next + '.'} Recharge ${gxsCdOf(k).toFixed(1)} s.</p></div><div>${max ? '<div class="reward">MAX</div>' : `<div class="reward">${cost.toLocaleString()} cr</div><button class="btn" data-act="gxup" data-k="${k}" ${G.credits >= cost ? '' : 'disabled'}>Upgrade</button>`}</div></div>`; }); }
+  return top + up + h; }; }
+{ const _sa131 = shipAct; shipAct = function (act, b, st) { _sa131(act, b, st);
+  if (act === 'gxshow') gxShowOpen();
+  if (act === 'gxup') { const k = b.dataset.k, cost = gxsUpCost(k); if (gxsLv(k) >= 3 || G.credits < cost) return; G.credits -= cost; GXS.up[k] = gxsLv(k) + 1; gxsSaveUp(); sfx('win'); say(`${SHIPS[k].gxSpecName} powered up to level ${gxsLv(k) + 1}!`, 'good'); save(); renderDock(); } }; }
+$('#resetBtn').addEventListener('click', () => { if (G.ships.length === 1 && G.ships[0] === 'lancer' && G.stats.kills === 0 && G.credits === 400) { GXS.up = {}; gxsSaveUp(); } });
+// --- showroom ---
+const GXSH = { el: null, r: null, scene: null, cam: null, model: null, keys: [], i: 0, yaw: 0.6, pitch: 0.25, dist: 1, drag: null, raf: 0, spin: true, t: 0 };
+function gxShowKeys() { const all = Object.keys(SHIPS).filter(k => !['ark', 'wanderer'].includes(k)); return ['lancer', ...all.filter(k => SHIPS[k].gxSpec), ...all.filter(k => k !== 'lancer' && !SHIPS[k].gxSpec)]; }
+function gxShowBuild() { if (GXSH.el) return; const el = document.createElement('div'); el.id = 'gxShow'; el.hidden = true;
+  el.innerHTML = `<div class="gxs-stage"><canvas></canvas><button class="gxs-nav prev" aria-label="Previous ship">‹</button><button class="gxs-nav next" aria-label="Next ship">›</button><div class="gxs-hint">Drag to spin · scroll to zoom</div></div>
+  <div class="gxs-info"><div class="gxs-top"><span class="gxs-count"></span><button class="gxs-close" aria-label="Close showroom">✕</button></div><h2 class="gxs-name"></h2><div class="gxs-cls"></div><p class="gxs-desc"></p><div class="gxs-stats"></div><div class="gxs-spec"></div><div class="gxs-buy"></div></div>`;
+  document.body.appendChild(el); GXSH.el = el;
+  el.querySelector('.prev').onclick = () => gxShowGo(-1); el.querySelector('.next').onclick = () => gxShowGo(1); el.querySelector('.gxs-close').onclick = gxShowClose;
+  const cv = el.querySelector('canvas');
+  cv.addEventListener('pointerdown', e => { GXSH.drag = { x: e.clientX, y: e.clientY }; GXSH.spin = false; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => { if (!GXSH.drag) return; GXSH.yaw -= (e.clientX - GXSH.drag.x) * 0.01; GXSH.pitch = clamp(GXSH.pitch + (e.clientY - GXSH.drag.y) * 0.006, -1.2, 1.2); GXSH.drag = { x: e.clientX, y: e.clientY }; });
+  cv.addEventListener('pointerup', () => { GXSH.drag = null; setTimeout(() => { if (!GXSH.drag) GXSH.spin = true; }, 2500); });
+  cv.addEventListener('wheel', e => { e.preventDefault(); GXSH.dist = clamp(GXSH.dist * (e.deltaY > 0 ? 1.1 : 0.9), 0.55, 2.2); }, { passive: false });
+  el.querySelector('.gxs-buy').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; shipAct(b.dataset.act, b, G.docked); gxShowInfo(); });
+  addEventListener('keydown', e => { if (!GXSH.el || GXSH.el.hidden) return; if (e.code === 'ArrowLeft') gxShowGo(-1); if (e.code === 'ArrowRight') gxShowGo(1); if (e.code === 'Escape') gxShowClose(); }); }
+function gxShowOpen() { gxShowBuild(); const el = GXSH.el; el.hidden = false; GXSH.keys = gxShowKeys(); GXSH.i = Math.max(0, GXSH.keys.indexOf(G.ship));
+  const cv = el.querySelector('canvas'); GXSH.r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); GXSH.r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); GXSH.r.outputEncoding = THREE.sRGBEncoding; GXSH.r.toneMapping = THREE.ACESFilmicToneMapping; GXSH.r.toneMappingExposure = 1.15;
+  GXSH.scene = new THREE.Scene(); GXSH.cam = new THREE.PerspectiveCamera(40, 1, 0.1, 50000);
+  GXSH.scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x302040, 0.9)); const k1 = new THREE.DirectionalLight(0xfff0dd, 1.6); k1.position.set(5, 8, 6); GXSH.scene.add(k1); const k2 = new THREE.DirectionalLight(0x7ab0ff, 0.9); k2.position.set(-6, 2, -5); GXSH.scene.add(k2); const k3 = new THREE.DirectionalLight(0xff8ad8, 0.6); k3.position.set(0, -6, 3); GXSH.scene.add(k3);
+  const floor = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 64), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: 0.5, side: THREE.DoubleSide })); floor.rotation.x = -Math.PI / 2; GXSH.floor = floor; GXSH.scene.add(floor);
+  gxShowLoad(); sfx('ui'); cancelAnimationFrame(GXSH.raf); let last = performance.now(); (function loop(now) { GXSH.raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000); last = now; gxShowFrame(dt); })(last); }
+function gxShowClose() { if (!GXSH.el) return; GXSH.el.hidden = true; cancelAnimationFrame(GXSH.raf); if (GXSH.r) { GXSH.r.dispose(); GXSH.r.forceContextLoss && GXSH.r.forceContextLoss(); GXSH.r = null; } GXSH.scene = null; GXSH.model = null; if (G.docked) renderDock(); }
+function gxShowGo(d) { GXSH.i = (GXSH.i + d + GXSH.keys.length) % GXSH.keys.length; GXSH.spin = true; GXSH.dist = 1; gxShowLoad(); sfx('ui', 0.6); }
+function gxShowLoad() { const k = GXSH.keys[GXSH.i], s = SHIPS[k]; if (GXSH.model) GXSH.scene.remove(GXSH.model); const m = s.make(); if (k === G.ship || !s.gxSpec) { /* keep player paint off the showroom copy */ } const box = new THREE.Box3().setFromObject(m), size = box.getSize(new V3()), c = box.getCenter(new V3()); const piv = new THREE.Group(); m.position.sub(c); piv.add(m); GXSH.scene.add(piv); GXSH.model = piv; GXSH.inner = m; GXSH.R = Math.max(size.x, size.y, size.z) * 0.5 || 5; GXSH.floor.scale.setScalar(GXSH.R * 1.25); GXSH.floor.position.y = -size.y * 0.5 - GXSH.R * 0.12; GXSH.el.classList.remove('gxs-pop'); void GXSH.el.offsetWidth; GXSH.el.classList.add('gxs-pop'); gxShowInfo(); }
+function gxShowInfo() { const k = GXSH.keys[GXSH.i], s = SHIPS[k], el = GXSH.el, st = G.docked; el.querySelector('.gxs-count').textContent = `Ship ${GXSH.i + 1} of ${GXSH.keys.length}`; el.querySelector('.gxs-name').textContent = s.name; el.querySelector('.gxs-cls').textContent = s.cls + ' · ' + s.size; el.querySelector('.gxs-desc').textContent = s.desc;
+  const spd = (() => { try { return s.speed; } catch (_) { return 1; } })(); const bar = (n, v, mx) => `<div class="gxs-bar"><span>${n}</span><b><i style="width:${Math.min(100, v / mx * 100)}%"></i></b></div>`;
+  el.querySelector('.gxs-stats').innerHTML = bar('Speed', spd, 1.5) + bar('Turning', s.turn, 1.3) + bar('Toughness', Math.log10(s.hull), Math.log10(25000)) + bar('Firepower', s.dmg, 3.2) + bar('Cargo', Math.log10(s.hold + 1), Math.log10(2001));
+  el.querySelector('.gxs-spec').innerHTML = s.gxSpec ? `<div class="gxs-sp"><kbd>Q</kbd> <b>${s.gxSpecName}</b> · recharge ${gxsCdOf(k).toFixed(0)} s${gxsLv(k) ? ' · level ' + (gxsLv(k) + 1) : ''}</div>` : '';
+  const owned = G.ships.includes(k), cur = G.ship === k, sold = st && s.yard.includes(st.id), cost = Object.assign({ cr: s.price }, s.extra || {});
+  let btn; if (cur) btn = '<div class="gxs-tag">You are flying this one</div>'; else if (owned) btn = `<button class="btn" data-act="flyship" data-k="${k}" ${G.crew >= s.crew ? '' : 'disabled'}>Fly this ship</button>`; else if (sold) btn = `<button class="btn" data-act="buyship" data-k="${k}" ${canAfford(cost) && G.crew >= s.crew ? '' : 'disabled'}>Buy for ${s.price.toLocaleString()} cr</button>${G.crew < s.crew ? `<div class="gxs-note">Needs ${s.crew.toLocaleString()} crew</div>` : ''}`; else if (s.reward) btn = '<div class="gxs-tag">Reward for defeating the Devourer</div>'; else if (s.restore) btn = '<div class="gxs-tag">Restore the derelict in Ember Reach</div>'; else btn = `<div class="gxs-tag">Sold at ${s.yard.map(id => (stationById(id) || { name: id }).name).join(', ')}${s.price ? ' · ' + s.price.toLocaleString() + ' cr' : ''}</div>`;
+  el.querySelector('.gxs-buy').innerHTML = btn; }
+function gxShowFrame(dt) { if (!GXSH.r || !GXSH.model) return; GXSH.t += dt; const cv = GXSH.r.domElement, w = cv.clientWidth, h = cv.clientHeight; if (cv.width !== Math.floor(w * GXSH.r.getPixelRatio()) || cv.height !== Math.floor(h * GXSH.r.getPixelRatio())) { GXSH.r.setSize(w, h, false); GXSH.cam.aspect = w / Math.max(1, h); GXSH.cam.updateProjectionMatrix(); }
+  if (GXSH.spin) GXSH.yaw += dt * 0.5; const R = GXSH.R * 3.1 * GXSH.dist; GXSH.cam.position.set(Math.sin(GXSH.yaw) * Math.cos(GXSH.pitch) * R, Math.sin(GXSH.pitch) * R, Math.cos(GXSH.yaw) * Math.cos(GXSH.pitch) * R); GXSH.cam.near = R * 0.01; GXSH.cam.far = R * 20; GXSH.cam.updateProjectionMatrix(); GXSH.cam.lookAt(0, 0, 0);
+  GXSH.model.position.y = Math.sin(GXSH.t * 1.4) * GXSH.R * 0.04; if (GXSH.inner.userData.gxAnim) GXSH.inner.userData.gxAnim(GXSH.t, dt);
+  GXSH.floor.material.opacity = 0.35 + Math.sin(GXSH.t * 2) * 0.15; GXSH.r.render(GXSH.scene, GXSH.cam); }
+// --- pirate aces: some pirates fly the special ships and use special moves ---
+const GXACE = { types: [
+  { k: 'jelly', make: () => makeJelly(), label: 'Bubble Pirate', col: 0xff8ad8, cd: 7 },
+  { k: 'stingray', make: () => makeStingray(), label: 'Shock Ray Pirate', col: 0x7ff0ff, cd: 6 },
+  { k: 'comet', make: () => makeComet(), label: 'Blink Pirate', col: 0xc89aff, cd: 4.5 },
+  { k: 'hornet', make: () => makeHornet(), label: 'Hive Pirate', col: 0xffd24a, cd: 10 },
+  { k: 'tusk', make: () => makeTusk(), label: 'Tusk Pirate', col: 0xff8a3a, cd: 7 },
+  { k: 'prism', make: () => makePrism(), label: 'Prism Pirate', col: 0xbfa8ff, cd: 9 } ], trap: 0 };
+function gxAceify(e, type) { const t = type || pick(GXACE.types); const old = e.obj; const m = t.make(); const box = new THREE.Box3().setFromObject(m), sz = box.getSize(new V3()); const sc = (e.r * 2.2) / Math.max(sz.x, sz.y, sz.z, 0.001); m.scale.multiplyScalar(sc);
+  m.traverse(o => { if (o.isMesh && o.material && o.material.emissive && !o.material.transparent) { o.material = o.material.clone(); o.material.emissive.lerp(new THREE.Color(0xff2a10), 0.25); } });
+  const ring = glowSprite(0xff3a2a, e.r * 1.2); ring.position.y = -e.r * 0.2; m.add(ring);
+  m.position.copy(old.position); m.quaternion.copy(old.quaternion); scene.remove(old); scene.add(m); e.obj = m; e.gxAce = t; e.gxCd = rand(2, t.cd); e.label = t.label; e.hp = e.maxHp = Math.round(e.hp * 2.2); e.bounty = Math.round(e.bounty * 3); return e; }
+{ const _spa131 = spawnPirate; spawnPirate = function (pos, opt = {}) { const e = _spa131(pos, opt); if (!opt.noAce && !opt.heavy && !e.turret && !e.core && G.stats.kills >= 3 && Math.random() < 0.22) gxAceify(e); return e; }; }
+function gxAceMove(e, dist) { const t = e.gxAce, p = e.obj.position, pp = player.position;
+  if (t.k === 'jelly') { if (dist > 420) return false; GXACE.trap = 1.6 + Math.random() * 0.4; gxsRing(pp, t.col, 60, 0.5); gx120Bubble(); GX120.bub.material.uniforms.col.value.setHex(t.col); GX120.t = 0.55; say('A Bubble Pirate trapped you in goo! Wiggle free!', 'bad'); sfx('pickup', 1); return true; }
+  if (t.k === 'stingray') { if (dist > 340) return false; gxsRing(p.clone(), t.col, 300, 0.55); sfx('elaser', 0.9); if (dist < 300) { damagePlayer(e.dmg * 2); spark(pp, t.col, 20); } return true; }
+  if (t.k === 'comet') { explode(p.clone(), 0.4, t.col); const side = randDir(); side.y *= 0.3; p.copy(pp).addScaledVector(side.normalize(), rand(140, 220)); orientTo(e.obj, pp); explode(p.clone(), 0.4, t.col); sfx('whoosh', 0.7); return true; }
+  if (t.k === 'hornet') { if (dist > 900) return false; for (let i = 0; i < 3; i++) { const d = spawnPirate(p.clone().add(randDir().multiplyScalar(e.r * 2)), { noAce: true }); d.obj.scale.multiplyScalar(0.5); d.r = 4; d.hp = d.maxHp = 14; d.dmg = 3; d.bounty = 10; d.label = 'Robo-bee'; d.speed = 190; d.mission = false; d.obj.traverse(o => { if (o.isMesh && o.material && o.material.color) { o.material = o.material.clone(); o.material.color.setHex(i % 2 ? 0xffc21a : 0x1a1410); } }); } say('A Hive Pirate released robo-bees!', 'bad'); sfx('build', 0.8); return true; }
+  if (t.k === 'tusk') { if (dist > 700 || dist < 60) return false; e.gxRam = 1.4; e.gxRamDir = pp.clone().sub(p).normalize(); orientTo(e.obj, pp); sfx('whoosh', 1); say('A Tusk Pirate is charging at you!', 'bad'); return true; }
+  if (t.k === 'prism') { if (dist > 900) return false; e.gxMirror = 4; e.gxMirB = e.gxMirB || (() => { const b = new THREE.Mesh(new THREE.SphereGeometry(e.r * 1.9, 20, 14), new THREE.MeshStandardMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.28, metalness: 0.6, roughness: 0.05, emissive: 0x6a7aff, emissiveIntensity: 0.4, depthWrite: false })); scene.add(b); return b; })(); e.gxMirB.visible = true; sfx('scan', 0.8); return true; }
+  return false; }
+{ const _ue131 = updateEnemies; updateEnemies = function (dt) { _ue131(dt);
+  for (const e of enemies) { const t = e.gxAce; if (!t) continue; if (e.obj.userData.gxAnim) e.obj.userData.gxAnim(T, dt); if (e.gxBub > 0) continue; const dist = e.obj.position.distanceTo(player.position);
+    if (G.state === 'fly' && player.visible) { e.gxCd -= dt; if (e.gxCd <= 0) { e.gxCd = gxAceMove(e, dist) ? t.cd * rand(0.85, 1.25) : 1; } }
+    if (e.gxRam > 0) { e.gxRam -= dt; e.obj.position.addScaledVector(e.gxRamDir, 430 * dt); if (Math.random() < 0.5) spark(e.obj.position.clone().addScaledVector(e.gxRamDir, e.r), 0xffb060, 14); if (e.obj.position.distanceTo(player.position) < e.r + P.r + 4) { damagePlayer(e.dmg * 3.5); shake = Math.min(1, shake + 0.6); P.vel.addScaledVector(e.gxRamDir, 160); e.gxRam = 0; sfx('boom', 0.6); } }
+    if (e.gxMirB) { if (e.gxMirror > 0) { e.gxMirror -= dt; e.gxMirB.position.copy(e.obj.position); e.gxMirB.visible = true; } else e.gxMirB.visible = false; } }
+  if (GXACE.trap > 0) { GXACE.trap -= dt; P.vel.multiplyScalar(Math.pow(0.04, dt)); if (GX120.bub) GX120.t = Math.max(GX120.t, 0.3); if (GXACE.trap <= 0 && GX120.bub) GX120.bub.material.uniforms.col.value.setHex(0x6fd8ff); } }; }
+// clean up the prism ace's bubble when it dies
+{ const _ke131 = killEnemy; killEnemy = function (e) { if (e && e.gxMirB) { scene.remove(e.gxMirB); e.gxMirB = null; } return _ke131.apply(this, arguments); }; }
+{ const _re131 = removeEnemy; removeEnemy = function (e) { if (e && e.gxMirB) { scene.remove(e.gxMirB); e.gxMirB = null; } return _re131.apply(this, arguments); }; }
+// prism aces reflect your shots while their mirror is up
+{ const _ubo131 = updateBolts; updateBolts = function (dt) { for (const e of enemies) { if (!(e.gxMirror > 0)) continue; for (const b of bolts) { if (b.owner !== 'player' || b.gxRef) continue; if (b.m.position.distanceTo(e.obj.position) < e.r * 1.9 + 12) { b.owner = 'enemy'; b.gxRef = true; b.vel.negate().multiplyScalar(0.8); b.dmg = Math.min(b.dmg, 12); b.home = null; b.boom = 0; b.m.material = BOLT_MAT_E; spark(b.m.position, 0xbfe8ff, 12); } } } _ubo131(dt); }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
