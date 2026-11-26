@@ -716,6 +716,15 @@ body.er-biking #sHudTR, body.er-biking #sHudB { visibility: hidden !important; }
 .track.gx126hit { animation: gx126hit .35s ease-out; }
 @keyframes gx126hit { 0% { box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 14px rgba(255,120,90,.8); } 100% { box-shadow: inset 0 1px 2px rgba(0,0,0,.5); } }
 @media (prefers-reduced-motion: reduce) { .track.gx126hit { animation: none; } }
+/* feel round 127: mission complete banner */
+#gx127 { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); z-index: 60; pointer-events: none; text-align: center; animation: gx127in .5s cubic-bezier(.2,.9,.3,1.35) both, gx127out .5s ease-in 2.05s forwards; }
+#gx127 .gx127t { font-weight: 800; font-size: clamp(24px, 5vw, 46px); line-height: 1.1; white-space: nowrap; color: #ffd25a; text-shadow: 0 0 18px rgba(255,190,80,.75), 0 3px 0 rgba(90,40,0,.6); letter-spacing: .02em; }
+#gx127 .gx127r { margin-top: 6px; font-weight: 700; font-size: clamp(16px, 2.6vw, 22px); color: #7dff9a; text-shadow: 0 0 12px rgba(125,255,154,.6); }
+#gx127 i { position: absolute; left: 50%; top: 40%; width: 9px; height: 14px; border-radius: 2px; opacity: 0; animation: gx127c 1.5s cubic-bezier(.15,.7,.4,1) forwards; }
+@keyframes gx127in { from { opacity: 0; transform: translateX(-50%) scale(.6); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+@keyframes gx127out { to { opacity: 0; transform: translateX(-50%) translateY(-14px); } }
+@keyframes gx127c { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 55% { opacity: 1; transform: translate(var(--x), var(--y)) rotate(var(--r)); } 100% { opacity: 0; transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 170px)) rotate(calc(var(--r) * 1.6)); } }
+@media (prefers-reduced-motion: reduce) { #gx127, #gx127 i { animation: none; } #gx127 i { display: none; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .overlay > *, .comms-card, .mk .dia, #prompt, #feed div { animation: none !important; } }
 </style>
@@ -14341,6 +14350,12 @@ const GX126 = { bars: [] };
 (function gx126Loop(ts) { requestAnimationFrame(gx126Loop); const now = performance.now(); GX126.bars.forEach(b => { const w = parseFloat(b.f.style.width) || 0; if (b.w === null) b.w = w; if (w < b.w - 0.5 && !b.hold) { b.tr.classList.remove('gx126hit'); void b.tr.offsetWidth; b.tr.classList.add('gx126hit'); }
   if (w < b.w) { if (!b.hold) b.hold = now + 450; if (now > b.hold) { b.w = Math.max(w, b.w - (b.w - w) * 0.08 - 0.2); if (b.w <= w + 0.05) { b.w = w; b.hold = 0; } } } else { b.w = w; b.hold = 0; }
   b.g.style.width = b.w + '%'; }); })();
+/* ============ feel round 127: a big "Contract complete" banner with confetti when you finish a mission ============ */
+function gx127Banner(reward) { const old = document.getElementById('gx127'); if (old) old.remove(); const d = document.createElement('div'); d.id = 'gx127'; d.setAttribute('aria-hidden', 'true');
+  d.innerHTML = '<div class="gx127t">Contract complete!</div><div class="gx127r">+' + Number(reward || 0).toLocaleString() + ' credits</div>'; const cols = ['#ffd25a', '#7dff9a', '#6fd8ff', '#ff8ae8', '#ff9a3a', '#c88aff'];
+  for (let i = 0; i < 36; i++) { const c = document.createElement('i'); c.style.setProperty('--x', (Math.random() * 2 - 1) * 260 + 'px'); c.style.setProperty('--y', (-60 - Math.random() * 160) + 'px'); c.style.setProperty('--r', (Math.random() * 720 - 360) + 'deg'); c.style.background = cols[i % cols.length]; c.style.animationDelay = (Math.random() * 0.12) + 's'; d.appendChild(c); }
+  document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
+{ const _cm127 = completeMission; completeMission = function (text) { const m = G.mission; const r = m && m.reward; _cm127.apply(this, arguments); gx127Banner(r); }; }
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
