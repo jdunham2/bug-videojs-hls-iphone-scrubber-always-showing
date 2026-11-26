@@ -14005,6 +14005,15 @@ function gx43Sparkle() { surf.traverse(o => { if (!o.isMesh || o.userData.gx43 |
   m.customProgramCacheKey = () => 'spk|' + (prevKey && prevKey !== THREE.Material.prototype.customProgramCacheKey ? prevKey.call(m) : ''); m.needsUpdate = true; }); }
 { const _usc36 = updateSurfCamera; updateSurfCamera = function (dt) { _usc36(dt); if (W !== RIME_W || !S.built) return; if (GX43.doneW !== W) { GX43.doneW = W; gx43Sparkle(); } GX43.on.value = GFX.hd ? 1 : 0; GX43.t.value += dt; }; }
 
+/* ============ graphics round 44: stations wear red and green navigation lights and white strobes ============ */
+const GX44 = { done: false, lights: [] };
+function gx44Build() { GX44.done = true; const box = new THREE.Box3(), sz = new V3(), ctr = new V3(); STATIONS.forEach(st => { if (!st.obj) return; box.makeEmpty(); st.obj.updateMatrixWorld(true); st.obj.traverse(o => { const m = o.material; if (!o.isMesh || o.isInstancedMesh || !m || Array.isArray(m) || m.transparent || !m.isMeshStandardMaterial || !o.geometry) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); }); if (box.isEmpty()) return; box.getSize(sz); box.getCenter(ctr); const R = Math.max(sz.x, sz.z) * 0.5; if (!(R > 5) || R > 2000) return; const s = Math.max(5, R * 0.09); const inv = new THREE.Matrix4().copy(st.obj.matrixWorld).invert();
+    const put = (wp, col, kind, ph) => { const g = glowSprite(col, s); g.position.copy(wp.clone().applyMatrix4(inv)); st.obj.add(g); GX44.lights.push({ g, kind, ph }); };
+    put(new V3(box.min.x, ctr.y, ctr.z), 0xff2a2a, 'nav', 0); put(new V3(box.max.x, ctr.y, ctr.z), 0x2aff5a, 'nav', 0);
+    put(new V3(ctr.x, box.max.y, ctr.z), 0xffffff, 'strobe', rand(0, 1)); put(new V3(ctr.x, box.min.y, ctr.z), 0xffffff, 'strobe', rand(0, 1));
+    put(new V3(ctr.x, ctr.y, box.min.z), 0xff2a2a, 'nav', 0.5); put(new V3(ctr.x, ctr.y, box.max.z), 0x2aff5a, 'nav', 0.5); }); }
+{ const _ub33 = updateBoss; updateBoss = function (dt) { _ub33(dt); if (renderScene !== scene) return; if (!GX44.done) gx44Build(); const hd = GFX.hd; GX44.lights.forEach(L => { L.g.visible = hd; if (!hd) return; if (L.kind === 'nav') L.g.material.opacity = 0.55 + 0.45 * (Math.sin(T * 2 + L.ph * 6) > 0 ? 1 : 0.2); else { const t = (T * 0.8 + L.ph) % 1; L.g.material.opacity = t < 0.06 || (t > 0.14 && t < 0.2) ? 1 : 0; } }); }; }
+
 $('#coopTitleBtn').addEventListener('click', openCoop); $('#coopPauseBtn').addEventListener('click', openCoop);
 
 /* ============ camera / loop ============ */
