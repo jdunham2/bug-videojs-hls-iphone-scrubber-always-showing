@@ -139,7 +139,7 @@ export class LocalPlayer {
         else if (this.atk.t < 0) this.startAttack(yaw);
         else if (this.atk.t > 0.4) this.atk.queued = true;
       }
-      for (let i = 0; i < 4; i++) if (input.actHit('skill' + (i + 1)) || (i === 0 && input.click(2))) { if (kit.tryCast(i, yaw)) { this.atk.t = -1; } }
+      for (let i = 0; i < 4; i++) if (input.actHit('skill' + (i + 1)) || (i === 0 && input.click(2) && !input.lockFailed)) { if (kit.tryCast(i, yaw)) { this.atk.t = -1; } }
     }
     if (active && input.actHit('dodge') && this.rollCd <= 0 && !this.roll && this.slamT < 0) this.startRoll(moving ? dir : null);
     if (active && input.actHit('jump') && this.onGround && this.slamT < 0 && !this.roll) { this.vy = 9; this.onGround = false; G.audio.jump(); }

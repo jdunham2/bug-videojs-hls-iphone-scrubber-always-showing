@@ -48,6 +48,7 @@ class UI {
   hideLobby() { $('lobby').classList.add('hidden'); $('hud').classList.remove('hidden'); }
   fade(on) { $('fade').style.opacity = on ? 1 : 0; }
   setRoom(code) {
+    if (G.net.offline) { $('roomInfo').innerHTML = `<b>SOLO</b><br><span class="muted">Depth <span id="depthTxt">${G.roomLevel}</span><br>Offline play · saved in this browser</span>`; return; }
     const url = `${location.origin}${location.pathname}?room=${code}`;
     $('roomInfo').innerHTML = `Party code <b>${code}</b><br><span class="muted">Depth <span id="depthTxt">${G.roomLevel}</span></span><br><button class="btn" id="copyInv">Copy invite link</button>`;
     $('copyInv').onclick = () => { navigator.clipboard?.writeText(url); this.toast('Invite link copied!', '#ffd98a'); };
@@ -180,7 +181,8 @@ class UI {
     // reticle
     const ret = $('reticle');
     if (G.lock && !G.lock.dead) { ret.style.display = ''; placeLabel(ret, new THREE.Vector3(G.lock.pos.x, G.lock.pos.y + G.lock.height * 0.55, G.lock.pos.z), G.camera, 60); } else ret.style.display = 'none';
-    $('clickToPlay').classList.toggle('hidden', G.input.locked || G.uiOpen || this.chatting || G.cinematic || G.input.pad.connected);
+    $('clickToPlay').textContent = G.input.lockFailed ? 'Hold right mouse and drag to look around' : 'Click to look around';
+    $('clickToPlay').classList.toggle('hidden', G.input.lockFailed ? G.input.buttons.has(2) || G.uiOpen : G.input.locked || G.uiOpen || this.chatting || G.cinematic || G.input.pad.connected);
     this.updateBuildBar();
   }
 

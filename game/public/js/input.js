@@ -36,18 +36,23 @@ export class Input {
     addEventListener('keyup', (e) => { this.keys.delete(e.code); this.released.add(e.code); });
     addEventListener('blur', () => { this.keys.clear(); this.buttons.clear(); });
     canvas.addEventListener('mousedown', (e) => {
-      if (this.wantLock && !this.locked && e.button === 0) { canvas.requestPointerLock?.(); this.swallow = true; return; }
+      if (this.wantLock && !this.locked && !this.lockFailed && e.button === 0) {
+        this.swallow = true;
+        try { const r = canvas.requestPointerLock?.(); r?.catch?.(() => { this.lockFailed = true; this.swallow = false; }); } catch (err) { this.lockFailed = true; this.swallow = false; }
+        return;
+      }
       this.buttons.add(e.button); this.clicked.add(e.button);
       if (e.button === 1) e.preventDefault();
     });
     addEventListener('mouseup', (e) => { this.buttons.delete(e.button); if (e.button === 0) this.swallow = false; });
     addEventListener('mousemove', (e) => {
       this.mouseX = e.clientX; this.mouseY = e.clientY;
-      if (this.locked) { this.dx += e.movementX * this.sens; this.dy += e.movementY * this.sens * (this.invertY ? -1 : 1); }
+      if (this.locked || (this.lockFailed && this.buttons.has(2))) { this.dx += e.movementX * this.sens; this.dy += e.movementY * this.sens * (this.invertY ? -1 : 1); }
     });
     addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); }, { passive: true });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === canvas; });
+    document.addEventListener('pointerlockerror', () => { this.lockFailed = true; this.swallow = false; });
     addEventListener('gamepadconnected', () => { this.pad.connected = true; this.onPad?.(true); });
     addEventListener('gamepaddisconnected', () => { this.pad.connected = false; this.onPad?.(false); });
     this.wantLock = false;

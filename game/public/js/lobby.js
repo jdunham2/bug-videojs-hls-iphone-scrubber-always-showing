@@ -6,12 +6,14 @@ import { COLORS } from './ui.js';
 import { getToken } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
 
 export class Lobby {
   constructor() {
-    this.cls = localStorage.getItem('emberfall_cls') || 'warden';
+    this.cls = lsGet('emberfall_cls') || 'warden';
     if (!CLASSES[this.cls]) this.cls = 'warden';
-    this.color = localStorage.getItem('emberfall_color') || COLORS[0];
+    this.color = lsGet('emberfall_color') || COLORS[0];
     this.levels = {};
     const canvas = $('preview');
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -39,11 +41,15 @@ export class Lobby {
     this.buildCards(); this.buildColors();
     this.setClass(this.cls);
     const token = getToken();
-    if (token) fetch('/api/profile?token=' + token).then((r) => r.json()).then((p) => {
+    if (window.EMBERFALL_OFFLINE) {
+      $('roomRow').hidden = true; $('roomInput').hidden = true;
+      $('lobbyGold').textContent = 'Solo mode — progress is saved in this browser. For online co-op, run the game server (npm start) and share the link.';
+      import('./localserver.js').then(({ offlineProfile }) => { const p = token && offlineProfile(token); if (p) { this.levels = Object.fromEntries(Object.entries(p.chars || {}).map(([k, c]) => [k, c.level])); if (!$('nameInput').value) $('nameInput').value = p.name || ''; this.buildCards(); } }).catch(() => {});
+    } else if (token) fetch('/api/profile?token=' + token).then((r) => r.json()).then((p) => {
       if (!p) return;
       this.levels = Object.fromEntries(Object.entries(p.chars || {}).map(([k, c]) => [k, c.level]));
       if (!$('nameInput').value) $('nameInput').value = p.name || '';
-      if (p.color && !localStorage.getItem('emberfall_color')) { this.color = p.color; this.buildColors(); this.setClass(this.cls); }
+      if (p.color && !lsGet('emberfall_color')) { this.color = p.color; this.buildColors(); this.setClass(this.cls); }
       $('lobbyGold').textContent = p.gold ? `◉ ${p.gold.toLocaleString()} gold in your account` : '';
       this.buildCards();
     }).catch(() => {});
@@ -57,12 +63,12 @@ export class Lobby {
     const sw = $('colors'); sw.innerHTML = '';
     COLORS.forEach((c) => {
       const d = document.createElement('div'); d.className = 'sw' + (c === this.color ? ' on' : ''); d.style.background = c; d.style.color = c;
-      d.onclick = () => { this.color = c; localStorage.setItem('emberfall_color', c); [...sw.children].forEach((x) => x.classList.remove('on')); d.classList.add('on'); this.setClass(this.cls); };
+      d.onclick = () => { this.color = c; lsSet('emberfall_color', c); [...sw.children].forEach((x) => x.classList.remove('on')); d.classList.add('on'); this.setClass(this.cls); };
       sw.appendChild(d);
     });
   }
   setClass(k) {
-    this.cls = k; localStorage.setItem('emberfall_cls', k);
+    this.cls = k; lsSet('emberfall_cls', k);
     document.querySelectorAll('.ccard').forEach((c) => c.classList.toggle('on', c.dataset.k === k));
     const C = CLASSES[k];
     $('classInfo').innerHTML = `<div class="cdesc">${C.desc}</div><div class="cskills">${C.skills.map((s) => `<span title="${s.desc}">${s.icon} ${s.name}</span>`).join('')}</div><div class="cres" style="color:${C.resource.color}">Resource: ${C.resource.name}</div>`;

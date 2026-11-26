@@ -117,6 +117,7 @@ function musicFor() {
 
 async function switchZone(m) {
   const prevKey = G.zoneKey;
+  if (cine.active) cine.stop();
   if (G.inGame && prevKey) { ui.fade(true); await sleep(380); }
   clearEntities();
   if (ghost) { ghost.parent?.remove(ghost); ghost = null; }
@@ -220,7 +221,7 @@ net.on('welcome', (m) => {
   lobby.dispose();
   ui.hideLobby();
   G.inGame = true;
-  setTimeout(() => ui.chat('★', 'Press H for help. Share your party code to play with friends!'), 800);
+  setTimeout(() => ui.chat('★', net.offline ? 'Press H for help. Solo mode: your hero is saved in this browser.' : 'Press H for help. Share your party code to play with friends!'), 800);
 });
 net.on('profile', (m) => {
   const first = !G.prof;

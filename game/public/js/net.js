@@ -1,7 +1,8 @@
-// Thin WebSocket client with typed message handlers.
+// WebSocket client with typed message handlers; falls back to an in-page server for solo/offline play.
 export class Net {
-  constructor() { this.handlers = {}; this.ws = null; }
-  connect() {
+  constructor() { this.handlers = {}; this.ws = null; this.offline = !!window.EMBERFALL_OFFLINE; }
+  async connect() {
+    if (this.offline) return this.connectLocal();
     const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url);
@@ -11,6 +12,11 @@ export class Net {
       ws.onclose = () => this.emit({ t: 'close' });
       ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.emit(m); };
     });
+  }
+  async connectLocal() {
+    const { connectLocal } = await import('./localserver.js');
+    this.offline = true;
+    this.ws = connectLocal((s) => this.emit(JSON.parse(s)), () => this.emit({ t: 'close' }));
   }
   emit(m) { const hs = this.handlers[m.t]; if (hs) for (const h of hs) h(m); }
   on(t, fn) { (this.handlers[t] ||= []).push(fn); }
