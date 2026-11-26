@@ -3576,6 +3576,103 @@ async function box26(){
 }
 SCENES[26]=[startC26a,startC26b];
 
+/* ================= CHAPTER XXVII · OLD BRINDLE (3D) ================= */
+SNAMES[27]=['The west road','Old Brindle'];
+const r27=z=>Math.sin(z*.045+1)*8;
+const LK27={ash:{skin:'#d9a57c',hair:'#c8c2b6',top:'#6b5a3a',sleeve:'#6b5a3a',bot:'#4a3a2a',kerchief:'#9c3b28'}};
+function friends27(x,z){
+  const L=n=>Object.assign({},KIDS26[n]);
+  R.kTavi=ally({x:x-1.4,z:z-1.5,name:'Tavi',L:L('Tavi'),weapon:'spear',shield:null,follow:true,followIdx:0,hp:150,dmg:10,talk:()=>say('Tavi',pickOne(['My feet hurt. Is it nearly Old Brindle? Is it nearly lunch?','On the isle, we sing when we walk far. Shall I sing? I’m going to sing.']))});
+  R.kUlla=ally({x:x+1.4,z:z-1.5,name:'Ulla',L:L('Ulla'),weapon:'axe',shield:'#3a4a4a',follow:true,followIdx:1,hp:180,dmg:12,talk:()=>say('Ulla',pickOne(['If anything attacks, leave it to me. If two things attack, leave one to me.','Old Rhun says the hills here are full of boars. Big ones. I hope so.']))});
+  R.kNim=ally({x,z:z-3,name:'Nim',L:L('Nim'),weapon:'sword',shield:null,follow:true,followIdx:2,hp:140,dmg:9,talk:()=>say('Nim',pickOne(['In our land, old places are full of stories. You just have to be quiet enough to hear them.','I am writing everything down. For the book. Your grandparent started a book of two languages. I am making it four.']))});
+}
+function buildC27a(){
+  newScene({sky:0xa8c8e0,near:45,far:150,sunI:.95,hemiI:.7,sunDir:[30,50,10]});
+  const h=(x,z)=>{const dx=Math.abs(x-r27(z));return nz(x,z)*2.6*sstep(5,16,dx)+Math.max(0,dx-22)*.5;};
+  terrain(180,h,(x,z)=>{const dx=Math.abs(x-r27(z)),n=hash(Math.round(x),Math.round(z));if(dx<2.3)return mixC('#9a8660','#8a7650',n);return mixC('#5f8f3e','#6c9a45',n).offsetHSL(0,0,(n-.5)*.05);});
+  walk=(x,z)=>Math.abs(x-r27(z))<28&&z>-64&&z<70;
+  const tp=[];for(let i=0;i<280;i++){const x=(hash(i,271)-.5)*150,z=(hash(271,i)-.5)*150;if(Math.abs(x-r27(z))<8)continue;tp.push([x,z]);}forest(tp);
+  for(let i=0;i<10;i++){const z=-50+i*11,s=hash(i,272)>.5?1:-1;rock(r27(z)+s*(5.5+hash(i,273)*3),z,.4+hash(i,274)*.5);}
+  const cart=new THREE.Group();const b=BOX(2.4,.7,1.3,'#6b4a2b');b.position.y=.5;b.rotation.z=.35;cart.add(b);const w=mesh(new THREE.CylinderGeometry(.45,.45,.12,10),'#3a2a1c');w.rotation.x=Math.PI/2;w.position.set(-.8,.3,.7);cart.add(w);
+  cart.position.set(r27(8)+3.4,h(r27(8)+3.4,8)-.3,8);scene.add(cart);obs.push({x:r27(8)+3.4,z:8,r:1.4});
+  const br=BOX(5,.3,8,'#6b4a2b');br.position.set(r27(48),h(r27(48),48)+.2,48);scene.add(br);
+  makePlayer(r27(-58),-58,0);friends27(r27(-60),-60);
+  R.ash=spawn({x:r27(8)+1.2,z:6.5,h:Math.PI/2,name:'Mother Ash, a peddler',L:LK27.ash,weapon:'none',faceP:true,talk:ash27});
+}
+function startC27a(){buildC27a();sc={step:'walk',obj:'',update:c27aUpdate,breadStart:S.c3.bread};setObj('Follow the west road into the hills.');markerT=[r27(-14),-14];toast('Beyond the walls. The four shores, on the road.');}
+function c27aUpdate(){
+  const foes=ents.filter(e=>e.team==='e'&&!e.dead);
+  if(sc.step==='walk'&&P.z>-16){sc.step='wolves';toast('Wolves! Out of the trees!');setObj('Fight off the wolves with your friends.');markerT=null;
+    [[-10,-6],[9,-4],[-8,2],[11,4]].forEach(([dx,z])=>wolf(r27(z)+dx,z,{h:Math.PI/2,sight:28}));return;}
+  if(sc.step==='wolves'&&!foes.length){sc.step='cart';toast('The pack scatters.');setObj('Someone is shouting further up the road. A cart in a ditch?');markerT=R.ash;}
+  if(sc.step==='go'&&P.z>40){sc.step='bandits';toast('Bandits at the bridge! Watch their fighting styles!');setObj('Clear the bandits off the bridge. Purple glow: dodge. Shields: heavy blow.');markerT=null;
+    raider(r27(52)-3,52,{style:'brute',weapon:'bigaxe',shield:null,sight:30});raider(r27(54)+3,54,{style:'guard',shield:'#5a6a5a',sight:30});raider(r27(56),56,{style:'quick',shield:null,sight:30});raider(r27(58)+2,58,{style:'quick',shield:null,sight:30});return;}
+  if(sc.step==='bandits'&&!foes.length){sc.step='end';toast('The road is clear.');setObj('Cross the bridge, and walk on into the hills.');markerT=[r27(66),66];}
+  if(sc.step==='end'&&P.z>64&&!sc.done){sc.done=true;runScript(async()=>{await say('Nim','Look. On the hill. Stones in rows. Walls. A town that isn’t there any more.');S.log.push('Cleared the bandits from the west bridge.');await endScene27(1);});}
+}
+async function ash27(){
+  if(sc.step==='walk'||sc.step==='wolves'){await say('Mother Ash','Wolves first, dearies! Then me!');return;}
+  if(sc.step==='cart'){
+    await say('Mother Ash','Four young ones on the west road! Nobody comes this way. Help an old woman? My cart’s in the ditch and my donkey has opinions.');
+    const c=await say(N(),'Help Mother Ash?',['Help pull the cart out','Sorry, we have to keep going']);
+    if(c===0){const h=await miniTiming({title:'Heave the cart',intro:'Heave together when the marker crosses the green. Four big pulls.',btn:'Heave',need:4,tries:7,zone:.22,speed:2.4,shrink:.015,hit:['It shifts!','Again!','Nearly out!','It’s out!'],miss:['Your feet slip!','The donkey pulls the wrong way!']});
+      S.c3.flags.peddler=1;gain('str',1);gain('charm',1);
+      await say('Mother Ash','Bless you, bless you. Old Brindle, is it? I know the way. Past the bridge, up to the hill with the dead oak. And mind Old Tusk. Biggest boar in the hills. He thinks the ruins are his.');
+      S.log.push('Pulled Mother Ash’s cart out of the ditch.');}
+    else{await say('Mother Ash','Off with you, then. Mind the bridge. Bandits.');S.log.push('Passed a peddler in a ditch.');}
+    sc.step='go';setObj('Walk on west toward the bridge.');markerT=[r27(44),44];return;}
+  await say('Mother Ash','Mind Old Tusk!');
+}
+async function endScene27(next){
+  S.c3.scene=next;save();$('#prompt').hidden=true;
+  await screen(`<div class="eyebrow">Chapter XXVII · Part 2</div><h2>Old Brindle</h2><p>On the third day, past a dead oak, the road ends at a hilltop covered in tumbled stone. Walls no higher than your knee. Doorways with no doors. In the middle, a ring of old stones around something round. A well.</p>`,'Walk into the ruins');
+  startScene(next);
+}
+function buildC27b(){
+  newScene({sky:0xe0b890,fog:0xd8b08c,near:40,far:130,sunI:.85,hemiI:.7,sunDir:[-30,30,15],sun:0xffd0a0});
+  const h=(x,z)=>{const r=Math.hypot(x,z);return nz(x,z)*1.4*sstep(14,30,r)+Math.max(0,r-34)*.6;};
+  terrain(160,h,(x,z)=>{const n=hash(Math.round(x),Math.round(z));return mixC('#8a9a5a','#7a8a4a',n).offsetHSL(0,0,(n-.5)*.06);});
+  walk=(x,z)=>Math.hypot(x,z)<36;
+  [[-10,-6,6,0],[-12,6,0,5],[9,-8,5,0],[12,4,0,6],[-3,14,7,0],[6,16,0,4],[-14,-14,4,0],[14,-14,0,4]].forEach(([x,z,w,d],i)=>{const hh=.5+hash(i,275)*.9;const m=BOX(w||.5,hh,d||.5,'#8a857c');m.position.set(x,h(x,z)+hh/2,z);scene.add(m);});
+  const well=mesh(new THREE.CylinderGeometry(1.1,1.2,.8,12),'#7d786e');well.position.set(0,h(0,0)+.4,0);scene.add(well);obs.push({x:0,z:0,r:1.3});
+  const arch=new THREE.Group();[-1.2,1.2].forEach(x=>{const p=BOX(.5,2.8,.5,'#9a958a');p.position.set(x,1.4,0);arch.add(p);});const t=BOX(3,.5,.6,'#9a958a');t.position.y=2.9;arch.add(t);arch.position.set(-6,h(-6,18),18);scene.add(arch);
+  const stone=BOX(1.2,1.8,.4,'#a39c90');stone.position.set(8,h(8,10)+.9,10);scene.add(stone);obs.push({x:8,z:10,r:.8});R.stone=stone;
+  const oak=mesh(new THREE.CylinderGeometry(.4,.6,5,6),'#5a4a3a');oak.position.set(-18,h(-18,-2)+2.5,-2);scene.add(oak);
+  makePlayer(0,-28,0);friends27(0,-30);
+  props.push({x:0,z:-1.8,r:2.6,prio:2,label:'Look down the old well',act:()=>search27('well'),on:()=>sc.step==='search'&&!S.c3.flags.found.well});
+  props.push({x:-6,z:16.5,r:2.6,prio:2,label:'Look at the old chapel arch',act:()=>search27('arch'),on:()=>sc.step==='search'&&!S.c3.flags.found.arch});
+  props.push({x:-12,z:7.5,r:2.6,prio:2,label:'Search the biggest house',act:()=>search27('house'),on:()=>sc.step==='search'&&!S.c3.flags.found.house});
+  props.push({x:8,z:8.5,r:2.6,prio:3,label:'Read the founders’ stone',act:stone27,on:()=>sc.step==='stone'});
+}
+function startC27b(){buildC27b();sc={step:'arrive',obj:'',update:c27bUpdate,breadStart:S.c3.bread};setObj('Explore the ruins of Old Brindle.');markerT=[0,-6];toast('Old Brindle. Golden light on old stones.');}
+function c27bUpdate(){
+  const foes=ents.filter(e=>e.team==='e'&&!e.dead);
+  if(sc.step==='arrive'&&P.z>-14){sc.step='tusk';toast('A huge shape bursts out of the ruins. OLD TUSK!');setObj('Drive off Old Tusk, the great boar. When he crouches and glows, dodge (Q)!');markerT=null;
+    R.tusk=boar(2,6,{big:true,h:Math.PI,sight:40,hp:260});R.tusk.unblock=true;
+    runScript(async()=>{await say('Ulla','FINALLY. A proper boar.');});return;}
+  if(sc.step==='tusk'&&!foes.length){sc.step='search';S.c3.flags.tusk=1;if(R.tusk){R.tusk.gone=true;R.tusk.f.g.visible=false;}toast('Old Tusk crashes off into the hills, grunting.');setObj('Search the ruins: the old well, the chapel arch, the biggest house.');markerT=null;gain('arms',1);}
+}
+async function search27(id){
+  const f=S.c3.flags;f.found[id]=1;const k=N();
+  if(id==='well')await say(k,'The old well is dry. But carved inside the stone rim, just where your hand rests, is a tiny marble. The same little drawing as on the floor of the founders’ hall.');
+  if(id==='arch')await say(k,'Under the chapel arch, a bell lies in the grass, cracked and green. Nim brushes the moss off it. “It has words,” Nim says. “Old ones. ‘We will carry the light.’”');
+  if(id==='house')await say(k,'In the biggest house, under a fallen beam, Tavi finds a little clay lamp, the kind you hold in your hand. “Someone carried this out of the dark,” Tavi says, “a very long time ago.”');
+  gain('wits',1);const n=Object.keys(f.found).length;toast(`Found ${n} of 3`);
+  if(n>=3){sc.step='stone';setObj('By the broken wall, a tall standing stone covered in names. Read it.');markerT=[8,8.5];}
+}
+async function stone27(){
+  sc.step='done';const k=N(),f=S.c3.flags;
+  await say(k,'The stone is covered in names, worn almost smooth. Families. Children. At the very bottom, in a wobbly hand, the oldest carving of all: not a name. A little drawing of a marble.');
+  await say('Nim','“We left Old Brindle in the hungry year, and walked east to the river, and found a place with good water. We will carry the light.” That is what it says. That is how it begins.');
+  await say('Tavi','Your family. On the very first line. With a marble.');
+  await say('Ulla','...I am not crying. It is the dust. Hollow Folk do not cry at stones.');
+  const r=await say(k,'What do you do with the founders’ stone?',['Bring it home to Brindlemoor, to stand beside the memorial','Carve your four names on it, and leave it here where it belongs','Stay, one day, and bring Old Brindle back to life']);
+  f.c27f=['stone','name','village'][r]||'stone';gain('charm',1);
+  await say('Nim',{stone:'Home, then. It is very heavy. Ulla will carry it. Ulla insists.',name:'Our names, under theirs. The story keeps going. Yes.',village:'A new town. Four peoples. One old well. ...I will write it in the book. “Chapter one.”'}[f.c27f]);
+  S.log.push('Found the founders’ stone in Old Brindle.');await ending27();
+}
+SCENES[27]=[startC27a,startC27b];
+
 /* ---- flow ---- */
 async function endScene(next){
   const cards=[null,['The north road','Dawn. Your company marches out of Harrow Field: forty spears, two wagons, and a sergeant who never seems to sleep. By midday the road climbs into the Thornwood. Scouts say northern raiders are about.'],['The Ashen Ford','You camp on the ridge above the Ashen Ford. Below, the river runs shallow over stones. On the far bank, the northern host is lighting its cookfires. At dawn, they will cross.']];
@@ -5162,7 +5259,7 @@ function creatorScreen(){
   <div class="btns"><button class="btn primary" id="begin" type="button">Begin at age 8</button><button class="btn ghost" id="backSlots" type="button">Back</button></div>
   <details class="later"><summary>Or start at a later chapter</summary><div class="btns">
   <button class="btn ghost" id="jump2" type="button">Age 12 · Chapter II</button><button class="btn ghost" id="jump3" type="button">Age 16 · Chapter III</button><button class="btn ghost" id="jump4" type="button">Age 20 · Chapter IV</button><button class="btn ghost" id="jump5" type="button">Age 32 · Chapter V</button><button class="btn ghost" id="jump6" type="button">Play as your child · Chapter VI</button><button class="btn ghost" id="jump7" type="button">Age 16 · Chapter VII</button><button class="btn ghost" id="jump8" type="button">Age 25 · Chapter VIII</button><button class="btn ghost" id="jump9" type="button">Age 40 · Chapter IX</button><button class="btn ghost" id="jump10" type="button">Age 60 · Chapter X</button><button class="btn ghost" id="jump11" type="button">Play as your grandchild · Chapter XI</button><button class="btn ghost" id="jump12" type="button">Age 21 · Chapter XII</button><button class="btn ghost" id="jump13" type="button">Age 35 · Chapter XIII</button>
-  <button class="btn ghost" id="jump14" type="button">Age 50 · Chapter XIV</button><button class="btn ghost" id="jump15" type="button">A Sunward child · Chapter XV</button><button class="btn ghost" id="jump16" type="button">Age 12 · Chapter XVI</button><button class="btn ghost" id="jump17" type="button">Age 14 · Chapter XVII</button><button class="btn ghost" id="jump18" type="button">Age 18 · Chapter XVIII</button><button class="btn ghost" id="jump19" type="button">Age 25 · Chapter XIX</button><button class="btn ghost" id="jump20" type="button">Age 35 · Chapter XX</button><button class="btn ghost" id="jump21" type="button">Play as your child · Chapter XXI</button><button class="btn ghost" id="jump22" type="button">Age 16 · Chapter XXII</button><button class="btn ghost" id="jump23" type="button">Age 25 · Chapter XXIII</button><button class="btn ghost" id="jump24" type="button">Age 35 · Chapter XXIV</button><button class="btn ghost" id="jump25" type="button">Play as your child · Chapter XXV</button><button class="btn ghost" id="jump26" type="button">Age 12 · Chapter XXVI</button>
+  <button class="btn ghost" id="jump14" type="button">Age 50 · Chapter XIV</button><button class="btn ghost" id="jump15" type="button">A Sunward child · Chapter XV</button><button class="btn ghost" id="jump16" type="button">Age 12 · Chapter XVI</button><button class="btn ghost" id="jump17" type="button">Age 14 · Chapter XVII</button><button class="btn ghost" id="jump18" type="button">Age 18 · Chapter XVIII</button><button class="btn ghost" id="jump19" type="button">Age 25 · Chapter XIX</button><button class="btn ghost" id="jump20" type="button">Age 35 · Chapter XX</button><button class="btn ghost" id="jump21" type="button">Play as your child · Chapter XXI</button><button class="btn ghost" id="jump22" type="button">Age 16 · Chapter XXII</button><button class="btn ghost" id="jump23" type="button">Age 25 · Chapter XXIII</button><button class="btn ghost" id="jump24" type="button">Age 35 · Chapter XXIV</button><button class="btn ghost" id="jump25" type="button">Play as your child · Chapter XXV</button><button class="btn ghost" id="jump26" type="button">Age 12 · Chapter XXVI</button><button class="btn ghost" id="jump27" type="button">Age 16 · Chapter XXVII</button>
   </div></details>`;
   $('#screen').hidden=false;
   const prev=$('#prevCv');
@@ -5206,6 +5303,7 @@ function genNotes(g){
     if(ch>=25)n.push('Made friends from all four peoples');
     if(S.c25f)n.push({gate:'Solved Lady Isolde’s last puzzle, and hung the first lantern over the castle gate',isle:'Solved Lady Isolde’s last puzzle, and sent the first lantern home to the Sunward Isle',fair:'Solved Lady Isolde’s last puzzle, and carried the first lantern to the fair'}[S.c25f]);
     if(S.c26f)n.push({share:'Found the founders’ hall under the castle, and opened the founders’ road to all',secret:'Found the founders’ hall under the castle, and kept it a secret of the four shores',boat:'Found the founders’ hall under the castle, and sailed the founders’ boat'}[S.c26f]);
+    if(S.c27f)n.push({stone:'Found Old Brindle, and brought the founders’ stone home',name:'Found Old Brindle, and carved four new names on the founders’ stone',village:'Found Old Brindle, and helped bring it back to life'}[S.c27f]);
   }else if(g===5){
     if(ch>=21)n.push('Ran off in a flood at eight, and came back');
     if(ch>=21)n.push('Tried three roads at the Fair of Three Peoples');
@@ -6877,11 +6975,45 @@ async function ending26(){
   const r=await screen(`<div class="eyebrow">Chapter XXVI complete</div><h2 class="big">The second box</h2>
   <p>Four friends, one candle, and a secret older than the castle.</p>
   <ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul>${statline()}
-  <p style="margin-top:14px;padding-top:10px;border-top:1px solid var(--ink-soft)"><span class="eyebrow">Next chapter</span><br><b>Not built yet.</b> Open the family tree (T) to see all six generations.</p>`,'Start a new life','Replay Chapter XXVI');
-  if(r===0){clearSave();S=null;titleScreen();}
+  <p style="margin-top:14px;padding-top:10px;border-top:1px solid var(--ink-soft)"><span class="eyebrow">Next chapter</span><br><b>Chapter XXVII · Age 16 · Old Brindle.</b> Beyond the walls, with the four shores, to find where the founders came from.</p>`,'Begin Chapter XXVII','Replay Chapter XXVI');
+  if(r===0){await startCh27();}
   else{S.stats={...S.ch26Start.stats};S.stats.str-=1;S.stats.wits-=1;S.stats.charm-=1;S.ch=25;await startCh26();}
 }
 JUMPX[26]=async(nm)=>{S.stats={str:2,wits:3,charm:3,coin:3,arms:1};S.items=['marble'];S.master='forge';S.c24f='school';S.c25f='gate';S.gen=6;S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',lk:{...DEFLOOK},master:'forge',bond:5};await startCh26();};
+
+/* ================= CHAPTER XXVII · OLD BRINDLE (story) ================= */
+async function startCh27(){
+  if(S.ch===26)S.c26f=S.c26f||(S.c3&&S.c3.flags&&S.c3.flags.c26f)||'share';
+  S.c26f=S.c26f||'share';S.gen=6;S.snow=false;S.storm=false;
+  if(!S.parent)S.parent={name:'Wren',top:'#9c3b28',lk:{...DEFLOOK},master:'forge',bond:5};
+  S.ch=27;S.age=16;S.day=1;S.period=0;S.done={};S.log=[];S.flags={};S.history=[];S.race=null;
+  S.stats.str+=2;S.stats.wits+=1;S.stats.charm+=1;S.stats.arms=Math.max((S.stats.arms||0)+1,3);
+  S.ch27Start={stats:{...S.stats}};
+  S.c3on=true;S.c3={scene:0,flags:{found:{}},bread:4,startBread:4};S.c3start={...S.stats};KID.on=false;
+  await screen(`<div class="eyebrow">Chapter XXVII · Age 16</div><h2 class="big">Old Brindle</h2>
+  <p>You are sixteen. Four years ago, under the castle, the four shores found Isolde’s map. ${{share:'Since then, every twelve-year-old in Brindlemoor has walked the founders’ road with a lantern.',secret:'You have kept the tunnels a secret all this time, and you are very smug about it.',boat:'You fixed the founders’ boat, and sailed it to the sea and back. Twice. Once on purpose.'}[S.c26f]}</p>
+  <p>But one corner of the map has always bothered you. In the hills, three days west, there is a tiny drawing of a well, and two words in very old letters: <b>Old Brindle</b>. The place the founders came from, before Brindlemoor.</p>
+  <p>Your family has gone beyond the walls before: north, south, past every chart. Now it’s your turn, with Tavi, Ulla and Nim beside you, and ${esc(S.parent.name)} pretending not to worry at the gate.</p>
+  <p style="color:var(--ink-soft);font-size:15px">Swing: Space · Block: Shift · Dodge: Q · Heavy: F · Talk: E · Eat: H</p>${statline()}`,'Walk out of the gate');
+  save();
+  if(!C3.begin()){S.c3on=false;S.c3.flags.c27f='stone';await ending27();}
+  hud();
+}
+CHX[27]={keep:[],when:()=>'Ch. XXVII · Age 16',objective:()=>'',async dayCard(){mode='play';hud();},async sleep(){},async talk(){}};
+async function ending27(){
+  const f=S.c3.flags;S.c27f=f.c27f||'stone';
+  const lines=[];
+  lines.push(f.peddler?'Mother Ash, the peddler whose cart you pulled out of the ditch, tells the story at every market from here to the sea. In her version, you lifted the cart with one hand.':'You passed a peddler in a ditch on the way, and still think about whether you should have stopped.');
+  lines.push(f.tusk?'Old Tusk, the great boar of the ruins, limps off into the hills and never troubles Old Brindle again. Ulla keeps one of his bristles as a lucky charm.':'Old Tusk, the great boar, still rules the hills. You leave him a turnip, out of respect.');
+  lines.push({stone:'You bring the founders’ name-stone home to Brindlemoor and set it beside the memorial. The oldest name on it is a child’s, written in a wobbly hand: just a little drawing of a marble.',name:'You carve four new names on the founders’ stone, Tavi, Ulla, Nim and your own, beneath the oldest names in Brindlemoor’s story, and leave it standing in the hills where it belongs.',village:'The four of you decide Old Brindle should not stay empty. It takes ten years, but families from all four peoples come to live there. They call it New Brindle. Nobody can pronounce it in four languages at once.'}[S.c27f]);
+  const r=await screen(`<div class="eyebrow">Chapter XXVII complete</div><h2 class="big">Old Brindle</h2>
+  <p>Four friends walked out of the gate and found where the whole story started: an old well in the hills, and a name-stone, and a child’s marble scratched into the rock.</p>
+  <ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul>${statline()}
+  <p style="margin-top:14px;padding-top:10px;border-top:1px solid var(--ink-soft)"><span class="eyebrow">Next chapter</span><br><b>Not built yet.</b> Open the family tree (T) to see all six generations.</p>`,'Start a new life','Replay Chapter XXVII');
+  if(r===0){clearSave();S=null;titleScreen();}
+  else{S.stats={...S.ch27Start.stats};S.stats.str-=2;S.stats.wits-=1;S.stats.charm-=1;S.stats.arms-=1;S.ch=26;await startCh27();}
+}
+JUMPX[27]=async(nm)=>{S.stats={str:4,wits:4,charm:4,coin:4,arms:2};S.items=['marble'];S.master='forge';S.c24f='school';S.c25f='gate';S.c26f='share';S.gen=6;S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',lk:{...DEFLOOK},master:'forge',bond:5};await startCh27();};
 
 /* ---------- DAYS ---------- */
 const DAYCARD=[
@@ -6965,7 +7097,7 @@ function bindJumps(){
   $('#jump11').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:2,wits:2,charm:2,coin:4,arms:0};S.items=['marble'];S.master='forge';S.c10f={succ:'tam',bond:5};S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh11();};
   $('#jump12').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:3,wits:3,charm:3,coin:6,arms:1};S.items=['marble'];S.master='forge';S.c11f={champ:'you'};S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh12();};
   $('#jump13').onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);S.stats={str:4,wits:4,charm:4,coin:8,arms:2};S.items=['marble'];S.master='forge';S.c12f='ferry';S.parent={name:nm==='Robin'?'Wren':'Robin',top:'#9c3b28',master:'forge',c4f:'trade',bond:5};$('#screen').hidden=true;await startCh13();};
-  for(let n=14;n<=26;n++){const b=$('#jump'+n);if(!b)continue;if(!JUMPX[n]){b.hidden=true;continue;}b.onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);$('#screen').hidden=true;await JUMPX[n](nm);};}
+  for(let n=14;n<=27;n++){const b=$('#jump'+n);if(!b)continue;if(!JUMPX[n]){b.hidden=true;continue;}b.onclick=async()=>{const nm=($('#nameIn').value||'Wren').trim().slice(0,14)||'Wren';S=newState(nm,CREATE.top);$('#screen').hidden=true;await JUMPX[n](nm);};}
 }
 /* ---------- INPUT ---------- */
 const keys={};
