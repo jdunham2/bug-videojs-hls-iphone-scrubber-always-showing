@@ -1312,6 +1312,7 @@ const keys = new Set(), tapped = new Set();
 addEventListener('keydown', e => {
   if (!document.getElementById('net').hidden) { if (e.code === 'Escape') netHide(); return; }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Slash', 'Quote', 'Backspace'].includes(e.code)) e.preventDefault();
+  if (G.state === 'town') { if (!e.repeat || e.code === 'Backspace') townKey(e.code); keys.add(e.code); e.preventDefault(); return; }
   if (e.code === 'KeyV' && !e.repeat) { toggle3D(); return; }
   if (!e.repeat) onKeyPress(e.code);
   keys.add(e.code); tapped.add(e.code); initAudio();
@@ -1323,10 +1324,11 @@ addEventListener('mousedown', e => {
   if (G.state !== 'title' || !document.getElementById('net').hidden) return;
   const r = canvas.getBoundingClientRect(), dpr = canvas.width / r.width;
   const gx = ((e.clientX - r.left) * dpr - offX) / scale, gy = ((e.clientY - r.top) * dpr - offY) / scale;
+  if (gx >= TOWN_BTN.x && gx <= TOWN_BTN.x + TOWN_BTN.w && gy >= TOWN_BTN.y && gy <= TOWN_BTN.y + TOWN_BTN.h) { enterTown(); return; }
   if (gx >= ONLINE_BTN.x && gx <= ONLINE_BTN.x + ONLINE_BTN.w && gy >= ONLINE_BTN.y && gy <= ONLINE_BTN.y + ONLINE_BTN.h) netShow();
   else if (G.world && !NET.role && gx >= REJOIN_BTN.x && gx <= REJOIN_BTN.x + REJOIN_BTN.w && gy >= REJOIN_BTN.y && gy <= REJOIN_BTN.y + REJOIN_BTN.h) netRejoin();
 });
-const ONLINE_BTN = { x: 1290, y: 22, w: 290, h: 64 }, REJOIN_BTN = { x: 1290, y: 98, w: 290, h: 52 };
+const TOWN_BTN = { x: 1330, y: 168, w: 250, h: 56 }, ONLINE_BTN = { x: 1290, y: 22, w: 290, h: 64 }, REJOIN_BTN = { x: 1290, y: 98, w: 290, h: 52 };
 
 const ACTIONS = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'dash', 'special', 'start', 'back'];
 class Ctrl {
@@ -1665,10 +1667,11 @@ const CHALLENGES = [
   { short: '80000 KOS', text: ['Defeat 80000 enemies', '(in any mode) to unlock!'], need: () => G.prog.kos >= 80000, prog: () => 'Enemies defeated: ' + Math.min(80000, G.prog.kos) + ' / 80000' },
   { short: '950 COMBO', text: ['Land a 950-hit combo', 'to unlock!'], need: () => (G.prog.combo || 0) >= 950, prog: () => 'Best combo: ' + Math.min(950, G.prog.combo || 0) + ' / 950' },
 ];
-const fighterUnlocked = i => i < STORY_FIGHTERS ? i < START_FIGHTERS + PER_CHAPTER * (G.cleared || 0) : !!(CHALLENGES[i - STORY_FIGHTERS] && CHALLENGES[i - STORY_FIGHTERS].need());
+const fighterUnlocked = i => i >= CUSTOM0 ? true : i < STORY_FIGHTERS ? i < START_FIGHTERS + PER_CHAPTER * (G.cleared || 0) : !!(CHALLENGES[i - STORY_FIGHTERS] && CHALLENGES[i - STORY_FIGHTERS].need());
 const fighterCount = () => CHARS.filter((c, i) => fighterUnlocked(i)).length;
 function bumpProg(key, val) {
   if (NET.role === 'guest') return;
+  addCoins({ kos: 1, bosses: 25, vs: 30, rush: 150 }[key] || 0);
   const before = CHARS.map((c, i) => fighterUnlocked(i));
   if (key === 'wave' || key === 'combo') G.prog[key] = Math.max(G.prog[key] || 0, val); else G.prog[key] = (G.prog[key] || 0) + 1;
   try { localStorage.setItem('stickSquadProg', JSON.stringify(G.prog)); } catch (e) { }
@@ -1676,6 +1679,9 @@ function bumpProg(key, val) {
   if (fresh.length) { G.unlockToast = { names: fresh, t: 420 }; SFX.banner(); }
 }
 const unlockChapter = i => Math.floor((i - START_FIGHTERS) / PER_CHAPTER);
+G.coins = 200;
+try { const c0 = localStorage.getItem('stickSquadCoins'); if (c0 !== null) G.coins = Math.max(0, +c0 || 0); } catch (e) { }
+function addCoins(n) { if (!n) return; G.coins = Math.max(0, (G.coins || 0) + n); try { localStorage.setItem('stickSquadCoins', '' + G.coins); } catch (e) { } }
 try { G.best = +localStorage.getItem('stickSquadBest') || 0; G.bestRush = +localStorage.getItem('stickSquadRush') || 0; } catch (e) { }
 let parts = [], texts = [], shake = 0, flashA = 0, flashCol = '#fff', timeScale = 1, slowT = 0, zoom = 0, zoomX = W / 2, zoomY = H / 2, hurtVig = 0;
 const twoP = () => G.players.filter(p => p.joined).length >= 2;
@@ -4574,6 +4580,36 @@ const SUPERS = {
 };
 const SUPER_IDS = Object.keys(SUPERS).filter(k => k !== 'MIMIC');
 for (const c of CHARS) c.supname = (SUPERS[c.name] || SUPERS.SCRIBBLE)[0];
+
+// ------------------------------------------------------- custom fighters (made in the Town's Fighter Workshop)
+const CUSTOM_N = 3, CUSTOM0 = CHARS.length;
+const CF_COLS = ['#e2342c', '#ff7a1a', '#e8b800', '#3aa04a', '#1a9a8a', '#2a7ae6', '#5a3ad0', '#c03aa0', '#ff6aa0', '#8a5a2a', '#2a2a33', '#6a6a7a', '#b0302a', '#0a6a4a', '#1a3a8a', '#7ad0ff'];
+const CF_ACC = [null, 'cap', 'band', 'beanie', 'beret', 'bow', 'bunny', 'cat', 'chef', 'cowboy', 'crown', 'flamehair', 'goggles', 'grad', 'halo', 'hardhat', 'hat', 'headphones', 'helmet', 'horns', 'knighthelm', 'luchador', 'mask', 'painthat', 'pigtails', 'spikes', 'tiara', 'tophat', 'topknot', 'tricorn', 'wisp', 'antenna', 'beehat', 'orbit', 'backcap'];
+const CF_SIZE = [['SMALL', 0.85], ['NORMAL', 1], ['BIG', 1.15], ['HUGE', 1.3]];
+const CF_TYPES = [['BALANCED', { hp: 100, spd: 1 }, 'Good at everything'], ['SPEEDY', { hp: 85, spd: 1.22 }, 'Super fast, a bit fragile'], ['STRONG', { hp: 110, spd: 0.95, dmg: 1.15 }, 'Hits extra hard'], ['TANK', { hp: 150, spd: 0.85, tough: 0.85, armorHeavy: true }, 'Huge health, slow'], ['FLOATY', { hp: 95, spd: 1.04, float: true, jumps: 3 }, 'Floats and triple jumps'], ['NINJA', { hp: 90, spd: 1.15, backstab: true }, 'Sneak attacks from behind'], ['MOON JUMPER', { hp: 95, spd: 1.05, lowgrav: true, jumps: 3 }, 'Floaty moon jumps'], ['ICE', { hp: 100, spd: 1.02, frost: true }, 'Hits freeze foes'], ['GUARD', { hp: 115, spd: 0.98, block: true }, 'Can block attacks']];
+let CF = [];
+try { CF = JSON.parse(localStorage.getItem('stickSquadCustom') || '[]') || []; } catch (e) { CF = []; }
+function cfDefault(i) { return { name: ['MY GUY', 'MY BUDDY', 'MY HERO'][i], col: [5, 0, 3][i], back: [14, 12, 13][i], acc: [1, 2, 10][i], size: 1, type: 0, heavy: [0, 3, 6][i], skill: [0, 1, 2][i], special: [0, 1, 2][i], sup: [0, 1, 2][i] }; }
+function cfSave() { try { localStorage.setItem('stickSquadCustom', JSON.stringify(CF)); } catch (e) { } }
+function cfWrap(v, n) { return ((v % n) + n) % n; }
+function applyCustom(i) {
+  const d = CF[i], idx = CUSTOM0 + i, old = CHARS[idx];
+  if (old && old.custom && SUPERS[old.name] && old.name !== 'SCRIBBLE') delete SUPERS[old.name];
+  const base = String(d.name || 'MY GUY').toUpperCase().replace(/[^A-Z0-9 !?'-]/g, '').trim().slice(0, 14) || 'MY GUY';
+  let nm = base, k = 2;
+  while (CHARS.some((c, j) => j !== idx && c.name === nm) || (SUPERS[nm] && !(old && old.name === nm))) nm = base.slice(0, 11) + ' ' + k++;
+  const src = v => CHARS[cfWrap(v, CUSTOM0)];
+  const hs = src(d.heavy), ks = src(d.skill), ss = src(d.special), us = src(d.sup);
+  const col = CF_COLS[cfWrap(d.col, 16)], back = CF_COLS[cfWrap(d.back, 16)];
+  const T = CF_TYPES[cfWrap(d.type, CF_TYPES.length)];
+  const c = F3(nm, 'CUSTOM FIGHTER', ['Made in the Town Workshop!', T[0] + ': ' + T[2] + '.', 'Special: ' + ss.sname + '.'], col, back, CF_COLS[cfWrap(d.col + 5, 16)], CF_ACC[cfWrap(d.acc, CF_ACC.length)], Object.assign({}, T[1], { size: CF_SIZE[cfWrap(d.size, 4)][1] }));
+  c.custom = true; c.heavy = hs.heavy; for (const k of ['sword', 'ranged', 'weapon', 'homerun']) if (hs[k] !== undefined) c[k] = hs[k]; c.skill = ks.skill || 'SK_UPPER'; c.kname = A[c.skill] ? A[c.skill].kname : ks.kname;
+  c.special = ss.special; c.sname = ss.sname;
+  SUPERS[nm] = SUPERS[us.name] || SUPERS.SCRIBBLE; c.supname = SUPERS[nm][0];
+  CHARS[idx] = c;
+  for (const p of (G.players || [])) if (p.ci === idx) p.applyChar();
+}
+for (let i = 0; i < CUSTOM_N; i++) { CF[i] = Object.assign(cfDefault(i), CF[i] || {}); CHARS.push({}); applyCustom(i); }
 function doSuper(p) {
   bumpProg('supers');
   const foes = foesOf(p), id = p.superId || p.char.name, S = SUPERS[id] || SUPERS.SCRIBBLE;
@@ -6084,11 +6120,13 @@ function onKeyPress(code) {
   if (G.state === 'cutscene' && code === 'Escape') { endScene(); return; }
   if (G.state === 'padsetup' && code === 'KeyR') resetPadMaps();
   if (G.state === 'title' && code === 'KeyC') enterSetup();
+  if (G.state === 'title' && code === 'KeyT') { enterTown(); return; }
   if (G.state === 'title' && code === 'KeyR' && G.world && !NET.role) netRejoin();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'play') G.state = 'pause'; });
 
 function step() {
+  if (G.state === 'town') { G.titleT++; townUpdate(); tapped.clear(); return; }
   if (NET.role === 'guest' && NET.connected) { guestStep(); return; }
   stepLocal(); netHostTick();
 }
@@ -9061,6 +9099,12 @@ function drawOver() {
 }
 function render(now) {
   boil = Math.floor(now / 110) % 4;
+  if (G.state === 'town' && V3.ok && TOWN.built) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); V3.c3.style.display = 'block';
+    ctx.setTransform(scale, 0, 0, scale, offX, offY); ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+    try { drawTown2D(); } catch (e) { console.warn(e); }
+    ctx.restore(); renderTown(); return;
+  }
   const in3D = V3.on && V3.ok && !['title', 'select', 'padsetup', 'mode', 'chapter', 'cutscene', 'stage'].includes(G.state);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (in3D) ctx.clearRect(0, 0, canvas.width, canvas.height); else { ctx.fillStyle = '#0d0d10'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
@@ -9461,6 +9505,7 @@ function toggle3D() {
   try { SFX.menu(); } catch (e) {}
 }
 function draw3DHint(in3D) {
+  if (G.state === 'title') { const b = TOWN_BTN; ctx.fillStyle = '#3aa04a'; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = '#24242a'; ctx.lineWidth = 4; ctx.strokeRect(b.x, b.y, b.w, b.h); txt('STICK TOWN', b.x + b.w / 2, b.y + 24, 27, '#fff', 'center', F1); txt('click or press T', b.x + b.w / 2, b.y + 47, 13, '#e8ffe0', 'center', F2); txt('COINS: ' + G.coins, b.x + b.w / 2, b.y + b.h + 22, 18, '#a07a10', 'center', F1); }
   if (G.state === 'title') txt('PRESS V FOR 3D VIEW' + (V3.on ? ' (ON)' : ''), 40, 112, 22, V3.on ? '#e2342c' : '#2a6ae6', 'left', F1);
   if (G.state === 'pause') txt('V = ' + (V3.on ? '2D' : '3D') + ' VIEW', W / 2, H - 40, 26, '#fff', 'center', F1);
   if (V3.msgT > 0) { V3.msgT--; ctx.save(); ctx.globalAlpha = Math.min(1, V3.msgT / 20); ctx.fillStyle = 'rgba(20,20,26,0.8)'; ctx.fillRect(W / 2 - 330, 120, 660, 64); txt(V3.msg, W / 2, 152, 34, '#ffd23a', 'center', F1); ctx.restore(); }
@@ -9561,6 +9606,497 @@ function init3D() {
   } catch (e) { console.warn('3D view unavailable', e); return false; }
 }
 function render3D() { try { V3.draw(); } catch (e) { console.warn(e); V3.on = false; } }
+
+// ================================================================ STICK TOWN (3D hub)
+// Walk around a 3D town, spend coins on homes, decorations and pets,
+// and design your own fighters in the Fighter Workshop.
+const TOWN_HOMES = [
+  { k: 'tent', n: 'TENT', p: 100, d: 'A cozy camping tent' }, { k: 'cabin', n: 'LOG CABIN', p: 250, d: 'A woodsy log cabin' },
+  { k: 'cottage', n: 'COTTAGE', p: 400, d: 'A cute little cottage' }, { k: 'igloo', n: 'IGLOO', p: 500, d: 'A chilly ice house' },
+  { k: 'treehouse', n: 'TREEHOUSE', p: 650, d: 'A house up in a tree' }, { k: 'mushroom', n: 'MUSHROOM HOUSE', p: 750, d: 'A giant spotty mushroom' },
+  { k: 'candy', n: 'CANDY HOUSE', p: 900, d: 'Made of sweets and candy canes' }, { k: 'rocket', n: 'ROCKET HOUSE', p: 1200, d: 'Ready for blast off' },
+  { k: 'mansion', n: 'MANSION', p: 1600, d: 'A huge fancy mansion' }, { k: 'castle', n: 'CASTLE', p: 2500, d: 'Your very own castle!' },
+];
+const TOWN_DECOR = [
+  { k: 'bush', n: 'BUSH', p: 10 }, { k: 'fence', n: 'FENCE', p: 10 }, { k: 'flowers', n: 'FLOWER BED', p: 15 }, { k: 'mailbox', n: 'MAILBOX', p: 15 },
+  { k: 'tree', n: 'TREE', p: 20 }, { k: 'pumpkin', n: 'PUMPKIN', p: 20 }, { k: 'lamp', n: 'LAMP POST', p: 25 }, { k: 'balloons', n: 'BALLOONS', p: 25 },
+  { k: 'bench', n: 'BENCH', p: 30 }, { k: 'gnome', n: 'GARDEN GNOME', p: 30 }, { k: 'flag', n: 'FLAG', p: 35 }, { k: 'snowman', n: 'SNOWMAN', p: 40 },
+  { k: 'campfire', n: 'CAMPFIRE', p: 45 }, { k: 'trampoline', n: 'TRAMPOLINE', p: 60, d: 'Jump on it to bounce!' }, { k: 'swing', n: 'SWING SET', p: 80 },
+  { k: 'arch', n: 'RAINBOW ARCH', p: 120 }, { k: 'pool', n: 'POOL', p: 140 }, { k: 'fountain', n: 'FOUNTAIN', p: 150 }, { k: 'statue', n: 'STATUE OF YOU', p: 200, d: 'A golden statue of your fighter' },
+];
+const TOWN_PETS = [
+  { k: 'duck', n: 'DUCK', p: 80 }, { k: 'bunny', n: 'BUNNY', p: 120 }, { k: 'puppy', n: 'PUPPY', p: 150 }, { k: 'kitty', n: 'KITTY', p: 150 },
+  { k: 'pig', n: 'PIGGY', p: 200 }, { k: 'penguin', n: 'PENGUIN', p: 300 }, { k: 'robodog', n: 'ROBO DOG', p: 600 },
+  { k: 'dragon', n: 'BABY DRAGON', p: 1200 }, { k: 'unicorn', n: 'UNICORN', p: 1500 },
+];
+const TOWN_LOTS = [[42, -15, 0], [58, -15, 0], [74, -15, 0], [90, -15, 0], [42, 15, Math.PI], [58, 15, Math.PI], [74, 15, Math.PI], [90, 15, Math.PI]];
+const TOWN_SHOPS = [
+  { k: 'workshop', n: 'FIGHTER WORKSHOP', x: -20, z: -30, r: 0, w: 12, d: 9, h: 6, col: '#2a7ae6', roof: '#1a3a8a' },
+  { k: 'homes', n: 'HOME SHOP', x: 0, z: -32, r: 0, w: 12, d: 9, h: 7, col: '#ff9a3a', roof: '#a0401a' },
+  { k: 'decor', n: 'DECOR SHOP', x: 20, z: -30, r: 0, w: 12, d: 9, h: 6, col: '#ff6aa0', roof: '#a02a6a' },
+  { k: 'pets', n: 'PET SHOP', x: -32, z: 4, r: Math.PI / 2, w: 11, d: 8, h: 6, col: '#3aa04a', roof: '#1a6a2a' },
+];
+const NAME_IDEAS = ['MY GUY', 'SUPER ME', 'CAPTAIN COOL', 'NINJA KID', 'MEGA MAX', 'STAR DUDE', 'THUNDER TOM', 'ZIPPY', 'BLAZE BOY', 'DOODLE KING', 'SPEEDY SAM', 'ROCKET RAY'];
+const TOWN = { built: false, ui: null, sel: 0, scroll: 0, tab: 'homes', msg: '', msgT: 0, prompt: null, px: 0, pz: 8, py: 0, vy: 0, face: 0, walkT: 0, field: 0, slot: 0, hold: 0, holdDir: 0, pad: {}, coins: [], coinT: 0, pet: null, petX: 0, petZ: 10, petY: 0 };
+let TS = { homes: [null, null, null, null, null, null, null, null], decor: [], pack: {}, pets: [], pet: null };
+try { const t = JSON.parse(localStorage.getItem('stickSquadTown') || 'null'); if (t) TS = Object.assign(TS, t); } catch (e) { }
+function townSave() { try { localStorage.setItem('stickSquadTown', JSON.stringify(TS)); } catch (e) { } }
+function townMsg(m, t) { TOWN.msg = m; TOWN.msgT = t || 120; }
+
+function enterTown() {
+  if (NET.role) { V3.msg = 'LEAVE ONLINE PLAY TO VISIT TOWN'; V3.msgT = 150; return; }
+  if (!init3D()) { V3.msg = 'THE TOWN NEEDS AN INTERNET CONNECTION'; V3.msgT = 150; return; }
+  try { if (!TOWN.built) buildTown(); } catch (e) { console.warn('town failed', e); V3.msg = 'THE TOWN COULD NOT LOAD'; V3.msgT = 150; return; }
+  G.state = 'town'; TOWN.ui = null; TOWN.px = 0; TOWN.pz = 10; TOWN.py = 0; TOWN.vy = 0; TOWN.face = Math.PI;
+  keys.clear(); refreshAvatar(); townMsg('WELCOME TO STICK TOWN!', 150); try { SFX.banner(); } catch (e) { }
+}
+function leaveTown(fight) {
+  G.state = 'title'; TOWN.ui = null; keys.clear(); if (V3.c3) V3.c3.style.display = 'none';
+  if (fight) { G.players[0].joined = true; goSelect(); }
+}
+
+// ---------- 3D building blocks
+let TG = null;
+function tMat(col) { let m = TG.mats.get(col); if (!m) { m = new THREE.MeshLambertMaterial({ color: new THREE.Color().setStyle(col) }); TG.mats.set(col, m); } return m; }
+function tPart(g, geo, col, x, y, z, sx, sy, sz, ry, rx, rz) {
+  const m = new THREE.Mesh(TG[geo], typeof col === 'string' ? tMat(col) : col); m.position.set(x, y, z); m.scale.set(sx, sy, sz);
+  if (ry) m.rotation.y = ry; if (rx) m.rotation.x = rx; if (rz) m.rotation.z = rz; m.castShadow = m.receiveShadow = true; g.add(m); return m;
+}
+function tGlow(col) { let m = TG.mats.get('glow' + col); if (!m) { m = new THREE.MeshBasicMaterial({ color: new THREE.Color().setStyle(col) }); TG.mats.set('glow' + col, m); } return m; }
+function signTex(text, bg, fg) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0, 0, 512, 128); g.strokeStyle = fg; g.lineWidth = 8; g.strokeRect(6, 6, 500, 116);
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = 64; g.font = `${fs}px ${F1}`; while (g.measureText(text).width > 470 && fs > 20) { fs -= 4; g.font = `${fs}px ${F1}`; }
+  g.fillText(text, 256, 68); return new THREE.CanvasTexture(c);
+}
+function tSign(g, text, bg, fg, x, y, z, w, ry) { const m = new THREE.Mesh(TG.plane, new THREE.MeshBasicMaterial({ map: signTex(text, bg, fg) })); m.position.set(x, y, z); m.scale.set(w, w / 4, 1); if (ry) m.rotation.y = ry; g.add(m); return m; }
+function tRoof(g, col, y, w, d, h) { tPart(g, 'roof', col, 0, y + h / 2, 0, w * 0.75, h, d * 0.75, Math.PI / 4); }
+function tWindow(g, x, y, z, w, h) { tPart(g, 'box', '#bfe6ff', x, y, z, w, h, 0.15); }
+
+function buildHome(k) {
+  const g = new THREE.Group();
+  const door = (z, col) => tPart(g, 'box', col || '#5a3a1a', 0, 1.1, z, 1.4, 2.2, 0.2);
+  if (k === 'tent') { tPart(g, 'roof', '#e2342c', 0, 1.7, 0, 3.4, 3.4, 3.4, Math.PI / 4); tPart(g, 'box', '#5a1a1a', 0, 0.8, 2.15, 1.2, 1.6, 0.1); }
+  else if (k === 'cabin') { tPart(g, 'box', '#8a5a2a', 0, 1.8, 0, 7, 3.6, 5.5); for (let y = 0.4; y < 3.6; y += 0.6) tPart(g, 'cyl', '#6a4018', 0, y, 2.8, 0.18, 7.2, 0.18, 0, 0, Math.PI / 2); tRoof(g, '#5a2a1a', 3.6, 8, 6.5, 2.4); door(2.9); tWindow(g, -2.3, 2, 2.95, 1.2, 1); tWindow(g, 2.3, 2, 2.95, 1.2, 1); }
+  else if (k === 'cottage') { tPart(g, 'box', '#f2e8d0', 0, 1.8, 0, 7, 3.6, 6); tRoof(g, '#c0392b', 3.6, 8.2, 7, 2.8); door(3.05, '#2a7ae6'); tWindow(g, -2.3, 2, 3.05, 1.3, 1.1); tWindow(g, 2.3, 2, 3.05, 1.3, 1.1); tPart(g, 'box', '#8a3a2a', 2.2, 5.6, -1, 0.8, 2, 0.8); for (const x of [-2.6, -1.6, 1.6, 2.6]) tPart(g, 'sph', '#ff6aa0', x, 0.3, 3.4, 0.35, 0.35, 0.35); }
+  else if (k === 'igloo') { tPart(g, 'sph', '#f2f8ff', 0, 0, 0, 3.6, 3.2, 3.6); tPart(g, 'cyl', '#e2eef8', 0, 0.9, 3.4, 1.2, 1.8, 1.2, 0, Math.PI / 2); tPart(g, 'box', '#3a5a7a', 0, 0.8, 4.3, 1.1, 1.5, 0.1); }
+  else if (k === 'treehouse') { tPart(g, 'cyl', '#6a4018', 0, 3, 0, 0.9, 6, 0.9); tPart(g, 'sph', '#3a9a3a', 0, 9.5, 0, 4.5, 3.2, 4.5); tPart(g, 'box', '#c08a4a', 0, 6.6, 0, 5, 2.6, 4); tRoof(g, '#a0401a', 7.9, 6, 5, 1.8); tPart(g, 'box', '#8a5a2a', 0, 5.2, 0, 6, 0.3, 5); tWindow(g, 0, 6.8, 2.05, 1.4, 1); for (let y = 0.4; y < 5.2; y += 0.6) tPart(g, 'box', '#8a5a2a', 0, y, 2.9, 1.2, 0.12, 0.12); tPart(g, 'box', '#8a5a2a', -0.6, 2.6, 2.9, 0.12, 5.2, 0.12); tPart(g, 'box', '#8a5a2a', 0.6, 2.6, 2.9, 0.12, 5.2, 0.12); }
+  else if (k === 'mushroom') { tPart(g, 'cyl', '#f2e8d0', 0, 2, 0, 2.2, 4, 2.2); tPart(g, 'sph', '#e2342c', 0, 4.2, 0, 4.4, 2.6, 4.4); for (const [x, y, z] of [[2, 5.6, 1.6], [-2.2, 5.3, 1.4], [0, 6.5, -0.5], [1.4, 5, -2.8], [-1.6, 5.6, -2.2], [3.2, 4.6, -0.6]]) tPart(g, 'sph', '#ffffff', x, y, z, 0.6, 0.45, 0.6); door(2.2, '#8a5a2a'); tWindow(g, 1.2, 2.6, 2.05, 0.8, 0.8); }
+  else if (k === 'candy') { tPart(g, 'box', '#ffb0d0', 0, 1.8, 0, 7, 3.6, 6); tRoof(g, '#6a3a1a', 3.6, 8.2, 7, 2.8); door(3.05, '#e2342c'); tWindow(g, -2.3, 2, 3.05, 1.3, 1.1); tWindow(g, 2.3, 2, 3.05, 1.3, 1.1); for (const x of [-3.9, 3.9]) for (let y = 0.3; y < 4.4; y += 0.6) tPart(g, 'cyl', (y * 10 | 0) % 12 < 6 ? '#ffffff' : '#e2342c', x, y, 3.2, 0.3, 0.6, 0.3); ['#ff4a6a', '#ffd23a', '#4ad07a', '#4a8aff', '#c04aff'].forEach((c, i) => tPart(g, 'sph', c, -2.4 + i * 1.2, 4.3 + (i % 2) * 0.3, 1.8 - (i % 2) * 0.6, 0.45, 0.45, 0.45)); }
+  else if (k === 'rocket') { tPart(g, 'cyl', '#d8dce8', 0, 4, 0, 2.6, 8, 2.6); tPart(g, 'cone', '#e2342c', 0, 9.6, 0, 2.6, 3.2, 2.6); for (const a of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) tPart(g, 'box', '#e2342c', Math.sin(a) * 2.8, 1.4, Math.cos(a) * 2.8, 0.3, 2.8, 1.6, a); tPart(g, 'sph', '#7ad0ff', 0, 6, 2.4, 0.9, 0.9, 0.5); door(2.5, '#6a6a7a'); }
+  else if (k === 'mansion') { tPart(g, 'box', '#f4f0e8', 0, 2.8, 0, 11, 5.6, 7); tPart(g, 'box', '#f4f0e8', 0, 6.4, -0.5, 7, 1.6, 5.5); tRoof(g, '#5a5a6a', 7.2, 8.5, 7, 2.4); for (const x of [-3.5, -1.2, 1.2, 3.5]) tPart(g, 'cyl', '#ffffff', x, 2.4, 4.2, 0.35, 4.8, 0.35); tPart(g, 'box', '#e8e0d0', 0, 5, 4.3, 8.4, 0.4, 1.6); door(3.6, '#5a2a1a'); for (const x of [-4.4, -2.6, 2.6, 4.4]) { tWindow(g, x, 1.8, 3.55, 1, 1.4); tWindow(g, x, 4, 3.55, 1, 1.2); } }
+  else if (k === 'castle') { tPart(g, 'box', '#a8a8b0', 0, 3, 0, 9, 6, 7); for (const [x, z] of [[-4.5, -3.5], [4.5, -3.5], [-4.5, 3.5], [4.5, 3.5]]) { tPart(g, 'cyl', '#9898a2', x, 4, z, 1.4, 8, 1.4); tPart(g, 'cone', '#2a5ab0', x, 9.2, z, 1.7, 2.6, 1.7); tPart(g, 'cyl', '#555', x, 11.4, z, 0.05, 1.6, 0.05); tPart(g, 'box', '#e2342c', x + 0.45, 11.8, z, 0.9, 0.5, 0.05); } for (let x = -4; x <= 4; x += 1.6) tPart(g, 'box', '#a8a8b0', x, 6.4, 3.5, 0.8, 0.8, 0.5); tPart(g, 'box', '#3a2a1a', 0, 1.6, 3.55, 2.4, 3.2, 0.2); tPart(g, 'cyl', '#3a2a1a', 0, 3.2, 3.55, 1.2, 0.2, 1.2, 0, Math.PI / 2); tWindow(g, -2.5, 4, 3.55, 0.8, 1.2); tWindow(g, 2.5, 4, 3.55, 0.8, 1.2); }
+  return g;
+}
+function buildDecor(k) {
+  const g = new THREE.Group();
+  if (k === 'tree') { tPart(g, 'cyl', '#6a4018', 0, 1.2, 0, 0.3, 2.4, 0.3); tPart(g, 'sph', '#3a9a3a', 0, 3, 0, 1.5, 1.4, 1.5); tPart(g, 'sph', '#4ab04a', 0, 4.1, 0, 1, 1, 1); }
+  else if (k === 'bush') tPart(g, 'sph', '#3a8a3a', 0, 0.5, 0, 1, 0.8, 1);
+  else if (k === 'flowers') { tPart(g, 'box', '#6a4018', 0, 0.15, 0, 2.4, 0.3, 1); ['#ff4a6a', '#ffd23a', '#c04aff', '#ff8a2a', '#4a8aff'].forEach((c, i) => { tPart(g, 'cyl', '#3a8a3a', -0.9 + i * 0.45, 0.5, 0, 0.04, 0.6, 0.04); tPart(g, 'sph', c, -0.9 + i * 0.45, 0.85, 0, 0.18, 0.18, 0.18); }); }
+  else if (k === 'lamp') { tPart(g, 'cyl', '#333', 0, 1.6, 0, 0.1, 3.2, 0.1); const b = tPart(g, 'sph', '#fff', 0, 3.3, 0, 0.35, 0.35, 0.35); b.material = tGlow('#ffe680'); }
+  else if (k === 'bench') { tPart(g, 'box', '#8a5a2a', 0, 0.6, 0, 2.4, 0.15, 0.7); tPart(g, 'box', '#8a5a2a', 0, 1.1, -0.32, 2.4, 0.6, 0.12); for (const x of [-1, 1]) tPart(g, 'box', '#333', x, 0.3, 0, 0.12, 0.6, 0.6); }
+  else if (k === 'mailbox') { tPart(g, 'cyl', '#6a4018', 0, 0.6, 0, 0.08, 1.2, 0.08); tPart(g, 'box', '#2a7ae6', 0, 1.35, 0, 0.5, 0.4, 0.8); tPart(g, 'box', '#e2342c', 0.3, 1.5, -0.1, 0.05, 0.4, 0.1); }
+  else if (k === 'fence') { for (const x of [-1.5, -0.5, 0.5, 1.5]) tPart(g, 'box', '#ffffff', x, 0.6, 0, 0.18, 1.2, 0.12); for (const y of [0.4, 0.9]) tPart(g, 'box', '#ffffff', 0, y, 0, 3.2, 0.12, 0.1); }
+  else if (k === 'gnome') { tPart(g, 'cyl', '#2a5ab0', 0, 0.35, 0, 0.3, 0.7, 0.3); tPart(g, 'sph', '#f2c8a0', 0, 0.85, 0, 0.25, 0.25, 0.25); tPart(g, 'sph', '#ffffff', 0, 0.7, 0.15, 0.2, 0.22, 0.12); tPart(g, 'cone', '#e2342c', 0, 1.3, 0, 0.3, 0.7, 0.3); }
+  else if (k === 'pumpkin') { tPart(g, 'sph', '#ff8a1a', 0, 0.45, 0, 0.6, 0.45, 0.6); tPart(g, 'cyl', '#3a7a2a', 0, 0.95, 0, 0.06, 0.25, 0.06); }
+  else if (k === 'snowman') { tPart(g, 'sph', '#ffffff', 0, 0.6, 0, 0.65, 0.65, 0.65); tPart(g, 'sph', '#ffffff', 0, 1.5, 0, 0.45, 0.45, 0.45); tPart(g, 'sph', '#ffffff', 0, 2.15, 0, 0.32, 0.32, 0.32); tPart(g, 'cone', '#ff8a1a', 0, 2.15, 0.4, 0.06, 0.35, 0.06, 0, Math.PI / 2); tPart(g, 'cyl', '#222', 0, 2.55, 0, 0.25, 0.4, 0.25); }
+  else if (k === 'flag') { tPart(g, 'cyl', '#ddd', 0, 2, 0, 0.06, 4, 0.06); tPart(g, 'box', '#e2342c', 0.65, 3.5, 0, 1.2, 0.8, 0.05); }
+  else if (k === 'campfire') { for (const a of [0, 1.05, 2.1]) tPart(g, 'cyl', '#6a4018', 0, 0.15, 0, 0.1, 1.2, 0.1, a, 0, Math.PI / 2); const f = tPart(g, 'cone', '#fff', 0, 0.55, 0, 0.35, 0.8, 0.35); f.material = tGlow('#ff8a1a'); const f2 = tPart(g, 'cone', '#fff', 0, 0.5, 0, 0.2, 0.5, 0.2); f2.material = tGlow('#ffe040'); }
+  else if (k === 'balloons') { ['#ff4a6a', '#4a8aff', '#ffd23a'].forEach((c, i) => { tPart(g, 'cyl', '#888', (i - 1) * 0.25, 1.4, 0, 0.015, 2.8, 0.015, 0, 0, (i - 1) * 0.15); tPart(g, 'sph', c, (i - 1) * 0.5, 3, 0, 0.35, 0.42, 0.35); }); }
+  else if (k === 'trampoline') { tPart(g, 'cyl', '#2a7ae6', 0, 0.5, 0, 1.5, 0.12, 1.5); tPart(g, 'cyl', '#222', 0, 0.52, 0, 1.3, 0.12, 1.3); for (const a of [0, 1.57, 3.14, 4.71]) tPart(g, 'cyl', '#888', Math.sin(a) * 1.3, 0.25, Math.cos(a) * 1.3, 0.05, 0.5, 0.05); }
+  else if (k === 'swing') { for (const x of [-1.6, 1.6]) { tPart(g, 'cyl', '#e2342c', x, 1.3, 0.5, 0.08, 2.8, 0.08, 0, 0.35); tPart(g, 'cyl', '#e2342c', x, 1.3, -0.5, 0.08, 2.8, 0.08, 0, -0.35); } tPart(g, 'cyl', '#e2342c', 0, 2.6, 0, 0.08, 3.4, 0.08, 0, 0, Math.PI / 2); for (const x of [-0.6, 0.6]) { tPart(g, 'cyl', '#888', x - 0.2, 1.6, 0, 0.02, 2, 0.02); tPart(g, 'cyl', '#888', x + 0.2, 1.6, 0, 0.02, 2, 0.02); tPart(g, 'box', '#ffd23a', x, 0.6, 0, 0.6, 0.08, 0.3); } }
+  else if (k === 'pool') { tPart(g, 'box', '#ffffff', 0, 0.2, 0, 4.4, 0.4, 3); const w = tPart(g, 'box', '#3ab0ff', 0, 0.25, 0, 4, 0.4, 2.6); w.material = tGlow('#5ac8ff'); }
+  else if (k === 'fountain') { tPart(g, 'cyl', '#b8b8c0', 0, 0.35, 0, 1.8, 0.7, 1.8); const w = tPart(g, 'cyl', '#fff', 0, 0.62, 0, 1.6, 0.1, 1.6); w.material = tGlow('#7ad0ff'); tPart(g, 'cyl', '#b8b8c0', 0, 1.3, 0, 0.25, 1.6, 0.25); tPart(g, 'cyl', '#b8b8c0', 0, 2.1, 0, 0.8, 0.2, 0.8); const s = tPart(g, 'sph', '#fff', 0, 2.5, 0, 0.3, 0.5, 0.3); s.material = tGlow('#9adcff'); }
+  else if (k === 'arch') { ['#e2342c', '#ff8a1a', '#ffd23a', '#3aa04a', '#2a7ae6', '#7a3ad0'].forEach((c, i) => { const m = new THREE.Mesh(new THREE.TorusGeometry(3 - i * 0.22, 0.12, 8, 32, Math.PI), tMat(c)); m.castShadow = true; g.add(m); }); }
+  else if (k === 'statue') { tPart(g, 'box', '#d8d8d0', 0, 0.5, 0, 1.6, 1, 1.6); const st = makeStick('#d4af37', '#b8902a', 1.1, null); st.g.position.y = 1; st.armL.rotation.z = 2.6; g.add(st.g); }
+  return g;
+}
+function buildPet(k) {
+  const g = new THREE.Group(), b = (col, x, y, z, sx, sy, sz) => tPart(g, 'sph', col, x, y, z, sx, sy, sz), eye = (x, y, z) => { b('#111', x, y, z, 0.06, 0.06, 0.06); };
+  const quad = (col, ears) => { b(col, 0, 0.45, 0, 0.35, 0.3, 0.5); b(col, 0, 0.75, 0.45, 0.26, 0.26, 0.26); eye(-0.1, 0.8, 0.68); eye(0.1, 0.8, 0.68); for (const x of [-0.2, 0.2]) for (const z of [-0.3, 0.3]) tPart(g, 'cyl', col, x, 0.18, z, 0.07, 0.36, 0.07); if (ears) ears(); };
+  if (k === 'puppy') quad('#a0703a', () => { for (const x of [-0.22, 0.22]) b('#6a4a1a', x, 0.72, 0.45, 0.08, 0.2, 0.12); b('#a0703a', 0, 0.55, -0.55, 0.06, 0.06, 0.2); });
+  else if (k === 'kitty') quad('#ff9a3a', () => { for (const x of [-0.14, 0.14]) tPart(g, 'cone', '#ff9a3a', x, 1.02, 0.45, 0.08, 0.18, 0.08); tPart(g, 'cyl', '#ff9a3a', 0, 0.7, -0.55, 0.05, 0.6, 0.05, 0, -0.6); });
+  else if (k === 'pig') quad('#ffb0c0', () => { b('#ff8aa0', 0, 0.72, 0.7, 0.12, 0.1, 0.06); for (const x of [-0.15, 0.15]) tPart(g, 'cone', '#ffb0c0', x, 1, 0.42, 0.08, 0.14, 0.08); });
+  else if (k === 'robodog') { tPart(g, 'box', '#9aa0aa', 0, 0.45, 0, 0.6, 0.4, 0.9); tPart(g, 'box', '#9aa0aa', 0, 0.8, 0.5, 0.45, 0.4, 0.4); const e1 = tPart(g, 'box', '#fff', -0.1, 0.85, 0.71, 0.08, 0.06, 0.02); e1.material = tGlow('#5aff8a'); const e2 = tPart(g, 'box', '#fff', 0.1, 0.85, 0.71, 0.08, 0.06, 0.02); e2.material = tGlow('#5aff8a'); for (const x of [-0.22, 0.22]) for (const z of [-0.3, 0.3]) tPart(g, 'box', '#6a6a7a', x, 0.15, z, 0.1, 0.3, 0.1); tPart(g, 'cyl', '#333', 0, 1.15, 0.5, 0.02, 0.3, 0.02); const t = tPart(g, 'sph', '#fff', 0, 1.3, 0.5, 0.05, 0.05, 0.05); t.material = tGlow('#ff4a4a'); }
+  else if (k === 'bunny') { b('#ffffff', 0, 0.35, 0, 0.3, 0.3, 0.35); b('#ffffff', 0, 0.7, 0.25, 0.22, 0.22, 0.22); for (const x of [-0.08, 0.08]) b('#ffd0e0', x, 1.05, 0.22, 0.06, 0.25, 0.05); eye(-0.08, 0.75, 0.45); eye(0.08, 0.75, 0.45); b('#ffffff', 0, 0.4, -0.38, 0.12, 0.12, 0.12); }
+  else if (k === 'duck') { b('#ffd23a', 0, 0.35, 0, 0.3, 0.28, 0.38); b('#ffd23a', 0, 0.75, 0.22, 0.2, 0.2, 0.2); tPart(g, 'box', '#ff8a1a', 0, 0.72, 0.45, 0.16, 0.06, 0.18); eye(-0.09, 0.8, 0.38); eye(0.09, 0.8, 0.38); }
+  else if (k === 'penguin') { b('#1a1a22', 0, 0.55, 0, 0.32, 0.5, 0.3); b('#ffffff', 0, 0.5, 0.15, 0.22, 0.38, 0.18); b('#1a1a22', 0, 1.1, 0, 0.22, 0.22, 0.22); tPart(g, 'cone', '#ff8a1a', 0, 1.08, 0.25, 0.05, 0.14, 0.05, 0, Math.PI / 2); eye(-0.08, 1.15, 0.18); eye(0.08, 1.15, 0.18); for (const x of [-0.12, 0.12]) tPart(g, 'box', '#ff8a1a', x, 0.04, 0.08, 0.14, 0.06, 0.2); }
+  else if (k === 'dragon') { quad('#3aa04a', () => { for (const x of [-0.12, 0.12]) tPart(g, 'cone', '#ffd23a', x, 1.05, 0.42, 0.05, 0.2, 0.05); for (const d of [-1, 1]) tPart(g, 'box', '#2a7a3a', d * 0.5, 0.75, 0, 0.6, 0.05, 0.4, 0, 0, d * 0.4); tPart(g, 'cone', '#3aa04a', 0, 0.5, -0.7, 0.12, 0.5, 0.12, 0, -Math.PI / 2); }); }
+  else if (k === 'unicorn') { quad('#ffffff', () => { tPart(g, 'cone', '#ffd23a', 0, 1.15, 0.55, 0.05, 0.35, 0.05, 0, 0.4); ['#ff4a6a', '#ffd23a', '#4a8aff'].forEach((c, i) => b(c, 0, 0.95 - i * 0.12, 0.3 - i * 0.1, 0.08, 0.1, 0.12)); }); }
+  return g;
+}
+function makeStick(col, back, sz, acc) {
+  const g = new THREE.Group(), s = sz || 1;
+  const limb = (c, x, y, len) => { const pv = new THREE.Group(); pv.position.set(x * s, y * s, 0); tPart(pv, 'cyl', c, 0, -len * s / 2, 0, 0.09 * s, len * s, 0.09 * s); tPart(pv, 'sph', c, 0, -len * s, 0, 0.1 * s, 0.1 * s, 0.1 * s); g.add(pv); return pv; };
+  const legL = limb(back, -0.14, 0.95, 0.95), legR = limb(col, 0.14, 0.95, 0.95), armL = limb(back, -0.2, 1.68, 0.75), armR = limb(col, 0.2, 1.68, 0.75);
+  tPart(g, 'cyl', col, 0, 1.33 * s, 0, 0.11 * s, 0.8 * s, 0.11 * s); tPart(g, 'sph', col, 0, 0.95 * s, 0, 0.13 * s, 0.13 * s, 0.13 * s);
+  tPart(g, 'sph', col, 0, 2.05 * s, 0, 0.29 * s, 0.29 * s, 0.29 * s);
+  for (const x of [-0.1, 0.1]) { tPart(g, 'sph', '#ffffff', x * s, 2.1 * s, 0.24 * s, 0.07 * s, 0.07 * s, 0.05 * s); tPart(g, 'sph', '#111111', x * s, 2.1 * s, 0.28 * s, 0.035 * s, 0.035 * s, 0.03 * s); }
+  const hy = 2.05 * s;
+  if (acc === 'crown' || acc === 'tiara') { tPart(g, 'cyl', '#f2c230', 0, hy + 0.3 * s, 0, 0.22 * s, 0.18 * s, 0.22 * s); }
+  else if (['cap', 'hardhat', 'helmet', 'backcap', 'beanie', 'knighthelm'].includes(acc)) tPart(g, 'sph', acc === 'hardhat' ? '#f2c230' : acc === 'knighthelm' ? '#9aa0aa' : col === '#e2342c' ? '#2a7ae6' : '#e2342c', 0, hy + 0.08 * s, 0, 0.31 * s, 0.22 * s, 0.31 * s);
+  else if (acc === 'tophat' || acc === 'chef') { tPart(g, 'cyl', acc === 'chef' ? '#ffffff' : '#1a1a1a', 0, hy + 0.42 * s, 0, 0.2 * s, 0.4 * s, 0.2 * s); tPart(g, 'cyl', acc === 'chef' ? '#ffffff' : '#1a1a1a', 0, hy + 0.24 * s, 0, 0.32 * s, 0.04 * s, 0.32 * s); }
+  else if (acc === 'horns' || acc === 'cat' || acc === 'bunny') for (const x of [-0.16, 0.16]) tPart(g, 'cone', acc === 'horns' ? '#f2e8d0' : col, x * s, hy + (acc === 'bunny' ? 0.45 : 0.3) * s, 0, 0.07 * s, (acc === 'bunny' ? 0.45 : 0.22) * s, 0.07 * s);
+  else if (acc === 'halo') { const h = new THREE.Mesh(new THREE.TorusGeometry(0.22 * s, 0.03 * s, 6, 20), tGlow('#ffe680')); h.position.set(0, hy + 0.45 * s, 0); h.rotation.x = Math.PI / 2; g.add(h); }
+  else if (acc === 'band' || acc === 'topknot' || acc === 'mask') tPart(g, 'cyl', acc === 'mask' ? '#15151a' : '#ffd23a', 0, hy + 0.06 * s, 0, 0.3 * s, 0.07 * s, 0.3 * s);
+  else if (acc) tPart(g, 'cone', '#ffd23a', 0, hy + 0.36 * s, 0, 0.22 * s, 0.3 * s, 0.22 * s);
+  return { g, legL, legR, armL, armR };
+}
+
+function buildTown() {
+  const S = new THREE.Scene(); S.background = new THREE.Color(0x9ad4ff); S.fog = new THREE.Fog(0x9ad4ff, 90, 190);
+  TG = { S, mats: new Map(), box: new THREE.BoxGeometry(1, 1, 1), cyl: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.SphereGeometry(1, 18, 14), cone: new THREE.ConeGeometry(1, 1, 16), roof: new THREE.ConeGeometry(1, 1, 4), plane: new THREE.PlaneGeometry(1, 1) };
+  TG.cam = new THREE.PerspectiveCamera(50, W / H, 0.5, 400);
+  S.add(new THREE.HemisphereLight(0xffffff, 0x7a9a5a, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0008;
+  Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 200 }); S.add(sun, sun.target); TG.sun = sun;
+  const gnd = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), tMat('#7ac25a')); gnd.rotation.x = -Math.PI / 2; gnd.receiveShadow = true; S.add(gnd);
+  const plaza = tPart(S, 'cyl', '#c2b293', 0, 0.02, 0, 16, 0.04, 16); plaza.castShadow = false;
+  tPart(S, 'box', '#8a8a92', 60, 0.03, 0, 92, 0.06, 9).castShadow = false; tPart(S, 'box', '#e8e8e8', 60, 0.07, 0, 92, 0.02, 0.4).castShadow = false;
+  for (const [x, z, w, d] of [[0, -20, 5, 14], [-24, 2, 18, 4], [0, 20, 5, 10]]) tPart(S, 'box', '#d8cbb0', x, 0.03, z, w, 0.04, d).castShadow = false;
+  // big town fountain
+  const fo = buildDecor('fountain'); fo.scale.setScalar(2.2); S.add(fo);
+  // shops
+  TG.solid = [{ x: 0, z: 0, r: 4.2 }];
+  for (const sh of TOWN_SHOPS) {
+    const g = new THREE.Group(); g.position.set(sh.x, 0, sh.z); g.rotation.y = sh.r;
+    tPart(g, 'box', sh.col, 0, sh.h / 2, 0, sh.w, sh.h, sh.d); tPart(g, 'roof', sh.roof, 0, sh.h + 1.6, 0, sh.w * 0.78, 3.2, sh.d * 0.78, Math.PI / 4);
+    tPart(g, 'box', '#3a2a1a', 0, 1.4, sh.d / 2 + 0.05, 2.2, 2.8, 0.2); tPart(g, 'box', '#ffffff', 0, 3.3, sh.d / 2 + 0.06, 3.2, 0.4, 0.2);
+    for (const x of [-sh.w / 3, sh.w / 3]) tWindow(g, x, 2.2, sh.d / 2 + 0.06, 2, 1.6);
+    tSign(g, sh.n, '#ffffff', sh.roof, 0, sh.h - 0.8, sh.d / 2 + 0.12, Math.min(sh.w - 1, 9));
+    if (sh.k === 'workshop') { const st = makeStick('#e2342c', '#a01a1a', 1, 'band'); st.g.position.set(sh.w / 2 + 1.5, 0, 1); st.armR.rotation.z = -2.4; g.add(st.g); }
+    if (sh.k === 'pets') { const p = buildPet('puppy'); p.position.set(sh.w / 2 - 1.5, 0, sh.d / 2 + 1.2); g.add(p); }
+    if (sh.k === 'decor') for (const [x, kk] of [[-sh.w / 2 - 1.2, 'tree'], [sh.w / 2 + 1.2, 'flowers']]) { const d = buildDecor(kk); d.position.set(x, 0, sh.d / 2); g.add(d); }
+    S.add(g);
+    const swap = Math.abs(Math.sin(sh.r)) > 0.5; TG.solid.push({ x: sh.x, z: sh.z, hw: (swap ? sh.d : sh.w) / 2 + 0.6, hd: (swap ? sh.w : sh.d) / 2 + 0.6 });
+    sh.dx = sh.x + Math.sin(sh.r) * (sh.d / 2 + 2); sh.dz = sh.z + Math.cos(sh.r) * (sh.d / 2 + 2);
+  }
+  // battle gate
+  const gate = new THREE.Group(); gate.position.set(0, 0, 30);
+  for (const x of [-3.5, 3.5]) tPart(gate, 'box', '#c0392b', x, 3, 0, 1, 6, 1); tPart(gate, 'box', '#c0392b', 0, 6.3, 0, 9, 0.8, 1.2); tPart(gate, 'box', '#1a1a1a', 0, 6.95, 0, 9.6, 0.4, 1.4);
+  tSign(gate, 'BATTLE!', '#ffd23a', '#c0392b', 0, 5.2, 0.65, 4.5); tSign(gate, 'BATTLE!', '#ffd23a', '#c0392b', 0, 5.2, -0.65, 4.5, Math.PI);
+  const portal = tPart(gate, 'box', '#fff', 0, 2.6, 0, 6, 5.2, 0.1); portal.material = new THREE.MeshBasicMaterial({ color: 0x9a5aff, transparent: true, opacity: 0.45 }); TG.portal = portal;
+  S.add(gate); TG.solid.push({ x: -3.5, z: 30, hw: 0.8, hd: 0.8 }, { x: 3.5, z: 30, hw: 0.8, hd: 0.8 });
+  tSign(S, 'YOUR STREET ->', '#ffffff', '#2a7ae6', 24, 3, 6, 6, -Math.PI / 2 + 0.2); tPart(S, 'cyl', '#6a4018', 24, 1, 6, 0.1, 2, 0.1);
+  // scenery trees
+  const rnd = (() => { let a = 12345; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
+  for (let i = 0; i < 90; i++) { const a = rnd() * Math.PI * 2, r = 105 + rnd() * 40; const t = buildDecor('tree'); t.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); t.scale.setScalar(1.5 + rnd() * 1.5); S.add(t); }
+  for (let i = 0; i < 30; i++) { let x = -100 + rnd() * 200, z = -100 + rnd() * 200; if (Math.abs(z) < 30 && x > 25) continue; if (Math.hypot(x, z) < 45) continue; const t = buildDecor(rnd() < 0.7 ? 'tree' : 'bush'); t.position.set(x, 0, z); t.scale.setScalar(1 + rnd()); S.add(t); }
+  for (let i = 0; i < 12; i++) { const c = new THREE.Group(); for (let k = 0; k < 4; k++) tPart(c, 'sph', '#ffffff', k * 2.2 - 3, (k % 2) * 0.8, 0, 2.2, 1.4, 1.6).castShadow = false; c.position.set(-150 + rnd() * 300, 45 + rnd() * 20, -150 + rnd() * 120); S.add(c); }
+  TG.homes = new THREE.Group(); TG.decor = new THREE.Group(); S.add(TG.homes, TG.decor);
+  TG.coinGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.12, 20); TG.coinMat = new THREE.MeshLambertMaterial({ color: 0xffcf3a, emissive: 0x6a4a00 });
+  TOWN.built = true; rebuildHomes(); rebuildDecor();
+  for (let i = 0; i < 12; i++) spawnTownCoin();
+}
+function rebuildHomes() {
+  const H2 = TG.homes; while (H2.children.length) H2.remove(H2.children[0]);
+  TG.homeSolid = [];
+  TOWN_LOTS.forEach(([x, z, r], i) => {
+    const lot = new THREE.Group(); lot.position.set(x, 0, z); lot.rotation.y = r;
+    const k = TS.homes[i];
+    tPart(lot, 'box', k ? '#8ad06a' : '#b89a6a', 0, 0.02, -1, 13, 0.04, 13).castShadow = false;
+    if (k) { const h = buildHome(k); h.position.z = -1.5; lot.add(h); TG.homeSolid.push({ x, z: z + (r ? 1.5 : -1.5), hw: k === 'mansion' || k === 'castle' ? 6 : 4.4, hd: k === 'mansion' || k === 'castle' ? 4.6 : 3.8 }); tSign(lot, TOWN_HOMES.find(h2 => h2.k === k).n, '#ffffff', '#3a7a2a', 4.8, 1.6, 5.2, 2.6); }
+    else { tPart(lot, 'cyl', '#6a4018', 0, 1.1, 3, 0.1, 2.2, 0.1); tSign(lot, 'FOR SALE', '#ffffff', '#e2342c', 0, 2.2, 3.06, 2.6); }
+    H2.add(lot);
+  });
+}
+function rebuildDecor() {
+  const D = TG.decor; while (D.children.length) D.remove(D.children[0]);
+  for (const d of TS.decor) { const m = buildDecor(d.k); m.position.set(d.x, 0, d.z); m.rotation.y = d.r || 0; D.add(m); }
+}
+function refreshAvatar() {
+  if (!TG) return;
+  if (TOWN.av) TG.S.remove(TOWN.av.g);
+  const c = CHARS[G.players[0].ci] || CHARS[0];
+  TOWN.av = makeStick(c.col, c.back || c.col, Math.min(1.3, c.size || 1), c.acc); TG.S.add(TOWN.av.g);
+  if (TOWN.petObj) TG.S.remove(TOWN.petObj);
+  TOWN.petObj = TS.pet ? buildPet(TS.pet) : null; if (TOWN.petObj) { TOWN.petX = TOWN.px + 2; TOWN.petZ = TOWN.pz + 2; TG.S.add(TOWN.petObj); }
+}
+function spawnTownCoin() {
+  let x, z, tries = 0;
+  do { const a = Math.random() * Math.PI * 2, r = 8 + Math.random() * 70; x = Math.cos(a) * r; z = Math.sin(a) * r; tries++; } while (tries < 30 && townBlocked(x, z, 1));
+  const m = new THREE.Mesh(TG.coinGeo, TG.coinMat); m.rotation.x = Math.PI / 2; m.position.set(x, 1, z); m.castShadow = true; TG.S.add(m); TOWN.coins.push(m);
+}
+function townBlocked(x, z, pad) {
+  for (const b of TG.solid.concat(TG.homeSolid || [])) {
+    if (b.r) { if (Math.hypot(x - b.x, z - b.z) < b.r + pad) return true; }
+    else if (Math.abs(x - b.x) < b.hw + pad && Math.abs(z - b.z) < b.hd + pad) return true;
+  }
+  return false;
+}
+function townPush() {
+  const pr = 0.45;
+  for (const b of TG.solid.concat(TG.homeSolid || [])) {
+    if (b.r) { const dx = TOWN.px - b.x, dz = TOWN.pz - b.z, d = Math.hypot(dx, dz); if (d < b.r + pr && d > 0.001) { TOWN.px = b.x + dx / d * (b.r + pr); TOWN.pz = b.z + dz / d * (b.r + pr); } continue; }
+    const ox = b.hw + pr - Math.abs(TOWN.px - b.x), oz = b.hd + pr - Math.abs(TOWN.pz - b.z);
+    if (ox > 0 && oz > 0) { if (ox < oz) TOWN.px += Math.sign(TOWN.px - b.x || 1) * ox; else TOWN.pz += Math.sign(TOWN.pz - b.z || 1) * oz; }
+  }
+  TOWN.px = clamp(TOWN.px, -100, 100); TOWN.pz = clamp(TOWN.pz, -100, 100);
+}
+
+// ---------- gamepad (read directly so keyboard and pad never double up)
+function townPad() {
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  const gp = pads[0], P = TOWN.pad, now = {};
+  if (gp) {
+    const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, bt = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    now.lx = Math.abs(ax) > 0.25 ? ax : 0; now.ly = Math.abs(ay) > 0.25 ? ay : 0;
+    now.up = bt(12) || ay < -0.6; now.down = bt(13) || ay > 0.6; now.left = bt(14) || ax < -0.6; now.right = bt(15) || ax > 0.6;
+    now.ok = bt(1); now.jump = bt(0); now.back = bt(0); now.pack = bt(3); now.pick = bt(2); now.leave = bt(9);
+  }
+  const hit = k => now[k] && !P[k];
+  const out = { lx: now.lx || 0, ly: now.ly || 0, hit, held: k => !!now[k] };
+  out.commit = () => { TOWN.pad = now; };
+  return out;
+}
+
+// ---------- input
+function townKey(code) {
+  if (TOWN.ui === 'creator') { creatorKey(code); return; }
+  if (TOWN.ui) {
+    const list = townList();
+    if (code === 'ArrowUp' || code === 'KeyW') { TOWN.sel = cfWrap(TOWN.sel - 1, list.length); try { SFX.menu(); } catch (e) { } }
+    else if (code === 'ArrowDown' || code === 'KeyS') { TOWN.sel = cfWrap(TOWN.sel + 1, list.length); try { SFX.menu(); } catch (e) { } }
+    else if (['Enter', 'KeyE', 'KeyJ', 'Space'].includes(code)) townChoose();
+    else if (code === 'Escape' || code === 'KeyB' || code === 'KeyQ') TOWN.ui = null;
+    return;
+  }
+  if (['KeyE', 'Enter', 'KeyJ'].includes(code)) townInteract();
+  else if (code === 'Space' || code === 'KeyL') townJump();
+  else if (code === 'KeyB') { TOWN.ui = 'pack'; TOWN.sel = 0; }
+  else if (code === 'KeyX') townPickUp();
+  else if (code === 'Escape') leaveTown(false);
+  else if (code === 'KeyM') musicOn = !musicOn;
+}
+function townJump() { if (TOWN.py <= 0.001) { TOWN.vy = 0.3; try { SFX.jump && SFX.jump(); } catch (e) { } } }
+function townNearShop() {
+  for (const sh of TOWN_SHOPS) if (Math.hypot(TOWN.px - sh.dx, TOWN.pz - sh.dz) < 3.2) return sh;
+  return null;
+}
+function townNearDecor() {
+  let best = null, bd = 2.6;
+  TS.decor.forEach((d, i) => { const dd = Math.hypot(d.x - TOWN.px, d.z - TOWN.pz); if (dd < bd) { bd = dd; best = i; } });
+  return best;
+}
+function townInteract() {
+  const sh = townNearShop(); if (!sh) return;
+  try { SFX.menu(); } catch (e) { }
+  if (sh.k === 'workshop') { TOWN.ui = 'creator'; TOWN.field = 0; TOWN.slot = Math.max(0, G.players[0].ci - CUSTOM0); if (TOWN.slot >= CUSTOM_N) TOWN.slot = 0; }
+  else { TOWN.ui = sh.k; TOWN.sel = 0; }
+}
+function townPickUp() {
+  const i = townNearDecor(); if (i === null) { townMsg('NOTHING TO PICK UP HERE', 60); return; }
+  const d = TS.decor.splice(i, 1)[0]; TS.pack[d.k] = (TS.pack[d.k] || 0) + 1; townSave(); rebuildDecor();
+  townMsg('PICKED UP ' + TOWN_DECOR.find(x => x.k === d.k).n + ' (IN YOUR BACKPACK)', 90);
+}
+function townList() {
+  if (TOWN.ui === 'homes') return TOWN_HOMES;
+  if (TOWN.ui === 'decor') return TOWN_DECOR;
+  if (TOWN.ui === 'pets') return TOWN_PETS.concat([{ k: null, n: 'NO PET', p: 0 }]);
+  if (TOWN.ui === 'pack') { const L = TOWN_DECOR.filter(d => TS.pack[d.k] > 0); return L.length ? L : [{ k: null, n: 'BACKPACK IS EMPTY', p: 0 }]; }
+  return [];
+}
+function townChoose() {
+  const it = townList()[TOWN.sel]; if (!it) return;
+  const buy = () => { if (G.coins < it.p) { townMsg('NOT ENOUGH COINS! BEAT ENEMIES OR GRAB TOWN COINS', 120); try { SFX.hurt && SFX.hurt(); } catch (e) { } return false; } addCoins(-it.p); try { SFX.banner(); } catch (e) { } return true; };
+  if (TOWN.ui === 'homes') {
+    const lot = TS.homes.indexOf(null); if (lot < 0) { townMsg('ALL 8 LOTS ARE FULL!', 100); return; }
+    if (!buy()) return; TS.homes[lot] = it.k; townSave(); rebuildHomes(); townMsg('YOU BOUGHT A ' + it.n + '! FIND IT ON YOUR STREET', 160);
+  } else if (TOWN.ui === 'decor') {
+    if (!buy()) return; TS.pack[it.k] = (TS.pack[it.k] || 0) + 1; townSave(); townMsg(it.n + ' ADDED TO YOUR BACKPACK! PRESS B TO PLACE IT', 160);
+  } else if (TOWN.ui === 'pets') {
+    if (!it.k) { TS.pet = null; townSave(); refreshAvatar(); townMsg('YOUR PET IS RESTING AT HOME', 90); return; }
+    if (!TS.pets.includes(it.k)) { if (!buy()) return; TS.pets.push(it.k); }
+    TS.pet = it.k; townSave(); refreshAvatar(); townMsg(it.n + ' IS FOLLOWING YOU!', 120);
+  } else if (TOWN.ui === 'pack') {
+    if (!it.k) return;
+    if (TS.decor.length >= 200) { townMsg('YOUR TOWN IS FULL OF STUFF!', 100); return; }
+    const x = TOWN.px + Math.sin(TOWN.face) * 2.6, z = TOWN.pz + Math.cos(TOWN.face) * 2.6;
+    if (Math.hypot(x, z) < 6 || Math.abs(x) > 98 || Math.abs(z) > 98) { townMsg("CAN'T PLACE THAT HERE", 80); return; }
+    TS.pack[it.k]--; TS.decor.push({ k: it.k, x: +x.toFixed(2), z: +z.toFixed(2), r: +(TOWN.face + Math.PI).toFixed(2) }); townSave(); rebuildDecor();
+    try { SFX.join(); } catch (e) { } TOWN.ui = null; townMsg('PLACED ' + it.n + '! (PRESS X NEAR IT TO PICK IT BACK UP)', 140);
+  }
+}
+
+// ---------- fighter workshop (creator)
+const CF_FIELDS = ['SLOT', 'NAME', 'BODY COLOR', 'ARMS & LEGS', 'HEADGEAR', 'SIZE', 'TYPE', 'HEAVY MOVE', 'SKILL', 'SPECIAL', 'SUPER', 'SAVE & PLAY AS HIM', 'BACK TO TOWN'];
+function cfChange(dir, fast) {
+  const d = CF[TOWN.slot], f = TOWN.field, n = fast ? 10 : 1;
+  if (f === 0) { TOWN.slot = cfWrap(TOWN.slot + dir, CUSTOM_N); return; }
+  if (f === 1) { const i = NAME_IDEAS.indexOf(d.name); d.name = NAME_IDEAS[cfWrap((i < 0 ? -1 : i) + dir, NAME_IDEAS.length)]; }
+  else if (f === 2) d.col = cfWrap(d.col + dir, 16); else if (f === 3) d.back = cfWrap(d.back + dir, 16);
+  else if (f === 4) d.acc = cfWrap(d.acc + dir, CF_ACC.length); else if (f === 5) d.size = cfWrap(d.size + dir, 4);
+  else if (f === 6) d.type = cfWrap(d.type + dir, CF_TYPES.length);
+  else if (f >= 7 && f <= 10) { const key = ['heavy', 'skill', 'special', 'sup'][f - 7]; d[key] = cfWrap(d[key] + dir * n, CUSTOM0); }
+  else return;
+  applyCustom(TOWN.slot); cfSave();
+}
+function creatorKey(code) {
+  const onName = TOWN.field === 1;
+  if (code === 'ArrowUp' || (!onName && code === 'KeyW')) { TOWN.field = cfWrap(TOWN.field - 1, CF_FIELDS.length); return; }
+  if (code === 'ArrowDown' || (!onName && code === 'KeyS')) { TOWN.field = cfWrap(TOWN.field + 1, CF_FIELDS.length); return; }
+  if (code === 'ArrowLeft' || (!onName && code === 'KeyA')) { cfChange(-1); try { SFX.menu(); } catch (e) { } return; }
+  if (code === 'ArrowRight' || (!onName && code === 'KeyD')) { cfChange(1); try { SFX.menu(); } catch (e) { } return; }
+  if (code === 'Escape') { creatorDone(false); return; }
+  if (onName) {
+    const d = CF[TOWN.slot];
+    if (code === 'Backspace') d.name = d.name.slice(0, -1);
+    else if (/^Key[A-Z]$/.test(code) && d.name.length < 14) d.name += code.slice(3);
+    else if (/^Digit[0-9]$/.test(code) && d.name.length < 14) d.name += code.slice(5);
+    else if (code === 'Space' && d.name.length < 14 && d.name && !d.name.endsWith(' ')) d.name += ' ';
+    else if (code === 'Enter') TOWN.field = 2;
+    else return;
+    if (d.name.trim()) { applyCustom(TOWN.slot); cfSave(); }
+    return;
+  }
+  if (['Enter', 'KeyE', 'KeyJ', 'Space'].includes(code)) {
+    if (TOWN.field === 11) creatorDone(true); else if (TOWN.field === 12) creatorDone(false); else cfChange(1);
+  }
+}
+function creatorDone(play) {
+  const d = CF[TOWN.slot]; if (!d.name.trim()) d.name = cfDefault(TOWN.slot).name;
+  applyCustom(TOWN.slot); cfSave(); TOWN.ui = null;
+  if (play) { G.players[0].ci = CUSTOM0 + TOWN.slot; G.players[0].applyChar(); refreshAvatar(); townMsg(CHARS[CUSTOM0 + TOWN.slot].name + ' IS READY TO FIGHT!', 160); try { SFX.banner(); } catch (e) { } }
+}
+
+// ---------- per-frame update
+function townUpdate() {
+  if (!TOWN.built) return;
+  const pad = townPad();
+  if (TOWN.msgT > 0) TOWN.msgT--;
+  if (TOWN.ui === 'creator') {
+    if (pad.hit('up')) TOWN.field = cfWrap(TOWN.field - 1, CF_FIELDS.length);
+    if (pad.hit('down')) TOWN.field = cfWrap(TOWN.field + 1, CF_FIELDS.length);
+    const dir = (keys.has('ArrowRight') || (TOWN.field !== 1 && keys.has('KeyD')) || pad.held('right')) ? 1 : (keys.has('ArrowLeft') || (TOWN.field !== 1 && keys.has('KeyA')) || pad.held('left')) ? -1 : 0;
+    if (pad.hit('left')) cfChange(-1); if (pad.hit('right')) cfChange(1);
+    if (dir && dir === TOWN.holdDir) { TOWN.hold++; if (TOWN.hold > 22 && TOWN.hold % 3 === 0) cfChange(dir, TOWN.field >= 7 && TOWN.hold > 70); } else { TOWN.hold = 0; TOWN.holdDir = dir; }
+    if (pad.hit('ok')) { if (TOWN.field === 11) creatorDone(true); else if (TOWN.field === 12) creatorDone(false); else cfChange(1); }
+    if (pad.hit('back')) creatorDone(false);
+  } else if (TOWN.ui) {
+    const list = townList();
+    if (pad.hit('up')) TOWN.sel = cfWrap(TOWN.sel - 1, list.length); if (pad.hit('down')) TOWN.sel = cfWrap(TOWN.sel + 1, list.length);
+    if (pad.hit('ok')) townChoose(); if (pad.hit('back')) TOWN.ui = null;
+  } else {
+    let mx = 0, mz = 0;
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) mx -= 1; if (keys.has('KeyD') || keys.has('ArrowRight')) mx += 1;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) mz -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) mz += 1;
+    mx += pad.lx; mz += pad.ly;
+    const m = Math.hypot(mx, mz), c = CHARS[G.players[0].ci] || CHARS[0];
+    if (m > 0.1) { const sp = 0.2 * Math.min(1.25, c.spd || 1) * (keys.has('ShiftLeft') ? 1.5 : 1); TOWN.px += mx / Math.max(1, m) * sp; TOWN.pz += mz / Math.max(1, m) * sp; const tf = Math.atan2(mx, mz); let df = tf - TOWN.face; while (df > Math.PI) df -= Math.PI * 2; while (df < -Math.PI) df += Math.PI * 2; TOWN.face += df * 0.25; TOWN.walkT += 0.25 * Math.min(1, m); }
+    else TOWN.walkT *= 0.85;
+    townPush();
+    if (pad.hit('jump')) townJump(); if (pad.hit('ok')) townInteract(); if (pad.hit('pack')) { TOWN.ui = 'pack'; TOWN.sel = 0; } if (pad.hit('pick')) townPickUp(); if (pad.hit('leave')) leaveTown(false);
+    // battle gate
+    if (Math.abs(TOWN.px) < 3 && Math.abs(TOWN.pz - 30) < 0.8) { leaveTown(true); pad.commit(); return; }
+  }
+  pad.commit();
+  // jump / trampolines
+  TOWN.vy -= 0.016; TOWN.py += TOWN.vy;
+  if (TOWN.py <= 0) { TOWN.py = 0; TOWN.vy = 0; if (TS.decor.some(d => d.k === 'trampoline' && Math.hypot(d.x - TOWN.px, d.z - TOWN.pz) < 1.5)) { TOWN.vy = 0.5; try { SFX.jump && SFX.jump(); } catch (e) { } } }
+  // coins
+  for (let i = TOWN.coins.length - 1; i >= 0; i--) { const cn = TOWN.coins[i]; cn.rotation.z += 0.06; cn.position.y = 1 + Math.sin(G.titleT * 0.06 + i) * 0.2; if (Math.hypot(cn.position.x - TOWN.px, cn.position.z - TOWN.pz) < 1.3 && TOWN.py < 2) { TG.S.remove(cn); TOWN.coins.splice(i, 1); addCoins(5); tone(1300, 0.08, 'square', 0.05, 1900); TOWN.coinT = 600; } }
+  if (TOWN.coins.length < 12 && --TOWN.coinT <= 0) { spawnTownCoin(); TOWN.coinT = 600; }
+  // avatar pose
+  const av = TOWN.av; if (av) {
+    av.g.position.set(TOWN.px, TOWN.py, TOWN.pz); av.g.rotation.y = TOWN.face;
+    const sw = Math.sin(TOWN.walkT) * Math.min(0.8, Math.abs(TOWN.walkT) > 0.01 ? 0.8 : 0) * (TOWN.py > 0 ? 0.3 : 1);
+    av.legL.rotation.x = sw; av.legR.rotation.x = -sw; av.armL.rotation.x = -sw * 0.8; av.armR.rotation.x = sw * 0.8;
+    const air = TOWN.py > 0.05; av.armL.rotation.z = air ? -0.9 : -0.12; av.armR.rotation.z = air ? 0.9 : 0.12;
+  }
+  // pet
+  if (TOWN.petObj) {
+    const tx = TOWN.px - Math.sin(TOWN.face) * 1.8 + Math.cos(TOWN.face) * 1.2, tz = TOWN.pz - Math.cos(TOWN.face) * 1.8 - Math.sin(TOWN.face) * 1.2;
+    const dx = tx - TOWN.petX, dz = tz - TOWN.petZ, dd = Math.hypot(dx, dz);
+    if (dd > 0.3) { const sp = Math.min(dd * 0.08, 0.32); TOWN.petX += dx / dd * sp; TOWN.petZ += dz / dd * sp; TOWN.petObj.rotation.y = Math.atan2(dx, dz); }
+    const fly = TS.pet === 'dragon' || TS.pet === 'unicorn';
+    TOWN.petObj.position.set(TOWN.petX, fly ? 1.2 + Math.sin(G.titleT * 0.08) * 0.3 : (dd > 0.3 ? Math.abs(Math.sin(G.titleT * 0.25)) * 0.35 : 0), TOWN.petZ);
+  }
+  if (TG.portal) TG.portal.material.opacity = 0.35 + Math.sin(G.titleT * 0.08) * 0.15;
+  TOWN.prompt = null;
+  if (!TOWN.ui) { const sh = townNearShop(); if (sh) TOWN.prompt = 'PRESS E TO ENTER THE ' + sh.n; else if (townNearDecor() !== null) TOWN.prompt = 'PRESS X TO PICK UP'; else if (Math.abs(TOWN.px) < 6 && TOWN.pz > 24 && TOWN.pz < 30) TOWN.prompt = 'WALK THROUGH THE GATE TO BATTLE!'; }
+}
+function renderTown() {
+  const R = V3.R, cam = TG.cam;
+  if (V3.c3.width !== canvas.width || V3.c3.height !== canvas.height) R.setSize(canvas.width, canvas.height, false);
+  V3.c3.style.width = canvas.style.width; V3.c3.style.height = canvas.style.height;
+  const tx = TOWN.px, tz = TOWN.pz, close = TOWN.ui === 'creator';
+  const want = new THREE.Vector3(tx, 9.5 + TOWN.py * 0.5, tz + 14);
+  if (!TOWN.camInit) { cam.position.copy(want); TOWN.camInit = true; } else cam.position.lerp(want, 0.12);
+  cam.lookAt(tx, 1.4 + TOWN.py * 0.5, tz);
+  TG.sun.position.set(tx + 30, 60, tz + 25); TG.sun.target.position.set(tx, 0, tz); TG.sun.target.updateMatrixWorld();
+  R.setScissorTest(false); R.setViewport(0, 0, canvas.width, canvas.height); R.setClearColor(0x0d0d10); R.clear();
+  R.setScissorTest(true); R.setViewport(offX, offY, W * scale, H * scale); R.setScissor(offX, offY, W * scale, H * scale);
+  R.render(TG.S, cam);
+}
+
+// ---------- 2D overlay (HUD, shops, workshop)
+function townPanel(x, y, w, h) { ctx.fillStyle = 'rgba(250,246,234,0.96)'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#24242a'; ctx.lineWidth = 4; ctx.strokeRect(x, y, w, h); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + w, y + 8, 8, h); ctx.fillRect(x + 8, y + h, w, 8); }
+function coinIcon(x, y, r) { ctx.fillStyle = '#ffcf3a'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 3; ctx.stroke(); txt('$', x, y + r * 0.35, r * 1.1, '#a07a10', 'center', F1); }
+function drawTown2D() {
+  townPanel(20, 20, 300, 64); coinIcon(56, 52, 18); txt('' + G.coins, 86, 64, 36, '#24242a', 'left', F1);
+  txt('STICK TOWN', 800, 58, 44, '#ffffff', 'center', F1, '#24242a', 8);
+  if (!TOWN.ui) {
+    txt('WASD/ARROWS walk · SPACE jump · E enter shop · B backpack · X pick up · ESC leave', 800, 884, 18, '#ffffff', 'center', F2, '#24242a', 5);
+    if (TOWN.prompt) { townPanel(800 - 300, 760, 600, 60); txt(TOWN.prompt, 800, 800, 26, '#e2342c', 'center', F1); }
+  }
+  if (TOWN.ui && TOWN.ui !== 'creator') drawTownShop();
+  if (TOWN.ui === 'creator') drawCreator();
+  if (TOWN.msgT > 0) { ctx.save(); ctx.globalAlpha = Math.min(1, TOWN.msgT / 20); const my = TOWN.ui ? 812 : 110; townPanel(800 - 420, my, 840, 60); txt(TOWN.msg, 800, my + 40, 26, '#2a6ae6', 'center', F1); ctx.restore(); }
+}
+function drawTownShop() {
+  const list = townList(), title = { homes: 'HOME SHOP', decor: 'DECOR SHOP', pets: 'PET SHOP', pack: 'YOUR BACKPACK' }[TOWN.ui];
+  townPanel(380, 110, 840, 690); txt(title, 800, 168, 48, '#e2342c', 'center', F1);
+  txt(TOWN.ui === 'pack' ? 'Pick something and press ENTER to place it in front of you' : TOWN.ui === 'homes' ? 'Homes are built on YOUR STREET (east of the fountain). Lots free: ' + TS.homes.filter(h => !h).length + ' / 8' : TOWN.ui === 'decor' ? 'Decorations go in your backpack. Press B in town to place them anywhere!' : 'Pets follow you around town. Pick one you own to switch pets.', 800, 204, 19, '#555', 'center', F2);
+  const per = 11; TOWN.scroll = clamp(TOWN.scroll, Math.max(0, TOWN.sel - per + 1), TOWN.sel);
+  list.slice(TOWN.scroll, TOWN.scroll + per).forEach((it, j) => {
+    const i = j + TOWN.scroll, y = 236 + j * 46, on = i === TOWN.sel;
+    if (on) { ctx.fillStyle = '#ffd23a'; ctx.fillRect(410, y, 780, 42); }
+    txt((on ? '▶ ' : '') + it.n, 430, y + 30, 26, '#24242a', 'left', F1);
+    let right = '';
+    if (TOWN.ui === 'pack') right = it.k ? 'x' + TS.pack[it.k] : '';
+    else if (TOWN.ui === 'pets' && it.k && TS.pets.includes(it.k)) right = TS.pet === it.k ? 'WITH YOU' : 'OWNED';
+    else if (TOWN.ui === 'homes' && TS.homes.includes(it.k)) right = 'OWNED · ' + it.p;
+    else if (TOWN.ui === 'decor' && TS.pack[it.k]) right = 'HAVE ' + TS.pack[it.k] + ' · ' + it.p;
+    else if (it.p) right = '' + it.p;
+    if (right) { txt(right, 1150, y + 30, 24, it.p > G.coins && !/OWNED|WITH|x/.test(right) ? '#c0392b' : '#24242a', 'right', F1); if (/^\d/.test(right) || /· \d/.test(right)) coinIcon(1170, y + 21, 11); }
+  });
+  const cur = list[TOWN.sel]; if (cur && cur.d) txt(cur.d, 800, 752, 22, '#2a6ae6', 'center', F2);
+  txt('▲▼ choose · ENTER ' + (TOWN.ui === 'pack' ? 'place' : TOWN.ui === 'pets' ? 'buy / pick' : 'buy') + ' · ESC close', 800, 784, 20, '#24242a', 'center', F2);
+}
+function cfMoveLabel(f) {
+  const d = CF[TOWN.slot], c = CHARS[CUSTOM0 + TOWN.slot];
+  if (f === 7) { const s2 = CHARS[cfWrap(d.heavy, CUSTOM0)]; const hd = (s2.desc || []).join(' ').match(/Heavy[^.!]*[.!]/); return ['LIKE ' + s2.name, hd ? hd[0] : 'from ' + s2.name]; }
+  if (f === 8) return [c.kname || 'SKILL', 'from ' + CHARS[cfWrap(d.skill, CUSTOM0)].name];
+  if (f === 9) return [c.sname, 'from ' + CHARS[cfWrap(d.special, CUSTOM0)].name];
+  if (f === 10) return [c.supname, 'from ' + CHARS[cfWrap(d.sup, CUSTOM0)].name];
+  return ['', ''];
+}
+function drawCreator() {
+  const d = CF[TOWN.slot], c = CHARS[CUSTOM0 + TOWN.slot];
+  townPanel(60, 100, 1480, 760); txt('FIGHTER WORKSHOP', 800, 156, 50, '#2a7ae6', 'center', F1); txt('Make your own fighter and pick his moves from any fighter in the game!', 800, 190, 20, '#555', 'center', F2);
+  // preview
+  ctx.fillStyle = 'rgba(42,122,230,0.08)'; ctx.fillRect(1060, 220, 440, 600); ctx.strokeStyle = '#24242a'; ctx.lineWidth = 3; ctx.strokeRect(1060, 220, 440, 600);
+  const s2 = 2.6 * c.size; drawFigure(null, 1280, 700, s2, 1, P.idle(G.titleT), c.col, Object.assign(charLook(c, c.col), { backCol: c.back }));
+  txt(c.name, 1280, 760, c.name.length > 11 ? 30 : 38, c.col, 'center', F1, '#24242a', 3);
+  txt('HP ' + c.hp + ' · SPEED ' + Math.round((c.spd || 1) * 100) + '%' + (c.dmg && c.dmg !== 1 ? ' · POWER ' + Math.round(c.dmg * 100) + '%' : ''), 1280, 796, 18, '#24242a', 'center', F2);
+  // fields
+  CF_FIELDS.forEach((name, f) => {
+    const y = 236 + f * 46, on = TOWN.field === f;
+    if (on) { ctx.fillStyle = '#ffd23a'; ctx.fillRect(90, y, 950, 42); }
+    txt(name, 110, y + 29, f >= 11 ? 26 : 22, f === 11 ? '#3aa04a' : f === 12 ? '#c0392b' : '#24242a', 'left', F1);
+    let v = '';
+    if (f === 0) v = 'SLOT ' + (TOWN.slot + 1) + ' OF ' + CUSTOM_N;
+    else if (f === 1) v = d.name + (on && G.titleT % 40 < 20 ? '_' : '');
+    else if (f === 2 || f === 3) { const col = CF_COLS[f === 2 ? d.col : d.back]; ctx.fillStyle = col; ctx.fillRect(560, y + 7, 120, 28); ctx.strokeStyle = '#24242a'; ctx.lineWidth = 2; ctx.strokeRect(560, y + 7, 120, 28); }
+    else if (f === 4) v = (CF_ACC[d.acc] || 'NONE').toUpperCase();
+    else if (f === 5) v = CF_SIZE[d.size][0];
+    else if (f === 6) v = CF_TYPES[d.type][0] + ' — ' + CF_TYPES[d.type][2];
+    else if (f >= 7 && f <= 10) { const [a, b] = cfMoveLabel(f); v = a; txt(b.slice(0, 60), 1020, y + 29, 15, '#666', 'right', F2); }
+    if (v) txt(v, 360, y + 29, 22, '#24242a', 'left', F1);
+    if (on && f <= 10) { txt('◀', 335, y + 29, 22, '#e2342c', 'center', F1); txt('▶', f === 2 || f === 3 ? 700 : 1035, y + 29, 22, '#e2342c', f === 2 || f === 3 ? 'center' : 'right', F1); }
+  });
+  txt(TOWN.field === 1 ? 'Type a name on the keyboard (◀ ▶ for name ideas) · ▲▼ move' : TOWN.field >= 7 && TOWN.field <= 10 ? 'Hold ◀ ▶ to scroll through every fighter\'s moves · ▲▼ move' : '▲▼ choose · ◀ ▶ change · ENTER select · ESC back', 565, 848, 19, '#24242a', 'center', F2);
+}
 
 // ---------------------------------------------------------------- boot
 G.players = [new Player(0), new Player(1)];

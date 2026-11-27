@@ -3,6 +3,17 @@
 A hand-drawn, local co-op stick-figure brawler. One player uses the **keyboard**, the other uses a **Nintendo Switch Pro Controller** (any standard gamepad works too).
 
 
+
+**Stick Town:** press **T** on the title screen (or click the green STICK TOWN button) to walk around a 3D town. You earn **coins** in every fight (1 per enemy, 25 per boss, 30 per Versus win, 150 per Boss Rush clear), and you can grab gold coins lying around town too. You start with 200. In town:
+
+- **Fighter Workshop:** make up to 3 of your own fighters. Pick a name, colors, headgear, size and type (Balanced, Speedy, Strong, Tank, Floaty, Ninja, Moon Jumper, Ice or Guard), then choose his heavy move, skill, special and super from any fighter in the game. Your fighters show up at the end of the fighter select screen.
+- **Home Shop:** buy homes (Tent, Log Cabin, Cottage, Igloo, Treehouse, Mushroom House, Candy House, Rocket House, Mansion, Castle). They get built on your street, east of the fountain (8 lots).
+- **Decor Shop:** buy 19 decorations (trees, flowers, lamps, a trampoline you can bounce on, a pool, a rainbow arch, a golden statue and more). Press **B** to open your backpack and place them anywhere, and **X** to pick them back up.
+- **Pet Shop:** buy a pet (Duck, Bunny, Puppy, Kitty, Piggy, Penguin, Robo Dog, Baby Dragon, Unicorn) that follows you around town.
+- **Battle Gate:** walk through it to go fight.
+
+Town controls: WASD or arrows to walk (Shift to run), Space to jump, E to enter a shop, B for your backpack, X to pick up, Esc to leave. A controller works too (stick to walk, A to enter, B to jump or go back, X backpack, Y pick up, + to leave). Everything you buy and make is saved in your browser. The town uses three.js, so it needs an internet connection.
+
 **3D view:** press **V** at any time to switch between the normal hand-drawn view and a 3D view. The game plays exactly the same, but the fighters, floor and platforms are drawn in 3D with lighting and shadows, and the camera gently follows the action. It works on every stage and in every mode (including online). The 3D view loads three.js from the internet, so it needs a connection.
 
 ## Play
