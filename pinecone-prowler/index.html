@@ -1,0 +1,494 @@
+<title>Pinecone Prowler</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+/* VOICE occasion: a cozy, funny stealth game
+   IDEA a 1990s provincial-park campground seen from above, signed with routed wooden park signs
+   PICTURE the live world on canvas: forest, lake, campsites, rangers' sight cones, Moss the forest giant
+   COLOUR deep fir green ground, cedar-sign brown panels, campfire amber, ranger-cone yellow, alarm red
+   TYPE Alfa Slab One (park signage) + Nunito
+   LAYOUT one screen: canvas fills it; stats top-left, alert eye top-centre, quest top-right, backpack bottom; phones add joystick + buttons */
+:root{color-scheme:dark;--bg:#13241a;--panel:rgba(48,32,20,.9);--panel2:#5b3b22;--edge:#8a5d36;--ink:#fbf3df;--dim:#e3d2b0;--moss:#8fd16a;--amber:#ffbf3c;--red:#ff5b4a;--sky:#6cd0ff}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.4 Nunito,system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
+.sign{background:var(--panel);border:2px solid var(--edge);border-radius:12px;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+.slab{font-family:'Alfa Slab One',Georgia,serif;font-weight:400;letter-spacing:.01em}
+#top{position:fixed;left:0;right:0;top:0;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;pointer-events:none;padding:max(10px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px))}
+#stats{padding:8px 12px;width:200px}
+#clock{font-size:17px;white-space:nowrap}
+.bar{height:9px;border-radius:5px;background:rgba(0,0,0,.45);overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;border-radius:5px;transition:width .2s}
+.lbl{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);margin-top:5px}
+#eye{margin:0 auto;padding:6px 12px;display:flex;gap:8px;align-items:center;min-width:150px}
+#eye svg{width:30px;height:20px;flex:none}
+#eye .bar{flex:1;margin:0;height:10px}
+#eyeTxt{font-size:13px;white-space:nowrap}
+#quest{padding:8px 12px;width:250px}
+#quest h3{margin:0;font-size:16px;color:var(--amber)}
+#quest p{margin:2px 0 0;font-size:13.5px;color:var(--dim)}
+#qprog{font-weight:900;color:var(--ink)}
+#bottom{position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+#prompt{padding:5px 12px;font-weight:800;font-size:15px}
+#prompt kbd,.keys kbd{font:900 12px Nunito,sans-serif;background:var(--ink);color:#3b2614;border-radius:5px;padding:1px 6px;margin-right:4px}
+#slots{display:flex;gap:6px;padding:6px;pointer-events:auto}
+.slot{width:46px;height:46px;border-radius:9px;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.12);display:grid;place-items:center;padding:4px;cursor:pointer}
+.slot svg{width:34px;height:34px}
+.slot:hover{border-color:var(--amber)}
+#coatBtn{pointer-events:auto}
+#toasts{display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:min(92vw,460px)}
+.toast{padding:7px 14px;font-weight:800;text-align:center;animation:pop .25s ease-out}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+#modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,14,10,.55);padding:16px}
+#card{width:min(520px,100%);max-height:92%;overflow:auto;padding:18px 20px;user-select:text}
+#card h2{margin:0 0 6px;font-size:28px;line-height:1.05;color:var(--amber)}
+#card h1{margin:0;font-size:clamp(38px,9vw,60px);line-height:1;color:var(--moss);text-shadow:0 3px 0 #2c1a0d}
+#card p{margin:8px 0;font-size:16px}
+.who{font-weight:900;color:var(--sky)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.btn{font:900 16px Nunito,sans-serif;border:0;border-radius:10px;padding:10px 16px;min-height:44px;background:var(--amber);color:#3b2614;cursor:pointer;box-shadow:0 3px 0 #9a6a12}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #9a6a12}
+.btn.alt{background:#e9dcc0;box-shadow:0 3px 0 #9d8c6b}
+.btn:disabled{opacity:.45;cursor:default}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:6px;margin-top:6px}
+.grid .slot{width:auto;height:56px}
+.shoprow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.12)}
+.shoprow svg{width:38px;height:38px;flex:none}
+.shoprow div{flex:1}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:14px;margin-top:8px;color:var(--dim)}
+#touch{position:fixed;inset:auto 0 0 0;height:170px;pointer-events:none}
+#joy{position:absolute;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.2);pointer-events:auto}
+#nub{position:absolute;left:41px;top:41px;width:48px;height:48px;border-radius:50%;background:rgba(251,243,223,.55)}
+#tbtns{position:absolute;right:max(14px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(2,62px);gap:10px;pointer-events:auto}
+#tbtns button{width:62px;height:62px;border-radius:50%;border:2px solid var(--edge);background:var(--panel);color:var(--ink);font:900 13px Nunito,sans-serif}
+#tbtns button:active{background:var(--panel2)}
+body.touch #bottom{padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))}
+@media(max-width:640px){#stats{width:165px;padding:6px 10px}#quest{order:3;width:100%;max-width:340px}#eye{min-width:0;flex:1}#clock{font-size:15px}.slot{width:40px;height:40px}.slot svg{width:30px;height:30px}}
+@media(prefers-reduced-motion:reduce){.toast{animation:none}}
+</style>
+
+<canvas id="cv"></canvas>
+
+<div id="top">
+  <div id="stats" class="sign">
+    <div id="clock" class="slab">Day 1 · 7:00 AM</div>
+    <div class="lbl"><span>Hunger</span><span id="hungerN">80</span></div>
+    <div class="bar"><i id="hungerB" style="background:var(--moss);width:80%"></i></div>
+    <div class="lbl"><span>Stamina</span><span id="coins">0 coins</span></div>
+    <div class="bar"><i id="stamB" style="background:var(--sky);width:100%"></i></div>
+  </div>
+  <div id="eye" class="sign">
+    <svg viewBox="0 0 30 20"><path d="M1 10Q15-4 29 10Q15 24 1 10Z" fill="#fbf3df"/><circle cx="15" cy="10" r="5.5" fill="#3b2614"/><circle cx="16.5" cy="8.5" r="1.6" fill="#fff"/></svg>
+    <div class="bar"><i id="eyeB" style="width:0;background:var(--amber)"></i></div>
+    <span id="eyeTxt">Unseen</span>
+  </div>
+  <div id="quest" class="sign">
+    <h3 class="slab" id="qt">Say hi to Pip</h3>
+    <p><span id="qd"></span> <span id="qprog"></span></p>
+  </div>
+</div>
+
+<div id="bottom">
+  <div id="toasts"></div>
+  <div id="prompt" class="sign" hidden></div>
+  <div id="slots" class="sign"></div>
+</div>
+
+<div id="touch" hidden>
+  <div id="joy"><div id="nub"></div></div>
+  <div id="tbtns">
+    <button data-k="coat">Coat</button><button data-k="eat">Eat</button>
+    <button data-k="run">Run</button><button data-k="act">Use</button>
+  </div>
+</div>
+
+<div id="modal" hidden><div id="card" class="sign"></div></div>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const cv=$('#cv'),ctx=cv.getContext('2d');
+const WW=2600,WH=1800,TAU=Math.PI*2;
+let seed=11;const rnd=()=>(seed=seed*16807%2147483647)/2147483647;
+const R=(a,b)=>a+rnd()*(b-a);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const dist=(a,b,c,d)=>Math.hypot(a-c,b-d);
+const segD=(px,py,ax,ay,bx,by)=>{const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=clamp(t,0,1);return Math.hypot(px-ax-t*dx,py-ay-t*dy)};
+const angDiff=(a,b)=>{let d=(a-b)%TAU;if(d>Math.PI)d-=TAU;if(d<-Math.PI)d+=TAU;return d};
+
+/* ---------- food ---------- */
+const FOOD={
+ hotdog:{n:'Hot dog',h:25,svg:'<rect x="3" y="11" width="26" height="11" rx="5.5" fill="#e9b35f"/><rect x="2" y="13.5" width="28" height="6" rx="3" fill="#c4452f"/><path d="M6 16.5q3-2 6 0t6 0t6 0" stroke="#ffd23f" stroke-width="1.6" fill="none"/>'},
+ sandwich:{n:'Sandwich',h:20,svg:'<path d="M4 24L16 6L28 24Z" fill="#f1d9a6"/><path d="M6 21.5H26" stroke="#6fbf4a" stroke-width="3"/><path d="M4 24H28" stroke="#d99a5b" stroke-width="2.5"/>'},
+ melon:{n:'Watermelon',h:30,svg:'<path d="M3 12A13 13 0 0 0 29 12Z" fill="#3f9b47"/><path d="M5.5 12A10.5 10.5 0 0 0 26.5 12Z" fill="#ff5a6e"/><circle cx="12" cy="16" r="1.2" fill="#222"/><circle cx="17" cy="18" r="1.2" fill="#222"/><circle cx="21" cy="15" r="1.2" fill="#222"/>'},
+ mallow:{n:'Marshmallows',h:12,svg:'<rect x="7" y="6" width="18" height="22" rx="3" fill="#7fc9ff"/><rect x="7" y="4" width="18" height="4" fill="#4a90c9"/><rect x="11" y="13" width="5" height="5" rx="1.5" fill="#fff"/><rect x="16" y="18" width="5" height="5" rx="1.5" fill="#fff"/>'},
+ apple:{n:'Apple',h:10,svg:'<circle cx="12" cy="18" r="8" fill="#e23b3b"/><circle cx="20" cy="18" r="8" fill="#e23b3b"/><path d="M16 11Q16 6 19 4" stroke="#6b3d1f" stroke-width="2" fill="none"/><ellipse cx="21" cy="8" rx="4" ry="2" fill="#5cb347"/>'},
+ pie:{n:'Berry pie',h:35,svg:'<ellipse cx="16" cy="19" rx="13" ry="8" fill="#c98a4b"/><ellipse cx="16" cy="17" rx="11" ry="6" fill="#7a2f6b"/><path d="M7 17h18M10 13l12 8M22 13l-12 8" stroke="#e9b35f" stroke-width="1.8"/>'},
+ soda:{n:'Pop can',h:6,svg:'<rect x="10" y="5" width="12" height="22" rx="3" fill="#2f7de1"/><rect x="10" y="12" width="12" height="7" fill="#fff"/><rect x="12" y="4" width="8" height="2" rx="1" fill="#bbb"/>'},
+ fish:{n:'Smoked fish',h:28,svg:'<ellipse cx="14" cy="16" rx="10" ry="6" fill="#c9773a"/><path d="M23 16L30 10V22Z" fill="#a85f2b"/><circle cx="9" cy="14.5" r="1.4" fill="#222"/>'},
+ chips:{n:'Chips',h:10,svg:'<path d="M8 5H24L26 27H6Z" fill="#ffc83d"/><rect x="11" y="12" width="10" height="8" rx="4" fill="#e2463a"/>'}
+};
+const icon=k=>`<svg viewBox="0 0 32 32">${FOOD[k].svg}</svg>`;
+const LOOT={cooler:['hotdog','sandwich','soda','melon','fish','hotdog'],basket:['sandwich','apple','pie','chips','mallow','apple'],bin:['apple','chips','soda']};
+const SHOP=[{k:'hotdog',p:5},{k:'pie',p:8},{k:'mallow',p:3}];
+
+/* ---------- world ---------- */
+const paths=[[[300,330],[560,470],[880,560],[1160,610],[1600,610],[2120,610]],[[1600,610],[1600,1130],[1330,1330]],[[1600,1130],[1960,1310]],[[1600,610],[1600,220]]];
+const nearPath=(x,y)=>Math.min(...paths.flatMap(p=>p.slice(1).map((q,i)=>segD(x,y,p[i][0],p[i][1],q[0],q[1]))));
+const lake={x:720,y:1330,rx:320,ry:180};
+const den={x:240,y:250,r:150};
+const clear=[{x:1100,y:180,w:1220,h:1000},{x:1150,y:1140,w:1020,h:420}];
+const rects=[],solids=[],trees=[],bushes=[],ints=[],coinSpots=[];
+const addRect=(x,y,w,h,k,o={})=>{const r={x,y,w,h,k,...o};rects.push(r);return r};
+const addInt=o=>{ints.push(o);return o};
+const sites=[['Pinecone',1300,380,'cooler','#e0533d'],['Elk Ridge',1880,380,'basket','#3d8be0'],['Lakeview',1300,880,'cooler','#e8a33a'],['Fern Gully',1880,880,'basket','#9a5bd6'],['Big Stump',2200,780,'cooler','#3fae8a']].map(([name,x,y,kind,col])=>{
+  addRect(x-120,y-85,84,58,'tent',{col});
+  addRect(x+5,y-35,74,34,'table',{block:false});
+  solids.push({x:x-30,y:y+45,r:15,fire:true});
+  addRect(x+92,y+20,34,24,'cont',{block:false});
+  const c=addInt({k:kind,x:x+109,y:y+32,stock:[],name});
+  return {name,x,y,kind,col,cont:c};
+});
+const line={x1:1340,x2:1470,y:1010};
+addRect(line.x1-4,line.y-4,8,8,'pole');addRect(line.x2-4,line.y-4,8,8,'pole');
+const coat=addInt({k:'coat',x:(line.x1+line.x2)/2,y:line.y+6});
+const shack=addRect(1240,1220,170,96,'shack');
+const shop=addInt({k:'shop',x:1325,y:1340});
+const station=addRect(1880,1290,210,124,'station');
+addRect(1826,1430,52,12,'board');
+const board=addInt({k:'board',x:1852,y:1455});
+[[1440,1330],[2120,1440],[1560,560],[1150,660],[2060,560],[1650,1060]].forEach(([x,y])=>{addRect(x-13,y-13,26,26,'bin',{block:false});addInt({k:'bin',x,y:y+4,stock:0})});
+const fridge=addInt({k:'fridge',x:170,y:205});addRect(146,150,48,42,'fridgeR');
+const bed=addInt({k:'bed',x:320,y:178});
+for(let a=0;a<TAU;a+=0.27){if(a>0.15&&a<1.35)continue;solids.push({x:den.x+Math.cos(a)*(den.r+18),y:den.y+Math.sin(a)*(den.r+14),r:R(26,38),rock:true})}
+for(let i=0;i<14;i++){const x=R(80,WW-80),y=R(80,WH-80);if(dist(x,y,den.x,den.y)>260&&nearPath(x,y)>60&&!clear.some(c=>x>c.x&&x<c.x+c.w&&y>c.y&&y<c.y+c.h))solids.push({x,y,r:R(18,30),rock:true})}
+const inClear=(x,y,m)=>clear.some(c=>x>c.x-m&&x<c.x+c.w+m&&y>c.y-m&&y<c.y+c.h+m);
+const inLake=(x,y,m)=>((x-lake.x)/(lake.rx+m))**2+((y-lake.y)/(lake.ry+m))**2<1;
+const nearSolid=(x,y,m)=>solids.some(s=>dist(x,y,s.x,s.y)<s.r+m);
+for(let n=0;trees.length<340&&n<30000;n++){const x=R(20,WW-20),y=R(20,WH-20);
+  if(inClear(x,y,10)||dist(x,y,den.x,den.y)<den.r+40||inLake(x,y,50)||nearPath(x,y)<52||nearSolid(x,y,30))continue;
+  if(trees.some(t=>dist(x,y,t.x,t.y)<64))continue;
+  trees.push({x,y,r:R(34,54),tone:rnd()});}
+sites.forEach(s=>{[[-170,40],[150,-90],[170,110],[-60,150]].forEach(([dx,dy])=>bushes.push({x:s.x+dx+R(-15,15),y:s.y+dy+R(-15,15),r:R(26,32),wig:0}))});
+[[1220,1180],[1500,1180],[1780,1500],[2160,1250],[1120,880],[1000,640],[700,560],[480,420],[1620,280],[2300,420],[1450,620],[1750,620]].forEach(([x,y])=>bushes.push({x,y,r:R(26,32),wig:0}));
+for(let n=0;bushes.length<70&&n<4000;n++){const x=R(60,WW-60),y=R(60,WH-60);if(!inLake(x,y,30)&&!trees.some(t=>dist(x,y,t.x,t.y)<44)&&nearPath(x,y)>40&&!nearSolid(x,y,30)&&!inClear(x,y,0))bushes.push({x,y,r:R(24,32),wig:0})}
+for(let n=0;coinSpots.length<16&&n<4000;n++){const x=R(1120,2280),y=R(200,1540);if(!rects.some(r=>x>r.x-20&&x<r.x+r.w+20&&y>r.y-20&&y<r.y+r.h+20)&&!nearSolid(x,y,20)&&inClear(x,y,0))coinSpots.push({x,y,on:true})}
+
+const blocks=r=>r.block!==false;
+function free(x,y,r){
+  if(x<r||y<r||x>WW-r||y>WH-r)return false;
+  if(inLake(x,y,-6))return false;
+  for(const t of trees)if(Math.abs(t.x-x)<30&&Math.abs(t.y-y)<30&&dist(x,y,t.x,t.y)<r+11)return false;
+  for(const s of solids)if(dist(x,y,s.x,s.y)<r+s.r)return false;
+  for(const q of rects){const cx=clamp(x,q.x,q.x+q.w),cy=clamp(y,q.y,q.y+q.h);if((x-cx)**2+(y-cy)**2<r*r&&q.k!=='bin'&&q.k!=='cont'||((x-cx)**2+(y-cy)**2<(r*.6)**2))return false}
+  return true;
+}
+function segRect(ax,ay,bx,by,q){let t0=0,t1=1;const dx=bx-ax,dy=by-ay;const ps=[-dx,dx,-dy,dy],qs=[ax-q.x,q.x+q.w-ax,ay-q.y,q.y+q.h-ay];for(let i=0;i<4;i++){if(ps[i]===0){if(qs[i]<0)return false}else{const t=qs[i]/ps[i];if(ps[i]<0){if(t>t1)return false;if(t>t0)t0=t}else{if(t<t0)return false;if(t<t1)t1=t}}}return true}
+function los(ax,ay,bx,by){
+  for(const q of rects)if(blocks(q)&&q.k!=='pole'&&segRect(ax,ay,bx,by,q))return false;
+  for(const t of trees)if(segD(t.x,t.y,ax,ay,bx,by)<15)return false;
+  for(const s of solids)if(s.rock&&segD(s.x,s.y,ax,ay,bx,by)<s.r*.8)return false;
+  return true;
+}
+
+/* ---------- static layer ---------- */
+const bg=document.createElement('canvas');bg.width=WW;bg.height=WH;
+(function paint(){const g=bg.getContext('2d');
+  g.fillStyle='#386b34';g.fillRect(0,0,WW,WH);
+  for(let i=0;i<9000;i++){g.fillStyle=rnd()<.5?'rgba(20,50,22,.18)':'rgba(140,190,90,.12)';g.fillRect(R(0,WW),R(0,WH),R(2,5),R(2,5))}
+  clear.forEach(c=>{g.fillStyle='#5f9346';g.beginPath();g.roundRect(c.x,c.y,c.w,c.h,80);g.fill()});
+  for(let i=0;i<2500;i++){const x=R(1100,2320),y=R(180,1560);if(inClear(x,y,-30)){g.fillStyle='rgba(200,230,140,.16)';g.fillRect(x,y,3,2)}}
+  sites.forEach(s=>{g.fillStyle='#a8875a';g.beginPath();g.ellipse(s.x-10,s.y,175,120,0,0,TAU);g.fill();g.fillStyle='rgba(0,0,0,.06)';for(let i=0;i<70;i++)g.fillRect(s.x+R(-150,130),s.y+R(-95,95),3,3);
+    g.font='bold 15px Nunito,sans-serif';});
+  g.lineCap='round';g.lineJoin='round';
+  paths.forEach(p=>{g.beginPath();p.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.strokeStyle='#8a6a40';g.lineWidth=40;g.stroke();g.strokeStyle='#bf9a63';g.lineWidth=32;g.stroke()});
+  g.fillStyle='#d8c48e';g.beginPath();g.ellipse(lake.x,lake.y,lake.rx+22,lake.ry+18,0,0,TAU);g.fill();
+  const lg=g.createRadialGradient(lake.x-60,lake.y-40,30,lake.x,lake.y,lake.rx);lg.addColorStop(0,'#59b8e0');lg.addColorStop(1,'#2a6f9e');g.fillStyle=lg;g.beginPath();g.ellipse(lake.x,lake.y,lake.rx,lake.ry,0,0,TAU);g.fill();
+  g.strokeStyle='rgba(255,255,255,.25)';g.lineWidth=2;for(let i=0;i<26;i++){const a=R(0,TAU),rr=R(.1,.8);const x=lake.x+Math.cos(a)*lake.rx*rr,y=lake.y+Math.sin(a)*lake.ry*rr;g.beginPath();g.moveTo(x-10,y);g.quadraticCurveTo(x,y-4,x+10,y);g.stroke()}
+  g.fillStyle='#5b5345';g.beginPath();g.arc(den.x,den.y,den.r+10,0,TAU);g.fill();g.fillStyle='#6d6453';g.beginPath();g.arc(den.x,den.y,den.r-10,0,TAU);g.fill();
+  g.fillStyle='#4a3a26';g.beginPath();g.ellipse(den.x-10,den.y-60,90,34,0,0,TAU);g.fill();
+  g.fillStyle='#8e5a33';g.fillRect(282,156,76,46);g.fillStyle='#d9c69a';g.fillRect(286,160,22,38);g.fillStyle='#b44f3a';g.fillRect(308,160,46,38);
+  solids.forEach(s=>{if(!s.rock)return;g.fillStyle='rgba(0,0,0,.22)';g.beginPath();g.ellipse(s.x+5,s.y+7,s.r,s.r*.8,0,0,TAU);g.fill();g.fillStyle='#837a6c';g.beginPath();g.arc(s.x,s.y,s.r,0,TAU);g.fill();g.fillStyle='#a19887';g.beginPath();g.arc(s.x-s.r*.25,s.y-s.r*.3,s.r*.6,0,TAU);g.fill()});
+  rects.forEach(q=>{
+    if(q.k==='tent'){g.fillStyle='rgba(0,0,0,.25)';g.fillRect(q.x+6,q.y+8,q.w,q.h);g.fillStyle=q.col;g.beginPath();g.moveTo(q.x,q.y+q.h);g.lineTo(q.x+q.w/2,q.y);g.lineTo(q.x+q.w,q.y+q.h);g.closePath();g.fill();g.fillStyle='rgba(255,255,255,.22)';g.beginPath();g.moveTo(q.x,q.y+q.h);g.lineTo(q.x+q.w/2,q.y);g.lineTo(q.x+q.w/2,q.y+q.h);g.fill();g.fillStyle='#2b2018';g.beginPath();g.moveTo(q.x+q.w/2-10,q.y+q.h);g.lineTo(q.x+q.w/2,q.y+q.h-26);g.lineTo(q.x+q.w/2+10,q.y+q.h);g.fill()}
+    if(q.k==='table'){g.fillStyle='rgba(0,0,0,.22)';g.fillRect(q.x+5,q.y+6,q.w,q.h);g.fillStyle='#7a4c2a';g.fillRect(q.x,q.y-8,q.w,8);g.fillRect(q.x,q.y+q.h,q.w,8);g.fillStyle='#a96d3d';g.fillRect(q.x,q.y,q.w,q.h);g.strokeStyle='#7a4c2a';g.lineWidth=1.5;for(let i=1;i<4;i++){g.beginPath();g.moveTo(q.x+i*q.w/4,q.y);g.lineTo(q.x+i*q.w/4,q.y+q.h);g.stroke()}g.fillStyle='#e6e1d6';g.beginPath();g.arc(q.x+20,q.y+16,6,0,TAU);g.fill()}
+    if(q.k==='pole'){g.fillStyle='#6b4a2c';g.fillRect(q.x,q.y,q.w,q.h)}
+    if(q.k==='board'){g.fillStyle='#6b4a2c';g.fillRect(q.x,q.y-30,q.w,40);g.fillStyle='#e8dcc0';g.fillRect(q.x+5,q.y-26,q.w-10,30);g.fillStyle='#d64a3a';g.fillRect(q.x+16,q.y-22,20,14)}
+    if(q.k==='fridgeR'){g.fillStyle='rgba(0,0,0,.3)';g.fillRect(q.x+5,q.y+6,q.w,q.h);g.fillStyle='#d9e8e4';g.beginPath();g.roundRect(q.x,q.y,q.w,q.h,6);g.fill();g.fillStyle='#9fb8b2';g.fillRect(q.x,q.y+16,q.w,3);g.fillStyle='#6f8984';g.fillRect(q.x+q.w-10,q.y+5,3,9);g.fillRect(q.x+q.w-10,q.y+23,3,12)}
+  });
+  [shack,station].forEach((q,i)=>{g.fillStyle='rgba(0,0,0,.3)';g.fillRect(q.x+10,q.y+12,q.w,q.h);g.fillStyle=i?'#4f6b3e':'#c94f3a';g.fillRect(q.x,q.y,q.w,q.h);g.fillStyle=i?'#3e5631':'#a63d2c';for(let y=q.y;y<q.y+q.h;y+=12)g.fillRect(q.x,y,q.w,5);g.fillStyle='#e9dcc0';g.fillRect(q.x+q.w/2-50,q.y+q.h-6,100,14);g.fillStyle='#3b2614';g.font='15px "Alfa Slab One",Georgia,serif';g.textAlign='center';g.fillText(i?'RANGER STATION':'SNACK SHACK',q.x+q.w/2,q.y+q.h+5)});
+  g.fillStyle='#6b4a2c';g.fillRect(460,300,8,46);g.fillRect(560,300,8,46);g.fillStyle='#8a5d36';g.beginPath();g.roundRect(440,276,148,40,6);g.fill();g.fillStyle='#fbf3df';g.font='14px "Alfa Slab One",Georgia,serif';g.textAlign='center';g.fillText('HOLLOWPINE',514,294);g.font='11px Nunito,sans-serif';g.fillText('PROVINCIAL CAMPGROUND',514,309);
+})();
+
+/* ---------- state ---------- */
+const P={x:330,y:330,r:14,ang:0,moving:false,hidden:false,sprint:false,bob:0};
+let S;const fresh=()=>({day:1,time:7*60,hunger:70,stam:100,coins:0,inv:[],fridge:[],q:0,hasCoat:false,coat:false,stats:{raids:0,eaten:0,caught:0},done:false});
+let alert=0,paused=true,started=false,lastSave=0,flash=0;
+const camper=(s,i)=>({kind:'camper',name:['Doug','Linda','Marcy','Trent','Gus'][i],x:s.x+10,y:s.y+70,site:s,ang:R(0,TAU),fov:1.9,vd:170,state:'idle',t:R(1,4),tx:0,ty:0,n:0,col:['#e86a4a','#5aa0e8','#f2c14e','#b07ae0','#53c2a0'][i],hair:['#4a2e1a','#d9b45a','#2a2a2a','#8a4a2a','#ccc'][i],say:'',sayT:0,r:12,asleep:false});
+const npcs=sites.map(camper);
+const WP=[[1980,1470],[1640,1190],[1200,1110],[1160,640],[1220,240],[1600,240],[2080,250],[2280,520],[2250,1080],[1990,1200]];
+const ranger={kind:'ranger',name:'Ranger Hollis',x:1980,y:1470,ang:0,fov:1.3,vd:230,state:'patrol',wp:1,t:0,n:0,r:13,lx:0,ly:0,say:'',sayT:0,col:'#4f7a3a',asleep:false};
+const clerk={kind:'clerk',name:'Bev',x:1325,y:1318,ang:Math.PI/2,fov:2.3,vd:190,state:'idle',t:0,n:0,r:12,say:'',sayT:0,col:'#e0533d',hair:'#5a3a22',asleep:false,still:true};
+npcs.push(ranger,clerk);
+const pip={x:420,y:380,tx:420,ty:380};
+const PIPAT=[[420,380],[1080,560],[330,360],[1460,1080],[1500,1250],[1790,1500],[420,380]];
+
+function restock(){sites.forEach(s=>{const L=LOOT[s.kind];s.cont.stock=[L[Math.floor(rnd()*L.length)],L[Math.floor(rnd()*L.length)]];if(rnd()<.6)s.cont.stock.push(L[Math.floor(rnd()*L.length)])});ints.forEach(o=>{if(o.k==='bin')o.stock=1});coinSpots.forEach(c=>c.on=true)}
+
+/* ---------- quests ---------- */
+const QUESTS=[
+ {t:'Say hi to Pip',d:'The crow by your den has news.'},
+ {t:'Raid a cooler',d:'Sneak into Hollowpine Campground, grab food from a cooler or basket, then eat it.'},
+ {t:'Stock your fridge',d:'Stash 5 snacks in the fridge in your den.',p:()=>`${Math.min(S.fridge.length,5)}/5`},
+ {t:'Find a disguise',d:'A raincoat and hat are drying on the Lakeview clothesline.'},
+ {t:'Shop like a human',d:'Put on the disguise, find 5 coins (try the trash bins), and buy food at the Snack Shack.',p:()=>`${Math.min(S.coins,5)}/5 coins`},
+ {t:'Read the notice',d:'Something new is pinned to the board by the Ranger Station.'},
+ {t:'Free roam',d:'You finished the first slice. Keep raiding; more of Hollowpine is coming.'}
+];
+const qTarget=()=>{switch(S.q){case 0:return pip;case 1:{let b=null,bd=1e9;sites.forEach(s=>{const d=dist(P.x,P.y,s.cont.x,s.cont.y);if(s.cont.stock.length&&d<bd){bd=d;b=s.cont}});return S.inv.length?null:b}case 2:return fridge;case 3:return S.hasCoat?null:coat;case 4:{if(S.coins>=5)return shop;let b=null,bd=1e9;ints.forEach(o=>{if(o.k==='bin'&&o.stock){const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}});return b||shop}case 5:return board;default:return null}};
+function advance(to){if(S.q>=to)return;S.q=to;sfx(660,.12,'triangle',.15);setTimeout(()=>sfx(880,.16,'triangle',.15),110);toast('New goal: '+QUESTS[to].t);save()}
+
+/* ---------- audio ---------- */
+let AC=null;
+function sfx(f,d=.1,type='square',v=.08,slide=0){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,AC.currentTime);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide),AC.currentTime+d);g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.connect(g).connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+
+/* ---------- UI ---------- */
+function toast(t){const el=document.createElement('div');el.className='toast sign';el.textContent=t;$('#toasts').appendChild(el);setTimeout(()=>el.remove(),2600);while($('#toasts').children.length>3)$('#toasts').firstChild.remove()}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let modalOnClose=null;
+function openModal(html,onClose){$('#card').innerHTML=html;$('#modal').hidden=false;paused=true;modalOnClose=onClose||null}
+function closeModal(){$('#modal').hidden=true;paused=false;const f=modalOnClose;modalOnClose=null;if(f)f()}
+function talk(lines,done){let i=0;const show=()=>{const [who,txt]=lines[i];openModal(`<p><span class="who">${esc(who)}</span></p><p>${esc(txt)}</p><div class="btns"><button class="btn" data-a="next">${i<lines.length-1?'Next':'OK'}</button></div>`);modalOnClose=null};show();
+  $('#card').onclick=e=>{if(e.target.dataset.a!=='next')return;i++;if(i<lines.length)show();else{$('#card').onclick=null;closeModal();if(done)done()}}}
+function renderSlots(){$('#slots').innerHTML=Array.from({length:6},(_,i)=>{const k=S.inv[i];return `<div class="slot" data-i="${i}" title="${k?esc(FOOD[k].n)+' — click to eat':'Empty'}">${k?icon(k):''}</div>`}).join('')}
+$('#slots').addEventListener('click',e=>{const s=e.target.closest('.slot');if(s&&!paused)eat(+s.dataset.i)});
+let hudT=0;
+function hud(){const h=Math.floor(S.time/60),m=Math.floor(S.time%60);$('#clock').textContent=`Day ${S.day} · ${((h+11)%12)+1}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}`;
+  $('#hungerN').textContent=Math.round(S.hunger)+(S.hunger<20?' · starving!':'');$('#hungerB').style.width=S.hunger+'%';$('#hungerB').style.background=S.hunger<20?'var(--red)':'var(--moss)';
+  $('#stamB').style.width=S.stam+'%';$('#coins').textContent=S.coins+(S.coins===1?' coin':' coins');
+  const chase=ranger.state==='chase';const lvl=chase?100:alert*100;$('#eyeB').style.width=lvl+'%';$('#eyeB').style.background=chase||lvl>70?'var(--red)':'var(--amber)';
+  $('#eyeTxt').textContent=chase?'Chased!':P.hidden?'Hidden':lvl>60?'Spotted?':lvl>5?'Noticed':S.coat?'Disguised':'Unseen';
+  const Q=QUESTS[S.q];$('#qt').textContent=Q.t;$('#qd').textContent=Q.d;$('#qprog').textContent=Q.p?Q.p():'';}
+
+/* ---------- actions ---------- */
+function observersSeeing(){return npcs.filter(o=>sees(o))}
+function caughtStealing(){const w=observersSeeing();w.forEach(o=>{if(S.coat&&o.kind!=='ranger'){o.n=Math.max(o.n,.75);say(o,'Hey! Not yours!')}else o.n=1});return w.length}
+function noise(r){npcs.forEach(o=>{if(!o.asleep&&!o.still&&dist(o.x,o.y,P.x,P.y)<r&&o.state!=='flee'){o.ang=Math.atan2(P.y-o.y,P.x-o.x);if(o.kind==='camper'){o.state='look';o.t=1.5}}})}
+function take(o){if(S.inv.length>=6){toast('Backpack full! Eat (Q) or stash at the den.');return}
+  if(o.k==='bin'){noise(150);caughtStealing();sfx(180,.18,'sawtooth',.06,-60);if(!o.stock){toast('Just old newspapers.');return}o.stock=0;if(rnd()<.55||S.q===4&&S.coins<5){const c=2+Math.floor(rnd()*3);S.coins+=c;toast(`Found ${c} coins in the trash!`);sfx(1200,.08,'square',.06)}else{const k=LOOT.bin[Math.floor(rnd()*3)];S.inv.push(k);toast('Found '+FOOD[k].n+' (slightly used)')}renderSlots();return}
+  if(!o.stock.length){toast(`This ${o.k} is empty. It restocks overnight.`);return}
+  const k=o.stock.shift();S.inv.push(k);S.stats.raids++;caughtStealing();sfx(520,.08,'square',.07,200);toast(`Snagged ${FOOD[k].n}!`);renderSlots()}
+function eat(i){const k=S.inv[i];if(!k)return;S.inv.splice(i,1);S.hunger=Math.min(100,S.hunger+FOOD[k].h);S.stats.eaten++;sfx(300,.07,'square',.07,-80);setTimeout(()=>sfx(260,.07,'square',.07,-80),90);toast(`Ate ${FOOD[k].n} (+${FOOD[k].h})`);renderSlots();if(S.q===1)advance(2)}
+function toggleCoat(){if(!S.hasCoat){toast('You need a disguise first.');return}const w=observersSeeing();S.coat=!S.coat;sfx(S.coat?440:330,.12,'triangle',.1);toast(S.coat?'Raincoat on. You look… mostly human.':'Raincoat off. Full fur.');if(w.length){w.forEach(o=>o.n=Math.max(o.n,.9));toast('Someone saw you change!')}}
+function interact(){const o=nearInt();if(!o)return;
+  if(o===pip){pipTalk();return}
+  if(o.k==='cooler'||o.k==='basket'||o.k==='bin'){take(o);return}
+  if(o.k==='fridge'){fridgeUI();return}
+  if(o.k==='bed'){const h=S.time/60;if(h>=18||h<5){sleep()}else toast('Not sleepy yet. Beds open after 6 PM.');return}
+  if(o.k==='coat'){S.hasCoat=true;S.coat=true;caughtStealing();sfx(700,.15,'triangle',.12);toast('Got a raincoat and bucket hat! Press G to swap.');if(S.q===3)advance(4);return}
+  if(o.k==='shop'){if(!S.coat){clerk.n=1;say(clerk,'EEEK! A BIGFOOT!');return}shopUI();return}
+  if(o.k==='board'){if(S.q>=5)notice();else toast('Lost dog posters and a fishing derby flyer.');return}}
+function pipTalk(){const L={0:[['Pip the crow','Moss! Wake up, big guy. The campers are back at Hollowpine and their coolers are FULL.'],['Pip the crow','Sneak in, grab a snack, and eat it. Stay out of their sight cones, and duck into bushes if someone looks your way.'],['Pip the crow','And watch out for Ranger Hollis. Get caught and you\'ll drop everything you\'re carrying.']],
+  1:[['Pip the crow','Coolers and picnic baskets are at each campsite. Walk up and press E. Then press Q (or tap the snack) to eat.']],
+  2:[['Pip the crow','Winter\'s coming. Fill that fridge in your den. Five snacks, minimum.']],
+  3:[['Pip the crow','Humans trust anyone in a raincoat. There\'s one on the Lakeview clothesline, south side of camp.']],
+  4:[['Pip the crow','With that coat on, campers will ignore you. Rangers still squint, so don\'t dawdle. Bev at the Snack Shack takes coins; people toss them in the trash bins, weirdly.']],
+  5:[['Pip the crow','Something\'s off. A man in a shiny suit pinned a notice by the Ranger Station. Go read it.']],
+  6:[['Pip the crow','Thirty days, Moss. We\'ll need a plan. And snacks. Mostly snacks.']]}[S.q];
+  talk(L,()=>{if(S.q===0)advance(1)})}
+function fridgeUI(){const draw=()=>{openModal(`<h2 class="slab">Den fridge</h2><p>${S.fridge.length} snack${S.fridge.length===1?'':'s'} stored. Click a stored snack to take it back.</p>
+  <div class="grid">${S.fridge.map((k,i)=>`<div class="slot" data-f="${i}" title="${esc(FOOD[k].n)}">${icon(k)}</div>`).join('')||'<p style="grid-column:1/-1;color:var(--dim)">Empty. Sad.</p>'}</div>
+  <p style="margin-top:12px">Backpack: ${S.inv.length}/6</p><div class="grid">${S.inv.map(k=>`<div class="slot">${icon(k)}</div>`).join('')}</div>
+  <div class="btns"><button class="btn" data-a="stash" ${S.inv.length?'':'disabled'}>Stash all</button><button class="btn alt" data-a="close">Close</button></div>`)};draw();
+  $('#card').onclick=e=>{const a=e.target.closest('[data-a],[data-f]');if(!a)return;if(a.dataset.a==='stash'){S.fridge.push(...S.inv);S.inv=[];sfx(500,.1,'triangle',.1);renderSlots();if(S.fridge.length>=5&&S.q===2)advance(3);save();draw()}else if(a.dataset.a==='close'){$('#card').onclick=null;closeModal()}else if(a.dataset.f!=null){if(S.inv.length<6){S.inv.push(S.fridge.splice(+a.dataset.f,1)[0]);renderSlots();draw()}}}}
+function shopUI(){const draw=()=>{openModal(`<h2 class="slab">Snack Shack</h2><p><span class="who">Bev:</span> "Afternoon, hon. Love the hat." You have <b>${S.coins}</b> coins.</p>
+  ${SHOP.map((s,i)=>`<div class="shoprow">${icon(s.k)}<div><b>${FOOD[s.k].n}</b><br><span style="color:var(--dim)">+${FOOD[s.k].h} hunger</span></div><button class="btn" data-b="${i}" ${S.coins>=s.p&&S.inv.length<6?'':'disabled'}>${s.p} coins</button></div>`).join('')}
+  <div class="btns"><button class="btn alt" data-a="close">Leave</button></div>`)};draw();
+  $('#card').onclick=e=>{const a=e.target.closest('[data-a],[data-b]');if(!a)return;if(a.dataset.a==='close'){$('#card').onclick=null;closeModal();return}const s=SHOP[+a.dataset.b];if(S.coins>=s.p&&S.inv.length<6){S.coins-=s.p;S.inv.push(s.k);sfx(990,.08,'square',.07);setTimeout(()=>sfx(1320,.1,'square',.07),80);renderSlots();if(S.q===4)advance(5);draw()}}}
+function notice(){talk([['Notice board','NOTICE: Hollowpine Provincial Campground has been purchased by GRUBE HOLDINGS INC.'],['Notice board','Coming soon: the GRUBE GRAND RESORT, featuring 400 condos, a wave pool and a 6-level parkade. Construction begins in 30 days. — Gideon Grube, CEO'],['Moss','…'],['Pip the crow','Six levels of PARKADE? Where are the coolers going to go, Moss? This means war. Snack-based war.']],()=>{if(S.q===5){advance(6);S.done=true;save();endCard()}})}
+function endCard(){openModal(`<h2 class="slab">To be continued…</h2><p>You finished the Pinecone Prowler vertical slice.</p><p>Day ${S.day} · ${S.stats.raids} raids · ${S.stats.eaten} snacks eaten · caught ${S.stats.caught} time${S.stats.caught===1?'':'s'} · ${S.fridge.length} in the fridge.</p><p style="color:var(--dim)">Keep exploring. Coolers restock every morning.</p><div class="btns"><button class="btn" data-a="go">Keep playing</button></div>`);$('#card').onclick=e=>{if(e.target.dataset.a==='go'){$('#card').onclick=null;closeModal()}}}
+function sleep(){const fade=()=>{S.day++;S.time=7*60;S.hunger=Math.max(0,S.hunger-15);restock();resetNPCs();save();toast(`Day ${S.day}. Coolers are restocked.`)};flash=1;fade()}
+function caught(){S.stats.caught++;const lost=S.inv.length;S.inv=[];renderSlots();flash=1;P.x=330;P.y=330;S.time+=120;if(S.time>=1440){S.time-=1440;S.day++;restock()}alert=0;resetNPCs();sfx(150,.4,'sawtooth',.1,-90);
+  talk([['Ranger Hollis','"Big hairy fella in my campground again? Shoo! Back to the woods!"'],['','He marched you back to your den.'+(lost?` You dropped ${lost} snack${lost>1?'s':''}.`:'')]]);save()}
+function resetNPCs(){ranger.state='patrol';ranger.wp=0;ranger.x=WP[0][0];ranger.y=WP[0][1];npcs.forEach(o=>{o.n=0;if(o.kind==='camper'){o.state='idle';o.x=o.site.x+10;o.y=o.site.y+70}})}
+function say(o,t){o.say=t;o.sayT=2.2}
+
+/* ---------- save ---------- */
+const KEY='pinecone-prowler-v1';
+function snapshot(){return {...S,inv:[...S.inv],fridge:[...S.fridge],px:P.x,py:P.y}}
+function save(){if(!started)return;try{localStorage.setItem(KEY,JSON.stringify(snapshot()))}catch(e){}}
+function load(d){S={...fresh(),...d,stats:{...fresh().stats,...(d.stats||{})}};P.x=d.px??330;P.y=d.py??330;started=true;restock();resetNPCs();renderSlots();pip.x=pip.tx=PIPAT[S.q][0];pip.y=pip.ty=PIPAT[S.q][1]}
+window.claude?.hot?.snapshot?.(()=>started?snapshot():null);
+window.__pp={P,get S(){return S},npcs,ranger,sites,interact,eat};
+
+/* ---------- input ---------- */
+const keys={};let joy={x:0,y:0},runBtn=false;
+addEventListener('keydown',e=>{if(e.repeat&&!['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code))return;keys[e.code]=true;
+  if(!$('#modal').hidden){if(e.code==='Escape'){const c=$('#card').querySelector('[data-a=close],[data-a=next],[data-a=go]');if(c)c.click()}else if((e.code==='KeyE'||e.code==='Enter'||e.code==='Space')&&!e.repeat){const c=$('#card').querySelector('[data-a=next],[data-a=go]');if(c){e.preventDefault();c.click()}}return}
+  if(paused)return;
+  if(e.code==='KeyE'||e.code==='Space'){e.preventDefault();interact()}
+  if(e.code==='KeyQ')eat(0);
+  if(e.code==='KeyG')toggleCoat();
+  if(/^Digit[1-6]$/.test(e.code))eat(+e.code.slice(5)-1);
+  if(e.code.startsWith('Arrow'))e.preventDefault()});
+addEventListener('keyup',e=>keys[e.code]=false);
+addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+if(matchMedia('(pointer:coarse)').matches){$('#touch').hidden=false;document.body.classList.add('touch')}
+{const j=$('#joy'),nub=$('#nub');let id=null,cx=0,cy=0;
+ j.addEventListener('pointerdown',e=>{id=e.pointerId;j.setPointerCapture(id);const r=j.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;mv(e)});
+ const mv=e=>{if(e.pointerId!==id)return;let dx=e.clientX-cx,dy=e.clientY-cy;const d=Math.hypot(dx,dy),m=48;if(d>m){dx*=m/d;dy*=m/d}joy={x:dx/m,y:dy/m};nub.style.transform=`translate(${dx}px,${dy}px)`};
+ j.addEventListener('pointermove',mv);
+ const up=e=>{if(e.pointerId!==id)return;id=null;joy={x:0,y:0};nub.style.transform=''};j.addEventListener('pointerup',up);j.addEventListener('pointercancel',up);
+ $('#tbtns').addEventListener('pointerdown',e=>{const k=e.target.dataset.k;if(!k||paused)return;e.preventDefault();if(k==='act')interact();if(k==='eat')eat(0);if(k==='coat')toggleCoat();if(k==='run')runBtn=true});
+ addEventListener('pointerup',()=>runBtn=false);}
+
+/* ---------- simulation ---------- */
+const darkness=()=>{const h=S.time/60;if(h<5)return .72;if(h<7)return .72*(1-(h-5)/2);if(h<18.5)return 0;if(h<20.5)return .72*(h-18.5)/2;return .72};
+function sees(o){if(o.asleep||o.state==='flee')return false;const d=dist(o.x,o.y,P.x,P.y);if(P.hidden&&d>18)return false;
+  const [vd,fov]=o_vd(o);
+  if(o.kind==='ranger'&&o.state==='chase'){if(d>vd*1.3)return false}else{if(d>vd)return false;if(Math.abs(angDiff(Math.atan2(P.y-o.y,P.x-o.x),o.ang))>fov/2)return false}
+  return los(o.x,o.y,P.x,P.y)}
+const o_vd=o=>{const dk=darkness();if(o.kind==='ranger')return dk>.3?[210,.9]:[o.vd,o.fov];if(o.kind==='clerk')return [o.vd*(1-dk*.3),o.fov];return [o.vd*(1-dk*.6),o.fov]};
+function walk(o,tx,ty,sp,dt){const dx=tx-o.x,dy=ty-o.y,d=Math.hypot(dx,dy);if(d<6)return true;const a=Math.atan2(dy,dx);const st=Math.min(sp*dt,d);
+  for(const k of [0,.6,-.6,1.2,-1.2,1.8,-1.8,2.4,-2.4]){const aa=a+k;const nx=o.x+Math.cos(aa)*st,ny=o.y+Math.sin(aa)*st;if(free(nx,ny,o.r)){o.x=nx;o.y=ny;o.ang+=angDiff(aa,o.ang)*Math.min(1,dt*8);o.moving=true;return false}}
+  return false}
+function updateNPCs(dt){const h=S.time/60,night=h>=22||h<6;
+  for(const o of npcs){o.moving=false;if(o.sayT>0)o.sayT-=dt;
+    if(o.kind==='camper'){
+      if(night&&o.state!=='flee'){if(!o.asleep){o.asleep=true;o.x=o.site.x-78;o.y=o.site.y-20}continue}
+      if(o.asleep){o.asleep=false;o.x=o.site.x+10;o.y=o.site.y+70}
+      o.t-=dt;
+      if(o.state==='flee'){walk(o,o.tx,o.ty,170,dt);if(o.t<=0){o.state='idle';o.t=3}continue}
+      if(o.state==='look'){if(o.t<=0){o.state='idle';o.t=2}}
+      else if(o.state==='idle'){o.ang+=Math.sin(performance.now()/900+o.x)*dt*.8;if(o.t<=0){o.state='walk';o.tx=o.site.x+R(-120,140);o.ty=o.site.y+R(-10,110);o.t=6}}
+      else if(o.state==='walk'){if(walk(o,o.tx,o.ty,55,dt)||o.t<=0){o.state='idle';o.t=R(2,5);o.ang=R(0,TAU)}}
+    }else if(o===ranger){
+      if(o.state==='patrol'){const [tx,ty]=WP[o.wp];if(walk(o,tx,ty,80,dt))o.wp=(o.wp+1)%WP.length}
+      else if(o.state==='investigate'||o.state==='chase'){if(walk(o,o.lx,o.ly,o.state==='chase'?185:120,dt)){o.state='search';o.t=4}}
+      else if(o.state==='search'){o.ang+=dt*2.2;o.t-=dt;if(o.t<=0){o.state='patrol';let b=0,bd=1e9;WP.forEach((w,i)=>{const d=dist(o.x,o.y,w[0],w[1]);if(d<bd){bd=d;b=i}});o.wp=b}}
+    }
+    const see=sees(o);o.seeing=see;
+    if(see){const d=dist(o.x,o.y,P.x,P.y);const [vd]=o_vd(o);let rate=(1.5-d/vd)*(o.kind==='ranger'?1.5:1.1);if(S.coat)rate*=o.kind==='ranger'?.22:0;if(P.sprint)rate*=1.5;if(o.n<1)o.n=Math.min(1,o.n+rate*dt);
+      if(o===ranger&&(o.state==='chase'||o.n>=1)){if(o.state!=='chase'){say(o,'HEY! Stop right there!');sfx(880,.3,'sawtooth',.08,-300)}o.state='chase';o.lx=P.x;o.ly=P.y}
+      else if(o!==ranger&&o.n>=1&&o.state!=='flee'){say(o,o.kind==='clerk'?'BIGFOOT! RANGER!!':['AAAH! BIGFOOT!','IT\'S REAL!','HOLLIS! HELP!'][Math.floor(rnd()*3)]);sfx(1000,.25,'sawtooth',.06,500);if(!o.still){o.state='flee';o.t=3;const a=Math.atan2(o.y-P.y,o.x-P.x);o.tx=o.x+Math.cos(a)*200;o.ty=o.y+Math.sin(a)*200}o.n=0;
+        if(ranger.state!=='chase'){ranger.state=dist(ranger.x,ranger.y,P.x,P.y)<380?'chase':'investigate';ranger.lx=P.x;ranger.ly=P.y;say(ranger,'On my way!')}}
+    }else o.n=Math.max(0,o.n-dt*.35);
+  }
+  if(ranger.state==='chase'&&dist(ranger.x,ranger.y,P.x,P.y)<P.r+ranger.r+2&&!(P.hidden&&!ranger.seeing))caught();
+  alert=Math.max(...npcs.map(o=>o.n));
+}
+function nearInt(){let b=null,bd=48;for(const o of ints){if(o.k==='coat'&&S.hasCoat)continue;const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}if(dist(P.x,P.y,pip.x,pip.y)<56&&(!b||dist(P.x,P.y,pip.x,pip.y)<bd))b=pip;return b}
+const LABEL=o=>o===pip?'Talk to Pip':o.k==='cooler'||o.k==='basket'?`Raid ${o.k} (${o.stock.length} left)`:o.k==='bin'?'Rummage in trash bin (noisy!)':o.k==='fridge'?'Open fridge':o.k==='bed'?'Sleep until morning':o.k==='coat'?'Grab the raincoat':o.k==='shop'?(S.coat?'Order food':'Order food (you are NOT disguised!)'):o.k==='board'?'Read notice board':'';
+let noiseT=0;
+function update(dt){
+  S.time+=dt*4;if(S.time>=1440){S.time-=1440;S.day++;restock();toast(`Day ${S.day}. Coolers restocked.`)}
+  S.hunger=Math.max(0,S.hunger-dt*.22);
+  let mx=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+joy.x,my=(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0)+joy.y;
+  const ml=Math.hypot(mx,my);if(ml>1){mx/=ml;my/=ml}
+  P.moving=ml>.1;const wantRun=(keys.ShiftLeft||keys.ShiftRight||runBtn)&&P.moving;
+  P.sprint=wantRun&&S.stam>2;S.stam=clamp(S.stam+(P.sprint?-32:18)*dt,0,100);
+  let sp=(P.sprint?240:150)*(S.hunger<=0?.7:1);
+  if(P.moving){P.ang=Math.atan2(my,mx);P.bob+=dt*(P.sprint?16:10);const nx=P.x+mx*sp*dt,ny=P.y+my*sp*dt;if(free(nx,P.y,P.r))P.x=nx;if(free(P.x,ny,P.r))P.y=ny}
+  if(P.sprint){noiseT-=dt;if(noiseT<=0){noise(110);noiseT=.6}}
+  const b=bushes.find(b=>dist(P.x,P.y,b.x,b.y)<b.r-2);if(b&&P.moving)b.wig=1;P.hidden=!!b&&!P.sprint;
+  bushes.forEach(b=>b.wig=Math.max(0,b.wig-dt*2));
+  coinSpots.forEach(c=>{if(c.on&&dist(P.x,P.y,c.x,c.y)<22){c.on=false;S.coins++;sfx(1500,.06,'square',.05);sfx(1900,.08,'square',.04)}});
+  updateNPCs(dt);
+  if(S.q===2&&S.fridge.length>=5)advance(3);if(S.q===3&&S.hasCoat)advance(4);
+  const q=PIPAT[S.q];pip.tx=q[0];pip.ty=q[1];pip.x+=(pip.tx-pip.x)*Math.min(1,dt*1.5);pip.y+=(pip.ty-pip.y)*Math.min(1,dt*1.5);
+  if(performance.now()-lastSave>15000){lastSave=performance.now();save()}
+  if(flash>0)flash=Math.max(0,flash-dt*1.2);
+}
+
+/* ---------- render ---------- */
+const dark=document.createElement('canvas'),dctx=dark.getContext('2d');
+let cw=0,ch=0,dpr=1,scale=1,camX=0,camY=0;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);cw=innerWidth;ch=innerHeight;cv.width=dark.width=cw*dpr;cv.height=dark.height=ch*dpr;scale=clamp(Math.min(cw/820,ch/620),.62,1.5)}
+addEventListener('resize',resize);resize();
+function human(o,t){const x=o.x,y=o.y;ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(x,y+10,12,6,0,0,TAU);ctx.fill();
+  const bob=o.moving?Math.sin(t/90)*1.5:0;ctx.fillStyle=o.col;ctx.beginPath();ctx.ellipse(x,y+bob,11,10,0,0,TAU);ctx.fill();
+  ctx.fillStyle='#f0c9a0';ctx.beginPath();ctx.arc(x+Math.cos(o.ang)*3,y-9+bob+Math.sin(o.ang)*2,7.5,0,TAU);ctx.fill();
+  if(o.kind==='ranger'){ctx.fillStyle='#c9a66b';ctx.beginPath();ctx.ellipse(x+Math.cos(o.ang)*3,y-12+bob,12,6,0,0,TAU);ctx.fill();ctx.fillStyle='#8a6a3a';ctx.beginPath();ctx.arc(x+Math.cos(o.ang)*3,y-14+bob,5,0,TAU);ctx.fill()}
+  else if(o.kind==='clerk'){ctx.fillStyle=o.col;ctx.beginPath();ctx.arc(x,y-13+bob,6,Math.PI,0);ctx.fill()}
+  else{ctx.fillStyle=o.hair;ctx.beginPath();ctx.arc(x+Math.cos(o.ang)*3-Math.cos(o.ang)*2,y-11+bob,6.5,Math.PI*1.05,Math.PI*1.95);ctx.fill()}
+  ctx.fillStyle='#2b1d12';const fx=Math.cos(o.ang),fy=Math.sin(o.ang);if(fy>-.5){ctx.beginPath();ctx.arc(x+fx*5-2.5,y-9+bob+fy*3,1.3,0,TAU);ctx.arc(x+fx*5+2.5,y-9+bob+fy*3,1.3,0,TAU);ctx.fill()}}
+function moss(t){const x=P.x,y=P.y,b=P.moving?Math.sin(P.bob)*2:0;ctx.globalAlpha=P.hidden?.45:1;
+  ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(x,y+13,17,7,0,0,TAU);ctx.fill();
+  ctx.fillStyle='#6a3f22';for(let i=0;i<10;i++){const a=i/10*TAU;ctx.beginPath();ctx.arc(x+Math.cos(a)*14,y+b+Math.sin(a)*12,6,0,TAU);ctx.fill()}
+  ctx.fillStyle=S.coat?'#f2c230':'#7d4b29';ctx.beginPath();ctx.ellipse(x,y+b,16,14,0,0,TAU);ctx.fill();
+  if(S.coat){ctx.strokeStyle='#c9981c';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y+b-8);ctx.lineTo(x,y+b+13);ctx.stroke()}
+  const fx=Math.cos(P.ang),fy=Math.sin(P.ang),hx=x+fx*4,hy=y-12+b+fy*3;
+  ctx.fillStyle='#6a3f22';ctx.beginPath();ctx.arc(hx,hy,11,0,TAU);ctx.fill();
+  if(fy>-.6){ctx.fillStyle='#c79a6e';ctx.beginPath();ctx.ellipse(hx+fx*4,hy+2+fy*2,6.5,5.5,0,0,TAU);ctx.fill();ctx.fillStyle='#1d120a';ctx.beginPath();ctx.arc(hx+fx*4-3,hy+fy*2,1.6,0,TAU);ctx.arc(hx+fx*4+3,hy+fy*2,1.6,0,TAU);ctx.fill()}
+  if(S.coat){ctx.fillStyle='#3c6e5a';ctx.beginPath();ctx.ellipse(hx,hy-6,14,7,0,0,TAU);ctx.fill();ctx.fillStyle='#2f5a49';ctx.beginPath();ctx.ellipse(hx,hy-8,8,5,0,0,TAU);ctx.fill()}
+  ctx.globalAlpha=1}
+function crow(t){const x=pip.x,y=pip.y+Math.sin(t/300)*3;ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(pip.x,pip.y+14,8,3,0,0,TAU);ctx.fill();ctx.fillStyle='#1d1f2a';ctx.beginPath();ctx.ellipse(x,y,9,7,0,0,TAU);ctx.fill();ctx.beginPath();ctx.arc(x+7,y-5,5.5,0,TAU);ctx.fill();ctx.fillStyle='#f2b33d';ctx.beginPath();ctx.moveTo(x+11,y-6);ctx.lineTo(x+17,y-4);ctx.lineTo(x+11,y-2);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x+8.5,y-6,1.5,0,TAU);ctx.fill();ctx.fillStyle='#2f3346';ctx.beginPath();ctx.moveTo(x-8,y);ctx.lineTo(x-16,y-3);ctx.lineTo(x-8,y+4);ctx.fill()}
+function bubble(x,y,txt,col){ctx.font='800 13px Nunito,sans-serif';const w=ctx.measureText(txt).width+14;ctx.fillStyle=col||'#fbf3df';ctx.beginPath();ctx.roundRect(x-w/2,y-22,w,20,8);ctx.fill();ctx.beginPath();ctx.moveTo(x-4,y-3);ctx.lineTo(x,y+3);ctx.lineTo(x+4,y-3);ctx.fill();ctx.fillStyle='#2b1d12';ctx.textAlign='center';ctx.fillText(txt,x,y-7)}
+function render(t){
+  const vw=cw/scale,vh=ch/scale;camX+=(clamp(P.x-vw/2,0,WW-vw)-camX)*.15;camY+=(clamp(P.y-vh/2,0,WH-vh)-camY)*.15;if(!started){camX=clamp(1500-vw/2,0,WW-vw);camY=clamp(650-vh/2,0,WH-vh)}
+  ctx.setTransform(dpr*scale,0,0,dpr*scale,-camX*dpr*scale,-camY*dpr*scale);
+  ctx.drawImage(bg,0,0);
+  const inView=(x,y,m=80)=>x>camX-m&&x<camX+vw+m&&y>camY-m&&y<camY+vh+m;
+  // fires
+  solids.forEach(s=>{if(!s.fire||!inView(s.x,s.y))return;ctx.fillStyle='#5b5345';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,TAU);ctx.fill();const f=1+Math.sin(t/80+s.x)*.15;ctx.fillStyle='#ff8a2a';ctx.beginPath();ctx.arc(s.x,s.y,9*f,0,TAU);ctx.fill();ctx.fillStyle='#ffd65a';ctx.beginPath();ctx.arc(s.x,s.y,5*f,0,TAU);ctx.fill()});
+  // containers & bins
+  ints.forEach(o=>{if(!inView(o.x,o.y))return;
+    if(o.k==='cooler'){ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(o.x-15,o.y-6,34,22);ctx.fillStyle=o.stock.length?'#d8423a':'#8c5551';ctx.beginPath();ctx.roundRect(o.x-17,o.y-12,34,24,4);ctx.fill();ctx.fillStyle='#f4f1e4';ctx.fillRect(o.x-17,o.y-12,34,7);ctx.fillStyle='#ccc';ctx.fillRect(o.x-6,o.y-14,12,4)}
+    if(o.k==='basket'){ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(o.x-13,o.y-4,30,18);ctx.fillStyle=o.stock.length?'#c9944e':'#8d7458';ctx.beginPath();ctx.roundRect(o.x-15,o.y-10,30,20,5);ctx.fill();ctx.strokeStyle='#8a5d2c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(o.x,o.y-10,10,Math.PI,0);ctx.stroke();ctx.fillStyle='#e2463a';ctx.fillRect(o.x-15,o.y-4,30,5)}
+    if(o.k==='bin'){ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(o.x-10,o.y-10,26,24);ctx.fillStyle='#4f5b5e';ctx.beginPath();ctx.roundRect(o.x-13,o.y-17,26,26,4);ctx.fill();ctx.fillStyle=o.stock?'#66767a':'#3c4547';ctx.fillRect(o.x-14,o.y-18,28,7)}
+    if(o.k==='coat'&&!S.hasCoat){ctx.strokeStyle='#e9dcc0';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(line.x1,line.y-2);ctx.lineTo(line.x2,line.y-2);ctx.stroke();ctx.fillStyle='#f2c230';ctx.beginPath();ctx.moveTo(o.x-14,o.y-8);ctx.lineTo(o.x+14,o.y-8);ctx.lineTo(o.x+18,o.y+16);ctx.lineTo(o.x-18,o.y+16);ctx.fill();ctx.fillStyle='#3c6e5a';ctx.beginPath();ctx.ellipse(o.x+30,o.y-2,11,6,0,0,TAU);ctx.fill()}});
+  if(S.hasCoat||!started){ctx.strokeStyle='#e9dcc0';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(line.x1,line.y-2);ctx.lineTo(line.x2,line.y-2);ctx.stroke()}
+  coinSpots.forEach(c=>{if(!c.on||!inView(c.x,c.y))return;const s=Math.abs(Math.sin(t/300+c.x));ctx.fillStyle='#ffcf3c';ctx.beginPath();ctx.ellipse(c.x,c.y,6*s+1,6,0,0,TAU);ctx.fill();ctx.fillStyle='#fff6';ctx.fillRect(c.x-1,c.y-4,2,3)});
+  // sight cones
+  npcs.forEach(o=>{if(o.asleep||o.state==='flee'||!inView(o.x,o.y,260))return;const [vd,fov]=o_vd(o);const chase=o===ranger&&o.state==='chase';
+    ctx.fillStyle=chase||o.n>.6?'rgba(255,80,60,.22)':o.n>.05?'rgba(255,190,60,.22)':'rgba(255,245,170,.13)';ctx.beginPath();ctx.moveTo(o.x,o.y);ctx.arc(o.x,o.y,vd,o.ang-fov/2,o.ang+fov/2);ctx.closePath();ctx.fill()});
+  // bushes under canopy but over ground
+  bushes.forEach(b=>{if(!inView(b.x,b.y))return;const w=Math.sin(t/40)*b.wig*3;ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(b.x+4,b.y+8,b.r,b.r*.7,0,0,TAU);ctx.fill();
+    const inside=P.hidden&&dist(P.x,P.y,b.x,b.y)<b.r;if(inside)ctx.globalAlpha=.75;
+    ctx.fillStyle='#2f6b2c';[[0,0,1],[-.45,.15,.7],[.45,.1,.72],[0,-.35,.66]].forEach(([dx,dy,k])=>{ctx.beginPath();ctx.arc(b.x+dx*b.r+w,b.y+dy*b.r,b.r*k,0,TAU);ctx.fill()});
+    ctx.fillStyle='#4f9a3a';[[-.2,-.3,.45],[.3,-.15,.38]].forEach(([dx,dy,k])=>{ctx.beginPath();ctx.arc(b.x+dx*b.r+w,b.y+dy*b.r,b.r*k,0,TAU);ctx.fill()});
+    ctx.fillStyle='#d94a5a';for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(b.x+Math.cos(i*1.7+b.x)*b.r*.55+w,b.y+Math.sin(i*1.7+b.y)*b.r*.45,2.4,0,TAU);ctx.fill()}ctx.globalAlpha=1});
+  // entities y-sorted
+  const ents=[...npcs.filter(o=>!o.asleep),{player:true,y:P.y},{crow:true,y:pip.y}].sort((a,b)=>a.y-b.y);
+  ents.forEach(e=>{if(e.player){if(started)moss(t)}else if(e.crow){if(started)crow(t)}else if(inView(e.x,e.y))human(e,t)});
+  // tree canopies
+  trees.forEach(tr=>{if(!inView(tr.x,tr.y,tr.r))return;const under=dist(P.x,P.y,tr.x,tr.y)<tr.r;ctx.globalAlpha=under?.45:1;
+    ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(tr.x+10,tr.y+14,tr.r,tr.r*.8,0,0,TAU);ctx.fill();
+    const c1=tr.tone<.5?'#1f4f2a':'#23553a',c2=tr.tone<.5?'#2d6b35':'#2f6e48',c3=tr.tone<.5?'#3f8a43':'#3e8a5c';
+    ctx.fillStyle=c1;ctx.beginPath();ctx.arc(tr.x,tr.y,tr.r,0,TAU);ctx.fill();ctx.fillStyle=c2;ctx.beginPath();ctx.arc(tr.x-tr.r*.15,tr.y-tr.r*.15,tr.r*.72,0,TAU);ctx.fill();ctx.fillStyle=c3;ctx.beginPath();ctx.arc(tr.x-tr.r*.3,tr.y-tr.r*.32,tr.r*.38,0,TAU);ctx.fill();ctx.globalAlpha=1});
+  // shack & station roofs label already on bg; quest marker
+  const tg=started&&qTarget();
+  if(tg){const by=tg.y-34+Math.sin(t/200)*4;ctx.fillStyle='#ffbf3c';ctx.beginPath();ctx.moveTo(tg.x-9,by-12);ctx.lineTo(tg.x+9,by-12);ctx.lineTo(tg.x,by);ctx.fill();ctx.strokeStyle='#3b2614';ctx.lineWidth=2;ctx.stroke()}
+  // bubbles
+  npcs.forEach(o=>{if(o.asleep||!inView(o.x,o.y))return;if(o.sayT>0)bubble(o.x,o.y-22,o.say,'#fff');else if(o===ranger&&o.state==='chase')bubble(o.x,o.y-22,'!','#ff5b4a');else if(o.n>.12)bubble(o.x,o.y-22,o.n>.6?'?!':'?',o.n>.6?'#ffbf3c':'#fbf3df')});
+  // night
+  const dk=darkness();ctx.setTransform(1,0,0,1,0,0);
+  if(dk>0){dctx.setTransform(1,0,0,1,0,0);dctx.globalCompositeOperation='source-over';dctx.clearRect(0,0,dark.width,dark.height);dctx.fillStyle=`rgba(8,12,38,${dk})`;dctx.fillRect(0,0,dark.width,dark.height);dctx.globalCompositeOperation='destination-out';
+    const sx=x=>(x-camX)*scale*dpr,sy=y=>(y-camY)*scale*dpr,k=scale*dpr;
+    const light=(x,y,r,a=1)=>{const g=dctx.createRadialGradient(sx(x),sy(y),0,sx(x),sy(y),r*k);g.addColorStop(0,`rgba(0,0,0,${a})`);g.addColorStop(1,'rgba(0,0,0,0)');dctx.fillStyle=g;dctx.beginPath();dctx.arc(sx(x),sy(y),r*k,0,TAU);dctx.fill()};
+    light(P.x,P.y,110,.7);solids.forEach(s=>{if(s.fire)light(s.x,s.y,130,.9)});light(shop.x,shop.y-10,150,.9);light(1985,1440,140,.85);
+    {const [vd,fov]=o_vd(ranger);dctx.fillStyle='rgba(0,0,0,.85)';dctx.beginPath();dctx.moveTo(sx(ranger.x),sy(ranger.y));dctx.arc(sx(ranger.x),sy(ranger.y),vd*k,ranger.ang-fov/2,ranger.ang+fov/2);dctx.closePath();dctx.fill()}
+    ctx.drawImage(dark,0,0)}
+  // offscreen quest arrow
+  if(tg){const sx=(tg.x-camX)*scale,sy=(tg.y-camY)*scale;if(sx<0||sy<0||sx>cw||sy>ch){const a=Math.atan2(sy-ch/2,sx-cw/2);const m=46;const ex=clamp(cw/2+Math.cos(a)*cw,m,cw-m),ey=clamp(ch/2+Math.sin(a)*ch,m+130,ch-m-110);ctx.save();ctx.scale(dpr,dpr);ctx.translate(ex,ey);ctx.rotate(a);ctx.fillStyle='#ffbf3c';ctx.strokeStyle='#3b2614';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(16,0);ctx.lineTo(-10,-12);ctx.lineTo(-4,0);ctx.lineTo(-10,12);ctx.closePath();ctx.stroke();ctx.fill();ctx.restore()}}
+  if(flash>0){ctx.fillStyle=`rgba(5,8,6,${Math.min(1,flash*1.4)})`;ctx.fillRect(0,0,cv.width,cv.height)}
+}
+let last=performance.now();
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!paused&&started)update(dt);else if(!started&&S){S.time=(S.time+dt*2)%1440}render(now);
+  if(started&&now-hudT>100){hudT=now;hud();const o=paused?null:nearInt();const pr=$('#prompt');if(o){pr.hidden=false;pr.innerHTML=`<kbd>${document.body.classList.contains('touch')?'Use':'E'}</kbd>${esc(LABEL(o))}`}else pr.hidden=true}
+  requestAnimationFrame(frame)}
+
+/* ---------- boot ---------- */
+function title(){let has=null;try{has=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+  openModal(`<h1 class="slab">Pinecone Prowler</h1><p>You are <b>Moss</b>, a shy forest giant with a big appetite. The campers at Hollowpine have coolers. You have stealth.</p>
+  <div class="keys"><span><kbd>WASD</kbd></span><span>Move · hold <b>Shift</b> to run (noisy)</span><span><kbd>E</kbd></span><span>Raid, talk, use</span><span><kbd>Q</kbd></span><span>Eat (or tap a snack)</span><span><kbd>G</kbd></span><span>Put the disguise on or off</span><span>Bushes</span><span>Walk into one to hide from sight cones</span></div>
+  <div class="btns">${has?'<button class="btn" data-a="cont">Continue (Day '+(+has.day||1)+')</button>':''}<button class="btn ${has?'alt':''}" data-a="new">New game</button></div>`);
+  $('#card').onclick=e=>{const a=e.target.dataset.a;if(!a)return;$('#card').onclick=null;sfx(520,.1,'triangle',.1);if(a==='cont')load(has);else{load(fresh());started=true}closeModal();hud();if(a==='new')setTimeout(()=>toast('Walk to Pip the crow and press E'),400)}}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal'&&started){const c=$('#card').querySelector('[data-a=close]');if(c)c.click()}});
+const boot=d=>{S=fresh();restock();renderSlots();if(d&&d.day){load(d);closeModal();paused=false}else title();requestAnimationFrame(frame)};
+window.claude?.hot?.ready?window.claude.hot.ready(boot):boot(window.claude?.hot?.data??null);
+}
+</script>
