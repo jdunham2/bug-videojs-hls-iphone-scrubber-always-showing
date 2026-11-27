@@ -20,20 +20,29 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - **Story**: eavesdrop on Grube and his assistant Kendra on the diner patio (11 AM–2 PM) → 30-day council-vote countdown in the HUD
 - Save format v2 with automatic migration of Slice 1 saves
 
-## Next prompt (Slice 3)
+## Done — Slice 3: Proof, vehicles and the golf course
+- **Drag-to-eat**: eating opens a close-up of Moss's face; drag food from the table into his mouth (mouth opens as food gets close, chomp animation). Picnic tables at every campsite now hold food you can feast on in place or drag into your backpack. Q / tapping a snack opens the same screen for backpack food
+- **Camera & photo proof**: Iris sells a disposable camera. Photo mode (C) with a moving viewfinder; E snaps a real cropped photo of the scene. Evidence photos (footprints on the east lakeshore, mossy nest in the forest, fur tuft on the Elk Ridge fence) are scored on framing + distance (stars, /100), spoiled if someone sees you, and kept in a photo album on the desk in the den
+- **Dr. Anita Holm** visits the Ranger Station 9–5; delivering the album triggers the species review and Grube's escalation
+- **Hank Voss**, Grube's private eye, prowls the campground at dusk with a flashlight; if he photographs undisguised Moss the council vote moves up 2 days (once per day)
+- **Vehicles**: bicycle (Brambles, 15 coins) and Walt's pickup (side quest *Truck Trouble*: fetch his tackle box from the lakeshore). E to get on/off, momentum, honk (H), noisy and more noticeable when undisguised
+- **Pinewick Golf Club** north of town: 3-hole golf mini-game (aim, oscillating power meter, wind, sand, water penalties), 5-coin entry, prizes, best-score board
+- **Caddy job**: 8 timed shots, hand Mrs. Thistlewood the right club for the lie and distance, once per day
+- Save format v3 with migration from v1/v2 saves; touch controls gained a Cam button and Run becomes Honk while riding
+
+## Next prompt (Slice 4)
 Copy this into the next session:
 
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 3: Proof, vehicles and the golf course**.
-> 1. **Camera and photo proof**: Iris sells a disposable camera at the post office. Add a photo mode (aim a viewfinder, snap) and a 3-step main quest to gather "rare species" evidence for the environmental review without being recognised: photograph your own footprints by the lake, a mossy nest in the deep forest, and a hair tuft snagged on a fence. Each photo is scored (framing and distance) and saved to an album in the den. Deliver the album to a new character, a provincial biologist named Dr. Anita Holm who visits the Ranger Station.
-> 2. **Vehicles**: a bicycle bought at Brambles, then a beat-up pickup truck (unlocked by a quest from Walt). Ride with E, faster movement, honking, parked anywhere; vehicles are noisy (guards notice) unless disguised.
-> 3. **Pinewick Golf Course** north of town: a 3-hole top-down mini-golf/golf mini-game (aim + power meter, wind, sand traps), entry fee, coin prizes, best-score board. A disguised Moss can play.
-> 4. **Second job: Golf Caddy**: carry clubs, follow a golfer, hand them the right club before each shot (timed choice mini-game).
-> 5. **Grube escalates**: Grube hires a private investigator (Hank Voss) who roams the campground at dusk with a flashlight and camera; if he photographs undisguised Moss, the countdown drops by 2 days.
-> Keep the 3/4 diorama renderer, art style, HUD, save format (bump to v3 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 4 when done.
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 4: Fishing, foraging and a dog**.
+> 1. **Fishing**: buy a rod at Brambles. Cast from the lakeshore or a new wooden dock (hold to cast farther, wait for a bite, a timing/tension mini-game to reel in). 8 fish species with sizes and rarity that depend on time of day and weather; sell fish at a new bait shop by the lake or cook them.
+> 2. **Mushroom foraging**: mushrooms spawn daily in the forest (chanterelles, morels, a poisonous look-alike). Collect into a basket; a forager's guidebook in the den fills in as you find species; sell to Dot for the diner's specials.
+> 3. **Adopt a dog**: a stray dog named Biscuit hangs around the campground; befriend it over 3 days with food. Once adopted it follows Moss, can be told to sit/stay, barks to distract campers (lures their sight cones away), and sniffs out buried truffles (a hot/cold mini-game) worth lots of coins.
+> 4. **Weather**: rain days (darker, campers stay in tents more, fish bite better, footprints vanish), with a rain particle effect and puddles in the 3/4 renderer.
+> 5. **Story**: Grube hires a bulldozer crew that starts clearing a corner of the forest; sabotage them at night (hide their keys, swap their lunch) to delay construction and win back days on the council countdown.
+> Keep the 3/4 diorama renderer, the drag-to-eat screen, art style, HUD, save format (bump to v4 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 5 when done.
 
 ## Later slices (ideas)
-- Slice 4: Fishing and mushroom foraging; adopt a dog that sniffs out truffles
 - Slice 5: Ski hill and lake activities (canoe, swimming, scuba)
 - Slice 6: More jobs (doctor's office, police desk), arcade cabinets in town
-- Slice 7: Birdwatching with photo scoring; badge collection
+- Slice 7: Birdwatching with photo scoring (reuse the camera); badge collection
 - Slice 8: Council vote finale and save Hollowpine
