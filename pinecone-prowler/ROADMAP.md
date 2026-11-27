@@ -30,19 +30,27 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - **Caddy job**: 8 timed shots, hand Mrs. Thistlewood the right club for the lie and distance, once per day
 - Save format v3 with migration from v1/v2 saves; touch controls gained a Cam button and Run becomes Honk while riding
 
-## Next prompt (Slice 4)
+## Done — Slice 4: Fishing, foraging and a dog
+- **Hollowpine Highway**: one long paved loop road (yellow centre line) connecting the den, the campground, Pinewick's Main Street, the east side, the Bait & Tackle, the lake and back. Four cars drive it, stop and honk when Moss is in the way, and report an undisguised Moss
+- **Fishing**: rod from Brambles (12). Cast from any lakeshore or the new wooden dock: hold to wind up (farther = bigger fish), hook when the bobber dips, then a reel/tension mini-game. 8 species (pumpkinseed to golden trout) depend on time of day, cast distance and rain. Fish log, bucket of 10, sell at **Bait & Tackle** (Marge) or cook at the den fire pit / any campfire into smoked fish
+- **Foraging**: mushrooms spawn daily in the forest (chanterelle, morel, rare porcini, and the poisonous jack-o'-lantern look-alike). Basket of 12; the forager's guidebook on the den desk fills in; sell to Dot (she bins the poisonous ones)
+- **Biscuit the dog**: a stray near the south of camp; feed her on 3 different days to adopt. Follow / Sit-and-stay / Sniff commands. Bark (B) makes everyone near her look at her for 5 s. Sniff mode shows a hot/cold meter to buried truffles under leafy trees (25 coins at the diner)
+- **Weather**: 30% rain days: darker, rain particles, puddles with ripples, campers stay in tents 2 hours out of 3, fish bite faster and rare fish appear, the evidence footprints wash away
+- **Story**: Grube's bulldozer crew (Big Earl and Deb by day, Stu the watchman by night) clears a forest corner east of the den. Hide the bulldozer keys and swap the crew's lunch in one night to win back a day on the council countdown
+- Save format v4 with migration from all older saves; touch controls gained a Bark button
+
+## Next prompt (Slice 5)
 Copy this into the next session:
 
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 4: Fishing, foraging and a dog**.
-> 1. **Fishing**: buy a rod at Brambles. Cast from the lakeshore or a new wooden dock (hold to cast farther, wait for a bite, a timing/tension mini-game to reel in). 8 fish species with sizes and rarity that depend on time of day and weather; sell fish at a new bait shop by the lake or cook them.
-> 2. **Mushroom foraging**: mushrooms spawn daily in the forest (chanterelles, morels, a poisonous look-alike). Collect into a basket; a forager's guidebook in the den fills in as you find species; sell to Dot for the diner's specials.
-> 3. **Adopt a dog**: a stray dog named Biscuit hangs around the campground; befriend it over 3 days with food. Once adopted it follows Moss, can be told to sit/stay, barks to distract campers (lures their sight cones away), and sniffs out buried truffles (a hot/cold mini-game) worth lots of coins.
-> 4. **Weather**: rain days (darker, campers stay in tents more, fish bite better, footprints vanish), with a rain particle effect and puddles in the 3/4 renderer.
-> 5. **Story**: Grube hires a bulldozer crew that starts clearing a corner of the forest; sabotage them at night (hide their keys, swap their lunch) to delay construction and win back days on the council countdown.
-> Keep the 3/4 diorama renderer, the drag-to-eat screen, art style, HUD, save format (bump to v4 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 5 when done.
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 5: The mountain and the lake**.
+> 1. **Ski hill**: extend the map north of the golf course with a snowy mountain (the 3/4 renderer gets snow ground, snowy pines and a chairlift with moving chairs). Rent skis at a ski lodge; a downhill mini-game (steer through gates, avoid trees, time trial with a best-time board) and a disguised-Moss-only ski patrol job.
+> 2. **Canoe & swimming**: rent a canoe at the Bait & Tackle and paddle around the lake (water becomes walkable while in the canoe); Moss can swim slowly in shallow water with a stamina drain. Hidden island in the lake with a secret.
+> 3. **Scuba diving**: buy scuba gear; dive spots on the lake show an underwater view mini-game (collect lost items, avoid running out of air) with a sunken treasure chest.
+> 4. **Story**: Gideon Grube tries to buy off Dr. Holm; find his bribe letter in the site office at night and mail it to the Pinewick Gazette (via Iris) to turn the town against him. Add a newspaper headline screen each morning showing world events.
+> 5. **Quality of life**: a map screen (M) showing the whole world, the loop road, and discovered places; a save/settings menu with sound volume.
+> Keep the 3/4 diorama renderer, the loop road and traffic, drag-to-eat, art style, HUD, save format (bump to v5 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 6 when done.
 
 ## Later slices (ideas)
-- Slice 5: Ski hill and lake activities (canoe, swimming, scuba)
 - Slice 6: More jobs (doctor's office, police desk), arcade cabinets in town
 - Slice 7: Birdwatching with photo scoring (reuse the camera); badge collection
 - Slice 8: Council vote finale and save Hollowpine
