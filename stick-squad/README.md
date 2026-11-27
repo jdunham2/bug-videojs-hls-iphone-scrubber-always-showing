@@ -2,6 +2,9 @@
 
 A hand-drawn, local co-op stick-figure brawler. One player uses the **keyboard**, the other uses a **Nintendo Switch Pro Controller** (any standard gamepad works too).
 
+
+**3D view:** press **V** at any time to switch between the normal hand-drawn view and a 3D view. The game plays exactly the same, but the fighters, floor and platforms are drawn in 3D with lighting and shadows, and the camera gently follows the action. It works on every stage and in every mode (including online). The 3D view loads three.js from the internet, so it needs a connection.
+
 ## Play
 
 Open `index.html` in Chrome or Edge (these browsers have the best gamepad support). No build step and no install.
