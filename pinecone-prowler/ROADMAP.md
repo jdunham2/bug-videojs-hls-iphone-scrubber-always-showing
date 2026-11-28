@@ -102,5 +102,16 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - Character animations: walk squash and lean, sprint dust, breathing and blinking, idle yawns, stretches, scratches and look-arounds, dancing to the den radio, eating with chomping cheeks and crumbs, rummaging when raiding, crouching in bushes with peeking eyes, startle hop with "!" when noticed, swim strokes and splashes, sleeping in bed with floating z's, coin sparkles, campers flailing when they flee, and z's over sleeping campers.
 - 4 new badges. Save format v10 with migration.
 
-## Possible next prompt (Slice 11, optional)
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 11: Friends and festivals**. 1) Moss can invite friends (Pip, Biscuit, and townsfolk from finished valley stories) to a campfire night at the den with marshmallow roasting. 2) A cooking pot at the den: combine 2 ingredients (fish, mushrooms, berries, apples) into new recipes that give bigger hunger boosts. 3) A summer lake swim race and an autumn pumpkin-carving contest. 4) A collection log for every food, outfit and furniture item with "found/not found" silhouettes. 5) Gamepad support (move, use, eat, menu). Keep everything working, save format v11 with migration, and test in a headless browser.
+## Done — Slice 11: Friends and festivals + a bigger valley
+- Bigger map: the town, golf club and mountain moved 1000 units east of the campground, and the mountain moved 500 units further north. The world is now 4950 wide. Old saves are moved to match.
+- New wilds between the biomes: Whispering Woods (a creek with two road bridges, an old fire lookout that reveals the whole map, Halfway Glade, wild berry bushes) and Pine Ridge on the trail up to the ski lodge. Road signs point the way.
+- Campfire nights at the den (6 PM to midnight): invite up to 3 friends (Pip, Biscuit, finished valley-story townsfolk) and roast marshmallows to golden for friendship hearts.
+- Cooking pot at the den: combine two of fish, mushroom, apple and berries into 10 recipes with a recipe book.
+- Summer lake swim race at the dock (tap left/right in turn) and an autumn pumpkin-carving contest on the town square (design a face, then time your cuts).
+- Collection log: every food, outfit and furniture item with silhouettes for ones not found yet.
+- Gamepad support: stick or d-pad moves, A use, B eat, X outfit, Y camera, RB run, LB map, Start menu; d-pad picks buttons in menus.
+- 5 new badges. Save format v11 with migration.
+- Coordinates: town/golf/mountain x positions are the old ones plus 1000; mountain y positions are the old ones minus 500.
+
+## Possible next prompt (Slice 12, optional)
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 12: Wild neighbours**. 1) Forest animals that live in each biome (deer and rabbits in Whispering Woods, mountain goats on Pine Ridge, ducks on the lake) that react to Moss and can be befriended with berries. 2) A creek fishing spot with its own fish. 3) A hidden waterfall cave up the creek with a treasure hunt using the fire lookout's view. 4) A fast-travel bus between the campground, Whispering Woods, Pinewick and the ski lodge (costs coins, needs a disguise). 5) Weather varies by biome: snow on Pine Ridge earlier in the year, fog in the woods at dawn. Keep everything working, save format v12 with migration, and test in a headless browser.
