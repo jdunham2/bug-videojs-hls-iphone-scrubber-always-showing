@@ -63,16 +63,24 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - Fixes: an adopted Biscuit no longer steals the E prompt from people and doors; bushes no longer grow inside the den or over buildings
 - Save format v6 with migration from all older saves
 
-## Next prompt (Slice 7)
+## Done — Slice 7: Birds and badges
+- **Birdwatching**: 20 bird species (robin, chickadee, Steller's jay, pileated woodpecker, great horned owl, heron, loon, mallard, kingfisher, bald eagle, ptarmigan, nutcracker, raven, sparrow, pigeon, rufous hummingbird, goldfinch, waxwing, evening grosbeak, snowy owl) spread across forest, lake, mountain, town, campground and the sanctuary. Each has its own time of day, and some only come in certain seasons. Birds hop and peck, and fly off if Moss walks too close (wider if he runs or drives; hiding in a bush keeps them calm). Camera photos of birds are scored (centred, size by distance, perched, rarity) and fill a **bird guide** on the den desk
+- **Binoculars** (Brambles, 10 coins; V key or Binoc button): a twin-lens zoom that names the bird in view and its rarity
+- **Rosa's bird sanctuary** north-west of the lake: meadow, feeders, a bird hide, and Rosa, who gives photo requests ("a Great blue heron, lakeshore, at dawn") for 18–34 coins
+- **Ranger badge book**: 25 badges across the whole game, with a popup (batched as "+N more") and a badge page in the Menu and on the desk
+- **Seasons** every 7 days: summer → autumn (orange and red leafy trees, golden grass, fallen leaves) → winter (snow over the whole map, snowy trees, frozen walkable lake with an ice-fishing hole, no canoe or diving, snowfall instead of rain) → spring (pink blossoms, wildflowers). Two seasonal fish: burbot (winter) and brook char (spring), for 10 species in total. Seasonal birds and newspaper headlines
+- **Story**: the council sets the vote (10 days). Dr. Holm needs a photo of the creature itself. Choose who you trust to take it (Pip and Biscuit try their best…), pick the place (den, lakeshore at dawn, mountain lookout) and how much Moss shows (shadow, half hidden, full portrait). A hand-drawn portrait goes into the album, and each friend reacts in their own way. Deliver it to Holm
+- **Look**: grass tufts everywhere, lake shimmer, a soft vignette, warm morning and golden-hour colour grading, and seasonal tints
+- Fixes: Pip and people now beat an adopted Biscuit for the E prompt; the phone clock wraps
+- Save format v7 with migration from all older saves
+
+## Next prompt (Slice 8)
 Copy this into the next session:
 
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 7: Birds and badges**.
-> 1. **Birdwatching**: 20 original bird species living in different places (forest, lake, mountain, town, campground) and times of day, drawn in the 3/4 renderer, that flutter off if Moss runs nearby. Use the existing camera: photos of birds are scored (size in frame, centred, bird not flying away, rare bonus) and fill a **bird guide** in the den.
-> 2. **Binoculars and a bird sanctuary**: buy binoculars at Brambles (zoom view that shows the bird's name and how rare it is); a bird sanctuary with feeders north of the lake run by a birder named Rosa, who gives photo requests ("a heron at dawn") for coins.
-> 3. **Badges**: a Ranger Badge book with 25 badges earned across everything (first raid, 10 fish species, ski under 40 s, arcade #1, all petition signatures, 15 birds…), with a badge popup and a badge page in the menu.
-> 4. **Seasons**: every 7 days the season changes (summer → autumn → winter → spring): autumn leaves on round trees, winter snow covers the whole map and the lake freezes (walkable, ice-fishing hole), spring flowers. Some birds and fish only appear in some seasons.
-> 5. **Story**: the council schedules the vote. Dr. Holm needs one final piece of evidence: a photo of Moss himself, taken by someone he trusts. Pick who (Pip can't hold a camera…), set up the shot, and choose how much of himself Moss is willing to show.
-> Keep the 3/4 diorama renderer, the loop road and traffic, the north mountain, drag-to-eat, map/menu/newspaper, jobs and arcade, art style, HUD, save format (bump to v7 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 8 when done.
-
-## Later slices (ideas)
-- Slice 8: Council vote finale and save Hollowpine
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 8: The vote (finale)**.
+> 1. **Vote day**: when the council countdown reaches 0 (or the player chooses "Go to the vote" from the menu once ready), hold the council meeting in a new Pinewick town hall on Main Street. Everyone Moss has helped shows up. A short scene: Grube, Kendra and their lawyer vs Dot, Iris, Walt, Rosa, Dr. Holm and the deputy. The outcome is scored from what the player achieved (evidence photos, the portrait and how much Moss revealed, petition signatures, sabotage nights, the bribe letter, the moose photo, badges, friendships). Show a tally on screen.
+> 2. **Endings**: three endings depending on the score: Hollowpine becomes a protected provincial park (best); the resort is downsized to a small lodge; or Grube wins but Moss and friends relocate deeper into the mountains (bittersweet). Each ending gets its own illustrated cutscene and credits.
+> 3. **Moss's choice**: right before the vote, Moss chooses whether to walk into the town hall without a disguise. It is risky; it changes the scene and the ending text.
+> 4. **Epilogue / post-game**: after the credits, free play continues in the changed world (park signs and a new ranger booth, or the small lodge, or snowy mountain camp). Unlock a "New Game+" option with all outfits, and a final badge "Keeper of Hollowpine".
+> 5. **Polish pass**: tutorial hints for first-time players (first raid, first hide, first disguise), a clear "what can I do now" activity list in the menu, balance check for coins, and performance (cull far-away objects).
+> Keep the 3/4 diorama renderer, the loop road and traffic, the north mountain, seasons and birds, drag-to-eat, map/menu/newspaper, jobs and arcade, art style, HUD, save format (bump to v8 with migration) and touch controls. Test it in a headless browser.
