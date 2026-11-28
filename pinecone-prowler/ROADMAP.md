@@ -74,13 +74,22 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - Fixes: Pip and people now beat an adopted Biscuit for the E prompt; the phone clock wraps
 - Save format v7 with migration from all older saves
 
-## Next prompt (Slice 8)
-Copy this into the next session:
+## Done — Slice 8: The vote (finale)
+- **Town Hall** on the town square (columns, clock, flag). When the countdown ends after the portrait is delivered (or you pick "Go to the vote" in the menu), quest "Vote day" sends you there (9 AM–6 PM). If the countdown runs out before the story is ready, the council postpones 3 days
+- **Moss's choice at the door**: walk in disguised, or take off the disguise and walk in as himself. This changes the scene (Grube panics, Deputy Ruiz: "He's waiting in line, sir"), the score and the ending text
+- **Council scene** built from what you did: Dot's petition, Iris and the Gazette, Walt and the moose, Rosa's birds, Dr. Holm's evidence and the portrait
+- **Tally** (max 102): evidence photos, portrait, petition, sabotage, bribe letter, moose photo, badges, bird guide, friends, and walking in as yourself. 70+ → **Hollowpine Provincial Park**; 40+ → **the little lodge**; less → **the mountain camp** (bittersweet)
+- **Endings**: an illustrated scene per ending, rolling credits for the whole cast, Pip's epilogue line and a newspaper headline the next morning
+- **Changed world after the vote**: park (bulldozer gone, flowers, ranger booth, "HOLLOWPINE PARK" sign, crew and Grube gone), lodge (a small Hollowpine Lodge replaces the bulldozer), mountain (construction continues; a new camp west of the ski run). If Moss revealed himself, people no longer panic when they see him
+- **New Game+** on the title screen after any ending (all outfits, binoculars, 50 coins). New badge **Keeper of Hollowpine** (26 total)
+- **Polish**: first-time tips (raiding, hiding, eating, disguise, map and menu), a "What can I do now?" list in the menu (goal, open jobs and venues, birds, fishing, foraging, badges), and a tree spatial grid that speeds up collision and line-of-sight checks
+- Save format v8 with migration from all older saves (veteran saves skip the tips)
 
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 8: The vote (finale)**.
-> 1. **Vote day**: when the council countdown reaches 0 (or the player chooses "Go to the vote" from the menu once ready), hold the council meeting in a new Pinewick town hall on Main Street. Everyone Moss has helped shows up. A short scene: Grube, Kendra and their lawyer vs Dot, Iris, Walt, Rosa, Dr. Holm and the deputy. The outcome is scored from what the player achieved (evidence photos, the portrait and how much Moss revealed, petition signatures, sabotage nights, the bribe letter, the moose photo, badges, friendships). Show a tally on screen.
-> 2. **Endings**: three endings depending on the score: Hollowpine becomes a protected provincial park (best); the resort is downsized to a small lodge; or Grube wins but Moss and friends relocate deeper into the mountains (bittersweet). Each ending gets its own illustrated cutscene and credits.
-> 3. **Moss's choice**: right before the vote, Moss chooses whether to walk into the town hall without a disguise. It is risky; it changes the scene and the ending text.
-> 4. **Epilogue / post-game**: after the credits, free play continues in the changed world (park signs and a new ranger booth, or the small lodge, or snowy mountain camp). Unlock a "New Game+" option with all outfits, and a final badge "Keeper of Hollowpine".
-> 5. **Polish pass**: tutorial hints for first-time players (first raid, first hide, first disguise), a clear "what can I do now" activity list in the menu, balance check for coins, and performance (cull far-away objects).
-> Keep the 3/4 diorama renderer, the loop road and traffic, the north mountain, seasons and birds, drag-to-eat, map/menu/newspaper, jobs and arcade, art style, HUD, save format (bump to v8 with migration) and touch controls. Test it in a headless browser.
+## Possible next prompt (Slice 9, optional extras)
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 9: Extras and polish**.
+> 1. **Music and ambience**: a small procedural WebAudio soundtrack per area (campground, town, mountain, night), birdsong and rain ambience, all controlled by the volume slider plus a separate music slider.
+> 2. **Holidays**: a Halloween night (campers in costumes, so Moss blends in without a disguise), a winter festival with a sledding hill, and a spring fishing derby with a leaderboard.
+> 3. **More to do after the vote**: a park-ranger job (if the park ending), lodge chef job (if the lodge ending) or a mountain-hermit trading post (if the mountain ending).
+> 4. **Accessibility**: remappable keys, a high-contrast HUD option, a "relaxed" mode with slower detection, and larger touch buttons.
+> 5. **Quality**: a short in-game controls card on first launch, a save-export/import code in the menu, and a pass over coin balance.
+> Keep everything else working (save format v9 with migration). Test it in a headless browser.

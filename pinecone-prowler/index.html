@@ -150,6 +150,8 @@ body.cammode #bottom{visibility:hidden}
 #badgePop{position:fixed;left:50%;top:18%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;padding:8px 14px;pointer-events:none;animation:pop .3s ease-out}
 #badgePop svg{width:40px;height:40px}
 #badgePop small{color:var(--amber);font-weight:900}
+@keyframes roll{from{transform:translateY(0)}to{transform:translateY(calc(-100% - 64vh))}}
+@media(prefers-reduced-motion:reduce){.credroll{animation:none!important;position:static!important}}
 @media(max-width:640px){.hbtn{padding:0 6px;font-size:12px;height:50px}#stats{width:165px;padding:6px 10px}#quest{order:3;width:100%;max-width:340px}#eye{min-width:0;flex:1}#clock{font-size:14px;white-space:normal;line-height:1.15}.slot{width:36px;height:36px;padding:3px}#slots{max-width:262px}.slot svg{width:26px;height:26px}.ing{font-size:13px;padding:4px 6px}.ing kbd{display:none}}
 @media(prefers-reduced-motion:reduce){.toast,.plate.shake{animation:none}}
 </style>
@@ -281,7 +283,8 @@ const B={
  clinic:addRect(3150,880,170,110,'bld',{style:'clinic',H:54}),
  police:addRect(3400,880,190,110,'bld',{style:'police',H:58}),
  arcade:addRect(3620,520,200,160,'bld',{style:'arcade',H:66}),
- hide:addRect(370,975,110,64,'bld',{style:'hide',H:44})
+ hide:addRect(370,975,110,64,'bld',{style:'hide',H:44}),
+ hall:addRect(3620,862,240,128,'bld',{style:'hall',H:72})
 };
 const shop=addInt({k:'shop',x:1325,y:1340});
 const dinerDoor=addInt({k:'diner',x:2750,y:700});
@@ -297,6 +300,7 @@ const officeInt=addInt({k:'office',x:914,y:196});const secretInt=addInt({k:'secr
 const clinicDoor=addInt({k:'clinic',x:3235,y:1012}),policeDoor=addInt({k:'police',x:3495,y:1012}),arcadeDoor=addInt({k:'arcade',x:3720,y:700});
 [[560,640],[640,820],[760,1000]].forEach((q,i)=>addInt({k:'stomp',i,x:q[0],y:q[1]}));addInt({k:'shelf',x:315,y:246});solids.push({x:3720,y:1065,r:28});
 [[490,1010],[540,1085],[400,1105]].forEach(([x,y])=>solids.push({x,y,r:6,feeder:true}));
+const hallInt=addInt({k:'hall',x:3740,y:1012});
 addRect(2060,226,200,8,'fence',{block:false});
 const tackle=addInt({k:'tackle',x:1000,y:1218});
 addRect(200,300,46,22,'desk');const album=addInt({k:'album',x:223,y:336});
@@ -332,6 +336,7 @@ trees.push({x:592,y:1326,r:30,tone:.3,round:true},{x:660,y:1334,r:24,tone:.7,rou
 {const inR=(x,y,q,m)=>x>q.x-m&&x<q.x+q.w+m&&y>q.y-m&&y<q.y+q.h+m;
 for(let n=0,c=0;c<150&&n<20000;n++){const x=R(MTN.x+20,WW-20),y=R(YMIN+60,40);if(inR(x,y,RUN,30)||inR(x,y,LODGEZ,20)||Math.abs(x-3560)<70||segMin(x,y,SKITRAIL)<50||inR(x,y,GOLF,0))continue;if(trees.some(t=>Math.abs(t.x-x)<64&&dist(x,y,t.x,t.y)<64))continue;trees.push({x,y,r:R(28,42),tone:rnd(),round:false,snow:true});c++}
 for(let n=0,c=0;c<260&&n<20000;n++){const x=R(20,MTN.x-20),y=R(YMIN+20,-10);if(trees.some(t=>Math.abs(t.x-x)<62&&dist(x,y,t.x,t.y)<62))continue;trees.push({x,y,r:R(30,46),tone:rnd(),round:rnd()<.15});c++}}
+for(let i=trees.length-1;i>=0;i--)if(dist(trees[i].x,trees[i].y,2650,-560)<90)trees.splice(i,1);
 {const SPth=[[480,430],[560,640],[640,820],[760,1000],[840,1040],[905,1072]];for(let i=trees.length-1;i>=0;i--)if(segMin(trees[i].x,trees[i].y,SPth)<50||dist(trees[i].x,trees[i].y,905,1072)<80)trees.splice(i,1);for(let i=solids.length-1;i>=0;i--){const q=solids[i];if(q.rock&&!q.cave&&dist(q.x,q.y,den.x,den.y)>260&&segMin(q.x,q.y,SPth)<60)solids.splice(i,1)}
 for(let i=bushes.length-1;i>=0;i--){const b=bushes[i];if(dist(b.x,b.y,den.x,den.y)<den.r+10||Object.values(B).some(q=>b.x>q.x-24&&b.x<q.x+q.w+24&&b.y>q.y-24&&b.y<q.y+q.h+30))bushes.splice(i,1)}}
 for(let n=0;bushes.length<95&&n<6000;n++){const x=R(60,WW-60),y=R(60,WH-60);if(!inLake(x,y,30)&&!trees.some(t=>dist(x,y,t.x,t.y)<44)&&nearPath(x,y)>40&&!nearSolid(x,y,30)&&!inClear(x,y,0)&&dist(x,y,den.x,den.y)>den.r+20)bushes.push({x,y,r:R(24,32),wig:0})}
@@ -344,7 +349,7 @@ function free(x,y,r,swim){
   if(x<r||y<YMIN+r||x>WW-r||y>WH-r)return false;
   if(SEASON===2&&dist(x,y,ICE.x,ICE.y)<14)return false;
   if(SEASON!==2&&inLake(x,y,-6)&&!onIsland(x,y,0)&&!(x>DOCK.x+4&&x<DOCK.x+DOCK.w-4&&y>DOCK.y&&y<DOCK.y+DOCK.h+40)&&!(swim&&!inLake(x,y,-62)))return false;
-  for(const t of trees)if(Math.abs(t.x-x)<30&&Math.abs(t.y-y)<30&&dist(x,y,t.x,t.y)<r+11)return false;
+  for(const t of treesNear(x,y))if(Math.abs(t.x-x)<30&&Math.abs(t.y-y)<30&&dist(x,y,t.x,t.y)<r+11)return false;
   for(const s of solids)if(Math.abs(s.x-x)<60&&dist(x,y,s.x,s.y)<r+s.r)return false;
   for(const q of rects){const cx=clamp(x,q.x,q.x+q.w),cy=clamp(y,q.y,q.y+q.h),d2=(x-cx)**2+(y-cy)**2;if(q.k==='bin'||q.k==='cont'?d2<(r*.6)**2:d2<r*r)return false}
   return true;
@@ -352,7 +357,7 @@ function free(x,y,r,swim){
 function segRect(ax,ay,bx,by,q){let t0=0,t1=1;const dx=bx-ax,dy=by-ay;const ps=[-dx,dx,-dy,dy],qs=[ax-q.x,q.x+q.w-ax,ay-q.y,q.y+q.h-ay];for(let i=0;i<4;i++){if(ps[i]===0){if(qs[i]<0)return false}else{const t=qs[i]/ps[i];if(ps[i]<0){if(t>t1)return false;if(t>t0)t0=t}else{if(t<t0)return false;if(t<t1)t1=t}}}return true}
 function los(ax,ay,bx,by){
   for(const q of rects)if(blocks(q)&&q.k!=='pole'&&segRect(ax,ay,bx,by,q))return false;
-  for(const t of trees)if(segD(t.x,t.y,ax,ay,bx,by)<15)return false;
+  for(const t of treesBox(Math.min(ax,bx),Math.min(ay,by),Math.max(ax,bx),Math.max(ay,by)))if(segD(t.x,t.y,ax,ay,bx,by)<15)return false;
   for(const s of solids)if(s.rock&&segD(s.x,s.y,ax,ay,bx,by)<s.r*.8)return false;
   return true;
 }
@@ -372,13 +377,14 @@ function text(t,x,y,size,col,font){ctx.font=font||`${size}px "Alfa Slab One",Geo
 
 function drawBuilding(q){const {x,y,w,h,H,style}=q,y0=gy(y),y1=gy(y+h),ym=(y0+y1)/2,fy=y1-H;
   shadowBox(x,y,w,h,H+20);
-  const wall={shack:'#c94f3a',station:'#557a43',diner:'#ece5d6',store:'#a8743f',po:'#a65a3e',golf:'#f1ece0',bait:'#7fa3b5',trailer:'#e6e2d6',lodge:'#8a5d36',clinic:'#eef1ee',police:'#3e5f8f',arcade:'#4a2a6a',hide:'#7a5a3a'}[style];
+  const wall={shack:'#c94f3a',station:'#557a43',diner:'#ece5d6',store:'#a8743f',po:'#a65a3e',golf:'#f1ece0',bait:'#7fa3b5',trailer:'#e6e2d6',lodge:'#8a5d36',clinic:'#eef1ee',police:'#3e5f8f',arcade:'#4a2a6a',hide:'#7a5a3a',hall:'#e6e0d0',plodge:'#a8743f'}[style];
   rect(wall,x,fy,w,H);
   if(style==='bait'){for(let yy=fy+3;yy<y1;yy+=8)rect('#6b8fa1',x,yy,w,2);rect('#3b2614',x+w/2-12,fy+18,24,H-18);[x+14,x+w-50].forEach(wx=>{rect('#f1e6cf',wx-3,fy+12,42,24);rect(winCol(),wx,fy+15,36,18)})}
   if(style==='lodge'){for(let yy=fy+4;yy<y1;yy+=9)rect('#6b4226',x,yy,w,3);rect('#3b2614',x+w/2-15,fy+20,30,H-20);[x+18,x+w-62].forEach(wx=>{rect('#e9dcc0',wx-3,fy+14,50,28);rect(winCol(),wx,fy+17,44,22)});rect('#8a8a8a',x+w-40,fy-50,16,40)}
   if(style==='clinic'){rect('#2fa79a',x,fy+H-14,w,6);rect('#2a3b3a',x+w/2-14,fy+18,28,H-18);[x+14,x+w-56].forEach(wx=>{rect('#b9c4c4',wx-3,fy+12,46,24);rect(winCol(),wx,fy+15,40,18)});rect('#fff',x+w/2-10,fy+3,20,12);rect('#d8423a',x+w/2-2,fy+4,4,10);rect('#d8423a',x+w/2-7,fy+7,14,4)}
   if(style==='police'){rect('#e9e4d8',x,fy+H-16,w,5);rect('#24344f',x+w/2-15,fy+20,30,H-20);[x+16,x+w-58].forEach(wx=>{rect('#e9e4d8',wx-3,fy+12,48,26);rect(winCol(),wx,fy+15,42,20);for(let k=1;k<4;k++)rect('#24344f',wx+k*10.5,fy+15,2,20)});const on=Math.floor(performance.now()/400)%2;rect(on?'#d8423a':'#3d8be0',x+w/2-6,fy-46,12,8)}
   if(style==='arcade'){const n=Math.floor(performance.now()/300)%3;rect(['#ff4f9a','#6cd0ff','#ffbf3c'][n],x,fy+H-14,w,4);rect('#1a1030',x+w/2-16,fy+22,32,H-22);rect('#1a1030',x+14,fy+14,60,34);rect(night>.3?'#ff7ac0':'#6a4a9a',x+17,fy+17,54,28);rect('#1a1030',x+w-74,fy+14,60,34);rect(night>.3?'#7ae0ff':'#6a4a9a',x+w-71,fy+17,54,28)}
+  if(style==='hall'){rect('#cfc8b6',x,fy+H-8,w,8);for(let i=0;i<6;i++){const cx=x+20+i*40;rect('#f4f0e4',cx-5,fy+6,10,H-14);rect('#d8d2c2',cx+3,fy+6,2,H-14)}rect('#3b2614',x+w/2-14,fy+24,28,H-32);rect('#f2c230',x+w/2-10,fy-40,20,20);ell('#fbf3df',x+w/2,fy-30,7,7);rect('#3b2614',x+w/2-.75,fy-35,1.5,5)}
   if(style==='hide'){for(let yy=fy+4;yy<y1;yy+=8)rect('#5c4028',x,yy,w,2);rect('#1a1a1a',x+12,fy+14,w-24,8);rect('#3b2614',x+w/2-12,fy+24,24,H-24)}
   if(style==='trailer'){rect('#c8423a',x,fy+H-12,w,4);rect('#9a9a9a',x+12,fy+10,22,H-10);[x+44,x+72].forEach(wx=>rect(winCol(),wx,fy+10,22,14))}
   if(style==='golf'){for(let yy=fy+4;yy<y1;yy+=10)rect('#e2dccd',x,yy,w,3);rect('#2f6b4a',x+w/2-14,fy+20,28,H-20);[x+16,x+w-60].forEach(wx=>{rect('#2f6b4a',wx-3,fy+14,48,28);rect(winCol(),wx,fy+17,42,22)})}
@@ -389,11 +395,11 @@ function drawBuilding(q){const {x,y,w,h,H,style}=q,y0=gy(y),y1=gy(y+h),ym=(y0+y1
   if(style==='po'){for(let yy=fy+5;yy<y1;yy+=9)for(let xx=x+((yy/9|0)%2)*10;xx<x+w;xx+=20)rect('#8e4a32',xx,yy,18,1.5);rect('#f1e6cf',x,fy,w,6);[x+20,x+w-62].forEach(wx=>{rect('#f1e6cf',wx-3,fy+18,48,30);rect(winCol(),wx,fy+21,42,24)});rect('#f1e6cf',x+w/2-18,fy+16,36,H-16);rect('#2e4a6b',x+w/2-14,fy+20,28,H-20)}
   if(style==='diner'){rect('#c9c2b2',x,y0-H,w,y1-y0);rect('#b4ad9e',x,y0-H,w,6);rect('#8f8a80',x-3,fy-6,w+6,8);
     rect('#3b2614',x+w/2-4,fy-40,8,40);rr('#d8423a',x+w/2-96,fy-70,192,36,8);text("STACK 'EM DINER",x+w/2,fy-52,17,'#fbf3df')}
-  else{const R=style==='shack'?16:26,ov=10,c={shack:'#7a3a2c',station:'#3b4f30',store:'#5c3f2a',po:'#4a4f5c',golf:'#2f6b4a',bait:'#3d5a6b',trailer:'#9a9a9a',lodge:'#e4edf3',clinic:'#2fa79a',police:'#24344f',arcade:'#2a1a40',hide:'#4f6b3a'}[style];
+  else{const R=style==='shack'?16:26,ov=10,c={shack:'#7a3a2c',station:'#3b4f30',store:'#5c3f2a',po:'#4a4f5c',golf:'#2f6b4a',bait:'#3d5a6b',trailer:'#9a9a9a',lodge:'#e4edf3',clinic:'#2fa79a',police:'#24344f',arcade:'#2a1a40',hide:'#4f6b3a',hall:'#5a6a7a',plodge:'#5c3f2a'}[style];
     poly(shade(c,-.35),x-ov,y0-H,x+w+ov,y0-H,x+w+ov,ym-H-R,x-ov,ym-H-R);
     poly(c,x-ov,fy+6,x+w+ov,fy+6,x+w+ov,ym-H-R,x-ov,ym-H-R);
     ctx.strokeStyle=shade(c,.12);ctx.lineWidth=1.5;for(let i=1;i<6;i++){const yy=fy+6+(ym-H-R-fy-6)*i/6;ctx.beginPath();ctx.moveTo(x-ov,yy);ctx.lineTo(x+w+ov,yy);ctx.stroke()}
-    const label={shack:'SNACK SHACK',station:'RANGER STATION',store:'BRAMBLES GENERAL STORE',po:'POST OFFICE',golf:'PINEWICK GOLF CLUB',bait:'BAIT & TACKLE',trailer:'SITE OFFICE',lodge:'SKI LODGE',clinic:'CLINIC',police:'POLICE',arcade:'PIXEL PALACE',hide:'BIRD HIDE'}[style],sw=Math.min(w-10,label.length*10+24),sc=style==='po'?'#2e4a6b':'#e9dcc0',tc=style==='po'?'#fbf3df':'#3b2614';
+    const label={shack:'SNACK SHACK',station:'RANGER STATION',store:'BRAMBLES GENERAL STORE',po:'POST OFFICE',golf:'PINEWICK GOLF CLUB',bait:'BAIT & TACKLE',trailer:'SITE OFFICE',lodge:'SKI LODGE',clinic:'CLINIC',police:'POLICE',arcade:'PIXEL PALACE',hide:'BIRD HIDE',hall:'TOWN HALL',plodge:'HOLLOWPINE LODGE'}[style],sw=Math.min(w-10,label.length*10+24),sc=style==='po'?'#2e4a6b':'#e9dcc0',tc=style==='po'?'#fbf3df':'#3b2614';
     rr(sc,x+w/2-sw/2,fy-4,sw,22,4);text(label,x+w/2,fy+7,style==='store'||style==='golf'?12.5:14,tc)}
 }
 function drawTent(q){const x0=q.x,x1=q.x+q.w,yb=gy(q.y+q.h),yt=gy(q.y),mx=(x0+x1)/2,H=46;
@@ -489,10 +495,10 @@ prop(2530,705,()=>{const f=gy(705);rect('#6b4a2c',2490,f-40,6,40);rect('#6b4a2c'
 prop(flag.x,flag.y,()=>{const x=flag.x,f=gy(flag.y);ell(SH,x+16,f+1,18,4);rect('#cccccc',x-2,f-110,4,110);poly('#d8423a',x+2,f-108,x+34,f-108+Math.sin(performance.now()/300)*2,x+34,f-88,x+2,f-88);rect('#fff',x+12,f-104,12,12)});
 prop(2944,658,()=>{const q=ptable;shadowBox(q.x,q.y,q.w,q.h,22);rect('#8f8a80',q.x+19,gy(q.y+q.h)-18,6,18);box(q.x-4,q.y,q.w+8,q.h,20,'#e9e4d8');ell('#d8423a',q.x+22,gy(q.y+14)-58,30,10);rect('#dddddd',q.x+21,gy(q.y+14)-58,2,38)});
 prop(3600,866,()=>{const f=gy(866);box(3560,846,80,16,14,'#7a4c2a');rect('#5c3820',3566,f-12,4,12);rect('#5c3820',3630,f-12,4,12);rect('#2f6b4a',3640,f-60,4,60);rr('#2f6b4a',3626,f-74,32,18,4);text('BUS',3642,f-65,10,'#fbf3df')});
-prop(815,270,()=>drawDozer(),150);
+prop(815,270,()=>drawSiteEnding(),150);prop(1150,710,()=>drawEndProps(),130);prop(2650,-550,()=>{if(S.ending==='mountain')drawEndProps()},120);
 prop(980,236,()=>{shadowBox(966,224,30,18,16);box(966,224,30,18,16,'#3d8be0');rect('#f4f1e4',966,gy(224)-16,30,5)});
 prop(900,345,()=>{const f=gy(345);ell(SH,914,f+1,14,4);rect('#555555',898,f-96,4,96);rect('#333333',890,f-104,22,10);ell(night>.2?'#fff6c8':'#cccccc',901,f-96,9,3)},120);
-prop(870,402,()=>{const f=gy(402);rect('#6b4a2c',810,f-36,6,36);rect('#6b4a2c',924,f-36,6,36);rr('#d9a72a',796,f-78,148,44,5);text('FUTURE HOME OF',870,f-64,9,'#3b2614','900 9px Nunito,sans-serif');text('GRUBE GRAND RESORT',870,f-48,12,'#3b2614')},90);
+prop(870,402,()=>{const f=gy(402);rect('#6b4a2c',810,f-36,6,36);rect('#6b4a2c',924,f-36,6,36);rr('#d9a72a',796,f-78,148,44,5);text(S.ending==='park'?'NOW AND FOREVER':S.ending==='lodge'?'COMING SOON':'FUTURE HOME OF',870,f-64,9,'#3b2614','900 9px Nunito,sans-serif');text(S.ending==='park'?'HOLLOWPINE PARK':S.ending==='lodge'?'HOLLOWPINE LODGE':'GRUBE GRAND RESORT',870,f-48,12,'#3b2614')},90);
 STUMPS.forEach(st=>prop(st.x,st.y,()=>{const x=st.x,f=gy(st.y);ell(SH,x+4,f+1,st.r+3,st.r*.4);rect('#6b4226',x-st.r,f-10,st.r*2,10);ell('#c9a46b',x,f-10,st.r,st.r*.55);ell('#a8854a',x,f-10,st.r*.5,st.r*.28)},20));
 [2560,2860,3160,3460,3760].forEach((px,i)=>prop(px,-1000,()=>{const f=gy(-985),w=170+(i%2)*40,h=230+(i%3)*40;poly('#7a8696',px-w,f,px,f-h,px+w,f);poly('#5f6b7a',px,f-h,px+w,f,px+w*.15,f);poly('#f4f8fb',px-w*.32,f-h*.68,px,f-h,px+w*.32,f-h*.68,px+w*.1,f-h*.6,px-w*.05,f-h*.7,px-w*.18,f-h*.6)},460));
 for(let y=-140;y>-960;y-=110)prop(3560,y,()=>{const f=gy(y);ell(SH,3572,f+1,12,4);rect('#6a6a6a',3557,f-118,6,118);rect('#4a4a4a',3540,f-122,40,5)},140);
@@ -509,7 +515,7 @@ prop(223,322,()=>{shadowBox(200,300,46,22,20);box(200,300,46,22,20,'#7a4c2a');co
 
 /* ---------- state ---------- */
 const P={x:330,y:330,r:14,ang:Math.PI/2,moving:false,hidden:false,sprint:false,bob:0,bush:null,vx:0,vy:0};
-let S;const fresh=()=>({v:3,day:1,time:7*60,hunger:70,stam:100,coins:0,inv:[],fridge:[],q:0,owned:[],outfit:'none',pick:'coat',shiftDay:0,deadline:0,side:{parcel:0,truck:0},stats:{raids:0,eaten:0,caught:0,shifts:0,best:0,caddy:0,fish:0},done:false,cam:false,photos:[],ev:{prints:0,nest:0,tuft:0},veh:{bike:null,truck:null,canoe:null},riding:null,golf:{best:0,rounds:0},caddyDay:0,vossDay:0,rod:false,catch:[],fishLog:{},basket:[],guide:{},truffles:0,dog:{friend:0,fed:0,adopted:false,mode:'follow',met:0},rain:false,wday:0,sab:{keys:-1,lunch:-1,won:-1,count:0},ski:{best:0,runs:0,patrolDay:0},skiDay:0,canoeDay:0,scuba:false,loot:[],chest:false,secret:0,letter:0,mailed:0,paperDay:1,seen:{den:1},tokens:0,arcade:{worm:[],timber:[],race:[]},home:{fridge:0,pack:0,shelf:0,rug:'red',wall:'plain'},clinicDay:0,policeDay:0,calmDay:0,calmN:0,pet:{},stomp:0,stamped:{},rallyDay:0,petDay:0,mooseDay:0,binoc:false,birds:{},birdT:{},req:null,badges:{},arc1:0,photog:'',reveal:0,place:'',proof:0,voteSet:0});
+let S;const fresh=()=>({v:8,day:1,time:7*60,hunger:70,stam:100,coins:0,inv:[],fridge:[],q:0,owned:[],outfit:'none',pick:'coat',shiftDay:0,deadline:0,side:{parcel:0,truck:0},stats:{raids:0,eaten:0,caught:0,shifts:0,best:0,caddy:0,fish:0},done:false,cam:false,photos:[],ev:{prints:0,nest:0,tuft:0},veh:{bike:null,truck:null,canoe:null},riding:null,golf:{best:0,rounds:0},caddyDay:0,vossDay:0,rod:false,catch:[],fishLog:{},basket:[],guide:{},truffles:0,dog:{friend:0,fed:0,adopted:false,mode:'follow',met:0},rain:false,wday:0,sab:{keys:-1,lunch:-1,won:-1,count:0},ski:{best:0,runs:0,patrolDay:0},skiDay:0,canoeDay:0,scuba:false,loot:[],chest:false,secret:0,letter:0,mailed:0,paperDay:1,seen:{den:1},tokens:0,arcade:{worm:[],timber:[],race:[]},home:{fridge:0,pack:0,shelf:0,rug:'red',wall:'plain'},clinicDay:0,policeDay:0,calmDay:0,calmN:0,pet:{},stomp:0,stamped:{},rallyDay:0,petDay:0,mooseDay:0,binoc:false,birds:{},birdT:{},req:null,badges:{},arc1:0,photog:'',reveal:0,place:'',proof:0,voteSet:0,ending:'',vote:{undisg:false,score:0},tips:{},voteDay:0,postDay:0});
 const has=o=>!!S&&S.owned.includes(o);const disg=()=>S.outfit!=='none';
 let alert=0,paused=true,started=false,lastSave=0,flash=0;
 const npcs=[];
@@ -541,7 +547,7 @@ mk({kind:'walker',name:'Skier',x:2700,y:-60,WP:[[2700,-60],[2900,-110],[3480,-10
 const vossS=mk({kind:'stake',name:'Hank Voss',x:480,y:430,ang:Math.atan2(-180,-240),fov:1.2,vd:210,col:'#b08a4f',pants:'#4a3a2a',hair:'#2a2a2a',hat:'fedora',camera:true,state:'watch',asleep:true,still:true,wp:0,st:12});
 const rosa=mk({kind:'towny',name:'Rosa',x:470,y:1080,hx:470,hy:1080,col:'#6fae52',pants:'#5a4a3a',hair:'#9a9a9a',hat:'brown',talk:'rosa',hours:[6,20]});
 const pip={x:420,y:380};
-const PIPAT=[[420,380],[1080,560],[330,360],[1460,1080],[1500,1250],[1790,1500],[2380,700],[2700,760],[3020,560],[3380,770],[1060,1160],[1940,1490],[640,430],[890,440],[3380,770],[3450,1110],[3100,800],[540,560],[1940,1490],[420,380],[420,380],[1940,1490],[420,380]];
+const PIPAT=[[420,380],[1080,560],[330,360],[1460,1080],[1500,1250],[1790,1500],[2380,700],[2700,760],[3020,560],[3380,770],[1060,1160],[1940,1490],[640,430],[890,440],[3380,770],[3450,1110],[3100,800],[540,560],[1940,1490],[420,380],[420,380],[1940,1490],[420,380],[3740,1110],[420,380]];
 
 function restock(){sites.forEach(s=>{const L=LOOT[s.kind];s.cont.stock=[pick(L),pick(L)];if(rnd()<.6)s.cont.stock.push(pick(L))});sites.forEach(s=>{s.tb.stock=rnd()<.75?[pick(TABLEFOOD)].concat(rnd()<.5?[pick(TABLEFOOD)]:[]):[]});ints.forEach(o=>{if(o.k==='bin')o.stock=1});coinSpots.forEach(c=>c.on=true);dailySpawns()}
 
@@ -569,9 +575,11 @@ const QUESTS=[
  {t:'Who holds the camera?',d:'Moss needs someone he trusts to take his portrait. Talk to Pip to decide.'},
  {t:'Set up the shot',d:'Find the friend you chose (disguised) and set up the portrait together.',p:()=>S.photog?`(${S.photog})`:''},
  {t:'Deliver the portrait',d:'Bring the portrait to Dr. Holm at the Ranger Station (9 AM to 5 PM).'},
- {t:'Ready for the vote',d:'Slice 7 complete! Photograph all 20 birds, earn all 25 badges and enjoy the seasons. The council vote is coming…'}
+ {t:'Ready for the vote',d:'The council vote is coming. Finish anything you like first: the vote happens when the countdown ends, or pick "Go to the vote" in the menu.',p:()=>S.deadline?`${Math.max(0,S.deadline-S.day)} days left`:''},
+ {t:'Vote day',d:'Today the council decides Hollowpine\'s fate. Go to the Town Hall on the town square (9 AM to 6 PM).'},
+ {t:'Life after the vote',d:'The story is complete! Explore the changed valley, finish your badges and bird guide, or start New Game+ from the title screen.'}
 ];
-const qTarget=()=>{switch(S.q){case 0:return pip;case 1:{let b=null,bd=1e9;sites.forEach(s=>{const d=dist(P.x,P.y,s.cont.x,s.cont.y);if(s.cont.stock.length&&d<bd){bd=d;b=s.cont}});return S.inv.length?null:b}case 2:return fridge;case 3:return has('coat')?null:coat;case 4:{if(S.coins>=5)return shop;let b=null,bd=1e9;ints.forEach(o=>{if(o.k==='bin'&&o.stock&&o.x<2400){const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}});return b||shop}case 5:return board;case 6:return {x:2560,y:770};case 7:return dinerDoor;case 8:return patioBush;case 9:return poDoor;case 10:{let b=null,bd=1e9;EVID.forEach(e=>{if((S.ev[e.k]||0)<40){const d=dist(P.x,P.y,e.x,e.y);if(d<bd){bd=d;b=e}}});return b}case 11:return holm;case 12:return S.sab.keys!==nightId()?siteKeys:siteLunch;case 13:return officeInt;case 14:return poDoor;case 15:return {x:3500,y:1070};case 16:{let b=null,bd=1e9;npcs.forEach(o=>{if(petOK(o)&&!o.asleep){const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}});return b}case 17:{if(!S.stomp)return storeDoor;for(let i=0;i<3;i++)if(!S.stamped[i])return ints.find(q=>q.k==='stomp'&&q.i===i);return vossS}case 18:return holm;case 19:return pip;case 20:return npcs.find(o=>o.name===S.photog&&!o.asleep)||null;case 21:return holm;default:return null}};
+const qTarget=()=>{switch(S.q){case 0:return pip;case 1:{let b=null,bd=1e9;sites.forEach(s=>{const d=dist(P.x,P.y,s.cont.x,s.cont.y);if(s.cont.stock.length&&d<bd){bd=d;b=s.cont}});return S.inv.length?null:b}case 2:return fridge;case 3:return has('coat')?null:coat;case 4:{if(S.coins>=5)return shop;let b=null,bd=1e9;ints.forEach(o=>{if(o.k==='bin'&&o.stock&&o.x<2400){const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}});return b||shop}case 5:return board;case 6:return {x:2560,y:770};case 7:return dinerDoor;case 8:return patioBush;case 9:return poDoor;case 10:{let b=null,bd=1e9;EVID.forEach(e=>{if((S.ev[e.k]||0)<40){const d=dist(P.x,P.y,e.x,e.y);if(d<bd){bd=d;b=e}}});return b}case 11:return holm;case 12:return S.sab.keys!==nightId()?siteKeys:siteLunch;case 13:return officeInt;case 14:return poDoor;case 15:return {x:3500,y:1070};case 16:{let b=null,bd=1e9;npcs.forEach(o=>{if(petOK(o)&&!o.asleep){const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}});return b}case 17:{if(!S.stomp)return storeDoor;for(let i=0;i<3;i++)if(!S.stamped[i])return ints.find(q=>q.k==='stomp'&&q.i===i);return vossS}case 18:return holm;case 19:return pip;case 20:return npcs.find(o=>o.name===S.photog&&!o.asleep)||null;case 21:return holm;case 23:return hallInt;default:return null}};
 function advance(to){if(S.q>=to)return;S.q=to;sfx(660,.12,'triangle',.15);setTimeout(()=>sfx(880,.16,'triangle',.15),110);toast('New goal: '+QUESTS[to].t);save()}
 
 /* ---------- audio ---------- */
@@ -592,7 +600,7 @@ $('#slots').addEventListener('click',e=>{const s=e.target.closest('.slot');if(s&
 function hud(){const h=Math.floor(S.time/60),m=Math.floor(S.time%60);$('#clock').textContent=`Day ${S.day} · ${((h+11)%12)+1}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}${S.rain?(SEASON===2?' · Snow':' · Rain'):''} · ${SEASONS[SEASON]}`;
   $('#hungerN').textContent=Math.round(S.hunger)+(S.hunger<20?' · starving!':'');$('#hungerB').style.width=S.hunger+'%';$('#hungerB').style.background=S.hunger<20?'var(--red)':'var(--moss)';
   $('#stamB').style.width=S.stam+'%';$('#coins').textContent=S.coins+(S.coins===1?' coin':' coins');
-  const v=$('#vote');if(S.deadline){const d=S.deadline-S.day;v.hidden=false;v.textContent=d>0?`Council vote in ${d} day${d===1?'':'s'}`:'Council vote is today!'}else v.hidden=true;
+  const v=$('#vote');if(S.deadline&&!S.ending){const d=S.deadline-S.day;v.hidden=false;v.textContent=d>0?`Council vote in ${d} day${d===1?'':'s'}`:'Council vote is today!'}else v.hidden=true;
   const chase=guards.some(g=>g.state==='chase');const lvl=chase?100:alert*100;$('#eyeB').style.width=lvl+'%';$('#eyeB').style.background=chase||lvl>70?'var(--red)':'var(--amber)';
   $('#eyeTxt').textContent=chase?'Chased!':P.hidden?'Hidden':S.riding&&!disg()?'Riding (noisy)':lvl>60?'Spotted?':lvl>5?'Noticed':disg()?'Disguised':'Unseen';
   const Q=QUESTS[S.q];$('#qt').textContent=Q.t;$('#qd').textContent=Q.d;$('#qprog').textContent=Q.p?Q.p():'';
@@ -614,6 +622,7 @@ function wear(k,quiet){const w=observersSeeing();S.outfit=k;if(k!=='none')S.pick
 function toggleCoat(){if(!S.owned.length){toast('You need a disguise first.');return}wear(disg()?'none':(has(S.pick)?S.pick:S.owned[0]))}
 function scared(o){o.n=1;say(o,o.kind==='towny'?'EEK! It\'s a BIGFOOT!':'AAAH!')}
 function interact(){const o=nearInt();if(!o)return;
+  if(o.k==='hall'){hallDoor();return}
   if(npcs.includes(o)&&petOK(o)){if(!disg()){scared(o);return}petitionTalk(o);return}
   if(o.k==='stomp'){stomp(o.i);return}
   if(o.k==='shelf'){trophyUI();return}
@@ -670,7 +679,9 @@ function pipTalk(){const L={0:[['Pip the crow','Moss! Wake up, big guy. The camp
   19:[['Pip the crow','A photo of YOU, Moss. Taken by someone you trust. That\'s a big deal. Who should hold the camera?']],
   20:[['Pip the crow',`Go find ${S.photog||'your friend'}. Keep the disguise on until you\'re somewhere private.`]],
   21:[['Pip the crow','That portrait is the real deal. Take it to Dr. Holm.']],
-  22:[['Pip the crow','Ten days, Moss. Let\'s enjoy them. Have you seen the waxwings at the sanctuary in winter? Gorgeous.']]}[S.q];
+  22:[['Pip the crow','The vote comes when the countdown runs out. Want to go early? Pick "Go to the vote" in the menu. Every badge, bird and friend helps.']],
+  23:[['Pip the crow','Today\'s the day, Moss. The Town Hall, on the town square. Whatever you decide at the door, I\'m with you.']],
+  24:[['Pip the crow',S.ending==='park'?'A park, Moss! Forever wild. Now, about those coolers…':S.ending==='lodge'?'A tiny lodge and a whole forest. Not bad at all.':'The mountain camp is west of the ski run. Cold toes, warm heart.']]}[S.q];
   talk(L,()=>{if(S.q===0)advance(1);if(S.q===19)photoChoice()})}
 function fridgeUI(){const draw=()=>menu(`<h2 class="slab">Den fridge</h2><p>${S.fridge.length} snack${S.fridge.length===1?'':'s'} stored. Click a stored snack to take it back.</p>
   <div class="grid">${S.fridge.map((k,i)=>`<div class="slot" data-a="f${i}" title="${esc(FOOD[k].n)}">${icon(k)}</div>`).join('')||'<p style="grid-column:1/-1;color:var(--dim)">Empty. Sad.</p>'}</div>
@@ -1249,6 +1260,8 @@ function mailLetter(){S.letter=2;S.mailed=S.day;if(S.deadline)S.deadline+=7;
   talk([['Iris Okafor','Oh my. OH my. A "research grant"? To bury the review?'],['Iris Okafor','Express post to the Gazette, on the house. Tomorrow morning, the whole town reads this.']],()=>{if(S.q===14)advance(15);toast('The council vote is delayed a week while the town investigates!');save();setTimeout(endCard5,1200)})}
 function headlines(){const y=S.day-1,H=[];
   if(S.day>1&&(S.day-1)%7===0)H.push([['SUMMER IS BACK','Campers return to Hollowpine. Coolers everywhere. Coincidence?'],['AUTUMN COLOURS ARRIVE','Leaves turn gold; the grosbeaks are back at Rosa\'s sanctuary.'],['WINTER FREEZES THE LAKE','Ice fishing season opens. Marge reports burbot "biting like crazy."'],['SPRING HAS SPRUNG','Wildflowers bloom; hummingbirds spotted downtown.']][seasonIdx()]);
+  if(S.voteDay&&S.voteDay===y)H.push(S.ending==='park'?['HOLLOWPINE PROTECTED FOREVER','Council votes to make the campground and forest a provincial park. Grube leaves town in his gold car.']:S.ending==='lodge'?['RESORT SHRINKS TO TWELVE ROOMS','Council approves a small lodge instead. "No wave pool," confirms a relieved mayor.']:['RESORT APPROVED IN CLOSE VOTE','Bulldozers return in spring. Residents report strange footprints heading up the mountain.']);
+  if(S.voteDay&&S.voteDay===y&&S.vote.undisg)H.push(['BIGFOOT ATTENDS COUNCIL MEETING','"He was very polite," says Mayor Linden. "Waited his turn."']);
   if(S.voteSet&&S.voteSet===y)H.push(['COUNCIL SETS VOTE DATE','Hollowpine\'s fate will be decided in ten days. Grube "confident." Town "not."']);
   if(S.mooseDay&&S.mooseDay===y)H.push(['PRIVATE EYE\'S "BIGFOOT" IS A MOOSE','Hank Voss fired after his "proof" turns out to be a 600-kilo moose. Grube declines to comment, again.']);
   if(S.petDay&&S.petDay===y)H.push(['PETITION HITS TEN NAMES','Even a deputy and a bulldozer foreman signed. Council says it is "taking it seriously."']);
@@ -1283,12 +1296,14 @@ function mapUI(){const H=Math.round(820*(WH-YMIN)*T/WW);openModal(`<h2 class="sl
 function menuUI(conf){menu(conf?`<h2 class="slab">Start over?</h2><p>This erases your saved game: coins, quests, photos, Biscuit, everything.</p><div class="btns"><button class="btn" data-a="wipe">Yes, start over</button><button class="btn alt" data-a="back">No, keep playing</button></div>`:`<h2 class="slab">Game menu</h2>
   <div class="row"><div><b>Sound volume</b><br><small id="volV">${SET.vol}%</small></div><input type="range" id="volR" min="0" max="100" value="${SET.vol}" aria-label="Sound volume" style="flex:1;accent-color:#ffbf3c"></div>
   <div class="row"><div><b>Morning newspaper</b><br><small>Show the Pinewick Gazette each morning.</small></div><button class="btn" data-a="paper">${SET.paper?'On':'Off'}</button></div>
-  <div class="row"><div><b>Ranger badge book</b><br><small>${Object.keys(S.badges).length}/25 badges earned.</small></div><button class="btn" data-a="badges">Open</button></div>
+  <div class="row"><div><b>What can I do now?</b><br><small>Open venues, jobs and goals right now.</small></div><button class="btn" data-a="act">Show</button></div>
+  ${S.q===22?`<div class="row"><div><b>Go to the vote</b><br><small>Call the council vote today instead of waiting.</small></div><button class="btn" data-a="vote">Go</button></div>`:''}
+  <div class="row"><div><b>Ranger badge book</b><br><small>${Object.keys(S.badges).length}/${BADGES.length} badges earned.</small></div><button class="btn" data-a="badges">Open</button></div>
   <div class="row"><div><b>Today's paper</b><br><small>Read the Gazette again.</small></div><button class="btn alt" data-a="news">Read</button></div>
   <div class="row"><div><b>Save game</b><br><small>The game also autosaves every 15 seconds and when you sleep.</small></div><button class="btn" data-a="save">Save now</button></div>
   <div class="row"><div><b>Start over</b><br><small>Erase your save and begin a new game.</small></div><button class="btn alt" data-a="reset">Restart…</button></div>
   <div class="btns"><button class="btn" data-a="close">Resume</button></div>`,a=>{
-    if(a==='badges'){badgeUI();return}if(a==='paper'){SET.paper=!SET.paper;saveSet();menuUI()}else if(a==='news')paperUI();else if(a==='save'){save();toast('Game saved.');closeModal()}else if(a==='reset')menuUI(true);else if(a==='back')menuUI();
+    if(a==='act'){activityUI();return}if(a==='vote'){goToVote();return}if(a==='badges'){badgeUI();return}if(a==='paper'){SET.paper=!SET.paper;saveSet();menuUI()}else if(a==='news')paperUI();else if(a==='save'){save();toast('Game saved.');closeModal()}else if(a==='reset')menuUI(true);else if(a==='back')menuUI();
     else if(a==='wipe'){try{localStorage.removeItem(KEY)}catch(e){}load(fresh());P.x=330;P.y=330;S.paperDay=1;closeModal();toast('A brand new day in Hollowpine. Walk to Pip and press E.')}});
   const r=$('#volR');if(r)r.addEventListener('input',()=>{SET.vol=+r.value;$('#volV').textContent=SET.vol+'%';saveSet()}),r.addEventListener('change',()=>sfx(660,.1,'triangle',.1))}
 
@@ -1539,7 +1554,7 @@ const badgeSvg=(i,on)=>`<svg viewBox="0 0 32 32"><path d="M16 2l12 5v9c0 7-5 12-
 let badgeT=0;
 function badgeTick(dt){badgeT-=dt;if(badgeT>0)return;badgeT=1.5;const nw=[];BADGES.forEach(([k],i)=>{if(!S.badges[k]){let ok=false;try{ok=!!BADGES[i][3]()}catch(e){}if(ok){S.badges[k]=S.day;nw.push(i)}}});if(nw.length){badgePop(nw[0],nw.length-1);save()}}
 function badgePop(i,more=0){const el=$('#badgePop');el.innerHTML=`${badgeSvg(i,true)}<div><small>Ranger badge earned!</small><br><b>${BADGES[i][1]}</b>${more?` <small>+${more} more</small>`:''}</div>`;el.hidden=false;el.style.animation='none';void el.offsetWidth;el.style.animation='';sfx(784,.1,'triangle',.1);setTimeout(()=>sfx(1046,.1,'triangle',.1),110);setTimeout(()=>sfx(1318,.18,'triangle',.1),220);clearTimeout(badgePop.t);badgePop.t=setTimeout(()=>el.hidden=true,3400)}
-function badgeUI(){const n=Object.keys(S.badges).length;menu(`<h2 class="slab">Ranger badge book</h2><p>${n}/25 badges earned.</p><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${BADGES.map(([k,nm,d],i)=>`<div class="row" style="border:0;align-items:flex-start;opacity:${S.badges[k]?1:.6}">${badgeSvg(i,!!S.badges[k])}<div><b>${nm}</b><br><small>${d}${S.badges[k]?` Day ${S.badges[k]}.`:''}</small></div></div>`).join('')}</div><div class="btns"><button class="btn alt" data-a="back">Back</button><button class="btn" data-a="close">Resume</button></div>`,a=>{if(a==='back')menuUI()})}
+function badgeUI(){const n=Object.keys(S.badges).length;menu(`<h2 class="slab">Ranger badge book</h2><p>${n}/${BADGES.length} badges earned.</p><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${BADGES.map(([k,nm,d],i)=>`<div class="row" style="border:0;align-items:flex-start;opacity:${S.badges[k]?1:.6}">${badgeSvg(i,!!S.badges[k])}<div><b>${nm}</b><br><small>${d}${S.badges[k]?` Day ${S.badges[k]}.`:''}</small></div></div>`).join('')}</div><div class="btns"><button class="btn alt" data-a="back">Back</button><button class="btn" data-a="close">Resume</button></div>`,a=>{if(a==='back')menuUI()})}
 
 /* seasons + look */
 const TUFTS=[];{for(let n=0;TUFTS.length<700&&n<9000;n++){const x=R2(30,WW-30),y=R2(30,WH-30);if(inLake(x,y,30)||nearPath(x,y)<34||dist(x,y,den.x,den.y)<den.r+20||rects.some(q=>x>q.x-16&&x<q.x+q.w+16&&y>q.y-16&&y<q.y+q.h+16)||(x>STREET.x-20&&y>STREET.y-60&&y<STREET.y+STREET.h+60)||(x>2620&&x<3040&&y>840&&y<1110)||(x>3100&&x<3900&&y>990&&y<1130))continue;TUFTS.push({x,y,f:Math.random(),c:Math.floor(Math.random()*4)})}}
@@ -1585,16 +1600,101 @@ function portraitImg(place,pose){const c=document.createElement('canvas');c.widt
   if(pose===2){g.fillStyle='#5e3a20';g.fillRect(126,30,24,130);g.fillStyle='#1f5a35';g.beginPath();g.moveTo(96,60);g.lineTo(138,0);g.lineTo(180,60);g.fill();g.beginPath();g.moveTo(100,100);g.lineTo(138,30);g.lineTo(176,100);g.fill()}
   g.fillStyle='rgba(255,240,210,.12)';g.fillRect(0,0,220,160);try{return c.toDataURL('image/jpeg',.75)}catch(e){return ''}}
 function holmDeliver(){const r=S.reveal||1;talk([['Dr. Anita Holm','You have it? Let me see…'],['Dr. Anita Holm',r===3?'Oh. Oh my. Hello. (She looks up at you for a long moment, and smiles.) Your secret is safe with me.':r===2?'Half a face behind a pine… but those eyes. That\'s not a costume. The review will hold.':'A shadow and a footprint. Clever, and careful. It may be just enough.'],['Dr. Anita Holm','I\'ll present it to the council on vote day. Whatever happens, Hollowpine has a fighting chance.'],['Pip the crow','Ten days, Moss. Let\'s make them count.']],()=>{S.proof=r;advance(22);save();setTimeout(endCard7,600)})}
-function endCard7(){openModal(`<h2 class="slab">To be continued…</h2><p>You finished Pinecone Prowler Slice 7: Birds and badges.</p><p>Day ${S.day} · ${SEASONS[SEASON]} · ${Object.keys(S.birds).length}/20 birds photographed · ${Object.keys(S.badges).length}/25 badges.</p><p style="color:var(--dim)">The council vote is ${S.deadline-S.day} days away. The finale is next.</p><div class="btns"><button class="btn" data-a="go">Keep playing</button></div>`);$('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))closeModal()}}
+function endCard7(){openModal(`<h2 class="slab">To be continued…</h2><p>You finished Pinecone Prowler Slice 7: Birds and badges.</p><p>Day ${S.day} · ${SEASONS[SEASON]} · ${Object.keys(S.birds).length}/20 birds photographed · ${Object.keys(S.badges).length}/${BADGES.length} badges.</p><p style="color:var(--dim)">The council vote is ${S.deadline-S.day} days away. The finale is next.</p><div class="btns"><button class="btn" data-a="go">Keep playing</button></div>`);$('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))closeModal()}}
+
+/* ---------- slice 8: the vote, endings, epilogue, NG+, tips, performance ---------- */
+BADGES.push(['keeper','Keeper of Hollowpine','See the story through to the end.',()=>!!S.ending]);
+PLACES.push({k:'hall',n:'Town hall',x:3740,y:930});
+/* tree spatial grid: faster collision and line-of-sight */
+let TG=null;
+function buildTG(){TG=new Map();for(const t of trees){const k=Math.floor(t.x/128)+','+Math.floor(t.y/128);let a=TG.get(k);if(!a)TG.set(k,a=[]);a.push(t)}}
+function treesNear(x,y){if(!TG)buildTG();const cx=Math.floor(x/128),cy=Math.floor(y/128),out=[];for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const a=TG.get((cx+i)+','+(cy+j));if(a)for(const t of a)out.push(t)}return out}
+function treesBox(x0,y0,x1,y1){if(!TG)buildTG();const out=[];for(let i=Math.floor(x0/128)-1;i<=Math.floor(x1/128)+1;i++)for(let j=Math.floor(y0/128)-1;j<=Math.floor(y1/128)+1;j++){const a=TG.get(i+','+j);if(a)for(const t of a)out.push(t)}return out}
+
+/* tips for new players */
+function hint(t){const el=document.createElement('div');el.className='toast sign';el.style.borderColor='var(--amber)';el.textContent=t;$('#toasts').appendChild(el);setTimeout(()=>el.remove(),5200)}
+let tipT=0;
+function tipCheck(dt){tipT-=dt;if(tipT>0)return;tipT=1;const T=S.tips;
+  if(!T.raid&&S.q<=2&&ints.some(o=>(o.k==='cooler'||o.k==='basket')&&o.stock.length&&dist(P.x,P.y,o.x,o.y)<130)){T.raid=1;hint('Tip: walk up to a cooler or picnic basket and press E (or Use) to raid it.')}
+  else if(!T.hide&&alert>.3&&!P.hidden){T.hide=1;hint('Tip: someone is noticing you! Walk into a bush to hide until the eye meter empties.')}
+  else if(!T.eat&&S.hunger<45&&S.inv.length){T.eat=1;hint('Tip: press Q (or tap a snack) and drag the food into Moss\'s mouth.')}
+  else if(!T.disg&&S.owned.length&&!disg()&&(P.x>2400||dist(P.x,P.y,shop.x,shop.y)<250)){T.disg=1;hint('Tip: press G (or Outfit) to put your disguise on before people see you.')}
+  else if(!T.map&&S.day>=2){T.map=1;hint('Tip: press M for the map and Esc for the menu. The menu lists everything you can do right now.')}}
+
+/* what can I do now? */
+function activityUI(){const h=hour(),L=[],open=(a,b)=>h>=a&&h<b;
+  L.push(['Main goal',`${QUESTS[S.q].t}: ${QUESTS[S.q].d}`]);
+  if(S.q>=7)L.push(['Diner shift',S.shiftDay===S.day?'Done today.':open(7,21)?'Open now at the Stack \'Em Diner.':'Opens 7 AM.']);
+  if(S.q>=7)L.push(['Caddy shift',S.caddyDay===S.day?'Done today.':open(7,20)?'Golf club is open.':'Opens 7 AM.']);
+  L.push(['Clinic shift',S.clinicDay===S.day?'Done today.':open(8,18)?'Dr. Patel needs help now.':'Opens 8 AM.'],['Police desk',S.policeDay===S.day?'Done today.':open(8,20)?'The desk is free now.':'Opens 8 AM.'],['Arcade',open(10,22)?`Open now. You have ${S.tokens} tokens.`:'Opens 10 AM.']);
+  L.push(['Ski hill',S.ski.patrolDay===S.day?'Patrol done today; runs still open 7–7.':open(7,19)?'Lifts are running.':'Opens 7 AM.']);
+  const nb=BIRDS.filter(sp=>inSeason(sp)&&!S.birds[sp.k]).length;L.push(['Birds',`${nb} species you haven't photographed are around this ${SEASONS[SEASON].toLowerCase()}.${S.req?' Rosa has a request.':''}`]);
+  L.push(['Fishing',SEASON===2?'Ice fishing at the hole in the frozen lake.':S.rain?'Rain! Fish are biting. Catfish and sturgeon love it.':'Dawn and dusk are best for trout.'],['Foraging',`${mush.length} mushrooms in the forest today.${S.dog.adopted?' Biscuit can sniff truffles.':''}`]);
+  L.push(['Badges',`${Object.keys(S.badges).length}/${BADGES.length} earned. Open the badge book to see what's left.`]);
+  menu(`<h2 class="slab">What can I do now?</h2>${L.map(([a,b])=>`<div class="row"><div><b>${a}</b><br><small>${esc(b)}</small></div></div>`).join('')}<div class="btns"><button class="btn alt" data-a="back">Back</button><button class="btn" data-a="close">Resume</button></div>`,a=>{if(a==='back')menuUI()})}
+
+/* the vote */
+const ENDN={park:'Hollowpine Provincial Park',lodge:'The little lodge',mountain:'The mountain camp'};
+function goToVote(){if(S.q!==22){toast('You can\'t call the vote yet.');return}S.deadline=S.day;advance(23);toast('The council meets today at the Town Hall on the town square (9 AM to 6 PM).');closeModal();save()}
+function hallDoor(){if(S.q>=24){toast(S.ending==='park'?'A plaque by the door: "Hollowpine is forever wild."':S.ending==='lodge'?'The council approved a twelve-room lodge. Grube\'s parkade is history.':'Construction trucks rumble past. Moss\'s new home is up on the mountain.');return}
+  if(S.q!==23){toast('Pinewick Town Hall. The council meets here.');return}const h=hour();if(h<9||h>=18){toast('The council meets between 9 AM and 6 PM.');return}
+  menu(`<h2 class="slab">The doors of the Town Hall</h2><p>Inside, the whole valley is waiting. Grube's gold car is parked out front. Pip lands on Moss's shoulder.</p><p><span class="who">Pip:</span> "Last chance, Moss. Do you go in like everyone thinks of you… or as yourself?"</p>
+  <div class="row"><div><b>Walk in disguised</b><br><small>Sit quietly in the back. Let your friends do the talking.</small></div><button class="btn" data-a="d">Choose</button></div>
+  <div class="row"><div><b>Take off the disguise</b><br><small>Walk in as yourself. Very risky. Very brave.</small></div><button class="btn" data-a="u">Choose</button></div>`,a=>{S.vote={undisg:a==='u'};voteScene()})}
+function voteTally(){const u=S.vote.undisg,rows=[
+  ['Evidence photos',evCount()*5,15],['Moss\'s portrait',[0,5,10,15][S.proof||0],15],['Petition signatures',petN(),10],['Nights of sabotage',Math.min(10,S.sab.count*2),10],['Bribe letter in the Gazette',S.letter===2?10:0,10],['Voss\'s moose photo',S.mooseDay?5:0,5],
+  ['Ranger badges',Math.min(10,Math.floor(Object.keys(S.badges).length/5)*2),10],['Bird guide',Math.min(5,Math.floor(Object.keys(S.birds).length/4)),5],['Friends made',Math.min(10,(S.dog.adopted?3:0)+(S.side.parcel===3?2:0)+(S.side.truck===3?2:0)+Math.min(3,S.stats.req||0)),10],['Walking in as yourself',u?(S.proof===3?12:8):0,12]];
+  return {rows,total:rows.reduce((a,r)=>a+r[1],0)}}
+function voteScene(){const u=S.vote.undisg,L=[['','The Town Hall is packed. Folding chairs, flannel shirts, a SAVE HOLLOWPINE banner over the stage. Mayor Linden taps the microphone.'],['Mayor Linden','Order, please. Tonight the council votes on the Grube Grand Resort permit for Hollowpine.'],['Mr. Pratt (Grube\'s lawyer)','Mayor, my client brings jobs, a wave pool and six levels of convenient parking. The so-called "species" is a hoax.']];
+  if(petN()>=10)L.push(['Dot Pickering','We\'ve got a petition, signed by folks from the diner to the bulldozer crew. Even the deputy!']);
+  if(S.letter===2)L.push(['Iris Okafor','And everybody read the Gazette. A fifty-thousand-dollar "research grant," Mr. Grube? Really?']);
+  if(S.mooseDay)L.push(['Walt Brambles','His private eye photographed a MOOSE and called it Bigfoot. I rest my case. I\'m not a lawyer.']);
+  if(Object.keys(S.birds).length>=5)L.push(['Rosa','Hollowpine has more birds than anywhere in the province. I have the photos to prove it.']);
+  L.push(['Dr. Anita Holm',evCount()>=3?'The footprints, the nest and the fur are real. And I have one more photograph.':'I have evidence. Not as much as I\'d like.']);
+  if(S.proof)L.push(['',S.proof===3?'The portrait goes up on the projector: a huge, gentle, furry face, waving. The room gasps.':S.proof===2?'The portrait goes up: half a furry face peeking from behind a pine. People lean forward.':'The portrait goes up: a huge shadow and a footprint the size of a canoe paddle. Murmurs.']);
+  if(u)L.push(['','Then the back doors swing open. Moss walks in. No raincoat. No hat. Just Moss.'],['Gideon Grube','SEE?! A MONSTER! Deputy, do something!'],['Deputy Ruiz','…He\'s waiting in line, sir. Like everyone else.'],['','Moss sits down in the front row. The chair creaks. A kid in the third row waves. Moss waves back.'],['Dr. Anita Holm','Ladies and gentlemen: the rare species of Hollowpine.']);
+  else L.push(['','In the back row, a very tall person in a '+outfitWord()+' quietly holds their breath.']);
+  L.push(['Mayor Linden','Thank you. The council will now vote.']);
+  talk(L,tallyUI)}
+function tallyUI(){const T=voteTally(),end=T.total>=70?'park':T.total>=40?'lodge':'mountain';S.vote.score=T.total;S.vote.end=end;
+  openModal(`<h2 class="slab">The council tally</h2>${T.rows.map(([n,v,m])=>`<div class="row"><div>${n}</div><b>${v} / ${m}</b></div>`).join('')}<div class="row"><div><b>Total</b></div><b style="font-size:20px">${T.total}</b></div><p style="color:var(--dim)">70+ protects Hollowpine. 40+ shrinks the resort. Below that, Grube gets his way.</p><div class="btns"><button class="btn" data-a="go">Hear the verdict</button></div>`);
+  $('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))endingScene(end)}}
+function endingScene(end){const u=S.vote.undisg,txt={park:['The vote is unanimous. Hollowpine becomes a protected provincial park, forever.','Grube storms out, then comes back for his car keys. The crowd cheers so loud the coffee urn tips over.'],lodge:['The council approves a compromise: no wave pool, no parkade, just a little twelve-room lodge by the road.','The campground stays. The forest stays. Grube calls it a "humiliating success" and leaves town.'],mountain:['The permit passes, five to four. The bulldozers will roll in spring.','That night, Moss, Pip and Biscuit pack up the den and climb to a quiet hollow high on the mountain. It is colder up here. It is also beautiful.']}[end];
+  const extra=u?(end==='mountain'?'Everyone in Pinewick knows Moss now. Dot sends pancakes up the mountain every Sunday.':'Moss walks out the front door with the whole town, and nobody screams. Well, Grube does.'):'Nobody in the hall ever found out who the tall person in the back row was. Except Dr. Holm. And Pip. And Biscuit.';
+  openModal(`<h2 class="slab">${ENDN[end]}</h2><canvas id="endCv" width="520" height="260" style="display:block;width:100%;border-radius:10px"></canvas><p>${txt[0]}</p><p>${txt[1]}</p><p style="color:var(--dim)">${extra}</p><div class="btns"><button class="btn" data-a="go">Roll the credits</button></div>`);
+  $('#card').style.width='min(640px,100%)';drawEnding(end);$('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))credits(end)}}
+function drawEnding(end){const c=$('#endCv');if(!c)return;const g=c.getContext('2d'),E=(x,y,rx,ry,col)=>{g.fillStyle=col;g.beginPath();g.ellipse(x,y,rx,ry,0,0,TAU);g.fill()},pine=(x,y,s,col,snow)=>{g.fillStyle='#5e3a20';g.fillRect(x-3*s,y-10*s,6*s,10*s);for(let i=0;i<3;i++){const w=(20-i*5)*s,b=y-8*s-i*14*s;g.fillStyle=col;g.beginPath();g.moveTo(x-w,b);g.lineTo(x,b-22*s);g.lineTo(x+w,b);g.fill();if(snow){g.fillStyle='#f4f8fb';g.beginPath();g.moveTo(x-w*.4,b-14*s);g.lineTo(x,b-22*s);g.lineTo(x+w*.4,b-14*s);g.fill()}}};
+  const sky=g.createLinearGradient(0,0,0,260);if(end==='mountain'){sky.addColorStop(0,'#1f2a4a');sky.addColorStop(1,'#6a7aa8')}else{sky.addColorStop(0,'#f6b880');sky.addColorStop(.6,'#ffe2b0');sky.addColorStop(1,'#cfe8c0')}g.fillStyle=sky;g.fillRect(0,0,520,260);
+  if(end==='mountain'){g.fillStyle='#fff';for(let i=0;i<60;i++)g.fillRect((i*97)%520,(i*53)%120,2,2);E(430,50,22,22,'#f4f0d8')}else E(260,170,60,60,'#ffd27a');
+  g.fillStyle=end==='mountain'?'#8a96aa':'#6a9a6a';g.beginPath();g.moveTo(0,180);g.lineTo(90,90);g.lineTo(180,170);g.lineTo(290,70);g.lineTo(400,160);g.lineTo(470,100);g.lineTo(520,150);g.lineTo(520,260);g.lineTo(0,260);g.fill();
+  if(end==='mountain'){g.fillStyle='#f4f8fb';[[90,90],[290,70],[470,100]].forEach(([x,y])=>{g.beginPath();g.moveTo(x-30,y+30);g.lineTo(x,y);g.lineTo(x+30,y+30);g.fill()})}
+  g.fillStyle=end==='mountain'?'#e9f1f7':'#5f9346';g.fillRect(0,200,520,60);
+  for(let i=0;i<9;i++)pine(20+i*62+(i%2)*14,206+(i%3)*6,.9+(i%2)*.3,end==='mountain'?'#2a5a40':'#1f5a35',end==='mountain');
+  if(end==='park'){g.fillStyle='#6b4a2c';g.fillRect(150,170,6,40);g.fillRect(274,170,6,40);g.fillStyle='#8a5d36';g.fillRect(132,140,166,40);g.fillStyle='#fbf3df';g.font='15px "Alfa Slab One",Georgia,serif';g.textAlign='center';g.fillText('HOLLOWPINE',215,158);g.font='800 10px Nunito,sans-serif';g.fillText('PROVINCIAL PARK · PROTECTED',215,172);for(let i=0;i<40;i++)E(20+(i*53)%500,225+(i*17)%30,2.5,2.5,['#ff7ab0','#ffd23f','#fff'][i%3])}
+  if(end==='lodge'){g.fillStyle='#a8743f';g.fillRect(150,150,140,55);g.fillStyle='#5c3f2a';g.beginPath();g.moveTo(140,152);g.lineTo(220,115);g.lineTo(300,152);g.fill();g.fillStyle='#ffd98a';g.fillRect(168,166,24,18);g.fillRect(248,166,24,18);g.fillStyle='#3b2614';g.fillRect(210,172,20,33);g.fillStyle='#fbf3df';g.font='800 10px Nunito,sans-serif';g.textAlign='center';g.fillText('HOLLOWPINE LODGE · 12 ROOMS',220,145)}
+  if(end==='mountain'){g.fillStyle='#d8423a';g.beginPath();g.moveTo(150,215);g.lineTo(190,165);g.lineTo(230,215);g.fill();g.fillStyle='#2b2018';g.beginPath();g.moveTo(180,215);g.lineTo(190,190);g.lineTo(200,215);g.fill();E(250,214,10,4,'#5b5345');g.fillStyle='#ff8a2a';g.beginPath();g.moveTo(243,212);g.lineTo(250,196);g.lineTo(257,212);g.fill()}
+  const mx=340,my=214;E(mx,my+2,22,6,'rgba(0,0,0,.25)');E(mx,my-24,20,24,'#7d4b29');E(mx,my-56,15,14,'#7d4b29');E(mx,my-52,9,7,'#c79a6e');E(mx-5,my-58,2,2,'#111');E(mx+5,my-58,2,2,'#111');E(mx+20,my-40,6,13,'#5f3519');E(mx+24,my-56,6,6,'#5f3519');
+  E(mx+46,my-6,12,6,'#c98a4b');E(mx+56,my-14,6,5,'#c98a4b');E(mx-30,my-70,8,6,'#1d1f2a');E(mx-25,my-75,4.5,4.5,'#1d1f2a');g.fillStyle='#f2b33d';g.beginPath();g.moveTo(mx-22,my-76);g.lineTo(mx-16,my-74);g.lineTo(mx-22,my-72);g.fill();g.textAlign='left'}
+function credits(end){openModal(`<div style="height:min(60vh,420px);overflow:hidden;position:relative;text-align:center"><div class="credroll" style="position:absolute;left:0;right:0;top:100%;animation:roll 26s linear forwards">
+  <h1 class="slab">Pinecone Prowler</h1><p>${ENDN[end]}</p><br>
+  ${[['Moss','a shy forest giant'],['Pip','the crow'],['Biscuit','a very good dog'],['Dot Pickering','Stack \'Em Diner'],['Walt Brambles','Brambles General Store'],['Iris Okafor','Pinewick Post Office'],['Dr. Anita Holm','provincial biologist'],['Rosa','the bird sanctuary'],['Marge','Bait & Tackle'],['Ingrid & Olaf','the ski hill'],['Dr. Patel','Pinewick Clinic'],['Deputy Ruiz','who stood in line'],['Ranger Hollis','who never caught on'],['Big Earl, Deb & Stu','the bulldozer crew'],['Hank Voss','moose photographer'],['Gideon Grube & Kendra','who learned nothing'],['Grandpa Root','who started it all, in 1952']].map(([a,b])=>`<p><b>${a}</b><br><small>${b}</small></p>`).join('')}
+  <br><p>Thanks for playing.</p><p style="color:var(--dim)">Your story continues. Free play is open, and New Game+ is unlocked in the title screen.</p></div></div><div class="btns"><button class="btn" data-a="go">Continue</button></div>`);
+  $('#card').onclick=e=>{if(e.target.closest('[data-a=go]')){closeModal();finishStory(end)}}}
+function finishStory(end){S.ending=end;S.voteDay=S.day;if(S.vote.undisg)S.outfit='none';SET.ngp=true;saveSet();applyEndingWorld();advance(24);save();
+  setTimeout(()=>talk([['Pip the crow',end==='park'?'We did it, Moss. A PARK. Nobody\'s paving anything, ever. Want to celebrate with every cooler in the campground?':end==='lodge'?'A little lodge. I can live with a little lodge. More campers means more coolers, right?':'Our new camp is up on the mountain, west of the ski run. It\'s cold, but it\'s ours. And the old den is still there when we miss it.']]),400)}
+function applyEndingWorld(){if(!S.ending)return;if(S.ending!=='mountain'){const i=rects.findIndex(r=>r.k==='dozer');if(i>=0)rects.splice(i,1)}if(S.ending==='lodge'&&!rects.some(r=>r.k==='plodgeR'))addRect(760,190,150,90,'plodgeR')}
+function drawSiteEnding(){if(S.ending==='lodge'){drawBuilding({x:760,y:190,w:150,h:90,H:46,style:'plodge'});return}if(S.ending==='park'){for(let i=0;i<30;i++)ell(['#ff7ab0','#ffd23f','#ffffff','#b07ae0'][i%4],720+(i*47)%300,gy(150+(i*71)%220),3,3);return}drawDozer()}
+function drawEndProps(){if(S.ending==='park'){const x=1150,f=gy(700);shadowBox(1130,680,40,30,40);box(1130,680,40,30,40,'#557a43');rect('#e9dcc0',1134,f-30,32,12);text('RANGER',1150,f-24,8,'#3b2614','900 8px Nunito,sans-serif');rect('#cccccc',1176,f-80,3,80);poly('#3f8a4a',1179,f-80,1200,f-74,1179,f-68)}
+  if(S.ending==='mountain'){const x=2650,f=gy(-560);poly('#d8423a',x-34,f,x,f-46,x+34,f);poly('#a8302a',x,f-46,x+34,f,x,f);poly('#2b2018',x-8,f,x,f-24,x+8,f);ell('#5b5345',x+52,f+2,12,5);poly('#ff8a2a',x+45,f,x+52,f-18,x+59,f);rect('#6b4a2c',x-60,f-50,3,50);poly('#7d4b29',x-57,f-50,x-36,f-44,x-57,f-38)}}
 
 /* ---------- save ---------- */
 const KEY='pinecone-prowler-v1';
 function snapshot(){return {...JSON.parse(JSON.stringify(S)),px:P.x,py:P.y}}
 function save(){if(!started)return;try{localStorage.setItem(KEY,JSON.stringify(snapshot()))}catch(e){}}
-function migrate(d){if(!d.v||d.v<2){d.owned=d.hasCoat?['coat']:[];d.outfit=d.coat?'coat':'none';d.pick='coat';d.v=2;delete d.hasCoat;delete d.coat}if(d.v<3)d.v=3;if(d.v<4)d.v=4;if(d.v<5)d.v=5;if(d.v<6)d.v=6;if(d.v<7)d.v=7;return d}
-function load(d){d=migrate({...d});const f=fresh();S={...f,...d};for(const k of ['stats','side','ev','veh','golf','fishLog','guide','dog','sab','ski','seen','arcade','home','pet','stamped','birds','birdT','badges'])S[k]={...f[k],...(d[k]||{})};S.photos=Array.isArray(d.photos)?d.photos:[];S.catch=Array.isArray(d.catch)?d.catch:[];S.basket=Array.isArray(d.basket)?d.basket:[];S.loot=Array.isArray(d.loot)?d.loot:[];if(!d.v||d.paperDay==null)S.paperDay=S.day;if(S.riding&&!S.veh[S.riding])S.riding=null;S.q=clamp(S.q|0,0,QUESTS.length-1);P.x=d.px??330;P.y=d.py??330;if(!free(P.x,P.y,P.r)){P.x=330;P.y=330}started=true;restock();resetNPCs();renderSlots();pip.x=PIPAT[S.q][0];pip.y=PIPAT[S.q][1];if(S.dog.adopted){dog.x=P.x-30;dog.y=P.y+24}if(S.home.shelf)addShelf();renderSlots()}
+function migrate(d){if(!d.v||d.v<2){d.owned=d.hasCoat?['coat']:[];d.outfit=d.coat?'coat':'none';d.pick='coat';d.v=2;delete d.hasCoat;delete d.coat}if(d.v<3)d.v=3;if(d.v<4)d.v=4;if(d.v<5)d.v=5;if(d.v<6)d.v=6;if(d.v<7)d.v=7;if(d.v<8){d.v=8;d.tips={raid:1,hide:1,eat:1,disg:1,map:1}}return d}
+function load(d){d=migrate({...d});const f=fresh();S={...f,...d};for(const k of ['stats','side','ev','veh','golf','fishLog','guide','dog','sab','ski','seen','arcade','home','pet','stamped','birds','birdT','badges','vote','tips'])S[k]={...f[k],...(d[k]||{})};S.photos=Array.isArray(d.photos)?d.photos:[];S.catch=Array.isArray(d.catch)?d.catch:[];S.basket=Array.isArray(d.basket)?d.basket:[];S.loot=Array.isArray(d.loot)?d.loot:[];if(!d.v||d.paperDay==null)S.paperDay=S.day;if(S.riding&&!S.veh[S.riding])S.riding=null;S.q=clamp(S.q|0,0,QUESTS.length-1);P.x=d.px??330;P.y=d.py??330;if(!free(P.x,P.y,P.r)){P.x=330;P.y=330}started=true;restock();resetNPCs();renderSlots();pip.x=PIPAT[S.q][0];pip.y=PIPAT[S.q][1];if(S.dog.adopted){dog.x=P.x-30;dog.y=P.y+24}if(S.home.shelf)addShelf();applyEndingWorld();renderSlots()}
 window.claude?.hot?.snapshot?.(()=>started?snapshot():null);
-window.__pp={P,pip,rosa,BIRDS,BADGES,get birds(){return birds},binToggle,birdGuideUI,badgeUI,rosaUI,photoChoice,get SEASON(){return SEASON},vossS,PET,get arc(){return arc},get clinic(){return clinic},get police(){return police},startArc,arcKey,startClinic,clinicPick,startPolice,policePick,policeRadio,catalogUI,trophyUI,stomp,invCap,DIVES,ISLE,SET,get ski(){return ski},get dive(){return dive},startSki,startDive,mapUI,menuUI,paperUI,headlines,waterFree,dog,stu,traffic,DOCK,MSPOTS,get mush(){return mush},get truffles(){return truffles},get fishing(){return fishing},fishAct,bark,startFishing,nightId,holm,voss,EVID,snap,camToggle,golfSwing,get golf(){return golf},get caddy(){return caddy},get feast(){return feast},caddyPick,feastEat,feastUI,mount,dismount,rightClub,get photo(){return photo},get S(){return S},npcs,guards,ranger,deputy,grube,sites,interact,eat,load,migrate,cookTap,get cook(){return cook}};
+window.__pp={P,hallDoor,goToVote,voteTally,activityUI,treesNear,get TG(){return TG},pip,rosa,BIRDS,BADGES,get birds(){return birds},binToggle,birdGuideUI,badgeUI,rosaUI,photoChoice,get SEASON(){return SEASON},vossS,PET,get arc(){return arc},get clinic(){return clinic},get police(){return police},startArc,arcKey,startClinic,clinicPick,startPolice,policePick,policeRadio,catalogUI,trophyUI,stomp,invCap,DIVES,ISLE,SET,get ski(){return ski},get dive(){return dive},startSki,startDive,mapUI,menuUI,paperUI,headlines,waterFree,dog,stu,traffic,DOCK,MSPOTS,get mush(){return mush},get truffles(){return truffles},get fishing(){return fishing},fishAct,bark,startFishing,nightId,holm,voss,EVID,snap,camToggle,golfSwing,get golf(){return golf},get caddy(){return caddy},get feast(){return feast},caddyPick,feastEat,feastUI,mount,dismount,rightClub,get photo(){return photo},get S(){return S},npcs,guards,ranger,deputy,grube,sites,interact,eat,load,migrate,cookTap,get cook(){return cook}};
 
 /* ---------- input ---------- */
 const keys={};let joy={x:0,y:0},runBtn=false;
@@ -1641,16 +1741,16 @@ const o_vd=o=>{const dk=darkness();if(o.kind==='pi')return [200,1.0];if(o.kind==
 function sees(o){if(o.asleep||o.state==='flee')return false;const d=dist(o.x,o.y,P.x,P.y);if(P.hidden&&d>18)return false;const [vd,fov]=o_vd(o);
   if(o.kind==='guard'&&o.state==='chase'){if(d>vd*1.3)return false}else{if(d>vd)return false;if(Math.abs(angDiff(Math.atan2(P.y-o.y,P.x-o.x),o.ang))>fov/2)return false}
   return los(o.x,o.y,P.x,P.y)}
-function rateMul(o){const rid=S.riding&&!disg()?1.4:1;if(o.kind==='guard')return (!disg()?1.5:S.outfit==='vest'?.06:.22)*rid;if(o.kind==='pi'||o.kind==='stake')return disg()?0:1.3*rid;return disg()?0:(o.kind==='camper'?1.1:1.3)*rid}
+function rateMul(o){if(S.ending&&S.vote&&S.vote.undisg)return 0;const rid=S.riding&&!disg()?1.4:1;if(o.kind==='guard')return (!disg()?1.5:S.outfit==='vest'?.06:.22)*rid;if(o.kind==='pi'||o.kind==='stake')return disg()?0:1.3*rid;return disg()?0:(o.kind==='camper'?1.1:1.3)*rid}
 function walk(o,tx,ty,sp,dt){const dx=tx-o.x,dy=ty-o.y,d=Math.hypot(dx,dy);if(d<6)return true;const a=Math.atan2(dy,dx);const st=Math.min(sp*dt,d);
   for(const k of [0,.6,-.6,1.2,-1.2,1.8,-1.8,2.4,-2.4]){const aa=a+k;const nx=o.x+Math.cos(aa)*st,ny=o.y+Math.sin(aa)*st;if(free(nx,ny,o.r)){o.x=nx;o.y=ny;o.ang+=angDiff(aa,o.ang)*Math.min(1,dt*8);o.moving=true;return false}}
   return false}
 function report(){if(S.calmDay===S.day&&Math.random()<Math.min(.75,.2*S.calmN)){toast('The deputy shrugs: "Another Bigfoot call? The desk says those are pranks."');return}report0()}
 function report0(){const g=guards.filter(q=>!q.asleep).reduce((a,b)=>dist(a.x,a.y,P.x,P.y)<dist(b.x,b.y,P.x,P.y)?a:b);if(g.state!=='chase'){g.state=dist(g.x,g.y,P.x,P.y)<380?'chase':'investigate';g.lx=P.x;g.ly=P.y;say(g,g===ranger?'On my way!':'Ruiz responding!')}}
-function updateNPCs(dt){const h=hour(),late=h>=22||h<6,closed=h>=21||h<7,lunch=S.q>=8&&h>=11&&h<14;
+function updateNPCs(dt){const h=hour(),late=h>=22||h<6,closed=h>=21||h<7,lunch=S.q>=8&&!S.ending&&h>=11&&h<14;
   for(const o of npcs){o.moving=false;if(o.sayT>0)o.sayT-=dt;
     if(o.kind==='vip'){o.asleep=!lunch;if(o.asleep)continue}
-    else if(o.kind==='towny'||o.kind==='walker'){const off=o.hours?(h<o.hours[0]||h>=o.hours[1]||S.q<(o.needQ||0)):closed;if(off&&o.state!=='flee'){o.asleep=true;continue}o.asleep=false}
+    else if(o.kind==='towny'||o.kind==='walker'){const off=o.hours?(h<o.hours[0]||h>=o.hours[1]||S.q<(o.needQ||0)||((o.name==='Big Earl'||o.name==='Deb')&&(S.ending==='park'||S.ending==='lodge'))):closed;if(off&&o.state!=='flee'){o.asleep=true;continue}o.asleep=false}
     else if(o.kind==='stake'){if(S.q!==17||o.state==='done'){o.asleep=true;continue}o.asleep=false}
     else if(o.kind==='pi'){const act=S.q>=10&&S.q<17&&h>=17&&h<22&&o.gone!==S.day;if(!act){o.asleep=true;o.state='patrol';continue}if(o.asleep){o.asleep=false;o.x=o.WP[0][0];o.y=o.WP[0][1];o.wp=1;o.state='patrol'}}
     if(o.kind==='camper'){
@@ -1663,7 +1763,7 @@ function updateNPCs(dt){const h=hour(),late=h>=22||h<6,closed=h>=21||h<7,lunch=S
       else if(o.kind==='walker'){const [tx,ty]=o.WP[o.wp];if(walk(o,tx,ty,48,dt))o.wp=(o.wp+1)%o.WP.length}
       else if(o.state==='idle'){o.ang+=Math.sin(performance.now()/900+o.x)*dt*.8;if(o.t<=0){o.state='walk';if(o.kind==='camper'){o.tx=o.site.x+R(-120,140);o.ty=o.site.y+R(-10,110)}else{o.tx=o.hx+R(-40,40);o.ty=o.hy+R(-6,6)}o.t=6}}
       else if(o.state==='walk'){if(walk(o,o.tx,o.ty,o.kind==='towny'?35:55,dt)||o.t<=0){o.state='idle';o.t=R(2,5);o.ang=o.kind==='towny'?Math.PI/2+R(-1.2,1.2):R(0,TAU)}}
-    }else if(o.kind==='guard'){if(o.night){const on=(h>=20||h<5)&&S.q>=12;if(!on){o.asleep=true;continue}if(o.asleep){o.asleep=false;o.x=o.WP[0][0];o.y=o.WP[0][1];o.wp=1;o.state='patrol'}}
+    }else if(o.kind==='guard'){if(o.night){const on=(h>=20||h<5)&&S.q>=12&&S.ending!=='park'&&S.ending!=='lodge';if(!on){o.asleep=true;continue}if(o.asleep){o.asleep=false;o.x=o.WP[0][0];o.y=o.WP[0][1];o.wp=1;o.state='patrol'}}
       if(o.state==='patrol'){const [tx,ty]=o.WP[o.wp];if(walk(o,tx,ty,80,dt))o.wp=(o.wp+1)%o.WP.length}
       else if(o.state==='investigate'||o.state==='chase'){if(walk(o,o.lx,o.ly,o.state==='chase'?185:120,dt)){o.state='search';o.t=4}}
       else if(o.state==='search'){o.ang+=dt*2.2;if(o.t<=0){o.state='patrol';let b=0,bd=1e9;o.WP.forEach((w,i)=>{const d=dist(o.x,o.y,w[0],w[1]);if(d<bd){bd=d;b=i}});o.wp=b}}}
@@ -1691,7 +1791,7 @@ function nearInt(){if(photo)return null;if(S.riding){if(S.riding==='canoe')for(l
   if((!b||b===dog)&&S.rod&&SEASON!==2){const fx=P.x+Math.cos(P.ang)*40,fy=P.y+Math.sin(P.ang)*40;if(inLake(fx,fy,0)&&!(inLake(P.x,P.y,-6)&&!(P.x>DOCK.x&&P.x<DOCK.x+DOCK.w)))b={k:'fish',x:fx,y:fy}}
   for(const k of ['bike','truck','canoe']){const v=S.veh[k];if(v){const d=dist(P.x,P.y,v.x,v.y);if(d<bd+12){bd=d;b={veh:k,x:v.x,y:v.y}}}}
   if(dist(P.x,P.y,pip.x,pip.y)<56&&(!b||b===dog||dist(P.x,P.y,pip.x,pip.y)<bd))b=pip;return b}
-const LABEL=o=>{const nd=disg()?'':' (NOT disguised!)';if(npcs.includes(o)&&petOK(o))return 'Ask '+o.name+' to sign the petition'+nd;if(o.k==='stomp')return S.stomp?'Stomp a fake footprint trail':'Fake trail spot (need joke slippers)';if(o.k==='shelf')return 'Look at your trophy shelf';if(o.k==='clinic')return 'Enter the Clinic'+nd;if(o.k==='police')return 'Enter the Police station'+nd;if(o.k==='arcade')return 'Enter Pixel Palace Arcade'+nd;if(o.k==='dismount')return (S.riding==='canoe'?'Get out of the canoe (near land)':'Hop off'+(S.riding==='bike'?' the bike':' the truck')+' · H to honk');if(o.veh)return o.veh==='bike'?'Ride bike':o.veh==='canoe'?'Get in the canoe':'Drive the pickup';if(o.k==='table')return o.stock.length?`Feast at picnic table (${o.stock.length})`:'Picnic table (empty)';if(o.k==='tackle')return 'Pick up Walt\'s tackle box';if(o.k==='album')return 'Open your desk (album, guidebook, fish log)';if(o===dog)return S.dog.adopted?'Command Biscuit':`Give Biscuit a snack (friendship ${S.dog.friend}/3)`;if(o.k==='mush')return S.guide[o.m.k]?'Pick '+MUSH[o.m.k].n:'Pick the mushroom';if(o.k==='truffle')return 'Dig up the truffle!';if(o.k==='fish')return 'Go fishing';if(o.k==='grill')return S.catch.length?`Cook your fish (${S.catch.length})`:'Campfire (catch fish to cook)';if(o.k==='dive')return S.scuba?'Dive here (scuba)':'Dive spot (needs scuba gear)';if(o.k==='lodge')return 'Enter the Ski Lodge'+nd;if(o.k==='lift')return 'Ride the chairlift and ski'+nd;if(o.k==='office')return 'Search the site office';if(o.k==='secret')return S.secret?'Grandpa Root\'s cairn':'Look under the mossy stones';if(o.k==='keys')return 'Hide the bulldozer keys';if(o.k==='lunch')return 'Swap the crew\'s lunch';if(o.k==='bait')return 'Enter Bait & Tackle'+nd;if(o.k==='golf')return 'Enter Pinewick Golf Club'+nd;if(o===pip)return 'Talk to Pip';if(o===gus)return 'Deliver the parcel to Gus'+nd;if(o.talk)return (S.q===20&&o.name===S.photog?'Ask '+o.name+' to take your portrait':'Talk to '+o.name)+nd;
+const LABEL=o=>{const nd=disg()?'':' (NOT disguised!)';if(npcs.includes(o)&&petOK(o))return 'Ask '+o.name+' to sign the petition'+nd;if(o.k==='stomp')return S.stomp?'Stomp a fake footprint trail':'Fake trail spot (need joke slippers)';if(o.k==='shelf')return 'Look at your trophy shelf';if(o.k==='hall')return S.q===23?'Enter the Town Hall for the vote':'Town Hall';if(o.k==='clinic')return 'Enter the Clinic'+nd;if(o.k==='police')return 'Enter the Police station'+nd;if(o.k==='arcade')return 'Enter Pixel Palace Arcade'+nd;if(o.k==='dismount')return (S.riding==='canoe'?'Get out of the canoe (near land)':'Hop off'+(S.riding==='bike'?' the bike':' the truck')+' · H to honk');if(o.veh)return o.veh==='bike'?'Ride bike':o.veh==='canoe'?'Get in the canoe':'Drive the pickup';if(o.k==='table')return o.stock.length?`Feast at picnic table (${o.stock.length})`:'Picnic table (empty)';if(o.k==='tackle')return 'Pick up Walt\'s tackle box';if(o.k==='album')return 'Open your desk (album, guidebook, fish log)';if(o===dog)return S.dog.adopted?'Command Biscuit':`Give Biscuit a snack (friendship ${S.dog.friend}/3)`;if(o.k==='mush')return S.guide[o.m.k]?'Pick '+MUSH[o.m.k].n:'Pick the mushroom';if(o.k==='truffle')return 'Dig up the truffle!';if(o.k==='fish')return 'Go fishing';if(o.k==='grill')return S.catch.length?`Cook your fish (${S.catch.length})`:'Campfire (catch fish to cook)';if(o.k==='dive')return S.scuba?'Dive here (scuba)':'Dive spot (needs scuba gear)';if(o.k==='lodge')return 'Enter the Ski Lodge'+nd;if(o.k==='lift')return 'Ride the chairlift and ski'+nd;if(o.k==='office')return 'Search the site office';if(o.k==='secret')return S.secret?'Grandpa Root\'s cairn':'Look under the mossy stones';if(o.k==='keys')return 'Hide the bulldozer keys';if(o.k==='lunch')return 'Swap the crew\'s lunch';if(o.k==='bait')return 'Enter Bait & Tackle'+nd;if(o.k==='golf')return 'Enter Pinewick Golf Club'+nd;if(o===pip)return 'Talk to Pip';if(o===gus)return 'Deliver the parcel to Gus'+nd;if(o.talk)return (S.q===20&&o.name===S.photog?'Ask '+o.name+' to take your portrait':'Talk to '+o.name)+nd;
   return {cooler:`Raid cooler (${o.stock?.length} left)`,basket:`Raid basket (${o.stock?.length} left)`,bin:'Rummage in trash bin (noisy!)',fridge:'Open fridge',wardrobe:'Open wardrobe',bed:'Sleep until morning',coat:'Grab the raincoat',shop:'Order food'+nd,board:'Read notice board',diner:'Enter Stack \'Em Diner'+nd,store:'Enter Brambles General Store'+nd,po:'Enter Post Office'+nd}[o.k]||''};
 let noiseT=0;
 function update(dt){
@@ -1713,9 +1813,9 @@ function update(dt){
   bushes.forEach(b=>b.wig=Math.max(0,b.wig-dt*2));
   coinSpots.forEach(c=>{if(c.on&&dist(P.x,P.y,c.x,c.y)<22){c.on=false;S.coins++;sfx(1500,.06,'square',.05);sfx(1900,.08,'square',.04)}});
   updateNPCs(dt);updateTraffic(dt);updateDog(dt);
-  if(S.q===2&&S.fridge.length>=5)advance(3);if(S.q===3&&has('coat'))advance(4);if(S.q===6&&P.x>2540)advance(7);if(S.q===9&&S.cam)advance(10);if(S.q===15&&disg()&&hour()>=9&&hour()<17&&dist(P.x,P.y,3500,1070)<170)rallyScene();if(S.q===10&&evCount()>=3)advance(11);
+  if(S.q===2&&S.fridge.length>=5)advance(3);if(S.q===3&&has('coat'))advance(4);if(S.q===6&&P.x>2540)advance(7);if(S.q===9&&S.cam)advance(10);if(S.deadline&&S.day>=S.deadline){if(S.q===22)advance(23);else if(S.q<22&&S.postDay!==S.day){S.postDay=S.day;S.deadline=S.day+3;toast('The council postponed the vote 3 days to finish its review.')}}if(S.q===15&&disg()&&hour()>=9&&hour()<17&&dist(P.x,P.y,3500,1070)<170)rallyScene();if(S.q===10&&evCount()>=3)advance(11);
   const q=PIPAT[S.q];pip.x+=(q[0]-pip.x)*Math.min(1,dt*1.2);pip.y+=(q[1]-pip.y)*Math.min(1,dt*1.2);
-  discover(dt);paperCheck();updateBirds(dt);badgeTick(dt);
+  discover(dt);paperCheck();updateBirds(dt);badgeTick(dt);tipCheck(dt);
   if(performance.now()-lastSave>15000){lastSave=performance.now();save()}
 }
 
@@ -1831,8 +1931,8 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!paused&&
 function title(){let sv=null;try{sv=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
   openModal(`<h1 class="slab">Pinecone Prowler</h1><p>You are <b>Moss</b>, a shy forest giant with a big appetite. The campers at Hollowpine have coolers, the town of Pinewick has jobs, and a developer named Grube has plans.</p>
   <div class="keys"><span><kbd>WASD</kbd></span><span>Move · hold <b>Shift</b> to run (noisy)</span><span><kbd>E</kbd></span><span>Raid, talk, use</span><span><kbd>Q</kbd></span><span>Eat: drag food into Moss's mouth</span><span><kbd>G</kbd></span><span>Outfit on or off</span><span><kbd>C</kbd></span><span>Camera (once you have one)</span><span><kbd>H</kbd></span><span>Honk while riding</span><span><kbd>B</kbd></span><span>Tell your dog to bark (once you have one)</span><span><kbd>M</kbd> <kbd>Esc</kbd></span><span>Map · game menu</span><span>Bushes</span><span>Walk into one to hide from sight cones</span></div>
-  <div class="btns">${sv?'<button class="btn" data-a="cont">Continue (Day '+(+sv.day||1)+')</button>':''}<button class="btn ${sv?'alt':''}" data-a="new">New game</button></div>`);
-  $('#card').onclick=e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(!a)return;sfx(520,.1,'triangle',.1);load(a==='cont'?sv:fresh());closeModal();hud();if(a==='new')setTimeout(()=>toast('Walk to Pip the crow and press E'),400)}}
+  <div class="btns">${sv?'<button class="btn" data-a="cont">Continue (Day '+(+sv.day||1)+')</button>':''}<button class="btn ${sv?'alt':''}" data-a="new">New game</button>${SET.ngp?'<button class="btn alt" data-a="ngp">New Game+</button>':''}</div>`);
+  $('#card').onclick=e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(!a)return;sfx(520,.1,'triangle',.1);load(a==='cont'?sv:a==='ngp'?{...fresh(),owned:['coat','sweater','vest'],outfit:'coat',binoc:true,coins:50,ngp:1}:fresh());closeModal();hud();if(a!=='cont')setTimeout(()=>toast('Walk to Pip the crow and press E'),400)}}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal'&&started&&!cook&&!golf&&!caddy&&!fishing&&!ski&&!dive&&!arc&&!clinic&&!police&&performance.now()-openedAt>500){const c=$('#card').querySelector('[data-a=close]');if(c)c.click()}});
 const boot=d=>{S=fresh();restock();renderSlots();if(d&&d.day){load(d);closeModal()}else title();requestAnimationFrame(frame)};
 window.claude?.hot?.ready?window.claude.hot.ready(boot):boot(window.claude?.hot?.data??null);
