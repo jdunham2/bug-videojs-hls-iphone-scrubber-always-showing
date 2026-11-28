@@ -113,5 +113,15 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - 5 new badges. Save format v11 with migration.
 - Coordinates: town/golf/mountain x positions are the old ones plus 1000; mountain y positions are the old ones minus 500.
 
-## Possible next prompt (Slice 12, optional)
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 12: Wild neighbours**. 1) Forest animals that live in each biome (deer and rabbits in Whispering Woods, mountain goats on Pine Ridge, ducks on the lake) that react to Moss and can be befriended with berries. 2) A creek fishing spot with its own fish. 3) A hidden waterfall cave up the creek with a treasure hunt using the fire lookout's view. 4) A fast-travel bus between the campground, Whispering Woods, Pinewick and the ski lodge (costs coins, needs a disguise). 5) Weather varies by biome: snow on Pine Ridge earlier in the year, fog in the woods at dawn. Keep everything working, save format v12 with migration, and test in a headless browser.
+## Done — Slice 12: Wild neighbours + side quests
+- Wild animals: deer and rabbits in Whispering Woods, mountain goats on Pine Ridge, ducks on the lake. They wander, and run off if Moss sprints, rides or makes noise nearby. Walk up gently and feed them wild berries: after 3 feedings, that species trusts Moss for good and follows with hearts.
+- Creek fishing at three pools along the creek, with four creek-only fish (brook trout, mottled sculpin, creek chub, rare cutthroat trout).
+- Hidden falls up the creek with a cave: the first fire lookout climb reveals three stone cairns, each with a map piece, and the chest behind the waterfall holds Grandpa Brambles' treasure (80 coins and a golden pinecone).
+- Valley bus: stops at the campground, Whispering Woods, Pinewick and the ski lodge. 3 coins a ride, 7 AM to 9 PM, needs a disguise.
+- Weather by biome: dawn fog in Whispering Woods (animals are calmer in it), and frost plus snow showers on Pine Ridge in autumn and spring.
+- Bramwell the hermit lives at Halfway Glade and doesn't mind Moss's fur.
+- Five side quests, available before the vote: The deer whisperer (Bramwell), Duck census (Rosa), Goat trouble (Olaf), Creek samples (Dr. Holm), Bus tour (Walt, after his truck quest). Side quests never interrupt main-quest conversations, and the NPC's normal chat follows a side-quest intro.
+- The menu's "Stories & side quests" page lists everything. 4 new badges. Save format v12.
+
+## Possible next prompt (Slice 13, optional)
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 13: Seasons festival and more neighbours**. 1) A big end-of-year Valley Fair on the town square with game booths (ring toss, pie eating, a berry-picking race) and prize tickets. 2) Three new townsfolk with their own homes and daily routines, each with a 3-step side quest. 3) Animal friends can visit the den (a deer at the door, ducks in a den pond) once befriended. 4) A beaver dam on the creek that changes the creek pools over time. 5) A "valley journal" page that records each day's highlights automatically. Keep everything working, save format v13 with migration, and test in a headless browser.
