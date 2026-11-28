@@ -51,17 +51,28 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - **Map (M)**: the whole world with the highway, buildings, trees, discovered places (12 to find), you, Biscuit and your goal star. **Menu (Esc)**: sound volume, newspaper on/off, reread today's paper, save now, start over. Map and Menu buttons sit beside the backpack
 - Save format v5 with migration from all older saves; settings are stored separately
 
-## Next prompt (Slice 6)
+## Done — Slice 6: Town life
+- **New town buildings**: Pinewick Clinic and Police station on the south side of Main Street, facing a new paved **town square** with a fountain; **Pixel Palace** arcade on Main Street (flashing neon)
+- **Clinic job** (Dr. Patel, 8 AM–6 PM, once a day): 8 patients, match their symptoms to one of 6 remedies before the timer runs out (cheat sheet included)
+- **Police desk job** (8 AM–8 PM, once a day): sort 8 reports into Traffic / Lost & found / Noise / Wildlife, answer the radio when it flashes, and quietly shred Bigfoot sightings. Shredded reports mean guards sometimes shrug off calls the next day
+- **Arcade** (10 AM–10 PM): tokens (3 for 2 coins), three original canvas games (Worm Hunt, Timber Drop, Highway 9) with keyboard and touch controls, top-5 boards with initials entry, 5-coin bonus for a new #1
+- **Home upgrades** (Home catalog on the den desk): bigger fridge (12 → 30), second backpack row (6 → 12 slots, shown as two rows), trophy shelf (biggest fish, golden pinecone, ski medal, golf trophy, photos, compass), rug colours (red, blue, green, plaid) and cave wall styles (bare, pine mural, starry ceiling)
+- **The town reacts**: a rally in the town square (sign-waving ralliers, Dot's speech), SAVE HOLLOWPINE buttons on townsfolk and campers, and a **petition** quest: 10 signers around the valley, each with a small favour (a mushroom, a fish, a sandwich, a cocoa, a ski run, a police shift…)
+- **Story finale for Voss**: Hank Voss stakes out the den. Buy joke bigfoot slippers, stomp a fake trail at 3 spots, have Biscuit bark near him, and he follows it to photograph a moose. Grube fires him; the Voss dusk patrols end
+- Newspaper headlines for the rally, the petition, the moose and the "misfiled" Bigfoot reports
+- Fixes: an adopted Biscuit no longer steals the E prompt from people and doors; bushes no longer grow inside the den or over buildings
+- Save format v6 with migration from all older saves
+
+## Next prompt (Slice 7)
 Copy this into the next session:
 
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 6: Town life**.
-> 1. **Two new jobs in Pinewick**: a **doctor's office** (Dr. Patel's clinic: a diagnosis mini-game where you match symptoms to remedies under a timer) and the **police desk** at a new Pinewick police station (sort incoming reports, answer the radio, and quietly "lose" any Bigfoot sighting reports, which lowers how often guards are alerted the next day).
-> 2. **Arcade**: a 1990s arcade on Main Street with 3 playable retro cabinets drawn on canvas (an original snake-style game, a falling-blocks game and a top-down racer), high-score tables with initials, and tokens bought with coins.
-> 3. **Home upgrades**: spend coins to upgrade the den (bigger fridge, a second backpack row, a trophy shelf that shows your best fish, golden pinecone, ski time and golf score, wallpaper and rug choices).
-> 4. **Town reacts to the scandal**: a protest rally against the resort in the town square; townsfolk wear "SAVE HOLLOWPINE" buttons; a petition quest where Moss (disguised) collects 10 signatures from NPCs around the map, each with a small favour.
-> 5. **Story**: Grube tries one last trick: he hires Hank Voss to stake out the den itself. Lead Voss on a wild-goose chase with Biscuit and planted fake footprints so he photographs a moose instead.
-> Keep the 3/4 diorama renderer, the loop road and traffic, the north mountain, drag-to-eat, map/menu/newspaper, art style, HUD, save format (bump to v6 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 7 when done.
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 7: Birds and badges**.
+> 1. **Birdwatching**: 20 original bird species living in different places (forest, lake, mountain, town, campground) and times of day, drawn in the 3/4 renderer, that flutter off if Moss runs nearby. Use the existing camera: photos of birds are scored (size in frame, centred, bird not flying away, rare bonus) and fill a **bird guide** in the den.
+> 2. **Binoculars and a bird sanctuary**: buy binoculars at Brambles (zoom view that shows the bird's name and how rare it is); a bird sanctuary with feeders north of the lake run by a birder named Rosa, who gives photo requests ("a heron at dawn") for coins.
+> 3. **Badges**: a Ranger Badge book with 25 badges earned across everything (first raid, 10 fish species, ski under 40 s, arcade #1, all petition signatures, 15 birds…), with a badge popup and a badge page in the menu.
+> 4. **Seasons**: every 7 days the season changes (summer → autumn → winter → spring): autumn leaves on round trees, winter snow covers the whole map and the lake freezes (walkable, ice-fishing hole), spring flowers. Some birds and fish only appear in some seasons.
+> 5. **Story**: the council schedules the vote. Dr. Holm needs one final piece of evidence: a photo of Moss himself, taken by someone he trusts. Pick who (Pip can't hold a camera…), set up the shot, and choose how much of himself Moss is willing to show.
+> Keep the 3/4 diorama renderer, the loop road and traffic, the north mountain, drag-to-eat, map/menu/newspaper, jobs and arcade, art style, HUD, save format (bump to v7 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 8 when done.
 
 ## Later slices (ideas)
-- Slice 7: Birdwatching with photo scoring (reuse the camera); badge collection
 - Slice 8: Council vote finale and save Hollowpine
