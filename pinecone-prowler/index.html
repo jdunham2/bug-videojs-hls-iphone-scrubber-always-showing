@@ -501,7 +501,7 @@ const bgN=document.createElement('canvas');bgN.width=WW;bgN.height=Math.ceil(-YM
 
 /* ---------- props (y-sorted 3D objects) ---------- */
 const prop=(x,y,draw,h=120)=>props.push({x,y,draw,h});
-trees.forEach(tr=>prop(tr.x,tr.y,()=>drawPine(tr),tr.r*3));
+trees.forEach(tr=>{prop(tr.x,tr.y,()=>drawPine(tr),tr.r*3);props[props.length-1].tree=tr});
 solids.forEach(s=>{if(s.rock)prop(s.x,s.y,()=>drawRock(s),s.r*2);if(s.lamp)prop(s.x,s.y,()=>drawLamp(s))});
 sites.forEach(s=>{prop(s.tent.x,s.tent.y+s.tent.h,()=>drawTent(s.tent));prop(s.table.x,s.table.y+s.table.h+12,()=>drawTable(s.table,s.tb))});
 Object.values(B).forEach(q=>prop(q.x+q.w/2,q.y+q.h,()=>drawBuilding(q),260));
@@ -539,7 +539,7 @@ prop(223,322,()=>{shadowBox(200,300,46,22,20);box(200,300,46,22,20,'#7a4c2a');co
 
 /* ---------- state ---------- */
 const P={x:330,y:330,r:14,ang:Math.PI/2,moving:false,hidden:false,sprint:false,bob:0,bush:null,vx:0,vy:0};
-let S;const fresh=()=>({v:12,day:1,time:7*60,hunger:70,stam:100,coins:0,inv:[],fridge:[],q:0,owned:[],outfit:'none',pick:'coat',shiftDay:0,deadline:0,side:{parcel:0,truck:0},stats:{raids:0,eaten:0,caught:0,shifts:0,best:0,caddy:0,fish:0},done:false,cam:false,photos:[],ev:{prints:0,nest:0,tuft:0},veh:{bike:null,truck:null,canoe:null},riding:null,golf:{best:0,rounds:0},caddyDay:0,vossDay:0,rod:false,catch:[],fishLog:{},basket:[],guide:{},truffles:0,dog:{friend:0,fed:0,adopted:false,mode:'follow',met:0},rain:false,wday:0,sab:{keys:-1,lunch:-1,won:-1,count:0},ski:{best:0,runs:0,patrolDay:0},skiDay:0,canoeDay:0,scuba:false,loot:[],chest:false,secret:0,letter:0,mailed:0,paperDay:1,seen:{den:1},tokens:0,arcade:{worm:[],timber:[],race:[]},home:{fridge:0,pack:0,shelf:0,rug:'red',wall:'plain'},clinicDay:0,policeDay:0,calmDay:0,calmN:0,pet:{},stomp:0,stamped:{},rallyDay:0,petDay:0,mooseDay:0,binoc:false,birds:{},birdT:{},req:null,badges:{},arc1:0,photog:'',reveal:0,place:'',proof:0,voteSet:0,ending:'',vote:{undisg:false,score:0},tips:{},voteDay:0,postDay:0,derby:{day:0,best:0,paid:true},sledBest:0,trick:{day:0,names:{}},rangerDay:0,chefDay:0,tradeDay:0,traded:{},lantern:false,furn:{},radioOn:false,stories:{},storm:{day:0,lit:{},paid:true},iceDay:0,merch:{bought:0},recipes:{},found:{},friends:{},berry:{day:0,got:{}},fireDay:0,swimDay:0,swimBest:0,carveDay:0,wild:{deer:0,rabbit:0,goat:0,duck:0},hunt:0,frag:{}});
+let S;const fresh=()=>({v:13,day:1,time:7*60,hunger:70,stam:100,coins:0,inv:[],fridge:[],q:0,owned:[],outfit:'none',pick:'coat',shiftDay:0,deadline:0,side:{parcel:0,truck:0},stats:{raids:0,eaten:0,caught:0,shifts:0,best:0,caddy:0,fish:0},done:false,cam:false,photos:[],ev:{prints:0,nest:0,tuft:0},veh:{bike:null,truck:null,canoe:null},riding:null,golf:{best:0,rounds:0},caddyDay:0,vossDay:0,rod:false,catch:[],fishLog:{},basket:[],guide:{},truffles:0,dog:{friend:0,fed:0,adopted:false,mode:'follow',met:0},rain:false,wday:0,sab:{keys:-1,lunch:-1,won:-1,count:0},ski:{best:0,runs:0,patrolDay:0},skiDay:0,canoeDay:0,scuba:false,loot:[],chest:false,secret:0,letter:0,mailed:0,paperDay:1,seen:{den:1},tokens:0,arcade:{worm:[],timber:[],race:[]},home:{fridge:0,pack:0,shelf:0,rug:'red',wall:'plain'},clinicDay:0,policeDay:0,calmDay:0,calmN:0,pet:{},stomp:0,stamped:{},rallyDay:0,petDay:0,mooseDay:0,binoc:false,birds:{},birdT:{},req:null,badges:{},arc1:0,photog:'',reveal:0,place:'',proof:0,voteSet:0,ending:'',vote:{undisg:false,score:0},tips:{},voteDay:0,postDay:0,derby:{day:0,best:0,paid:true},sledBest:0,trick:{day:0,names:{}},rangerDay:0,chefDay:0,tradeDay:0,traded:{},lantern:false,furn:{},radioOn:false,stories:{},storm:{day:0,lit:{},paid:true},iceDay:0,merch:{bought:0},recipes:{},found:{},friends:{},berry:{day:0,got:{}},fireDay:0,swimDay:0,swimBest:0,carveDay:0,wild:{deer:0,rabbit:0,goat:0,duck:0},hunt:0,frag:{},tickets:0,fairPlayed:{},ribbon:0,journal:[],jday:0,dam:{d0:0}});
 const has=o=>!!S&&S.owned.includes(o);const disg=()=>S.outfit!=='none';
 let alert=0,paused=true,started=false,lastSave=0,flash=0;
 const npcs=[];
@@ -648,7 +648,9 @@ function scared(o){o.n=1;say(o,o.kind==='towny'?'EEK! It\'s a BIGFOOT!':'AAAH!')
 function interact(){const o=nearInt();if(!o)return;
   if(npcs.includes(o)&&storyOK(o)&&storyTalk(o))return;
   if(o===bram){bramTalk();return}
+  if(resTalk(o))return;
   if(o.k&&s10Int(o))return;
+  if(o.k&&s13Int(o))return;
   if(o.k&&s12Int(o))return;
   if(o.k&&s11Int(o))return;
   if(npcs.includes(o)&&trickOK(o)){trickTreat(o);return}
@@ -1072,7 +1074,7 @@ const FISH=[
 const FISHHINT={any:'any time',day:'daytime',dawndusk:'dawn and dusk',night:'at night'};
 const fishSvg=f=>`<svg viewBox="0 0 32 32"><ellipse cx="14" cy="16" rx="11" ry="6" fill="${f.col}"/><path d="M24 16L31 10V22Z" fill="${f.col}"/><circle cx="8" cy="15" r="1.6" fill="#222"/></svg>`;
 const fishTod=()=>{const h=hour();return h>=5&&h<8||h>=17&&h<21?'dawndusk':h>=8&&h<17?'day':'night'};
-function pickFish(far){const tod=fishTod(),ws=FISH.map(f=>f.w*((f.when==='any'||f.when===tod||(f.when==='day'&&tod==='dawndusk'))?1:.12)*(f.far?(far?1.8:.2):1)*(S.rain&&f.rain?3:1)*(f.season&&f.season!==seasonName()?0:1)*((!!f.creek)===fishCreek?1:0));let r=Math.random()*ws.reduce((a,b)=>a+b,0);for(let i=0;i<FISH.length;i++){r-=ws[i];if(r<=0)return FISH[i]}return FISH[0]}
+function pickFish(far){const tod=fishTod(),ws=FISH.map(f=>f.w*((f.when==='any'||f.when===tod||(f.when==='day'&&tod==='dawndusk'))?1:.12)*(f.far?(far?1.8:.2):1)*(S.rain&&f.rain?3:1)*(f.season&&f.season!==seasonName()?0:1)*((!!f.creek)===fishCreek?1:0)*creekWeight(f));let r=Math.random()*ws.reduce((a,b)=>a+b,0);for(let i=0;i<FISH.length;i++){r-=ws[i];if(r<=0)return FISH[i]}return FISH[0]}
 const fishVal=c=>{const f=FISH.find(x=>x.k===c.k);return Math.max(1,Math.round(f.v*c.cm/((f.min+f.max)/2)))};
 let fishing=null;
 const biteTime=()=>(2+Math.random()*4)*(S.rain?.55:1);
@@ -1097,7 +1099,7 @@ function fishLoop(now){const F=fishing;if(!F)return;const dt=Math.min(.05,(now-F
     F.ten=Math.max(0,F.ten);F.low=F.ten<.06?F.low+dt:0;
     if(F.ten>=1){F.ph='done';F.res={lost:1};sfx(150,.3,'sawtooth',.08,-80);fkMsg('SNAP! The line broke. Tap to cast again.');fkBtn('Cast again')}
     else if(F.low>1.6||F.prog<=0){F.ph='done';F.res={lost:1};fkMsg('It shook the hook and swam off. Tap to cast again.');fkBtn('Cast again')}
-    else if(F.prog>=1){const f=F.f,cm=Math.round(f.min+(f.max-f.min)*Math.pow(Math.random(),1.6));F.res={f,cm};const best=!S.fishLog[f.k]||cm>S.fishLog[f.k];S.fishLog[f.k]=Math.max(S.fishLog[f.k]||0,cm);if(fishCreek)S.stats.creek=(S.stats.creek||0)+1;if(holiday()==='derby'){if(S.derby.day!==S.day)S.derby={day:S.day,best:0,paid:false};S.derby.best=Math.max(S.derby.best,cm)}S.stats.fish=(S.stats.fish||0)+1;
+    else if(F.prog>=1){const f=F.f,cm=Math.round(f.min+(f.max-f.min)*Math.pow(Math.random(),1.6));F.res={f,cm};const best=!S.fishLog[f.k]||cm>S.fishLog[f.k];if(!S.fishLog[f.k])jlog('First '+f.n.toLowerCase()+' caught ('+cm+' cm).');S.fishLog[f.k]=Math.max(S.fishLog[f.k]||0,cm);if(fishCreek)S.stats.creek=(S.stats.creek||0)+1;if(holiday()==='derby'){if(S.derby.day!==S.day)S.derby={day:S.day,best:0,paid:false};S.derby.best=Math.max(S.derby.best,cm)}S.stats.fish=(S.stats.fish||0)+1;
       if(S.catch.length<10){S.catch.push({k:f.k,cm});fkMsg(`Caught a ${f.n}! ${cm} cm${best?' (new record!)':''}. Into the bucket.`)}else fkMsg(`Caught a ${f.n} (${cm} cm), but your bucket is full, so you let it go.`);
       F.ph='done';sfx(990,.1,'triangle',.1);setTimeout(()=>sfx(1320,.15,'triangle',.1),100);fkBtn('Cast again');const b=$('#fkB');if(b)b.textContent=S.catch.length}}
   drawFish(now);requestAnimationFrame(fishLoop)}
@@ -1297,7 +1299,7 @@ function mailLetter(){S.letter=2;S.mailed=S.day;if(S.deadline)S.deadline+=7;
   talk([['Iris Okafor','Oh my. OH my. A "research grant"? To bury the review?'],['Iris Okafor','Express post to the Gazette, on the house. Tomorrow morning, the whole town reads this.']],()=>{if(S.q===14)advance(15);toast('The council vote is delayed a week while the town investigates!');save();setTimeout(endCard5,1200)})}
 function headlines(){const y=S.day-1,H=[];
   if(S.day>1&&(S.day-1)%7===0)H.push([['SUMMER IS BACK','Campers return to Hollowpine. Coolers everywhere. Coincidence?'],['AUTUMN COLOURS ARRIVE','Leaves turn gold; the grosbeaks are back at Rosa\'s sanctuary.'],['WINTER FREEZES THE LAKE','Ice fishing season opens. Marge reports burbot "biting like crazy."'],['SPRING HAS SPRUNG','Wildflowers bloom; hummingbirds spotted downtown.']][seasonIdx()]);
-  {const nx=(S.day)%28;if(nx===13)H.push(['HALLOWEEN TONIGHT!','Costumes encouraged. Campers say the "bigfoot costumes" get better every year.']);if(nx===17)H.push(['WINTER FESTIVAL IN THE SQUARE','Lights, a giant tree, and free sledding on the golf course hill all day.']);if(nx===25)H.push(['FISHING DERBY TODAY','Marge\'s 64 cm pike is the fish to beat. Prizes at 6 PM at the Bait & Tackle.'])}
+  {const nx=(S.day)%28;if(nx===13)H.push(['HALLOWEEN TONIGHT!','Costumes encouraged. Campers say the "bigfoot costumes" get better every year.']);if(nx===17)H.push(['WINTER FESTIVAL IN THE SQUARE','Lights, a giant tree, and free sledding on the golf course hill all day.']);if(nx===27)H.push(['VALLEY FAIR TOMORROW','Ring toss, pie eating and the berry race on the town square, 10 AM to 8 PM. Win prize tickets!']);if(nx===25)H.push(['FISHING DERBY TODAY','Marge\'s 64 cm pike is the fish to beat. Prizes at 6 PM at the Bait & Tackle.'])}
   {const nx=(S.day)%28;if(nx===3&&seasonIdx()===0)H.push(['HEATWAVE ON THE WAY','Two scorchers coming. The ice cream truck will park on the town square. Swim to stay cool!']);if(nx===9)H.push(['STORM WARNING','A big thunderstorm is due tomorrow night. Pinewick\'s old power lines may not hold. Keep a lantern handy.']);if(merchDay(S.day))H.push(['TRAVELLING MERCHANT IN TOWN',`Juniper's wagon is parked ${merchSpot().n} today, 9 AM to 7 PM. Rare goods!`])}
   if(S.voteDay&&S.voteDay===y)H.push(S.ending==='park'?['HOLLOWPINE PROTECTED FOREVER','Council votes to make the campground and forest a provincial park. Grube leaves town in his gold car.']:S.ending==='lodge'?['RESORT SHRINKS TO TWELVE ROOMS','Council approves a small lodge instead. "No wave pool," confirms a relieved mayor.']:['RESORT APPROVED IN CLOSE VOTE','Bulldozers return in spring. Residents report strange footprints heading up the mountain.']);
   if(S.voteDay&&S.voteDay===y&&S.vote.undisg)H.push(['BIGFOOT ATTENDS COUNCIL MEETING','"He was very polite," says Mayor Linden. "Waited his turn."']);
@@ -1335,8 +1337,9 @@ function mapUI(){const H=Math.round(820*(WH-YMIN)*T/WW);openModal(`<h2 class="sl
 function menuUI(conf){menu(conf?`<h2 class="slab">Start over?</h2><p>This erases your saved game: coins, quests, photos, Biscuit, everything.</p><div class="btns"><button class="btn" data-a="wipe">Yes, start over</button><button class="btn alt" data-a="back">No, keep playing</button></div>`:`<h2 class="slab">Game menu</h2>
   <div class="row"><div><b>Sound volume</b><br><small id="volV">${SET.vol}%</small></div><input type="range" id="volR" min="0" max="100" value="${SET.vol}" aria-label="Sound volume" style="flex:1;accent-color:#ffbf3c"></div>
   <div class="row"><div><b>Morning newspaper</b><br><small>Show the Pinewick Gazette each morning.</small></div><button class="btn" data-a="paper">${SET.paper?'On':'Off'}</button></div>
+  <div class="row"><div><b>Valley journal</b><br><small>Moss's day-by-day notes.</small></div><button class="btn" data-a="journal">Open</button></div>
   <div class="row"><div><b>Collection log</b><br><small>Every food, outfit and furniture piece you've found.</small></div><button class="btn" data-a="coll">Open</button></div>
-  <div class="row"><div><b>Stories &amp; side quests</b><br><small>${oddDone()}/5 side quests${S.ending?' · '+storyDone()+'/5 valley stories':' · valley stories unlock after the vote'}</small></div><button class="btn" data-a="stories">Open</button></div>
+  <div class="row"><div><b>Stories &amp; side quests</b><br><small>${oddDone()}/${ODDJOBS.length} side quests${S.ending?' · '+storyDone()+'/5 valley stories':' · valley stories unlock after the vote'}</small></div><button class="btn" data-a="stories">Open</button></div>
   <div class="row"><div><b>Settings &amp; accessibility</b><br><small>Music, relaxed mode, high contrast, big buttons, controls, save code.</small></div><button class="btn" data-a="set">Open</button></div>
   <div class="row"><div><b>What can I do now?</b><br><small>Open venues, jobs and goals right now.</small></div><button class="btn" data-a="act">Show</button></div>
   ${S.q===22?`<div class="row"><div><b>Go to the vote</b><br><small>Call the council vote today instead of waiting.</small></div><button class="btn" data-a="vote">Go</button></div>`:''}
@@ -1345,7 +1348,7 @@ function menuUI(conf){menu(conf?`<h2 class="slab">Start over?</h2><p>This erases
   <div class="row"><div><b>Save game</b><br><small>The game also autosaves every 15 seconds and when you sleep.</small></div><button class="btn" data-a="save">Save now</button></div>
   <div class="row"><div><b>Start over</b><br><small>Erase your save and begin a new game.</small></div><button class="btn alt" data-a="reset">Restart…</button></div>
   <div class="btns"><button class="btn" data-a="close">Resume</button></div>`,a=>{
-    if(a==='coll'){collectionUI();return}if(a==='stories'){storiesUI();return}if(a==='set'){settingsUI();return}if(a==='act'){activityUI();return}if(a==='vote'){goToVote();return}if(a==='badges'){badgeUI();return}if(a==='paper'){SET.paper=!SET.paper;saveSet();menuUI()}else if(a==='news')paperUI();else if(a==='save'){save();toast('Game saved.');closeModal()}else if(a==='reset')menuUI(true);else if(a==='back')menuUI();
+    if(a==='journal'){journalUI(0);return}if(a==='coll'){collectionUI();return}if(a==='stories'){storiesUI();return}if(a==='set'){settingsUI();return}if(a==='act'){activityUI();return}if(a==='vote'){goToVote();return}if(a==='badges'){badgeUI();return}if(a==='paper'){SET.paper=!SET.paper;saveSet();menuUI()}else if(a==='news')paperUI();else if(a==='save'){save();toast('Game saved.');closeModal()}else if(a==='reset')menuUI(true);else if(a==='back')menuUI();
     else if(a==='wipe'){try{localStorage.removeItem(KEY)}catch(e){}load(fresh());P.x=330;P.y=330;S.paperDay=1;closeModal();toast('A brand new day in Hollowpine. Walk to Pip and press E.')}});
   const r=$('#volR');if(r)r.addEventListener('input',()=>{SET.vol=+r.value;$('#volV').textContent=SET.vol+'%';saveSet()}),r.addEventListener('change',()=>sfx(660,.1,'triangle',.1))}
 
@@ -1758,7 +1761,7 @@ function cricket(t){for(let i=0;i<6;i++){const o=AC.createOscillator(),g=AC.crea
 
 /* holidays */
 const HOLN={halloween:'Halloween',festival:'Winter Festival',derby:'Fishing Derby'};
-const holiday=()=>{const i=(S.day-1)%28;return i===13?'halloween':i===17?'festival':i===25?'derby':''};
+const holiday=()=>{const i=(S.day-1)%28;return i===13?'halloween':i===17?'festival':i===25?'derby':i===27?'fair':''};
 const isHalloweenNight=()=>holiday()==='halloween'&&hour()>=17;
 function costume(o,x,y){const k=(o.name.length+Math.floor(o.hx||o.x))%3;if(k===0){poly('#1a1a1a',x-11,y-41,x+11,y-41,x+2,y-62);ell('#1a1a1a',x,y-41,13,3.5)}else if(k===1){ell('#e8761a',x,y-37,10,9);poly('#1a1a1a',x-5,y-39,x-2,y-39,x-3.5,y-35);poly('#1a1a1a',x+2,y-39,x+5,y-39,x+3.5,y-35);rect('#3f8a4a',x-1,y-48,2,4)}else{ell('#f4f4f4',x,y-24,13,21);ell('#1a1a1a',x-4,y-34,2,2.5);ell('#1a1a1a',x+4,y-34,2,2.5)}}
 const trickOK=o=>isHalloweenNight()&&o.kind==='camper'&&!o.asleep&&!(S.trick.day===S.day&&S.trick.names[o.name]);
@@ -1923,7 +1926,7 @@ function storyTalk(o){const st=storyFor(o);if(!st)return false;if(!disg()&&!(S.v
   if(!cur){talk(st.intro,()=>{storyStep(st,0);toast((st.odd?'Side quest: ':'Valley story: ')+st.t);sfx(660,.12,'triangle',.12);save();if(st.odd&&o.talk&&!o.friendly)setTimeout(()=>townTalk(o),60)});return true}
   const step=st.steps[cur.s];
   if(step.bring){const j=S.inv.indexOf(step.bring);if(j>=0){S.inv.splice(j,1);renderSlots();talk([[who,'Perfect, that\'s just what I needed!']],()=>{storyAdvance(st);toast('Next: '+st.steps[S.stories[st.id].s].d)});return true}talk([[who,step.d]]);return true}
-  if(step.back){talk(st.end,()=>{S.stories[st.id]={s:st.steps.length};S.coins+=st.coins||0;(st.food||[]).forEach(f=>{if(S.inv.length<invCap())S.inv.push(f)});renderSlots();toast(st.odd?`Side quest complete: ${st.t}! +${st.coins} coins (${oddDone()}/5 side quests)`:`Story complete: ${st.t}! +${st.coins} coins (${storyDone()}/5 valley stories)`);sfx(990,.15,'triangle',.12);setTimeout(()=>sfx(1320,.2,'triangle',.12),140);save()});return true}
+  if(step.back){talk(st.end,()=>{S.stories[st.id]={s:st.steps.length};S.coins+=st.coins||0;(st.food||[]).forEach(f=>{if(S.inv.length<invCap())S.inv.push(f)});if(st.furn)S.furn[st.furn]=1;renderSlots();toast(st.odd?`Side quest complete: ${st.t}! +${st.coins} coins (${oddDone()}/${ODDJOBS.length} side quests)`:`Story complete: ${st.t}! +${st.coins} coins (${storyDone()}/5 valley stories)`);sfx(990,.15,'triangle',.12);setTimeout(()=>sfx(1320,.2,'triangle',.12),140);save()});return true}
   talk([[who,step.d]]);return true}
 function storyTick(){for(const st of QLIST()){const c=S.stories[st.id];if(!c||c.s>=st.steps.length)continue;const step=st.steps[c.s];
   if(step.go&&dist(P.x,P.y,step.go[0],step.go[1])<80){toast(step.msg);storyAdvance(st)}
@@ -2216,7 +2219,7 @@ function padTick(){let gp=null;try{gp=navigator.getGamepads?[...navigator.getGam
     padHold('ArrowLeft',ax<-.5||b(14));padHold('ArrowRight',ax>.5||b(15));padHold('ArrowUp',ay<-.5||b(12));padHold('ArrowDown',ay>.5||b(13));
     const L=padBtns();if(PAD.fi>=0&&!(L[PAD.fi]&&L[PAD.fi].classList.contains('gpf')))PAD.fi=-1;
     const up=edge(12)||edge(14)||(ay<-.5&&PAD.sy>=-.5)||(ax<-.5&&PAD.sx>=-.5),dn=edge(13)||edge(15)||(ay>.5&&PAD.sy<=.5)||(ax>.5&&PAD.sx<=.5);
-    if(!(swimR||roast||carve||ski||fishing)){if(up)padFocus(-1);if(dn)padFocus(1)}
+    if(!(swimR||roast||carve||ski||fishing||fairG)){if(up)padFocus(-1);if(dn)padFocus(1)}
     const f=PAD.fi>=0?L[PAD.fi]:null;padHold('Space',b(0)&&!f);
     if(edge(0)&&f){if(f.dataset.c!==undefined)f.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));else f.click();PAD.fi=-1}
     if(edge(1)||edge(9)){const c=$('#card').querySelector('[data-a=close],[data-a=go],[data-a=next]');if(c)c.click();else padTap('Escape')}}
@@ -2354,18 +2357,174 @@ function s12Skip(o){if(o.k==='wild')return !S.inv.includes('berries')||o.a.st===
 function s12Label(o){if(o.k==='wild')return `Feed the ${WKIND[o.a.kind].n} some berries`;if(o.k==='creekfish')return S.rod?'Fish in the creek':'Creek pool (need a fishing rod)';if(o.k==='cave')return S.hunt>=4&&S.hunt<5?'Open the chest behind the falls':'Peek behind the waterfall';if(o.k==='cairn')return 'Look at the stone cairn';if(o.k==='bus')return 'Valley bus stop: '+o.s.n;return ''}
 prop(FALLS.x,FALLS.y,()=>drawFalls(performance.now()),160);CAIRNS.forEach(o=>prop(o.x,o.y-22,()=>drawCairn(o),40));
 PLACES.push({k:'falls',n:'Hidden falls',x:FALLS.x,y:FALLS.y,r:240});
-BADGES.push(['wildfriend','Wild neighbour','Befriend deer, rabbits, goats and ducks.',()=>Object.keys(WKIND).every(wildFriend)],['treasure','Treasure hunter','Find the treasure behind the waterfall.',()=>S.hunt>=5],['oddjobs','Helping paw','Finish all five side quests.',()=>oddDone()>=5],['creek','Creek angler','Catch all four creek fish.',()=>['brook','sculpin','chub','cutthroat'].every(k=>S.fishLog[k])]);
+BADGES.push(['wildfriend','Wild neighbour','Befriend deer, rabbits, goats and ducks.',()=>Object.keys(WKIND).every(wildFriend)],['treasure','Treasure hunter','Find the treasure behind the waterfall.',()=>S.hunt>=5],['oddjobs','Helping paw','Finish five side quests.',()=>oddDone()>=5],['creek','Creek angler','Catch all four creek fish.',()=>['brook','sculpin','chub','cutthroat'].every(k=>S.fishLog[k])]);
 function s12Tick(dt){wildTick(dt)}
 function spookWild(r){WILD.forEach(a=>{if(dist(a.x,a.y,P.x,P.y)<r)a.spook=.5})}
 function mainBusy(o){try{return (o===holm&&(S.q===18||S.q===21))||(S.q===20&&o.name===S.photog)||(o===gus&&S.side.parcel===1)||petOK(o)}catch(e){return false}}
+/* ---------- slice 13: valley fair, new neighbours, den visitors, beavers, journal ---------- */
+HOLN.fair='Valley Fair';
+const isFair=()=>(S.day-1)%28===27;
+const fairOpen=()=>isFair()&&hour()>=10&&hour()<20;
+FOOD.honey={n:'Wildflower honey',h:20,svg:'<path d="M9 10h14v16a4 4 0 0 1-4 4h-6a4 4 0 0 1-4-4Z" fill="#f2b33d"/><rect x="8" y="6" width="16" height="5" rx="2" fill="#8a5d36"/><path d="M12 16h8" stroke="#fff" stroke-width="2" opacity=".5"/>'};
+FOOD.cotton={n:'Cotton candy',h:10,svg:'<circle cx="16" cy="11" r="9" fill="#f4b8c8"/><circle cx="11" cy="9" r="4" fill="#fbd0dc"/><path d="M16 18v12" stroke="#e9dcc0" stroke-width="2.5"/>'};
+FOOD.caramel={n:'Caramel apple',h:22,svg:'<circle cx="16" cy="19" r="9" fill="#d8423a"/><path d="M7 17q9-6 18 0v3q-9 5-18 0Z" fill="#c9862a"/><path d="M16 10V2" stroke="#8a5d36" stroke-width="2.5"/>'};
+Object.assign(FOODCOL,{honey:'#f2b33d',cotton:'#f4b8c8',caramel:'#c9862a'});
+FURNK.push('plush','pennant','ship','painting');Object.assign(FURNN,{plush:'Plush moose',pennant:'Fair pennant',ship:'Ship in a bottle',painting:'Valley painting'});
+const NEWICON={plush:'<ellipse cx="16" cy="20" rx="10" ry="8" fill="#8a5d36"/><circle cx="16" cy="11" r="6" fill="#8a5d36"/><path d="M9 6l-4-3M23 6l4-3M9 6l-2 4M23 6l2 4" stroke="#d8c4a0" stroke-width="2"/>',pennant:'<path d="M5 6L28 13L5 20Z" fill="#d8423a"/><path d="M5 4v24" stroke="#5a3a22" stroke-width="2.5"/><path d="M9 11l9 2.5" stroke="#fff" stroke-width="2"/>',ship:'<ellipse cx="16" cy="18" rx="13" ry="8" fill="rgba(180,220,240,.6)" stroke="#9ac" stroke-width="1.5"/><path d="M9 20h14l-2 3H11Z" fill="#8a5d36"/><path d="M16 9v11M16 10l5 7h-5M16 11l-4 6h4" stroke="#fff" stroke-width="1.5" fill="#fbf3df"/>',painting:'<rect x="4" y="6" width="24" height="20" fill="#8a5d36"/><rect x="7" y="9" width="18" height="14" fill="#9fd4ff"/><path d="M7 23l6-8 4 5 3-3 5 6Z" fill="#3f8a3a"/><circle cx="21" cy="13" r="2" fill="#ffd84a"/>'};
+{const _fi=furnIcon;furnIcon=k=>NEWICON[k]?`<svg viewBox="0 0 32 32">${NEWICON[k]}</svg>`:_fi(k)}
+function drawFurn13(k,t){if(!S.furn[k])return;
+  if(k==='painting'){const x=286,f=gy(122);rect('#5a3a22',x-26,f-58,52,38);rect('#9fd4ff',x-22,f-54,44,30);poly('#3f8a3a',x-22,f-24,x-8,f-44,x+2,f-32,x+10,f-40,x+22,f-24);ell('#ffd84a',x+12,f-47,3,3)}
+  if(k==='ship'){const x=350,f=gy(150);box(x-16,150-6,32,10,8,'#8a5d36');ell('rgba(190,225,245,.55)',x,f-20,18,10);poly('#8a5d36',x-9,f-16,x+9,f-16,x+6,f-12,x-6,f-12);rect('#fbf3df',x-1,f-30,2,14);poly('#fbf3df',x,f-30,x+7,f-20,x,f-20)}
+  if(k==='pennant'){const x=392,f=gy(206);rect('#5a3a22',x-1,f-50,3,50);poly('#d8423a',x+2,f-50,x+30,f-43+Math.sin(t/300)*2,x+2,f-36)}
+  if(k==='plush'){const x=190,f=gy(350);ell(SH,x+2,f+1,12,4);ell('#8a5d36',x,f-9,11,9);ell('#8a5d36',x,f-21,7,6);ctx.strokeStyle='#d8c4a0';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x-5,f-25);ctx.lineTo(x-11,f-31);ctx.moveTo(x+5,f-25);ctx.lineTo(x+11,f-31);ctx.stroke();ell('#2a2a2a',x-2.5,f-22,1,1);ell('#2a2a2a',x+2.5,f-22,1,1)}}
+[['painting',286,122],['ship',350,150],['pennant',392,206],['plush',190,350]].forEach(([k,x,y])=>prop(x,y,()=>drawFurn13(k,performance.now()),70));
+
+/* ---------- valley fair ---------- */
+const BOOTHS=[{k:'ring',n:'Ring toss',x:4250,c:'#d8423a'},{k:'pie',n:'Pie eating',x:4410,c:'#e9b35f'},{k:'berryr',n:'Berry race',x:4570,c:'#7a3a8a'},{k:'prize',n:'Prize booth',x:4840,c:'#3d8be0'}];
+BOOTHS.forEach(b=>{b.int=addInt({k:'fair',b,x:b.x,y:1048});prop(b.x,1012,()=>{if(isFair())drawBooth(b,performance.now())},110)});
+function drawBooth(b,t){const x=b.x,f=gy(1012);ell(SH,x+4,f+2,48,10);box(x-42,1012-14,84,14,26,'#8a5d36');rect('#5c3820',x-42,f-74,4,50);rect('#5c3820',x+38,f-74,4,50);
+  for(let i=0;i<6;i++){ctx.fillStyle=i%2?'#fbf3df':b.c;ctx.beginPath();ctx.moveTo(x-46+i*15.3,f-74);ctx.lineTo(x-46+(i+1)*15.3,f-74);ctx.lineTo(x-46+(i+.5)*15.3,f-62);ctx.closePath();ctx.fill()}
+  rr(b.c,x-46,f-90,92,16,3);text(b.n.toUpperCase(),x,f-82,8,'#fff','900 8px Nunito,sans-serif');
+  if(b.k==='ring'){[-18,0,18].forEach(dx=>{rect('#3f8a4a',x+dx-3,f-40,6,14);rect('#3f8a4a',x+dx-1.5,f-46,3,6)})}
+  if(b.k==='pie'){[-20,0,20].forEach(dx=>{ell('#c9862a',x+dx,f-30,9,4);ell('#7a3a8a',x+dx,f-31,6,2.5)})}
+  if(b.k==='berryr'){[-18,0,18].forEach(dx=>{ell('#4f9a3a',x+dx,f-34,9,7);ell('#7a3a8a',x+dx-3,f-35,2,2);ell('#d8423a',x+dx+3,f-33,2,2)})}
+  if(b.k==='prize'){ell('#8a5d36',x-18,f-34,7,6);ell('#8a5d36',x-18,f-43,4.5,4);poly('#d8423a',x+4,f-46,x+24,f-41,x+4,f-36);ell('#f4b8c8',x+20,f-30,6,6)}}
+function drawFairDeco(t){if(!isFair())return;for(let i=0;i<9;i++){const x0=4130+i*90;ctx.strokeStyle='#5c3820';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x0,gy(998)-62);ctx.quadraticCurveTo(x0+45,gy(998)-46,x0+90,gy(998)-62);ctx.stroke();for(let j=0;j<5;j++){const px=x0+9+j*18,py=gy(998)-60+Math.sin((j+.5)/5*Math.PI)*14;poly(['#d8423a','#f2c230','#3d8be0','#6fae52'][(i+j)%4],px-5,py,px+5,py,px,py+9)}}}
+prop(4500,998,()=>drawFairDeco(performance.now()),90);
+let fairG=null;
+const FAIRSAY={ring:'Land rings on the bottles! Press Space (or Throw) when the ring is over a bottle.',pie:'Chomp as fast as you can! Tap Space (or Chomp) over and over.',berryr:'Catch the berries in your basket with ← → (or the buttons). Avoid the rotten brown ones!'};
+function fairUI(b){if(!fairOpen()){toast('The Valley Fair booths open 10 AM to 8 PM.');return}
+  if(b.k==='prize'){prizeUI();return}
+  if(!disg()&&!(S.vote&&S.vote.undisg)){toast('The booth attendant squeaks. Maybe wear something?');return}
+  if(S.fairPlayed[b.k]===S.day){toast('One go per booth! Try the others, or visit the prize booth.');return}
+  menu(`<h2 class="slab">${b.n}</h2><p>${FAIRSAY[b.k]}</p><p>You have <b>${S.tickets}</b> prize tickets.</p><div class="btns"><button class="btn alt" data-a="close">Maybe later</button><button class="btn" data-a="go">Play!</button></div>`,a=>{if(a==='go')startFair(b.k)})}
+function startFair(k){S.fairPlayed[k]=S.day;fairG={k,t:0,last:performance.now(),done:false,score:0,
+  m:.5,dir:1,sp:.9,throws:5,rings:[],
+  bites:0,rivals:[0,0,0].map(()=>R(4.2,6.2)),rb:[0,0,0],
+  bx:180,items:[],spawn:0,caught:0};const btns=k==='ring'?'<button class="btn" id="fgA" style="min-width:120px;touch-action:none">Throw!</button>':k==='pie'?'<button class="btn" id="fgA" style="min-width:120px;touch-action:none">Chomp!</button>':'<button class="btn alt" id="fgL" style="touch-action:none;min-width:90px">◀</button><button class="btn alt" id="fgR" style="touch-action:none;min-width:90px">▶</button>';
+  openModal(`<h2 class="slab">${BOOTHS.find(b=>b.k===k).n}</h2><canvas id="fgCv" width="360" height="230" style="display:block;width:100%;max-width:420px;margin:0 auto;border-radius:10px"></canvas><p id="fgMsg" style="font-weight:800;text-align:center;min-height:22px;margin:8px 0"></p><div class="btns">${btns}</div>`);$('#card').onclick=null;
+  const A=$('#fgA');if(A)A.addEventListener('pointerdown',e=>{e.preventDefault();fairAct()});
+  const L=$('#fgL'),Rb=$('#fgR');if(L){const hold=(el,d)=>{el.addEventListener('pointerdown',e=>{e.preventDefault();fairG&&(fairG.hold=d)});['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,()=>{if(fairG&&fairG.hold===d)fairG.hold=0}))};hold(L,-1);hold(Rb,1)}
+  requestAnimationFrame(fairLoop)}
+function fairAct(){const G=fairG;if(!G||G.done)return;
+  if(G.k==='ring'&&G.throws>0&&!G.fly){G.fly={x:30+300*G.m,y:20,t:0};G.throws--;sfx(500,.06,'triangle',.06)}
+  if(G.k==='pie'){G.bites++;sfx(260+Math.random()*60,.04,'square',.04);G.chomp=.12}}
+function fairLoop(now){const G=fairG;if(!G)return;const dt=Math.min(.05,(now-G.last)/1000);G.last=now;const c=$('#fgCv');if(!c){fairG=null;return}const g=c.getContext('2d'),W=360,H=230;
+  g.fillStyle='#2a3a5a';g.fillRect(0,0,W,H);g.fillStyle='#8a5d36';g.fillRect(0,170,W,60);for(let i=0;i<12;i++){g.fillStyle=i%2?'#fbf3df':'#d8423a';g.fillRect(i*30,0,30,14)}
+  const msg=$('#fgMsg');
+  if(G.k==='ring'){G.m+=G.dir*G.sp*dt;if(G.m>1){G.m=1;G.dir=-1}if(G.m<0){G.m=0;G.dir=1}const bots=[100,180,260];
+    bots.forEach(x=>{g.fillStyle='#3f8a4a';g.fillRect(x-9,120,18,50);g.fillRect(x-4,104,8,16);g.fillStyle='rgba(255,255,255,.3)';g.fillRect(x-6,124,3,40)});
+    G.rings.forEach(r=>{g.strokeStyle='#ffd84a';g.lineWidth=4;g.beginPath();g.ellipse(r.x,r.hit?110:166,13,5,0,0,TAU);g.stroke()});
+    if(G.fly){G.fly.t+=dt*2.2;const y=20+G.fly.t*90;g.strokeStyle='#ffd84a';g.lineWidth=4;g.beginPath();g.ellipse(G.fly.x,y,13,5,0,0,TAU);g.stroke();
+      if(G.fly.t>=1){const hit=bots.some(x=>Math.abs(x-G.fly.x)<12);G.rings.push({x:G.fly.x,hit});if(hit){G.score++;sfx(990,.1,'triangle',.08);msg.textContent='Ringer!'}else{sfx(200,.08,'sawtooth',.05);msg.textContent='Clink… missed.'}G.fly=null;G.sp+=.25;if(G.throws<=0){G.done=true;setTimeout(fairEnd,800)}}}
+    else if(G.throws>0){g.strokeStyle='#ffd84a';g.lineWidth=4;g.beginPath();g.ellipse(30+300*G.m,20,13,5,0,0,TAU);g.stroke()}
+    g.fillStyle='#fff';g.font='800 12px Nunito,sans-serif';g.textAlign='left';g.fillText(`Rings left: ${G.throws}  ·  Ringers: ${G.score}`,10,200)}
+  if(G.k==='pie'){if(!G.done){G.t+=dt;G.rb=G.rb.map((b,i)=>b+G.rivals[i]*dt);if(G.t>=8){G.done=true;setTimeout(fairEnd,700)}}G.chomp=Math.max(0,(G.chomp||0)-dt);
+    const eaters=[['Moss',G.bites,'#7d4b29'],['Big Earl',G.rb[0],'#e86a2a'],['Marcy',G.rb[1],'#e86a8a'],['Trent',G.rb[2],'#3d8be0']];
+    eaters.forEach(([n,b,col],i)=>{const x=50+i*88,pies=Math.floor(b/10),left=1-(b%10)/10;g.fillStyle=col;g.beginPath();g.ellipse(x,120,22,26,0,0,TAU);g.fill();g.fillStyle=i?'#e0b48c':'#7d4b29';g.beginPath();g.arc(x,82-(i===0&&G.chomp>0?4:0),14,0,TAU);g.fill();
+      g.fillStyle='#c9862a';g.beginPath();g.ellipse(x,160,24*Math.max(.15,left),8*Math.max(.15,left),0,0,TAU);g.fill();g.fillStyle='#7a3a8a';g.beginPath();g.ellipse(x,158,16*Math.max(.1,left),5*Math.max(.1,left),0,0,TAU);g.fill();
+      g.fillStyle='#fff';g.font='800 11px Nunito,sans-serif';g.textAlign='center';g.fillText(n,x,200);g.fillText(pies+' pies',x,214)});
+    g.textAlign='right';g.font='900 14px Nunito,sans-serif';g.fillText(Math.max(0,8-G.t).toFixed(1)+' s',W-10,32);G.score=Math.floor(G.bites/10)}
+  if(G.k==='berryr'){const kx=(keys.ArrowLeft||keys.KeyA?-1:0)+(keys.ArrowRight||keys.KeyD?1:0)+(G.hold||0);G.bx=clamp(G.bx+kx*260*dt,30,W-30);
+    if(!G.done){G.t+=dt;G.spawn-=dt;if(G.spawn<=0){G.spawn=R(.25,.55);G.items.push({x:R(20,W-20),y:10,v:R(90,150)+G.t*4,bad:Math.random()<.2})}if(G.t>=20){G.done=true;setTimeout(fairEnd,600)}}
+    for(let i=G.items.length-1;i>=0;i--){const it=G.items[i];it.y+=it.v*dt;if(it.y>=160&&it.y<180&&Math.abs(it.x-G.bx)<30){G.items.splice(i,1);if(it.bad){G.caught=Math.max(0,G.caught-1);sfx(180,.08,'sawtooth',.05)}else{G.caught++;sfx(800,.05,'triangle',.05)}continue}if(it.y>H)G.items.splice(i,1)}
+    G.items.forEach(it=>{g.fillStyle=it.bad?'#6b4a2c':'#7a3a8a';g.beginPath();g.arc(it.x,it.y,7,0,TAU);g.fill();if(!it.bad){g.fillStyle='#d8423a';g.beginPath();g.arc(it.x+4,it.y-4,4,0,TAU);g.fill()}});
+    g.fillStyle='#c9944e';g.fillRect(G.bx-28,162,56,20);g.strokeStyle='#8a5d36';g.lineWidth=3;g.beginPath();g.arc(G.bx,166,22,Math.PI,0);g.stroke();
+    g.fillStyle='#fff';g.font='800 12px Nunito,sans-serif';g.textAlign='left';g.fillText(`Berries: ${G.caught}`,10,210);g.textAlign='right';g.fillText(Math.max(0,20-G.t).toFixed(1)+' s',W-10,210);G.score=G.caught}
+  if(msg&&!msg.textContent)msg.textContent=FAIRSAY[G.k];
+  requestAnimationFrame(fairLoop)}
+function fairEnd(){const G=fairG;fairG=null;let tk=0,txt='';
+  if(G.k==='ring'){tk=G.score+(G.score>=5?2:0);txt=`${G.score}/5 ringers`}
+  if(G.k==='pie'){const mine=G.bites/10,pl=1+G.rb.filter(b=>b/10>mine).length;tk=[4,2,1,0][pl-1];txt=`${Math.floor(mine)} pies, ${['1st','2nd','3rd','4th'][pl-1]} place`;S.hunger=Math.min(100,S.hunger+15)}
+  if(G.k==='berryr'){tk=Math.floor(G.caught/4);txt=`${G.caught} berries caught`}
+  S.tickets+=tk;S.stats.tickets=(S.stats.tickets||0)+tk;jlog(`Valley Fair ${BOOTHS.find(b=>b.k===G.k).n.toLowerCase()}: ${txt}.`);save();sfx(tk?990:300,.15,'triangle',.1);
+  menu(`<h2 class="slab">${BOOTHS.find(b=>b.k===G.k).n}</h2><p>${txt}!</p><div class="row"><div><b>Prize tickets won</b></div><b>${tk}</b></div><div class="row"><div><b>Your tickets</b></div><b>${S.tickets}</b></div><div class="btns"><button class="btn" data-a="close">Done</button></div>`,()=>{})}
+addEventListener('keydown',e=>{if(!fairG||e.repeat)return;if((e.code==='Space'||e.code==='KeyE'||e.code==='Enter')&&(fairG.k==='ring'||fairG.k==='pie')){e.preventDefault();fairAct()}});
+const PRIZES=[{k:'cotton',t:'f',p:2},{k:'caramel',t:'f',p:3},{k:'pennant',t:'r',p:6},{k:'plush',t:'r',p:8},{k:'ribbon',t:'b',p:12,n:'Blue ribbon',d:'The fair\'s top prize. Pure bragging rights.'}];
+function prizeUI(){menu(`<h2 class="slab">Prize booth</h2><p>You have <b>${S.tickets}</b> tickets. Tickets keep until next year's fair.</p>${PRIZES.map((p,i)=>{const own=p.t==='r'?S.furn[p.k]:p.t==='b'?S.ribbon:false;const nm=p.t==='f'?FOOD[p.k].n:p.t==='r'?FURNN[p.k]:p.n,ic=p.t==='f'?icon(p.k):p.t==='r'?furnIcon(p.k):'<svg viewBox="0 0 32 32"><circle cx="16" cy="12" r="9" fill="#3d8be0"/><path d="M11 18l-4 12 6-3 3 4 1-13M21 18l4 12-6-3-3 4" fill="#2a6ab0"/><circle cx="16" cy="12" r="5" fill="#ffd84a"/></svg>';
+  return `<div class="row">${ic}<div><b>${nm}</b><br><small>${p.t==='f'?'+'+FOOD[p.k].h+' hunger':p.t==='r'?'Den decoration':p.d}</small></div>${own?'<button class="btn alt" disabled>Owned</button>':`<button class="btn" data-a="p${i}" ${S.tickets>=p.p&&(p.t!=='f'||S.inv.length<invCap())?'':'disabled'}>${p.p} 🎟</button>`}</div>`}).join('')}<div class="btns"><button class="btn alt" data-a="close">Leave</button></div>`,a=>{const p=PRIZES[+a.slice(1)];if(!p||S.tickets<p.p)return;
+    if(p.t==='f'){if(S.inv.length>=invCap())return;S.inv.push(p.k);renderSlots()}else if(p.t==='r'){if(S.furn[p.k])return;S.furn[p.k]=1}else{if(S.ribbon)return;S.ribbon=1}
+    S.tickets-=p.p;sfx(990,.1,'triangle',.1);toast(p.t==='f'?`Got a ${FOOD[p.k].n.toLowerCase()}!`:p.t==='r'?`Won the ${FURNN[p.k].toLowerCase()}! It's in your den.`:'You won the Blue ribbon!');jlog(`Won ${p.t==='b'?'the Blue ribbon':'a prize'} at the fair.`);save();prizeUI()})}
+
+/* ---------- new neighbours ---------- */
+const HOMES=[{x:2560,y:330,c:'#c9862a',roof:'#7a3a2a'},{x:900,y:1055,c:'#4a7ab0',roof:'#2e4a6b'},{x:3560,y:-270,c:'#8a5d36',roof:'#4a6fa8'}];
+HOMES.forEach(h=>{for(let i=trees.length-1;i>=0;i--)if(dist(trees[i].x,trees[i].y,h.x,h.y)<110)trees.splice(i,1);solids.push({x:h.x-24,y:h.y-6,r:22},{x:h.x+24,y:h.y-6,r:22});prop(h.x,h.y,()=>drawHome(h),110)});
+for(let i=trees.length-1;i>=0;i--)if(dist(trees[i].x,trees[i].y,2660,430)<70)trees.splice(i,1);TG=null;
+function drawHome(h){const x=h.x,f=gy(h.y);ell(SH,x+6,f+2,62,14);box(x-48,h.y-26,96,26,40,h.c);poly(h.roof,x-56,f-38,x+56,f-38,x+40,f-74,x-40,f-74);poly(shade(h.roof,-.2),x-56,f-38,x+56,f-38,x+56,f-34,x-56,f-34);
+  rect('#3b2614',x-9,f-28,18,28);rect('#fbf3df',x-38,f-30,16,12);rect('#fbf3df',x+22,f-30,16,12);rect('#5c3820',x+30,f-90,8,18);
+  if(darkness()>.35){ell('rgba(255,210,120,.4)',x-30,f-24,12,8);ell('rgba(255,210,120,.4)',x+30,f-24,12,8)}}
+prop(2660,430,()=>{for(const [dx,dy] of [[-18,0],[14,6]]){const x=2660+dx,f=gy(430+dy);box(x-9,430+dy-6,18,10,22,'#f2e2a0');rect('#e0c070',x-9,f-12,18,3);if(Math.random()<.3)ell('#2a2a2a',x+R(-14,14),f-30-R(0,14),1.5,1.2)}},50);
+const RES=[
+ {name:'Juno',col:'#e9b35f',pants:'#5a4a3a',hair:'#8a4a2a',hat:'brown',sched:[[7,11,2560,375],[11,17,2660,470],[17,21,2740,1235]],line:['Bees are like people. Mostly busy, sometimes cranky, always hungry.','My hives make the best wildflower honey in the province. Don\'t tell the bears.']},
+ {name:'Captain Pell',col:'#2e4a6b',pants:'#2a2a3a',hair:'#d9d2c5',hat:'cap',sched:[[6,11,740,1572],[11,16,1000,1565],[16,21,900,1100]],line:['Forty years on the sea, and now I fish a lake. Best decision I ever made.','A lake\'s just a small sea that minds its manners.']},
+ {name:'Tess',col:'#6fae52',pants:'#3a3f55',hair:'#2a2a2a',skin:'#c98e62',hat:'brown',sched:[[8,12,3800,-160],[12,16,3760,-560],[16,21,3560,-225]],line:['I paint the valley every morning. It never sits still for me.','Pine Ridge at sunrise. Purple, gold, a little bit of fog. Perfect.']}];
+RES.forEach(r=>{const s0=r.sched[0];r.o=mk({kind:'towny',name:r.name,x:s0[2],y:s0[3],hx:s0[2],hy:s0[3],col:r.col,pants:r.pants,hair:r.hair,skin:r.skin||'#f0c9a0',hat:r.hat,talk:'res',hours:[r.sched[0][0],21]});r.cur=0});
+function resTick(){const h=hour();for(const r of RES){const i=r.sched.findIndex(s=>h>=s[0]&&h<s[1]);if(i<0||i===r.cur)continue;r.cur=i;const s=r.sched[i];r.o.hx=s[2];r.o.hy=s[3];if(dist(r.o.x,r.o.y,P.x,P.y)>700||dist(s[2],s[3],P.x,P.y)>700){r.o.x=s[2];r.o.y=s[3]}r.o.state='walk';r.o.tx=s[2];r.o.ty=s[3];r.o.t=20}}
+function resTalk(o){const r=RES.find(q=>q.o===o);if(!r)return false;if(!disg()&&!(S.vote&&S.vote.undisg)){scared(o);return true}talk([[r.name,pick(r.line)]]);return true}
+ODDJOBS.push(
+ {id:'o_juno',odd:1,who:'Juno',t:'Bee swarm',intro:[['Juno','Oh no, oh no. Half my bees swarmed off this morning! They love flowers. Big patches of flowers.'],['Juno','Could you look for them? And bring me some wild berries for syrup, to coax them home.']],
+  steps:[{d:'Find the bee swarm in the bird sanctuary flowers.',go:[460,1040],msg:'There they are, humming in the sanctuary flowers! They follow your honey-sweet fur back toward the woods.'},{d:'Bring Juno some wild berries.',bring:'berries'},{d:'Tell Juno her bees are coming home.',back:1}],
+  end:[['Juno','Listen to them! Happy as anything. Here, my best honey. You\'ve earned it twice over.']],coins:25,food:['honey','honey']},
+ {id:'o_pell',odd:1,who:'Captain Pell',t:'Message in a bottle',intro:[['Captain Pell','Ahoy, big fella. I tossed a bottle into the lake as a lad. Message for whoever found it. Never did hear back.'],['Captain Pell','The currents push everything toward that little island. Have a look? And catch me a creek fish while you\'re out. My knees can\'t do the woods.']],
+  steps:[{d:'Search the mystery island for an old bottle.',go:[620,1340],msg:'Wedged in the island reeds: a bottle with a curled-up note inside!'},{d:'Catch a fish in the Whispering Woods creek.',base:()=>S.stats.creek||0,cond:b=>(S.stats.creek||0)>b,msg:'A fine creek fish for the Captain.'},{d:'Bring the bottle to Captain Pell.',back:1}],
+  end:[['Captain Pell','"Dear finder: be kind to the lake." Ha! You already are. Take this ship in a bottle. Built it myself.']],coins:30,furn:'ship'},
+ {id:'o_tess',odd:1,who:'Tess',t:'Three views',intro:[['Tess','I\'m painting the whole valley on one canvas, but I can\'t get to the hard spots. You can describe them to me!'],['Tess','The hidden falls up the creek, and the view from the old fire lookout. Then come tell me everything.']],
+  steps:[{d:'Visit the hidden falls up the creek.',go:[2990,-430],msg:'You memorise every sparkle of the falls for Tess.'},{d:'Take in the view from the fire lookout.',go:[3150,1160],msg:'The whole valley spread out like a quilt. Tess will love this.'},{d:'Describe the views to Tess.',back:1}],
+  end:[['Tess','I can see it! Hold still while I finish… there. The first print is yours, for your den.']],coins:25,furn:'painting'});
+
+/* ---------- den visitors ---------- */
+const POND={x:530,y:320};for(let i=trees.length-1;i>=0;i--)if(dist(trees[i].x,trees[i].y,POND.x,POND.y)<110)trees.splice(i,1);TG=null;
+const visiting=()=>{const h=hour();return h>=7&&h<19};
+const VIS=[{kind:'deer',x:440,y:410,ang:2.6},{kind:'rabbit',x:385,y:455,ang:0},{kind:'rabbit',x:475,y:445,ang:3},{kind:'duck',x:510,y:315,ang:0},{kind:'duck',x:550,y:328,ang:3},{kind:'goat',x:240,y:96,ang:0}].map(v=>({...v,hx:v.x,hy:v.y,moving:false,hop:0,heart:0,buck:true,fed:0}));
+function drawPond(inView){if(!wildFriend('duck')||!inView(POND.x,POND.y,10))return;ctx.save();ctx.scale(1,T);ctx.fillStyle='#d8c48e';ctx.beginPath();ctx.ellipse(POND.x,POND.y,72,44,0,0,TAU);ctx.fill();ctx.fillStyle=SEASON===2?'#cfe4f0':'#3f86b8';ctx.beginPath();ctx.ellipse(POND.x,POND.y,62,36,0,0,TAU);ctx.fill();ctx.restore()}
+function visList(list,inView,t){if(!visiting())return;for(const v of VIS){if(!wildFriend(v.kind)||!inView(v.x,v.y,60))continue;if(v.kind==='duck'&&SEASON===2)continue;
+  if(v.kind!=='goat'){v.x=v.hx+Math.sin(t/2600+v.hy)*14;v.ang=Math.cos(t/2600+v.hy)>0?0:Math.PI;v.moving=Math.abs(Math.cos(t/2600+v.hy))>.3;if(v.kind==='rabbit')v.hop=v.moving?(t/110)%Math.PI:0}
+  v.heart=dist(v.x,v.y,P.x,P.y)<90?1:0;list.push({y:v.kind==='goat'?v.y+60:v.y,draw:()=>drawWild(v,t)})}}
+
+/* ---------- beaver dam ---------- */
+const DAM={x:2955,y:600};for(let i=trees.length-1;i>=0;i--)if(dist(trees[i].x,trees[i].y,DAM.x+5,DAM.y-40)<110)trees.splice(i,1);TG=null;const damInt=addInt({k:'beaver',x:DAM.x+50,y:DAM.y+20});
+const damStage=()=>S.dam.d0?Math.min(3,Math.floor((S.day-S.dam.d0)/3)):0;
+let creekSpot=-1;
+function drawDamGround(inView){if(!inView(DAM.x,DAM.y,20))return;const st=damStage();if(st<1)return;ctx.save();ctx.scale(1,T);ctx.fillStyle='#7a6a48';ctx.beginPath();ctx.ellipse(DAM.x+5,DAM.y-40,34+st*20,22+st*12,0,0,TAU);ctx.fill();ctx.fillStyle=SEASON===2?'#cfe4f0':'#3f86b8';ctx.beginPath();ctx.ellipse(DAM.x+5,DAM.y-40,26+st*20,16+st*12,0,0,TAU);ctx.fill();ctx.restore()}
+function drawDam(t){const st=damStage(),x=DAM.x,f=gy(DAM.y);const n=4+st*5;for(let i=0;i<n;i++){const a=(i/n-.5)*1.2;ctx.save();ctx.translate(x+(i/n-.5)*(30+st*14),f-4-(i%3)*4);ctx.rotate(a);rect('#6b4a2c',-14,-2,28,4);ctx.restore()}
+  if(st>=3){ell('#5c3f2a',x+38,f-50,22,14);ell('#6b4a2c',x+38,f-56,16,9);for(let i=0;i<5;i++){ctx.save();ctx.translate(x+26+i*6,f-56);ctx.rotate(i*.7);rect('#4a2e15',-8,-1.5,16,3);ctx.restore()}}
+  if(st>=1){const bx=x+Math.sin(t/1500)*(20+st*10),by=f-38+Math.cos(t/1500)*6;ell('#6b4528',bx,by,8,5);ell('#6b4528',bx+7,by-2,4,3.5);ell('#4a2e15',bx-9,by+1,5,2.5);ell('rgba(255,255,255,.4)',bx-12,by+2,6,2)}}
+prop(DAM.x,DAM.y,()=>drawDam(performance.now()),70);
+function beaverUI(){if(!S.dam.d0)S.dam.d0=S.day;const st=damStage();talk([['',['A few sticks are wedged across the creek. Teeth marks! Something busy lives here.','Two beavers are hauling branches. The dam is half built, and a little pool is forming upstream.','The dam is finished! The pool above it is deep and still. Big trout like that kind of water.','A proper beaver lodge now, and a wide pond upstream. The downstream pool has gone shallow, but the upstream pool is a trout paradise.'][st]]]);if(st>=3)S.stats.beaver=1;save()}
+function creekWeight(f){if(!fishCreek||damStage()<2)return 1;if(creekSpot===0)return f.k==='cutthroat'?3:f.k==='brook'?1.6:.8;if(creekSpot===1)return f.k==='sculpin'?2.2:f.k==='cutthroat'?.25:.6;return 1}
+
+/* ---------- valley journal ---------- */
+function jlog(txt){if(!S||!S.journal)return;let d=S.journal[S.journal.length-1];if(!d||d.d!==S.day){d={d:S.day,i:[]};S.journal.push(d);if(S.journal.length>80)S.journal.shift()}if(!d.i.includes(txt)&&d.i.length<12)d.i.push(txt)}
+{const _t=toast;const JRX=[/^Discovered: /,/complete: /i,/^Treasure found/,/trust you now/,/^Pinewick glows again/,/^Bought the /,/^New recipe/,/^Valley story: |^Side quest: /,/^Won the /,/^New goal: /,/^A storm lantern/];
+ toast=function(t){try{if(started&&JRX.some(r=>r.test(t)))jlog(String(t).replace(/^New goal: /,'New goal: '))}catch(e){}return _t(t)}}
+{const _b=badgePop;badgePop=function(i,more){try{jlog(`Earned the "${BADGES[i][1]}" badge.`)}catch(e){}return _b(i,more)}}
+{const _s=swimEnd;swimEnd=function(){_s();try{jlog(`Swam in the lake race (best ${S.swimBest} s).`)}catch(e){}}}
+{const _c=carveEnd;carveEnd=function(){_c();try{jlog('Entered the pumpkin carving contest.')}catch(e){}}}
+{const _r=roastEnd;roastEnd=function(){_r();try{jlog('Hosted a campfire night at the den.')}catch(e){}}}
+function journalDay(){if(S.jday===S.day)return;S.jday=S.day;const h=holiday(),w=weatherName();const L=[];if(h)L.push(HOLN[h]+'!');if(w==='Storm')L.push('A thunderstorm rolled in.');else if(w==='Heatwave')L.push('A scorching heatwave.');else if(S.rain)L.push(SEASON===2?'Snowy day.':'Rainy day.');if(merchDay(S.day))L.push('Juniper\'s wagon was in the valley.');if(!L.length)L.push(pick(['A quiet day in Hollowpine.','Sunny and calm.','Birdsong all morning.']));L.forEach(jlog)}
+function journalUI(page=0){const days=[...S.journal].reverse(),per=5,pages=Math.max(1,Math.ceil(days.length/per));page=clamp(page,0,pages-1);const sl=days.slice(page*per,page*per+per);
+  menu(`<h2 class="slab">Valley journal</h2><p style="color:var(--dim)">Moss's notes, written automatically each day.</p>${sl.map(d=>`<div class="row" style="display:block"><b>Day ${d.d} · ${SEASONS[Math.floor((d.d-1)/7)%4]}</b><ul style="margin:4px 0 0 18px;padding:0">${d.i.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')||'<p>Nothing yet. Go have an adventure!</p>'}
+  <div class="btns"><button class="btn alt" data-a="newer" ${page>0?'':'disabled'}>◀ Newer</button><span style="align-self:center;font-weight:800">${page+1}/${pages}</span><button class="btn alt" data-a="older" ${page<pages-1?'':'disabled'}>Older ▶</button><button class="btn" data-a="close">Close</button></div>`,a=>{if(a==='newer')journalUI(page-1);if(a==='older')journalUI(page+1)})}
+
+/* ---------- hooks ---------- */
+function s13Int(o){
+  if(o.k==='creekfish'){creekSpot=o.i;return false}
+  if(o.k==='fair'){fairUI(o.b);return true}
+  if(o.k==='beaver'){beaverUI();return true}
+  return false}
+function s13Skip(o){if(o.k==='fair')return !isFair();return false}
+function s13Label(o){if(o.k==='fair')return o.b.k==='prize'?`Prize booth (${S.tickets} tickets)`:`Play ${o.b.n.toLowerCase()}`+(S.fairPlayed[o.b.k]===S.day?' (played)':'');if(o.k==='beaver')return damStage()>=1?'Watch the beavers':'Look at the sticks in the creek';return ''}
+function s13Tick(){resTick();journalDay();if(!S.dam.d0&&dist(P.x,P.y,DAM.x,DAM.y)<260)S.dam.d0=S.day}
+BADGES.push(['fair','Fair champion','Win 10 prize tickets at the Valley Fair.',()=>(S.stats.tickets||0)>=10],['ribbon','Blue ribbon','Win the Blue ribbon at the prize booth.',()=>!!S.ribbon],['neighbour','Good neighbour','Finish Juno, Captain Pell and Tess\'s side quests.',()=>['o_juno','o_pell','o_tess'].every(k=>S.stories[k]&&S.stories[k].s>=3)],['visitors','Open house','Have a wild friend visit your den.',()=>VIS.some(v=>wildFriend(v.kind))],['beaver','Busy beavers','Watch the beaver lodge get finished.',()=>!!S.stats.beaver]);
+{const TS=new Set(trees);for(let i=props.length-1;i>=0;i--)if(props[i].tree&&!TS.has(props[i].tree))props.splice(i,1)}
 /* ---------- save ---------- */
 const KEY='pinecone-prowler-v1';
 function snapshot(){return {...JSON.parse(JSON.stringify(S)),px:P.x,py:P.y}}
 function save(){if(!started)return;try{localStorage.setItem(KEY,JSON.stringify(snapshot()))}catch(e){}}
-function migrate(d){if(!d.v||d.v<2){d.owned=d.hasCoat?['coat']:[];d.outfit=d.coat?'coat':'none';d.pick='coat';d.v=2;delete d.hasCoat;delete d.coat}if(d.v<3)d.v=3;if(d.v<4)d.v=4;if(d.v<5)d.v=5;if(d.v<6)d.v=6;if(d.v<7)d.v=7;if(d.v<8){d.v=8;d.tips={raid:1,hide:1,eat:1,disg:1,map:1}}if(d.v<9)d.v=9;if(d.v<10)d.v=10;if(d.v<11){const q={x:d.px,y:d.py};shiftOldPos(q);d.px=q.x;d.py=q.y;if(d.veh)['bike','truck'].forEach(k=>shiftOldPos(d.veh[k]));d.v=11}if(d.v<12)d.v=12;return d}
-function load(d){d=migrate({...d});const f=fresh();S={...f,...d};for(const k of ['stats','side','ev','veh','golf','fishLog','guide','dog','sab','ski','seen','arcade','home','pet','stamped','birds','birdT','badges','vote','tips','derby','trick','traded','furn','stories','storm','merch','recipes','found','friends','berry','wild','frag'])S[k]={...f[k],...(d[k]||{})};S.photos=Array.isArray(d.photos)?d.photos:[];S.catch=Array.isArray(d.catch)?d.catch:[];S.basket=Array.isArray(d.basket)?d.basket:[];S.loot=Array.isArray(d.loot)?d.loot:[];if(!d.v||d.paperDay==null)S.paperDay=S.day;if(S.riding&&!S.veh[S.riding])S.riding=null;S.q=clamp(S.q|0,0,QUESTS.length-1);P.x=d.px??330;P.y=d.py??330;if(!free(P.x,P.y,P.r)){P.x=330;P.y=330}started=true;restock();resetNPCs();renderSlots();pip.x=PIPAT[S.q][0];pip.y=PIPAT[S.q][1];if(S.dog.adopted){dog.x=P.x-30;dog.y=P.y+24}if(S.home.shelf)addShelf();applyEndingWorld();renderSlots()}
+function migrate(d){if(!d.v||d.v<2){d.owned=d.hasCoat?['coat']:[];d.outfit=d.coat?'coat':'none';d.pick='coat';d.v=2;delete d.hasCoat;delete d.coat}if(d.v<3)d.v=3;if(d.v<4)d.v=4;if(d.v<5)d.v=5;if(d.v<6)d.v=6;if(d.v<7)d.v=7;if(d.v<8){d.v=8;d.tips={raid:1,hide:1,eat:1,disg:1,map:1}}if(d.v<9)d.v=9;if(d.v<10)d.v=10;if(d.v<11){const q={x:d.px,y:d.py};shiftOldPos(q);d.px=q.x;d.py=q.y;if(d.veh)['bike','truck'].forEach(k=>shiftOldPos(d.veh[k]));d.v=11}if(d.v<12)d.v=12;if(d.v<13)d.v=13;return d}
+function load(d){d=migrate({...d});const f=fresh();S={...f,...d};for(const k of ['stats','side','ev','veh','golf','fishLog','guide','dog','sab','ski','seen','arcade','home','pet','stamped','birds','birdT','badges','vote','tips','derby','trick','traded','furn','stories','storm','merch','recipes','found','friends','berry','wild','frag','fairPlayed','dam'])S[k]={...f[k],...(d[k]||{})};S.photos=Array.isArray(d.photos)?d.photos:[];S.catch=Array.isArray(d.catch)?d.catch:[];S.basket=Array.isArray(d.basket)?d.basket:[];S.loot=Array.isArray(d.loot)?d.loot:[];if(!d.v||d.paperDay==null)S.paperDay=S.day;if(S.riding&&!S.veh[S.riding])S.riding=null;S.q=clamp(S.q|0,0,QUESTS.length-1);P.x=d.px??330;P.y=d.py??330;if(!free(P.x,P.y,P.r)){P.x=330;P.y=330}started=true;restock();resetNPCs();renderSlots();pip.x=PIPAT[S.q][0];pip.y=PIPAT[S.q][1];if(S.dog.adopted){dog.x=P.x-30;dog.y=P.y+24}if(S.home.shelf)addShelf();applyEndingWorld();renderSlots()}
 window.claude?.hot?.snapshot?.(()=>started?snapshot():null);
-window.__pp={P,WILD,feedWild,ODDJOBS,oddDone,STOPS,busUI,CAIRNS,caveUI,huntStart,FALLS,isFog,snowLine,get fishCreek(){return fishCreek},bram,BRIDGES,CREEK,potUI,campfireUI,startRoast,roastServe,get roast(){return roast},startSwim,swimStroke,get swimR(){return swimR},carveUI,startCarve,carveCut,get carve(){return carve},collectionUI,padTick,PAD,POTREC,ingCount,guestsAvail,bushes,ints,MA,FX,STORIES,storyTalk,storyOK,storyDone,storyTarget,merchHere,merchSpot,merchDay,merchUI,isHeat,isStorm,isStormNight,powerOut,bookUI,perfUI,storiesUI,ICEJOB,sleepAnim,mossAct,get book(){return book},MUS,holiday,isHalloweenNight,startQuiz,quizPick,get quiz(){return quiz},RANGERJOB,CHEFJOB,tradeUI,settingsUI,controlsUI,codeUI,controlsCard,get remapWait(){return remapWait},musicArea,hallDoor,goToVote,voteTally,activityUI,treesNear,get TG(){return TG},pip,rosa,BIRDS,BADGES,get birds(){return birds},binToggle,birdGuideUI,badgeUI,rosaUI,photoChoice,get SEASON(){return SEASON},vossS,PET,get arc(){return arc},get clinic(){return clinic},get police(){return police},startArc,arcKey,startClinic,clinicPick,startPolice,policePick,policeRadio,catalogUI,trophyUI,stomp,invCap,DIVES,ISLE,SET,get ski(){return ski},get dive(){return dive},startSki,startDive,mapUI,menuUI,paperUI,headlines,waterFree,dog,stu,traffic,DOCK,MSPOTS,get mush(){return mush},get truffles(){return truffles},get fishing(){return fishing},fishAct,bark,startFishing,nightId,holm,voss,EVID,snap,camToggle,golfSwing,get golf(){return golf},get caddy(){return caddy},get feast(){return feast},caddyPick,feastEat,feastUI,mount,dismount,rightClub,get photo(){return photo},get S(){return S},npcs,guards,ranger,deputy,grube,sites,interact,eat,load,migrate,cookTap,get cook(){return cook}};
+window.__pp={P,isFair,BOOTHS,fairUI,startFair,fairAct,get fairG(){return fairG},prizeUI,RES,VIS,DAM,damStage,beaverUI,journalUI,jlog,HOMES,get creekSpot(){return creekSpot},WILD,feedWild,ODDJOBS,oddDone,STOPS,busUI,CAIRNS,caveUI,huntStart,FALLS,isFog,snowLine,get fishCreek(){return fishCreek},bram,BRIDGES,CREEK,potUI,campfireUI,startRoast,roastServe,get roast(){return roast},startSwim,swimStroke,get swimR(){return swimR},carveUI,startCarve,carveCut,get carve(){return carve},collectionUI,padTick,PAD,POTREC,ingCount,guestsAvail,bushes,ints,MA,FX,STORIES,storyTalk,storyOK,storyDone,storyTarget,merchHere,merchSpot,merchDay,merchUI,isHeat,isStorm,isStormNight,powerOut,bookUI,perfUI,storiesUI,ICEJOB,sleepAnim,mossAct,get book(){return book},MUS,holiday,isHalloweenNight,startQuiz,quizPick,get quiz(){return quiz},RANGERJOB,CHEFJOB,tradeUI,settingsUI,controlsUI,codeUI,controlsCard,get remapWait(){return remapWait},musicArea,hallDoor,goToVote,voteTally,activityUI,treesNear,get TG(){return TG},pip,rosa,BIRDS,BADGES,get birds(){return birds},binToggle,birdGuideUI,badgeUI,rosaUI,photoChoice,get SEASON(){return SEASON},vossS,PET,get arc(){return arc},get clinic(){return clinic},get police(){return police},startArc,arcKey,startClinic,clinicPick,startPolice,policePick,policeRadio,catalogUI,trophyUI,stomp,invCap,DIVES,ISLE,SET,get ski(){return ski},get dive(){return dive},startSki,startDive,mapUI,menuUI,paperUI,headlines,waterFree,dog,stu,traffic,DOCK,MSPOTS,get mush(){return mush},get truffles(){return truffles},get fishing(){return fishing},fishAct,bark,startFishing,nightId,holm,voss,EVID,snap,camToggle,golfSwing,get golf(){return golf},get caddy(){return caddy},get feast(){return feast},caddyPick,feastEat,feastUI,mount,dismount,rightClub,get photo(){return photo},get S(){return S},npcs,guards,ranger,deputy,grube,sites,interact,eat,load,migrate,cookTap,get cook(){return cook}};
 
 /* ---------- input ---------- */
 const keys={};let joy={x:0,y:0},runBtn=false;
@@ -2422,7 +2581,7 @@ function report0(){const g=guards.filter(q=>!q.asleep).reduce((a,b)=>dist(a.x,a.
 function updateNPCs(dt){const h=hour(),late=h>=22||h<6,closed=h>=21||h<7,lunch=S.q>=8&&!S.ending&&h>=11&&h<14;
   for(const o of npcs){o.moving=false;if(o.sayT>0)o.sayT-=dt;if(farAway(o))continue;
     if(o.kind==='vip'){o.asleep=!lunch;if(o.asleep)continue}
-    else if(o.kind==='towny'||o.kind==='walker'){const off=o.hours?(h<o.hours[0]||h>=o.hours[1]||S.q<(o.needQ||0)||((o.name==='Big Earl'||o.name==='Deb')&&(S.ending==='park'||S.ending==='lodge'))):closed;if(off&&o.state!=='flee'){o.asleep=true;continue}o.asleep=false}
+    else if(o.kind==='towny'||o.kind==='walker'){const off=o.hours?((o.name==='Rallier'&&isFair())||h<o.hours[0]||h>=o.hours[1]||S.q<(o.needQ||0)||((o.name==='Big Earl'||o.name==='Deb')&&(S.ending==='park'||S.ending==='lodge'))):closed;if(off&&o.state!=='flee'){o.asleep=true;continue}o.asleep=false}
     else if(o.kind==='stake'){if(S.q!==17||o.state==='done'){o.asleep=true;continue}o.asleep=false}
     else if(o.kind==='pi'){const act=S.q>=10&&S.q<17&&h>=17&&h<22&&o.gone!==S.day;if(!act){o.asleep=true;o.state='patrol';continue}if(o.asleep){o.asleep=false;o.x=o.WP[0][0];o.y=o.WP[0][1];o.wp=1;o.state='patrol'}}
     if(o.kind==='camper'){
@@ -2454,7 +2613,7 @@ function updateNPCs(dt){const h=hour(),late=h>=22||h<6,closed=h>=21||h<7,lunch=S
   alert=Math.max(...npcs.map(o=>o.asleep?0:o.n));
   if(S.q===8&&lunch&&dist(P.x,P.y,grube.x,grube.y)<130&&(P.hidden||disg())&&grube.n<.5&&kendra.n<.5&&!guards.some(g=>g.state==='chase'))overhear();
 }
-function nearInt(){if(photo)return null;if(S.riding){if(S.riding==='canoe')for(let i=0;i<DIVES.length;i++)if(dist(P.x,P.y,DIVES[i].x,DIVES[i].y)<50)return {k:'dive',i,x:DIVES[i].x,y:DIVES[i].y};return {k:'dismount'}}let b=null,bd=48;for(const o of ints){if(o.k==='coat'&&has('coat'))continue;if(o.k==='tackle'&&S.side.truck!==1)continue;if(o.k==='stomp'&&!(S.q===17&&!S.stamped[o.i]))continue;if(o.k==='shelf'&&!S.home.shelf)continue;if(o.k==='sled'&&holiday()!=='festival')continue;if(o.k==='rjob'&&S.ending!=='park')continue;if(o.k==='chef'&&S.ending!=='lodge')continue;if(o.k==='trade'&&S.ending!=='mountain')continue;if(s10Skip(o))continue;if(s11Skip(o))continue;if(s12Skip(o))continue;const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}
+function nearInt(){if(photo)return null;if(S.riding){if(S.riding==='canoe')for(let i=0;i<DIVES.length;i++)if(dist(P.x,P.y,DIVES[i].x,DIVES[i].y)<50)return {k:'dive',i,x:DIVES[i].x,y:DIVES[i].y};return {k:'dismount'}}let b=null,bd=48;for(const o of ints){if(o.k==='coat'&&has('coat'))continue;if(o.k==='tackle'&&S.side.truck!==1)continue;if(o.k==='stomp'&&!(S.q===17&&!S.stamped[o.i]))continue;if(o.k==='shelf'&&!S.home.shelf)continue;if(o.k==='sled'&&holiday()!=='festival')continue;if(o.k==='rjob'&&S.ending!=='park')continue;if(o.k==='chef'&&S.ending!=='lodge')continue;if(o.k==='trade'&&S.ending!=='mountain')continue;if(s10Skip(o))continue;if(s11Skip(o))continue;if(s12Skip(o))continue;if(s13Skip(o))continue;const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}
   for(const o of npcs){if(o.asleep||!(o.talk||(o===gus&&S.side.parcel===1)||petOK(o)||trickOK(o)||storyOK(o)))continue;const d=dist(P.x,P.y,o.x,o.y);if(d<bd+4){bd=d;b=o}}
   {const d=dist(P.x,P.y,dog.x,dog.y);if(S.dog.adopted?(!b&&d<30):d<bd+6){bd=d;b=dog}}
   for(const m of mush){const d=dist(P.x,P.y,m.x,m.y);if(d<Math.min(bd,34)){bd=d;b={k:'mush',m,x:m.x,y:m.y}}}
@@ -2463,7 +2622,7 @@ function nearInt(){if(photo)return null;if(S.riding){if(S.riding==='canoe')for(l
   if((!b||b===dog)&&S.rod&&SEASON!==2){const fx=P.x+Math.cos(P.ang)*40,fy=P.y+Math.sin(P.ang)*40;if(inLake(fx,fy,0)&&!(inLake(P.x,P.y,-6)&&!(P.x>DOCK.x&&P.x<DOCK.x+DOCK.w)))b={k:'fish',x:fx,y:fy}}
   for(const k of ['bike','truck','canoe']){const v=S.veh[k];if(v){const d=dist(P.x,P.y,v.x,v.y);if(d<bd+12){bd=d;b={veh:k,x:v.x,y:v.y}}}}
   if(dist(P.x,P.y,pip.x,pip.y)<56&&(!b||b===dog||dist(P.x,P.y,pip.x,pip.y)<bd))b=pip;return b}
-const LABEL=o=>{const nd=disg()?'':' (NOT disguised!)';if(npcs.includes(o)&&petOK(o))return 'Ask '+o.name+' to sign the petition'+nd;if(o.k==='stomp')return S.stomp?'Stomp a fake footprint trail':'Fake trail spot (need joke slippers)';if(o.k==='shelf')return 'Look at your trophy shelf';if(s12Label(o))return s12Label(o);if(s11Label(o))return s11Label(o);if(s10Label(o))return s10Label(o);if(npcs.includes(o)&&storyOK(o))return (S.stories[storyFor(o).id]?'Talk to ':storyFor(o).odd?'Side quest: talk to ':'Story: talk to ')+o.name;if(o.k==='sled')return 'Go sledding (Winter Festival)';if(o.k==='rjob')return S.rangerDay===S.day?'Ranger booth (done today)':'Start your park ranger rounds';if(o.k==='chef')return 'Cook in the lodge kitchen';if(o.k==='trade')return 'Mountain trading post';if(npcs.includes(o)&&trickOK(o))return 'Trick or treat!';if(o.k==='hall')return S.q===23?'Enter the Town Hall for the vote':'Town Hall';if(o.k==='clinic')return 'Enter the Clinic'+nd;if(o.k==='police')return 'Enter the Police station'+nd;if(o.k==='arcade')return 'Enter Pixel Palace Arcade'+nd;if(o.k==='dismount')return (S.riding==='canoe'?'Get out of the canoe (near land)':'Hop off'+(S.riding==='bike'?' the bike':' the truck')+' · H to honk');if(o.veh)return o.veh==='bike'?'Ride bike':o.veh==='canoe'?'Get in the canoe':'Drive the pickup';if(o.k==='table')return o.stock.length?`Feast at picnic table (${o.stock.length})`:'Picnic table (empty)';if(o.k==='tackle')return 'Pick up Walt\'s tackle box';if(o.k==='album')return 'Open your desk (album, guidebook, fish log)';if(o===dog)return S.dog.adopted?'Command Biscuit':`Give Biscuit a snack (friendship ${S.dog.friend}/3)`;if(o.k==='mush')return S.guide[o.m.k]?'Pick '+MUSH[o.m.k].n:'Pick the mushroom';if(o.k==='truffle')return 'Dig up the truffle!';if(o.k==='fish')return 'Go fishing';if(o.k==='grill')return S.catch.length?`Cook your fish (${S.catch.length})`:'Campfire (catch fish to cook)';if(o.k==='dive')return S.scuba?'Dive here (scuba)':'Dive spot (needs scuba gear)';if(o.k==='lodge')return 'Enter the Ski Lodge'+nd;if(o.k==='lift')return 'Ride the chairlift and ski'+nd;if(o.k==='office')return 'Search the site office';if(o.k==='secret')return S.secret?'Grandpa Root\'s cairn':'Look under the mossy stones';if(o.k==='keys')return 'Hide the bulldozer keys';if(o.k==='lunch')return 'Swap the crew\'s lunch';if(o.k==='bait')return 'Enter Bait & Tackle'+nd;if(o.k==='golf')return 'Enter Pinewick Golf Club'+nd;if(o===pip)return 'Talk to Pip';if(o===gus)return 'Deliver the parcel to Gus'+nd;if(o.talk)return (S.q===20&&o.name===S.photog?'Ask '+o.name+' to take your portrait':'Talk to '+o.name)+nd;
+const LABEL=o=>{const nd=disg()?'':' (NOT disguised!)';if(npcs.includes(o)&&petOK(o))return 'Ask '+o.name+' to sign the petition'+nd;if(o.k==='stomp')return S.stomp?'Stomp a fake footprint trail':'Fake trail spot (need joke slippers)';if(o.k==='shelf')return 'Look at your trophy shelf';if(s13Label(o))return s13Label(o);if(s12Label(o))return s12Label(o);if(s11Label(o))return s11Label(o);if(s10Label(o))return s10Label(o);if(npcs.includes(o)&&storyOK(o))return (S.stories[storyFor(o).id]?'Talk to ':storyFor(o).odd?'Side quest: talk to ':'Story: talk to ')+o.name;if(o.k==='sled')return 'Go sledding (Winter Festival)';if(o.k==='rjob')return S.rangerDay===S.day?'Ranger booth (done today)':'Start your park ranger rounds';if(o.k==='chef')return 'Cook in the lodge kitchen';if(o.k==='trade')return 'Mountain trading post';if(npcs.includes(o)&&trickOK(o))return 'Trick or treat!';if(o.k==='hall')return S.q===23?'Enter the Town Hall for the vote':'Town Hall';if(o.k==='clinic')return 'Enter the Clinic'+nd;if(o.k==='police')return 'Enter the Police station'+nd;if(o.k==='arcade')return 'Enter Pixel Palace Arcade'+nd;if(o.k==='dismount')return (S.riding==='canoe'?'Get out of the canoe (near land)':'Hop off'+(S.riding==='bike'?' the bike':' the truck')+' · H to honk');if(o.veh)return o.veh==='bike'?'Ride bike':o.veh==='canoe'?'Get in the canoe':'Drive the pickup';if(o.k==='table')return o.stock.length?`Feast at picnic table (${o.stock.length})`:'Picnic table (empty)';if(o.k==='tackle')return 'Pick up Walt\'s tackle box';if(o.k==='album')return 'Open your desk (album, guidebook, fish log)';if(o===dog)return S.dog.adopted?'Command Biscuit':`Give Biscuit a snack (friendship ${S.dog.friend}/3)`;if(o.k==='mush')return S.guide[o.m.k]?'Pick '+MUSH[o.m.k].n:'Pick the mushroom';if(o.k==='truffle')return 'Dig up the truffle!';if(o.k==='fish')return 'Go fishing';if(o.k==='grill')return S.catch.length?`Cook your fish (${S.catch.length})`:'Campfire (catch fish to cook)';if(o.k==='dive')return S.scuba?'Dive here (scuba)':'Dive spot (needs scuba gear)';if(o.k==='lodge')return 'Enter the Ski Lodge'+nd;if(o.k==='lift')return 'Ride the chairlift and ski'+nd;if(o.k==='office')return 'Search the site office';if(o.k==='secret')return S.secret?'Grandpa Root\'s cairn':'Look under the mossy stones';if(o.k==='keys')return 'Hide the bulldozer keys';if(o.k==='lunch')return 'Swap the crew\'s lunch';if(o.k==='bait')return 'Enter Bait & Tackle'+nd;if(o.k==='golf')return 'Enter Pinewick Golf Club'+nd;if(o===pip)return 'Talk to Pip';if(o===gus)return 'Deliver the parcel to Gus'+nd;if(o.talk)return (S.q===20&&o.name===S.photog?'Ask '+o.name+' to take your portrait':'Talk to '+o.name)+nd;
   return {cooler:`Raid cooler (${o.stock?.length} left)`,basket:`Raid basket (${o.stock?.length} left)`,bin:'Rummage in trash bin (noisy!)',fridge:'Open fridge',wardrobe:'Open wardrobe',bed:'Sleep until morning',coat:'Grab the raincoat',shop:'Order food'+nd,board:'Read notice board',diner:'Enter Stack \'Em Diner'+nd,store:'Enter Brambles General Store'+nd,po:'Enter Post Office'+nd}[o.k]||''};
 let noiseT=0;
 function update(dt){
@@ -2487,7 +2646,7 @@ function update(dt){
   updateNPCs(dt);updateTraffic(dt);updateDog(dt);
   if(S.q===2&&S.fridge.length>=5)advance(3);if(S.q===3&&has('coat'))advance(4);if(S.q===6&&P.x>3540)advance(7);if(S.q===9&&S.cam)advance(10);if(S.deadline&&S.day>=S.deadline){if(S.q===22)advance(23);else if(S.q<22&&S.postDay!==S.day){S.postDay=S.day;S.deadline=S.day+3;toast('The council postponed the vote 3 days to finish its review.')}}if(S.q===15&&disg()&&hour()>=9&&hour()<17&&dist(P.x,P.y,4500,1070)<170)rallyScene();if(S.q===10&&evCount()>=3)advance(11);
   const q=PIPAT[S.q];pip.x+=(q[0]-pip.x)*Math.min(1,dt*1.2);pip.y+=(q[1]-pip.y)*Math.min(1,dt*1.2);
-  discover(dt);paperCheck();updateBirds(dt);badgeTick(dt);tipCheck(dt);holidayTick();s10Tick(dt);s12Tick(dt);
+  discover(dt);paperCheck();updateBirds(dt);badgeTick(dt);tipCheck(dt);holidayTick();s10Tick(dt);s12Tick(dt);s13Tick();
   if(performance.now()-lastSave>15000){lastSave=performance.now();save()}
 }
 
@@ -2545,7 +2704,7 @@ function render(t){
   ctx.drawImage(bg,0,0);ctx.drawImage(bgN,0,gy(YMIN));if(started)SEASON=seasonIdx();if(SEASON===2)drawWinterGround(vw,vh);
   const inView=(x,y,h=120)=>x>camX-140&&x<camX+vw+140&&gy(y)>camY-40&&gy(y)-h<camY+vh+40;
   coinSpots.forEach(c=>{if(!c.on||!inView(c.x,c.y,20))return;const s=Math.abs(Math.sin(t/300+c.x)),y=gy(c.y);ell(SH,c.x,y+1,5,2);ell('#d9a020',c.x,y-8,6*s+1,6.5);ell('#ffcf3c',c.x,y-8,5*s+.6,5.5)});
-  drawGroundSeason(t,inView);drawFrost(inView);
+  drawGroundSeason(t,inView);drawFrost(inView);drawPond(inView);drawDamGround(inView);
   ctx.save();ctx.scale(1,T);
   if(inView(den.x,den.y,80)){const rc=RUGS[S.home.rug]||RUGS.red;ctx.save();ctx.beginPath();ctx.ellipse(den.x+10,den.y+20,60,40,0,0,TAU);ctx.clip();ctx.fillStyle=rc[0];ctx.fillRect(den.x-60,den.y-30,140,100);ctx.fillStyle=rc[1];ctx.beginPath();ctx.ellipse(den.x+10,den.y+20,44,28,0,0,TAU);ctx.fill();if(S.home.rug==='plaid'){ctx.strokeStyle='rgba(70,30,20,.35)';ctx.lineWidth=4;for(let i=-4;i<=4;i++){ctx.beginPath();ctx.moveTo(den.x+10+i*14,den.y-30);ctx.lineTo(den.x+10+i*14,den.y+70);ctx.moveTo(den.x-60,den.y+20+i*10);ctx.lineTo(den.x+80,den.y+20+i*10);ctx.stroke()}}ctx.restore()}
   [[560,640],[640,820],[760,1000]].forEach(([sx,sy],i)=>{if(!S.stamped[i]||!inView(sx,sy,20))return;for(let j=0;j<4;j++){ctx.save();ctx.translate(sx-24+j*16,sy-12+j*10+(j%2?6:-6));ctx.rotate(.6);ctx.fillStyle='rgba(70,45,20,.55)';ctx.beginPath();ctx.ellipse(0,0,14,7,0,0,TAU);ctx.fill();ctx.restore()}});
@@ -2576,7 +2735,7 @@ function render(t){
   for(const k of ['bike','truck','canoe']){const v=S.veh[k];if(v&&S.riding!==k&&inView(v.x,v.y,80))list.push({y:v.y,draw:()=>drawVeh(k,v.x,v.y,v.a||0,false)})}
   if(started){list.push({y:MA.act==='sleep'?P.y+60:P.hidden&&P.bush?P.bush.y:P.y,draw:()=>S.riding?drawVeh(S.riding,P.x,P.y,P.ang,true):moss(t)});list.push({y:pip.y,draw:()=>crow(t)})}
   if(merchHere()){const m=merchSpot();if(inView(m.x,m.y,110))list.push({y:m.y,draw:()=>drawWagon(t)})}
-  wildList(list,inView,t);
+  wildList(list,inView,t);visList(list,inView,t);
   list.sort((a,b)=>a.y-b.y);for(const it of list)it.draw();drawLift(t);drawFX();drawPeek(t);drawZzz(t,inView);
   ctx.setTransform(1,0,0,1,0,0);
   if(night>0){dctx.setTransform(1,0,0,1,0,0);dctx.globalCompositeOperation='source-over';dctx.clearRect(0,0,dark.width,dark.height);dctx.fillStyle=`rgba(8,12,38,${night})`;dctx.fillRect(0,0,dark.width,dark.height);dctx.globalCompositeOperation='destination-out';
