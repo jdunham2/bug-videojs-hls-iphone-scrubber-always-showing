@@ -85,11 +85,13 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - **Polish**: first-time tips (raiding, hiding, eating, disguise, map and menu), a "What can I do now?" list in the menu (goal, open jobs and venues, birds, fishing, foraging, badges), and a tree spatial grid that speeds up collision and line-of-sight checks
 - Save format v8 with migration from all older saves (veteran saves skip the tips)
 
-## Possible next prompt (Slice 9, optional extras)
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 9: Extras and polish**.
-> 1. **Music and ambience**: a small procedural WebAudio soundtrack per area (campground, town, mountain, night), birdsong and rain ambience, all controlled by the volume slider plus a separate music slider.
-> 2. **Holidays**: a Halloween night (campers in costumes, so Moss blends in without a disguise), a winter festival with a sledding hill, and a spring fishing derby with a leaderboard.
-> 3. **More to do after the vote**: a park-ranger job (if the park ending), lodge chef job (if the lodge ending) or a mountain-hermit trading post (if the mountain ending).
-> 4. **Accessibility**: remappable keys, a high-contrast HUD option, a "relaxed" mode with slower detection, and larger touch buttons.
-> 5. **Quality**: a short in-game controls card on first launch, a save-export/import code in the menu, and a pass over coin balance.
-> Keep everything else working (save format v9 with migration). Test it in a headless browser.
+## Done — Slice 9: Extras and polish
+- Procedural WebAudio music per area (camp, town, mountain, night), plus birdsong, crickets and rain ambience. Main volume controls everything; a separate Music slider controls music.
+- Holidays on a 28-day calendar: Halloween night (day 14: campers in costumes don't react to Moss, trick-or-treat for candy), Winter Festival (day 18: lights, a tree, sledding on the golf hill), Spring Fishing Derby (day 26: leaderboard, prizes at 6 PM). The newspaper announces each one the day before.
+- Post-vote jobs: park ranger rounds (park ending), lodge kitchen (lodge ending), mountain trading post (mountain ending).
+- Accessibility: remappable keys, high-contrast HUD, relaxed mode (slower suspicion and chases), large touch buttons.
+- Controls card on first launch, save export/import code in Settings. Coin prices were reviewed against job pay and left unchanged.
+- Save format v9 with migration.
+
+## Possible next prompt (Slice 10, optional)
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 10: Seasons of the valley**. 1) A wandering travelling merchant who appears on random days with rare outfits and furniture. 2) Weather events: a thunderstorm night (power out in town, lanterns needed) and a summer heatwave (ice cream truck job). 3) Achievement-style "Valley stories": five short side stories, each with three steps, from townsfolk who now know Moss after the vote. 4) A photo album book you can flip through, with captions. 5) Performance pass for older phones (pause offscreen NPCs, cap the frame rate option). Keep everything working, save format v10 with migration, and test in a headless browser.
