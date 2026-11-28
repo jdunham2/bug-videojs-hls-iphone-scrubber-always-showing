@@ -93,5 +93,14 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - Controls card on first launch, save export/import code in Settings. Coin prices were reviewed against job pay and left unchanged.
 - Save format v9 with migration.
 
-## Possible next prompt (Slice 10, optional)
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 10: Seasons of the valley**. 1) A wandering travelling merchant who appears on random days with rare outfits and furniture. 2) Weather events: a thunderstorm night (power out in town, lanterns needed) and a summer heatwave (ice cream truck job). 3) Achievement-style "Valley stories": five short side stories, each with three steps, from townsfolk who now know Moss after the vote. 4) A photo album book you can flip through, with captions. 5) Performance pass for older phones (pause offscreen NPCs, cap the frame rate option). Keep everything working, save format v10 with migration, and test in a headless browser.
+## Done — Slice 10: Seasons of the valley + character animations
+- Juniper's travelling wagon: shows up on some days (the newspaper says where), 9 AM to 7 PM, at the Snack Shack, the town square or the ski lodge. Sells two rare outfits (Lumberjack flannel, Rain poncho), a storm lantern and den furniture (lamp, radio, fern, quilt).
+- Weather events: a thunderstorm on day 10 of each 28-day cycle (and some other rainy days) with lightning, thunder and a town blackout; hang lanterns on 4 dark lamp posts to relight Pinewick. A summer heatwave (days 4–5) drains hunger and stamina faster (swim to cool off) and brings an ice cream truck job.
+- Valley stories (after the vote): five 3-step side stories from Dot, Walt, Iris, Rosa and Olaf, tracked in the side panel, quest arrow and a "Valley stories" menu.
+- Photo book: flip through photos two pages at a time and write captions. The album now keeps 12 photos.
+- Performance options: pause far-away people, 30 fps cap, low detail.
+- Character animations: walk squash and lean, sprint dust, breathing and blinking, idle yawns, stretches, scratches and look-arounds, dancing to the den radio, eating with chomping cheeks and crumbs, rummaging when raiding, crouching in bushes with peeking eyes, startle hop with "!" when noticed, swim strokes and splashes, sleeping in bed with floating z's, coin sparkles, campers flailing when they flee, and z's over sleeping campers.
+- 4 new badges. Save format v10 with migration.
+
+## Possible next prompt (Slice 11, optional)
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 11: Friends and festivals**. 1) Moss can invite friends (Pip, Biscuit, and townsfolk from finished valley stories) to a campfire night at the den with marshmallow roasting. 2) A cooking pot at the den: combine 2 ingredients (fish, mushrooms, berries, apples) into new recipes that give bigger hunger boosts. 3) A summer lake swim race and an autumn pumpkin-carving contest. 4) A collection log for every food, outfit and furniture item with "found/not found" silhouettes. 5) Gamepad support (move, use, eat, menu). Keep everything working, save format v11 with migration, and test in a headless browser.
