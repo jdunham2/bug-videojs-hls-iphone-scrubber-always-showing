@@ -1671,7 +1671,7 @@ const fighterUnlocked = i => i >= CUSTOM0 ? true : i < STORY_FIGHTERS ? i < STAR
 const fighterCount = () => CHARS.filter((c, i) => fighterUnlocked(i)).length;
 function bumpProg(key, val) {
   if (NET.role === 'guest') return;
-  addCoins({ kos: 1, bosses: 25, vs: 30, rush: 150 }[key] || 0);
+  addCoins(({ kos: 1, bosses: 25, vs: 30, rush: 150 }[key] || 0) * (G.coinMult || 1));
   const before = CHARS.map((c, i) => fighterUnlocked(i));
   if (key === 'wave' || key === 'combo') G.prog[key] = Math.max(G.prog[key] || 0, val); else G.prog[key] = (G.prog[key] || 0) + 1;
   try { localStorage.setItem('stickSquadProg', JSON.stringify(G.prog)); } catch (e) { }
@@ -5928,6 +5928,7 @@ function banner(text, sub, col, life = 110) { G.banner = { text, sub, col, t: 0,
 // ---------------------------------------------------------------- flow
 function startGame(startStage = 0, mode = 'story') {
   initAudio();
+  G.coinMult = 1;
   G.startStage = startStage; G.mode = mode; G.won = false; G.rushIdx = -1; G.rushT = 0; G.newBestRush = false; G.bossOv = null; G.miniOv = null; G.cut = null;
   G.state = 'play'; G.wave = mode === 'rush' ? 0 : startStage * 5; G.stage = -1; G.frame = 0; G.enemies = []; G.projs = []; G.pickups = []; G.portals = []; G.ghosts = [];
   G.overT = 0; G.teamSuperT = 0; G.boss = null; G.crateT = 700; G.newBest = false; parts = []; texts = []; slowT = 0; timeScale = 1;
@@ -5938,6 +5939,7 @@ function startGame(startStage = 0, mode = 'story') {
     G.vs = { round: 1, wins: [0, 0] }; G.crateT = 500; musIntensity = 2; startVersusRound();
   } else if (mode === 'campaign') beginChapter(startStage);
   else nextWave();
+  applySnacks();
 }
 function playScene(id, then) {
   const sc = SCENES[id];
@@ -9505,7 +9507,7 @@ function toggle3D() {
   try { SFX.menu(); } catch (e) {}
 }
 function draw3DHint(in3D) {
-  if (G.state === 'title') { const b = TOWN_BTN; ctx.fillStyle = '#3aa04a'; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = '#24242a'; ctx.lineWidth = 4; ctx.strokeRect(b.x, b.y, b.w, b.h); txt('STICK TOWN', b.x + b.w / 2, b.y + 24, 27, '#fff', 'center', F1); txt('click or press T', b.x + b.w / 2, b.y + 47, 13, '#e8ffe0', 'center', F2); txt('COINS: ' + G.coins, b.x + b.w / 2, b.y + b.h + 22, 18, '#a07a10', 'center', F1); }
+  if (G.state === 'title') { const b = TOWN_BTN; ctx.fillStyle = '#3aa04a'; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = '#24242a'; ctx.lineWidth = 4; ctx.strokeRect(b.x, b.y, b.w, b.h); txt('STICK TOWN', b.x + b.w / 2, b.y + 24, 27, '#fff', 'center', F1); txt('click or press T', b.x + b.w / 2, b.y + 47, 13, '#e8ffe0', 'center', F2); txt('COINS: ' + G.coins, b.x + b.w / 2, b.y + b.h + 22, 18, '#a07a10', 'center', F1); if (TS.boost && TS.boost.length) txt('SNACK POWER READY!', b.x + b.w / 2, b.y + b.h + 44, 16, '#e2342c', 'center', F1); }
   if (G.state === 'title') txt('PRESS V FOR 3D VIEW' + (V3.on ? ' (ON)' : ''), 40, 112, 22, V3.on ? '#e2342c' : '#2a6ae6', 'left', F1);
   if (G.state === 'pause') txt('V = ' + (V3.on ? '2D' : '3D') + ' VIEW', W / 2, H - 40, 26, '#fff', 'center', F1);
   if (V3.msgT > 0) { V3.msgT--; ctx.save(); ctx.globalAlpha = Math.min(1, V3.msgT / 20); ctx.fillStyle = 'rgba(20,20,26,0.8)'; ctx.fillRect(W / 2 - 330, 120, 660, 64); txt(V3.msg, W / 2, 152, 34, '#ffd23a', 'center', F1); ctx.restore(); }
@@ -9650,12 +9652,39 @@ const TOWN_SHOPS = [
   { k: 'homes', n: 'HOME SHOP', x: 0, z: -32, r: 0, w: 12, d: 9, h: 7, col: '#ff9a3a', roof: '#a0401a' },
   { k: 'decor', n: 'DECOR SHOP', x: 20, z: -30, r: 0, w: 12, d: 9, h: 6, col: '#ff6aa0', roof: '#a02a6a' },
   { k: 'pets', n: 'PET SHOP', x: -32, z: 4, r: Math.PI / 2, w: 11, d: 8, h: 6, col: '#3aa04a', roof: '#1a6a2a' },
+  { k: 'garage', n: 'GARAGE', x: -32, z: -14, r: Math.PI / 2, w: 11, d: 8, h: 6, col: '#8a8a9a', roof: '#3a3a4a' },
+  { k: 'hats', n: 'HAT SHOP', x: -20, z: 32, r: Math.PI, w: 10, d: 8, h: 6, col: '#c04ad0', roof: '#6a1a7a' },
+  { k: 'snacks', n: 'SNACK SHACK', x: 20, z: 32, r: Math.PI, w: 10, d: 8, h: 5.5, col: '#ffd23a', roof: '#e2342c' },
+  { k: 'fireworks', n: 'FIREWORKS', x: 36, z: -29, r: 0, w: 9, d: 6, h: 5, col: '#e2342c', roof: '#1a3a8a' },
+];
+const TOWN_HATS = [
+  { k: 'party', n: 'PARTY HAT', p: 30 }, { k: 'cap', n: 'BASEBALL CAP', p: 40 }, { k: 'beanie', n: 'BEANIE', p: 40 }, { k: 'flower', n: 'FLOWER CROWN', p: 60 },
+  { k: 'cowboy', n: 'COWBOY HAT', p: 80 }, { k: 'chef', n: 'CHEF HAT', p: 80 }, { k: 'bunny', n: 'BUNNY EARS', p: 100 }, { k: 'cat', n: 'CAT EARS', p: 100 },
+  { k: 'tophat', n: 'TOP HAT', p: 150 }, { k: 'pirate', n: 'PIRATE HAT', p: 180 }, { k: 'santa', n: 'SANTA HAT', p: 200 }, { k: 'wizard', n: 'WIZARD HAT', p: 250 },
+  { k: 'viking', n: 'VIKING HELMET', p: 300 }, { k: 'propeller', n: 'PROPELLER CAP', p: 350, d: 'The propeller really spins!' }, { k: 'halo', n: 'HALO', p: 500 }, { k: 'crown', n: 'GOLD CROWN', p: 800 },
+];
+const TOWN_RIDES = [
+  { k: 'skate', n: 'SKATEBOARD', p: 150, spd: 1.5, d: '1.5x faster' }, { k: 'scooter', n: 'SCOOTER', p: 250, spd: 1.65, d: '1.65x faster' },
+  { k: 'bike', n: 'BIKE', p: 400, spd: 1.85, d: '1.85x faster' }, { k: 'horse', n: 'PONY', p: 600, spd: 1.9, d: 'Giddy up! 1.9x faster' },
+  { k: 'gokart', n: 'GO-KART', p: 900, spd: 2.1, d: 'Vroom! 2.1x faster' }, { k: 'hover', n: 'HOVERBOARD', p: 1400, spd: 2.3, d: 'Floats above the ground! 2.3x faster' },
+  { k: 'jetpack', n: 'JETPACK', p: 2000, spd: 2, d: 'Fly super high jumps! 2x faster' },
+];
+const TOWN_SNACKS = [
+  { k: 'shake', n: 'INK SHAKE', p: 30, d: 'Start your next fight with a FULL ink meter' }, { k: 'soda', n: 'SPEEDY SODA', p: 35, d: 'Start your next fight with SUPER SPEED' },
+  { k: 'cookie', n: 'SHIELD COOKIE', p: 40, d: 'Start your next fight with a 3-hit shield' }, { k: 'wings', n: 'HOT WINGS', p: 45, d: 'Start your next fight with FIRE FISTS' },
+  { k: 'burger', n: 'MEGA BURGER', p: 50, d: 'Get +40 max health in your next fight' }, { k: 'gummy', n: 'GIANT GUMMY', p: 60, d: 'Start your next fight GIANT size' },
+  { k: 'fortune', n: 'LUCKY FORTUNE COOKIE', p: 100, d: 'Earn DOUBLE coins in your next fight' }, { k: 'sundae', n: 'SUPER SUNDAE', p: 200, d: 'Full ink, shield, +40 health, speed AND double coins!' },
+];
+const TOWN_FW = [
+  { k: 'rocket', n: 'ROCKETS x5', p: 25, d: 'Press F in town to launch one' }, { k: 'rocket20', n: 'ROCKETS x20', p: 80, d: 'A big box of rockets' },
+  { k: 'rainbow', n: 'RAINBOW ROCKETS x5', p: 60, d: 'Bursts in every color!' }, { k: 'show', n: 'MEGA SHOW (launch now!)', p: 150, d: 'A huge fireworks show right now' },
 ];
 const NAME_IDEAS = ['MY GUY', 'SUPER ME', 'CAPTAIN COOL', 'NINJA KID', 'MEGA MAX', 'STAR DUDE', 'THUNDER TOM', 'ZIPPY', 'BLAZE BOY', 'DOODLE KING', 'SPEEDY SAM', 'ROCKET RAY'];
 const TOWN = { built: false, ui: null, sel: 0, scroll: 0, tab: 'homes', msg: '', msgT: 0, prompt: null, px: 0, pz: 8, py: 0, vy: 0, face: 0, walkT: 0, field: 0, slot: 0, hold: 0, holdDir: 0, pad: {}, coins: [], coinT: 0, pet: null, petX: 0, petZ: 10, petY: 0 };
-let TS = { homes: [null, null, null, null, null, null, null, null], decor: [], pack: {}, pets: [], pet: null };
+let TS = { homes: [null, null, null, null, null, null, null, null], decor: [], pack: {}, pets: [], pet: null, hats: [], hat: null, rides: [], ride: null, boost: [], fw: { rocket: 0, rainbow: 0 } };
 try { const t = JSON.parse(localStorage.getItem('stickSquadTown') || 'null'); if (t) TS = Object.assign(TS, t); } catch (e) { }
 while (TS.homes.length < TOWN_LOTS.length) TS.homes.push(null);
+for (const [k, v] of [['hats', []], ['rides', []], ['boost', []], ['fw', { rocket: 0, rainbow: 0 }]]) if (!TS[k]) TS[k] = v;
 function townSave() { try { localStorage.setItem('stickSquadTown', JSON.stringify(TS)); } catch (e) { } }
 function townMsg(m, t) { TOWN.msg = m; TOWN.msgT = t || 120; }
 
@@ -9863,7 +9892,11 @@ function refreshAvatar() {
   if (!TG) return;
   if (TOWN.av) TG.S.remove(TOWN.av.g);
   const c = CHARS[G.players[0].ci] || CHARS[0];
-  TOWN.av = makeStick(c.col, c.back || c.col, Math.min(1.3, c.size || 1), c.acc); TG.S.add(TOWN.av.g);
+  const sz = Math.min(1.3, c.size || 1);
+  TOWN.av = makeStick(c.col, c.back || c.col, sz, TS.hat ? null : c.acc); TG.S.add(TOWN.av.g);
+  if (TS.hat) addHat(TOWN.av.g, TS.hat, sz);
+  if (TOWN.rideObj) TG.S.remove(TOWN.rideObj);
+  TOWN.rideObj = TS.ride && TOWN.riding ? buildRide(TS.ride) : null; if (TOWN.rideObj) TG.S.add(TOWN.rideObj);
   if (TOWN.petObj) TG.S.remove(TOWN.petObj);
   TOWN.petObj = TS.pet ? buildPet(TS.pet) : null; if (TOWN.petObj) { TOWN.petX = TOWN.px + 2; TOWN.petZ = TOWN.pz + 2; TG.S.add(TOWN.petObj); }
 }
@@ -9897,7 +9930,7 @@ function townPad() {
     const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, bt = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
     now.lx = Math.abs(ax) > 0.25 ? ax : 0; now.ly = Math.abs(ay) > 0.25 ? ay : 0;
     now.up = bt(12) || ay < -0.6; now.down = bt(13) || ay > 0.6; now.left = bt(14) || ax < -0.6; now.right = bt(15) || ax > 0.6;
-    now.ok = bt(1); now.jump = bt(0); now.back = bt(0); now.pack = bt(3); now.pick = bt(2); now.leave = bt(9);
+    now.ok = bt(1); now.jump = bt(0); now.back = bt(0); now.pack = bt(3); now.pick = bt(2); now.leave = bt(9); now.ride = bt(4); now.fw = bt(5);
   }
   const hit = k => now[k] && !P[k];
   const out = { lx: now.lx || 0, ly: now.ly || 0, hit, held: k => !!now[k] };
@@ -9920,10 +9953,12 @@ function townKey(code) {
   else if (code === 'Space' || code === 'KeyL') townJump();
   else if (code === 'KeyB') { TOWN.ui = 'pack'; TOWN.sel = 0; }
   else if (code === 'KeyX') townPickUp();
+  else if (code === 'KeyR') townToggleRide();
+  else if (code === 'KeyF') launchFirework();
   else if (code === 'Escape') leaveTown(false);
   else if (code === 'KeyM') musicOn = !musicOn;
 }
-function townJump() { if (TOWN.py <= 0.001) { TOWN.vy = 0.3; try { SFX.jump && SFX.jump(); } catch (e) { } } }
+function townJump() { if (TOWN.py <= 0.001) { TOWN.vy = TOWN.riding && TS.ride === 'jetpack' ? 0.62 : 0.3; try { SFX.jump && SFX.jump(); } catch (e) { } } }
 function townNearShop() {
   for (const sh of TOWN_SHOPS) if (Math.hypot(TOWN.px - sh.dx, TOWN.pz - sh.dz) < 3.2) return sh;
   return null;
@@ -9932,6 +9967,88 @@ function townNearDecor() {
   let best = null, bd = 2.6;
   TS.decor.forEach((d, i) => { const dd = Math.hypot(d.x - TOWN.px, d.z - TOWN.pz); if (dd < bd) { bd = dd; best = i; } });
   return best;
+}
+
+// ---------- hats, rides, snacks, fireworks
+const RIDE_POSE = { skate: [0.2, 0, 0], scooter: [0.22, 0, -1.1], bike: [0.55, -1.2, -1.2], horse: [1.05, -1.3, -1.0], gokart: [0.25, -1.45, -1.1], hover: [0.5, 0, 0], jetpack: [0, 0, 0] };
+function addHat(g, k, s) {
+  const hy = 2.05 * s, P = (geo, col, x, y, z, sx, sy, sz, ry, rx, rz) => tPart(g, geo, col, x * s, hy + y * s, z * s, sx * s, sy * s, sz * s, ry, rx, rz);
+  if (k === 'party') { P('cone', '#ff4a8a', 0, 0.42, 0, 0.2, 0.5, 0.2); P('sph', '#ffd23a', 0, 0.7, 0, 0.07, 0.07, 0.07); }
+  else if (k === 'cap') { P('sph', '#2a7ae6', 0, 0.1, 0, 0.31, 0.2, 0.31); P('box', '#2a7ae6', 0, 0.14, 0.28, 0.4, 0.04, 0.28); }
+  else if (k === 'beanie') { P('sph', '#e2342c', 0, 0.1, 0, 0.32, 0.24, 0.32); P('sph', '#ffffff', 0, 0.34, 0, 0.08, 0.08, 0.08); }
+  else if (k === 'flower') ['#ff4a8a', '#ffd23a', '#c04aff', '#ff8a2a', '#4a8aff', '#ffffff'].forEach((c, i) => { const a = i / 6 * Math.PI * 2; P('sph', c, Math.cos(a) * 0.27, 0.18, Math.sin(a) * 0.27, 0.08, 0.08, 0.08); });
+  else if (k === 'cowboy') { P('cyl', '#8a5a2a', 0, 0.2, 0, 0.5, 0.04, 0.5); P('cyl', '#8a5a2a', 0, 0.36, 0, 0.24, 0.3, 0.24); }
+  else if (k === 'chef') { P('cyl', '#ffffff', 0, 0.3, 0, 0.26, 0.3, 0.26); P('sph', '#ffffff', 0, 0.5, 0, 0.32, 0.18, 0.32); }
+  else if (k === 'bunny') for (const x of [-0.13, 0.13]) { P('sph', '#ffffff', x, 0.55, 0, 0.07, 0.3, 0.05); P('sph', '#ffb0c8', x, 0.55, 0.03, 0.04, 0.22, 0.03); }
+  else if (k === 'cat') for (const x of [-0.17, 0.17]) P('cone', '#3a3a44', x, 0.32, 0, 0.09, 0.2, 0.06);
+  else if (k === 'tophat') { P('cyl', '#1a1a1a', 0, 0.22, 0, 0.36, 0.04, 0.36); P('cyl', '#1a1a1a', 0, 0.45, 0, 0.22, 0.44, 0.22); P('cyl', '#e2342c', 0, 0.3, 0, 0.225, 0.07, 0.225); }
+  else if (k === 'pirate') { P('box', '#1a1a1a', 0, 0.28, 0, 0.7, 0.2, 0.3); P('sph', '#1a1a1a', 0, 0.3, 0, 0.26, 0.2, 0.26); P('sph', '#ffffff', 0, 0.32, 0.17, 0.06, 0.06, 0.03); }
+  else if (k === 'santa') { P('cyl', '#ffffff', 0, 0.2, 0, 0.32, 0.08, 0.32); P('cone', '#e2342c', 0.05, 0.48, 0, 0.27, 0.5, 0.27, 0, 0, -0.3); P('sph', '#ffffff', 0.2, 0.68, 0, 0.08, 0.08, 0.08); }
+  else if (k === 'wizard') { P('cyl', '#4a2a9a', 0, 0.2, 0, 0.45, 0.04, 0.45); P('cone', '#4a2a9a', 0, 0.62, 0, 0.26, 0.8, 0.26); P('sph', '#ffd23a', 0.12, 0.55, 0.16, 0.05, 0.05, 0.02); P('sph', '#ffd23a', -0.08, 0.75, 0.1, 0.04, 0.04, 0.02); }
+  else if (k === 'viking') { P('sph', '#9aa0aa', 0, 0.1, 0, 0.32, 0.25, 0.32); for (const d of [-1, 1]) P('cone', '#f2e8d0', d * 0.36, 0.3, 0, 0.07, 0.32, 0.07, 0, 0, -d * 0.7); }
+  else if (k === 'propeller') { P('sph', '#e2342c', 0, 0.1, 0, 0.31, 0.2, 0.31); P('cyl', '#555', 0, 0.32, 0, 0.02, 0.2, 0.02); const pr = new THREE.Group(); pr.position.set(0, hy + 0.42 * s, 0); pr.userData.prop = true; tPart(pr, 'box', '#ffd23a', 0, 0, 0, 0.7 * s, 0.03 * s, 0.1 * s); tPart(pr, 'box', '#2a7ae6', 0, 0, 0, 0.1 * s, 0.03 * s, 0.7 * s); g.add(pr); }
+  else if (k === 'halo') { const h = new THREE.Mesh(new THREE.TorusGeometry(0.22 * s, 0.03 * s, 6, 20), tGlow('#ffe680')); h.position.set(0, hy + 0.45 * s, 0); h.rotation.x = Math.PI / 2; g.add(h); }
+  else if (k === 'crown') { P('cyl', '#f2c230', 0, 0.28, 0, 0.24, 0.2, 0.24); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; P('cone', '#f2c230', Math.cos(a) * 0.2, 0.45, Math.sin(a) * 0.2, 0.05, 0.14, 0.05); } P('sph', '#e2342c', 0, 0.3, 0.24, 0.05, 0.05, 0.03); }
+}
+function buildRide(k) {
+  const g = new THREE.Group(), wheel = (x, y, z, r, col) => { const w = tPart(g, 'cyl', col || '#222', x, y, z, r, 0.08, r, 0, 0, Math.PI / 2); w.userData.wheel = true; return w; };
+  if (k === 'skate') { tPart(g, 'box', '#e2342c', 0, 0.15, 0, 0.4, 0.05, 1.1); for (const z of [-0.38, 0.38]) for (const x of [-0.15, 0.15]) wheel(x, 0.06, z, 0.06, '#ffd23a'); }
+  else if (k === 'scooter') { tPart(g, 'box', '#2a7ae6', 0, 0.15, 0, 0.3, 0.05, 1.1); wheel(0, 0.08, 0.5, 0.09); wheel(0, 0.08, -0.5, 0.09); tPart(g, 'cyl', '#888', 0, 0.75, 0.52, 0.03, 1.2, 0.03); tPart(g, 'cyl', '#222', 0, 1.35, 0.52, 0.03, 0.6, 0.03, 0, 0, Math.PI / 2); }
+  else if (k === 'bike') { for (const z of [-0.6, 0.6]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 8, 20), tMat('#222')); w.position.set(0, 0.35, z); w.rotation.y = Math.PI / 2; w.castShadow = true; g.add(w); } tPart(g, 'box', '#3aa04a', 0, 0.6, 0, 0.06, 0.06, 1.1, 0, 0.2); tPart(g, 'box', '#222', 0, 0.85, -0.25, 0.2, 0.06, 0.3); tPart(g, 'cyl', '#888', 0, 0.85, 0.55, 0.03, 0.6, 0.03); tPart(g, 'cyl', '#222', 0, 1.15, 0.55, 0.03, 0.6, 0.03, 0, 0, Math.PI / 2); }
+  else if (k === 'horse') { const H = '#a0703a'; tPart(g, 'sph', H, 0, 1.0, 0, 0.42, 0.42, 0.85); tPart(g, 'cyl', H, 0, 1.45, 0.75, 0.16, 0.7, 0.16, 0, 0.6); tPart(g, 'sph', H, 0, 1.75, 1.0, 0.18, 0.18, 0.32); for (const x of [-0.22, 0.22]) for (const z of [-0.55, 0.55]) tPart(g, 'cyl', H, x, 0.4, z, 0.08, 0.8, 0.08); tPart(g, 'box', '#3a2a1a', 0, 1.62, 0.55, 0.05, 0.5, 0.5, 0, 0.6); tPart(g, 'cyl', '#3a2a1a', 0, 0.95, -0.95, 0.06, 0.6, 0.06, 0, -0.6); tPart(g, 'box', '#e2342c', 0, 1.4, -0.05, 0.6, 0.06, 0.5); }
+  else if (k === 'gokart') { tPart(g, 'box', '#e2342c', 0, 0.3, 0, 1.1, 0.25, 1.8); tPart(g, 'box', '#1a1a1a', 0, 0.55, -0.4, 0.6, 0.5, 0.15); tPart(g, 'cyl', '#222', 0, 0.65, 0.45, 0.2, 0.04, 0.2, 0, Math.PI / 3); for (const x of [-0.6, 0.6]) for (const z of [-0.65, 0.65]) wheel(x, 0.22, z, 0.22); tPart(g, 'box', '#ffd23a', 0, 0.44, 0.9, 1.1, 0.06, 0.06); }
+  else if (k === 'hover') { tPart(g, 'cyl', '#4a4a5a', 0, 0.1, 0, 0.55, 0.08, 0.55); const gl = tPart(g, 'cyl', '#fff', 0, 0.04, 0, 0.5, 0.04, 0.5); gl.material = tGlow('#5ac8ff'); }
+  else if (k === 'jetpack') { for (const x of [-0.13, 0.13]) { tPart(g, 'cyl', '#9aa0aa', x, 1.35, -0.2, 0.1, 0.5, 0.1); const f = tPart(g, 'cone', '#fff', x, 0.95, -0.2, 0.07, 0.3, 0.07, 0, Math.PI); f.material = tGlow('#ff8a1a'); f.userData.flame = true; } tPart(g, 'box', '#e2342c', 0, 1.4, -0.15, 0.3, 0.4, 0.12); }
+  return g;
+}
+function townToggleRide() {
+  if (!TS.ride) { townMsg('BUY A RIDE AT THE GARAGE FIRST!', 100); return; }
+  TOWN.riding = !TOWN.riding; refreshAvatar(); try { SFX.menu(); } catch (e) { }
+}
+function applySnacks() {
+  if (NET.role === 'guest' || !TS.boost || !TS.boost.length) return;
+  const b = new Set(TS.boost); if (b.has('sundae')) ['shake', 'cookie', 'burger', 'soda', 'fortune'].forEach(k => b.add(k));
+  const ps = G.players.filter(p => p.joined && (G.mode !== 'versus' || p.idx === 0));
+  for (const p of ps) {
+    if (b.has('burger')) { p.maxHp += 40; p.hp = p.maxHp; p.hpGhost = p.maxHp; }
+    if (b.has('shake')) p.meter = 100;
+    if (b.has('cookie')) p.shield = Math.max(p.shield || 0, 3);
+    if (b.has('gummy')) setPower(p, 'giant'); else if (b.has('wings')) setPower(p, 'fire'); else if (b.has('soda')) setPower(p, 'haste');
+    if (b.has('wings') && b.has('gummy')) p.burnT = 0;
+  }
+  if (b.has('fortune')) G.coinMult = 2;
+  floatText(W / 2, 220, 'SNACK POWER!', '#ff8a2a', 44, 90);
+  TS.boost = []; townSave();
+}
+const FW_COLS = ['#ff4a6a', '#ffd23a', '#4ad07a', '#4a8aff', '#c04aff', '#ff8a2a', '#ffffff'];
+function launchFirework(free, x0, z0) {
+  if (!free) {
+    if (TS.fw.rainbow > 0) { TS.fw.rainbow--; free = 'rainbow'; } else if (TS.fw.rocket > 0) { TS.fw.rocket--; free = 'rocket'; }
+    else { townMsg('NO FIREWORKS! BUY SOME AT THE FIREWORKS STAND', 110); return; }
+    townSave();
+  }
+  const r = tPart(TG.S, 'sph', '#fff', x0 ?? TOWN.px + (Math.random() - 0.5) * 10, 1.5, z0 ?? TOWN.pz - 10 - Math.random() * 8, 0.18, 0.35, 0.18); r.material = tGlow('#ffe680'); r.castShadow = false;
+  (TOWN.fx = TOWN.fx || []).push({ m: r, vx: (Math.random() - 0.5) * 0.04, vy: 0.2 + Math.random() * 0.05, vz: (Math.random() - 0.5) * 0.04, life: 48 + Math.random() * 14, rocket: true, rainbow: free === 'rainbow', col: pick(FW_COLS) });
+  tone(300, 0.5, 'sawtooth', 0.04, 900);
+}
+function updateFireworks() {
+  if (TOWN.showQ > 0 && G.titleT % 12 === 0) { TOWN.showQ--; launchFirework(Math.random() < 0.5 ? 'rainbow' : 'rocket', TOWN.px + (Math.random() - 0.5) * 30, TOWN.pz - 10 - Math.random() * 20); }
+  const fx = TOWN.fx || [];
+  for (let i = fx.length - 1; i >= 0; i--) {
+    const f = fx[i]; f.m.position.x += f.vx; f.m.position.y += f.vy; f.m.position.z += f.vz; f.life--;
+    if (f.rocket) { f.vy *= 0.985; if (f.life <= 0) { TG.S.remove(f.m); fx.splice(i, 1); burstFirework(f); } continue; }
+    f.vy -= 0.006; f.vx *= 0.97; f.vz *= 0.97; f.vy *= 0.97; const k = Math.max(0.01, f.life / f.max); f.m.scale.setScalar(0.32 * k + 0.03);
+    if (f.life <= 0) { TG.S.remove(f.m); fx.splice(i, 1); }
+  }
+}
+function burstFirework(f) {
+  const p = f.m.position, n = (TOWN.fx || []).length > 700 ? 20 : 56;
+  for (let i = 0; i < n; i++) {
+    const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u), sp = 0.2 + Math.random() * 0.08;
+    const m = new THREE.Mesh(TG.sph, tGlow(f.rainbow ? FW_COLS[i % FW_COLS.length] : f.col)); m.position.copy(p); m.scale.setScalar(0.3); TG.S.add(m);
+    TOWN.fx.push({ m, vx: Math.cos(a) * r * sp, vy: u * sp, vz: Math.sin(a) * r * sp, life: 60 + Math.random() * 20, max: 80 });
+  }
+  noise(0.4, 0.3, 800, 'lowpass', 300);
 }
 
 // ---------- townsfolk
@@ -10027,12 +10144,36 @@ function townList() {
   if (TOWN.ui === 'homes') return TOWN_HOMES;
   if (TOWN.ui === 'decor') return TOWN_DECOR;
   if (TOWN.ui === 'pets') return TOWN_PETS.concat([{ k: null, n: 'NO PET', p: 0 }]);
+  if (TOWN.ui === 'hats') return TOWN_HATS.concat([{ k: null, n: 'NO HAT', p: 0 }]);
+  if (TOWN.ui === 'garage') return TOWN_RIDES.concat([{ k: null, n: 'WALK (NO RIDE)', p: 0 }]);
+  if (TOWN.ui === 'snacks') return TOWN_SNACKS;
+  if (TOWN.ui === 'fireworks') return TOWN_FW;
   if (TOWN.ui === 'pack') { const L = TOWN_DECOR.filter(d => TS.pack[d.k] > 0); return L.length ? L : [{ k: null, n: 'BACKPACK IS EMPTY', p: 0 }]; }
   return [];
 }
 function townChoose() {
   const it = townList()[TOWN.sel]; if (!it) return;
   const buy = () => { if (G.coins < it.p) { townMsg('NOT ENOUGH COINS! BEAT ENEMIES OR GRAB TOWN COINS', 120); try { SFX.hurt && SFX.hurt(); } catch (e) { } return false; } addCoins(-it.p); try { SFX.banner(); } catch (e) { } return true; };
+  if (TOWN.ui === 'hats') {
+    if (!it.k) { TS.hat = null; townSave(); refreshAvatar(); townMsg('HAT OFF!', 80); return; }
+    if (!TS.hats.includes(it.k)) { if (!buy()) return; TS.hats.push(it.k); }
+    TS.hat = it.k; townSave(); refreshAvatar(); townMsg('LOOKING GOOD IN YOUR ' + it.n + '!', 120); return;
+  }
+  if (TOWN.ui === 'garage') {
+    if (!it.k) { TS.ride = null; TOWN.riding = false; townSave(); refreshAvatar(); townMsg('BACK TO WALKING', 80); return; }
+    if (!TS.rides.includes(it.k)) { if (!buy()) return; TS.rides.push(it.k); }
+    TS.ride = it.k; TOWN.riding = true; townSave(); refreshAvatar(); townMsg('RIDING YOUR ' + it.n + '! PRESS R TO HOP ON OR OFF', 150); return;
+  }
+  if (TOWN.ui === 'snacks') {
+    if (TS.boost.includes(it.k)) { townMsg('YOU ALREADY HAVE THAT READY FOR YOUR NEXT FIGHT!', 110); return; }
+    if (!buy()) return; TS.boost.push(it.k); townSave(); townMsg('YUM! ' + it.n + ' WILL POWER YOU UP IN YOUR NEXT FIGHT', 150); return;
+  }
+  if (TOWN.ui === 'fireworks') {
+    if (!buy()) return;
+    if (it.k === 'show') { TOWN.ui = null; for (let i = 0; i < 12; i++) TOWN.showQ = (TOWN.showQ || 0) + 1; townMsg('LOOK UP AT THE SKY!', 150); return; }
+    if (it.k === 'rainbow') TS.fw.rainbow += 5; else TS.fw.rocket += it.k === 'rocket20' ? 20 : 5;
+    townSave(); townMsg('FIREWORKS READY! PRESS F IN TOWN TO LAUNCH', 140); return;
+  }
   if (TOWN.ui === 'homes') {
     const lot = TS.homes.indexOf(null); if (lot < 0) { townMsg('ALL ' + TOWN_LOTS.length + ' LOTS ARE FULL!', 100); return; }
     if (!buy()) return; TS.homes[lot] = it.k; townSave(); rebuildHomes(); townMsg('YOU BOUGHT A ' + it.n + '! FIND IT ON YOUR STREET', 160);
@@ -10116,10 +10257,11 @@ function townUpdate() {
     if (keys.has('KeyW') || keys.has('ArrowUp')) mz -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) mz += 1;
     mx += pad.lx; mz += pad.ly;
     const m = Math.hypot(mx, mz), c = CHARS[G.players[0].ci] || CHARS[0];
-    if (m > 0.1) { const sp = 0.2 * Math.min(1.25, c.spd || 1) * (keys.has('ShiftLeft') ? 1.5 : 1); TOWN.px += mx / Math.max(1, m) * sp; TOWN.pz += mz / Math.max(1, m) * sp; const tf = Math.atan2(mx, mz); let df = tf - TOWN.face; while (df > Math.PI) df -= Math.PI * 2; while (df < -Math.PI) df += Math.PI * 2; TOWN.face += df * 0.25; TOWN.walkT += 0.25 * Math.min(1, m); }
+    const rideSp = TOWN.riding && TS.ride ? TOWN_RIDES.find(r => r.k === TS.ride).spd : 1;
+    if (m > 0.1) { const sp = 0.2 * Math.min(1.25, c.spd || 1) * (keys.has('ShiftLeft') ? 1.5 : 1) * rideSp; TOWN.px += mx / Math.max(1, m) * sp; TOWN.pz += mz / Math.max(1, m) * sp; const tf = Math.atan2(mx, mz); let df = tf - TOWN.face; while (df > Math.PI) df -= Math.PI * 2; while (df < -Math.PI) df += Math.PI * 2; TOWN.face += df * 0.25; TOWN.walkT += 0.25 * Math.min(1, m); }
     else TOWN.walkT *= 0.85;
     townPush();
-    if (pad.hit('jump')) townJump(); if (pad.hit('ok')) townInteract(); if (pad.hit('pack')) { TOWN.ui = 'pack'; TOWN.sel = 0; } if (pad.hit('pick')) townPickUp(); if (pad.hit('leave')) leaveTown(false);
+    if (pad.hit('jump')) townJump(); if (pad.hit('ok')) townInteract(); if (pad.hit('pack')) { TOWN.ui = 'pack'; TOWN.sel = 0; } if (pad.hit('pick')) townPickUp(); if (pad.hit('ride')) townToggleRide(); if (pad.hit('fw')) launchFirework(); if (pad.hit('leave')) leaveTown(false);
     // battle gate
     if (Math.abs(TOWN.px) < 3 && Math.abs(TOWN.pz - 30) < 0.8) { leaveTown(true); pad.commit(); return; }
   }
@@ -10136,7 +10278,13 @@ function townUpdate() {
     const sw = Math.sin(TOWN.walkT) * Math.min(0.8, Math.abs(TOWN.walkT) > 0.01 ? 0.8 : 0) * (TOWN.py > 0 ? 0.3 : 1);
     av.legL.rotation.x = sw; av.legR.rotation.x = -sw; av.armL.rotation.x = -sw * 0.8; av.armR.rotation.x = sw * 0.8;
     const air = TOWN.py > 0.05; av.armL.rotation.z = air ? -0.9 : -0.12; av.armR.rotation.z = air ? 0.9 : 0.12;
+    const R = TOWN.riding && TS.ride, lift = R ? RIDE_POSE[TS.ride][0] : 0;
+    av.g.position.y = TOWN.py + lift + (R === 'hover' ? Math.sin(G.titleT * 0.1) * 0.08 : 0);
+    if (R) { const pz = RIDE_POSE[R]; if (pz[1]) { av.legL.rotation.x = av.legR.rotation.x = pz[1]; } else if (R !== 'jetpack') { av.legL.rotation.x = 0; av.legR.rotation.x = 0.15; } if (pz[2]) { av.armL.rotation.x = av.armR.rotation.x = pz[2]; } }
+    if (TOWN.rideObj) { TOWN.rideObj.position.set(TOWN.px, TOWN.py + (R === 'hover' ? 0.35 + Math.sin(G.titleT * 0.1) * 0.08 : 0), TOWN.pz); TOWN.rideObj.rotation.y = TOWN.face; if (R === 'jetpack') TOWN.rideObj.children.forEach(o => { if (o.userData.flame) o.scale.y = 0.4 + Math.random() * (TOWN.py > 0.05 ? 0.8 : 0.3); }); TOWN.rideObj.traverse(o => { if (o.userData.wheel) o.rotation.x += TOWN.walkT ? 0.3 : 0; }); }
+    av.g.traverse(o => { if (o.userData.prop) o.rotation.y += 0.4; });
   }
+  updateFireworks();
   // pet
   if (TOWN.petObj) {
     const tx = TOWN.px - Math.sin(TOWN.face) * 1.8 + Math.cos(TOWN.face) * 1.2, tz = TOWN.pz - Math.cos(TOWN.face) * 1.8 - Math.sin(TOWN.face) * 1.2;
@@ -10156,9 +10304,11 @@ function renderTown() {
   if (V3.c3.width !== canvas.width || V3.c3.height !== canvas.height) R.setSize(canvas.width, canvas.height, false);
   V3.c3.style.width = canvas.style.width; V3.c3.style.height = canvas.style.height;
   const tx = TOWN.px, tz = TOWN.pz, close = TOWN.ui === 'creator';
-  const want = new THREE.Vector3(tx, 9.5 + TOWN.py * 0.5, tz + 14);
+  const blocked = townBlocked(tx, tz + 14, 1.5) || townBlocked(tx, tz + 9, 1.5) || (Math.abs(tx) < 6 && tz + 14 > 29 && tz < 30);
+  const want = blocked ? new THREE.Vector3(tx, 17 + TOWN.py * 0.5, tz + 7) : new THREE.Vector3(tx, 9.5 + TOWN.py * 0.5, tz + 14);
   if (!TOWN.camInit) { cam.position.copy(want); TOWN.camInit = true; } else cam.position.lerp(want, 0.12);
-  cam.lookAt(tx, 1.4 + TOWN.py * 0.5, tz);
+  TOWN.look = (TOWN.look || 0) + (((TOWN.fx && TOWN.fx.length) || TOWN.showQ > 0 ? 4.5 : 0) - (TOWN.look || 0)) * 0.05;
+  cam.lookAt(tx, 1.4 + TOWN.py * 0.5 + TOWN.look, tz - TOWN.look);
   TG.sun.position.set(tx + 30, 60, tz + 25); TG.sun.target.position.set(tx, 0, tz); TG.sun.target.updateMatrixWorld();
   R.setScissorTest(false); R.setViewport(0, 0, canvas.width, canvas.height); R.setClearColor(0x0d0d10); R.clear();
   R.setScissorTest(true); R.setViewport(offX, offY, W * scale, H * scale); R.setScissor(offX, offY, W * scale, H * scale);
@@ -10173,7 +10323,7 @@ function drawTown2D() {
   townPanel(20, 20, 300, 64); coinIcon(56, 52, 18); txt('' + G.coins, 86, 64, 36, '#24242a', 'left', F1);
   txt('STICK TOWN', 800, 58, 44, '#ffffff', 'center', F1, '#24242a', 8);
   if (!TOWN.ui) {
-    txt('WASD/ARROWS walk · SPACE jump · E enter shop / talk · B backpack · X pick up · ESC leave', 800, 884, 18, '#ffffff', 'center', F2, '#24242a', 5);
+    txt('WASD walk · SPACE jump · E shop/talk · B backpack · R ride · F fireworks · X pick up · ESC leave', 800, 884, 18, '#ffffff', 'center', F2, '#24242a', 5);
     if (TOWN.prompt) { townPanel(800 - 300, 760, 600, 60); txt(TOWN.prompt, 800, 800, 26, '#e2342c', 'center', F1); }
   }
   if (TOWN.ui && TOWN.ui !== 'creator') drawTownShop();
@@ -10181,9 +10331,10 @@ function drawTown2D() {
   if (TOWN.msgT > 0) { ctx.save(); ctx.globalAlpha = Math.min(1, TOWN.msgT / 20); const my = TOWN.ui ? 812 : 110; townPanel(800 - 420, my, 840, 60); txt(TOWN.msg, 800, my + 40, 26, '#2a6ae6', 'center', F1); ctx.restore(); }
 }
 function drawTownShop() {
-  const list = townList(), title = { homes: 'HOME SHOP', decor: 'DECOR SHOP', pets: 'PET SHOP', pack: 'YOUR BACKPACK' }[TOWN.ui];
+  const list = townList(), title = { homes: 'HOME SHOP', decor: 'DECOR SHOP', pets: 'PET SHOP', pack: 'YOUR BACKPACK', hats: 'HAT SHOP', garage: 'GARAGE', snacks: 'SNACK SHACK', fireworks: 'FIREWORKS STAND' }[TOWN.ui];
   townPanel(380, 110, 840, 690); txt(title, 800, 168, 48, '#e2342c', 'center', F1);
-  txt(TOWN.ui === 'pack' ? 'Pick something and press ENTER to place it in front of you' : TOWN.ui === 'homes' ? 'Homes are built on YOUR STREET (east of the fountain). Lots free: ' + TS.homes.filter(h => !h).length + ' / ' + TOWN_LOTS.length : TOWN.ui === 'decor' ? 'Decorations go in your backpack. Press B in town to place them anywhere!' : 'Pets follow you around town. Pick one you own to switch pets.', 800, 204, 19, '#555', 'center', F2);
+  const sub = { hats: 'Hats you buy are yours to keep. Pick one you own to wear it.', garage: 'Rides make you zoom around town. Press R to hop on or off.', snacks: 'Snacks power you up at the start of your NEXT fight!' + (TS.boost.length ? '  Ready: ' + TS.boost.length : ''), fireworks: 'Rockets: ' + TS.fw.rocket + ' · Rainbow: ' + TS.fw.rainbow + ' · Press F in town to launch!' }[TOWN.ui];
+  if (sub) txt(sub, 800, 204, 19, '#555', 'center', F2); else txt(TOWN.ui === 'pack' ? 'Pick something and press ENTER to place it in front of you' : TOWN.ui === 'homes' ? 'Homes are built on YOUR STREET (east of the fountain). Lots free: ' + TS.homes.filter(h => !h).length + ' / ' + TOWN_LOTS.length : TOWN.ui === 'decor' ? 'Decorations go in your backpack. Press B in town to place them anywhere!' : 'Pets follow you around town. Pick one you own to switch pets.', 800, 204, 19, '#555', 'center', F2);
   const per = 11; TOWN.scroll = clamp(TOWN.scroll, Math.max(0, TOWN.sel - per + 1), TOWN.sel);
   list.slice(TOWN.scroll, TOWN.scroll + per).forEach((it, j) => {
     const i = j + TOWN.scroll, y = 236 + j * 46, on = i === TOWN.sel;
@@ -10193,9 +10344,12 @@ function drawTownShop() {
     if (TOWN.ui === 'pack') right = it.k ? 'x' + TS.pack[it.k] : '';
     else if (TOWN.ui === 'pets' && it.k && TS.pets.includes(it.k)) right = TS.pet === it.k ? 'WITH YOU' : 'OWNED';
     else if (TOWN.ui === 'homes' && TS.homes.includes(it.k)) right = 'OWNED · ' + it.p;
+    else if (TOWN.ui === 'hats' && it.k && TS.hats.includes(it.k)) right = TS.hat === it.k ? 'WEARING' : 'OWNED';
+    else if (TOWN.ui === 'garage' && it.k && TS.rides.includes(it.k)) right = TS.ride === it.k ? 'RIDING' : 'OWNED';
+    else if (TOWN.ui === 'snacks' && TS.boost.includes(it.k)) right = 'READY!';
     else if (TOWN.ui === 'decor' && TS.pack[it.k]) right = 'HAVE ' + TS.pack[it.k] + ' · ' + it.p;
     else if (it.p) right = '' + it.p;
-    if (right) { txt(right, 1150, y + 30, 24, it.p > G.coins && !/OWNED|WITH|x/.test(right) ? '#c0392b' : '#24242a', 'right', F1); if (/^\d/.test(right) || /· \d/.test(right)) coinIcon(1170, y + 21, 11); }
+    if (right) { txt(right, 1150, y + 30, 24, it.p > G.coins && !/OWNED|WITH|WEARING|RIDING|READY|x/.test(right) ? '#c0392b' : '#24242a', 'right', F1); if (/^\d/.test(right) || /· \d/.test(right)) coinIcon(1170, y + 21, 11); }
   });
   const cur = list[TOWN.sel]; if (cur && cur.d) txt(cur.d, 800, 752, 22, '#2a6ae6', 'center', F2);
   txt('▲▼ choose · ENTER ' + (TOWN.ui === 'pack' ? 'place' : TOWN.ui === 'pets' ? 'buy / pick' : 'buy') + ' · ESC close', 800, 784, 20, '#24242a', 'center', F2);

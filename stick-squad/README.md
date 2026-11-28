@@ -10,10 +10,14 @@ A hand-drawn, local co-op stick-figure brawler. One player uses the **keyboard**
 - **Home Shop:** buy 22 homes (Tent, Beach Hut, Log Cabin, Red Barn, Cottage, Igloo, Windmill, Treehouse, Lighthouse, Mushroom House, Haunted House, Candy House, Giant Cake, Pirate Ship, Rocket House, Pyramid, UFO House, Mansion, Ice Palace, Volcano Lair, Castle, Skyscraper). They get built on your street, east of the fountain (16 lots).
 - **Decor Shop:** buy 35 decorations (trees, palm trees, cacti, flowers, lamps, picnic tables, a slide, a sandbox, a treasure chest, a giant donut, a dino statue, a trampoline and a bouncy castle you can bounce on, a spinning Ferris wheel, a floating hot air balloon, a golden statue of you and more). Press **B** to open your backpack and place them anywhere, and **X** to pick them back up.
 - **Pet Shop:** buy one of 20 pets (Duck, Frog, Turtle, Hamster, Bunny, Puppy, Kitty, Slime, Piggy, Fox, Owl, Monkey, Penguin, Panda, Robo Dog, Little Ghost, Baby T-Rex, Baby Dragon, Unicorn, Phoenix) that follows you around town. The Owl, Ghost, Dragon, Unicorn and Phoenix fly.
+- **Hat Shop:** 16 hats for your town fighter (party hat, cowboy hat, wizard hat, Viking helmet, a propeller cap that spins, a halo, a gold crown and more).
+- **Garage:** 7 rides that make you zoom around town (skateboard, scooter, bike, pony, go-kart, hoverboard and a jetpack for super high jumps). Press **R** to hop on or off.
+- **Snack Shack:** snacks that power you up at the start of your next fight (full ink, super speed, a shield, fire fists, +40 health, giant size, or double coins). The Super Sundae does almost everything at once!
+- **Fireworks Stand:** buy rockets and rainbow rockets, then press **F** in town to launch them, or buy a Mega Show for a big fireworks display.
 - **Townsfolk:** 16 people walk around town (some with their pets). They wave when you walk by, and you can press **E** next to them to chat.
 - **Battle Gate:** walk through it to go fight.
 
-Town controls: WASD or arrows to walk (Shift to run), Space to jump, E to enter a shop, B for your backpack, X to pick up, Esc to leave. A controller works too (stick to walk, A to enter, B to jump or go back, X backpack, Y pick up, + to leave). Everything you buy and make is saved in your browser. The town uses three.js, so it needs an internet connection.
+Town controls: WASD or arrows to walk (Shift to run), Space to jump, E to enter a shop or talk, B for your backpack, X to pick up, R to ride, F for fireworks, Esc to leave. A controller works too (stick to walk, A to enter, B to jump or go back, X backpack, Y pick up, + to leave). Everything you buy and make is saved in your browser. The town uses three.js, so it needs an internet connection.
 
 **3D view:** press **V** at any time to switch between the normal hand-drawn view and a 3D view. The game plays exactly the same, but the fighters, floor and platforms are drawn in 3D with lighting and shadows, and the camera gently follows the action. It works on every stage and in every mode (including online). The 3D view loads three.js from the internet, so it needs a connection.
 
