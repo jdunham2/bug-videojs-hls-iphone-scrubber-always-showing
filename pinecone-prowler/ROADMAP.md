@@ -39,18 +39,29 @@ An original cozy stealth game: you are **Moss**, a shy forest giant raiding Holl
 - **Story**: Grube's bulldozer crew (Big Earl and Deb by day, Stu the watchman by night) clears a forest corner east of the den. Hide the bulldozer keys and swap the crew's lunch in one night to win back a day on the council countdown
 - Save format v4 with migration from all older saves; touch controls gained a Bark button
 
-## Next prompt (Slice 5)
+## Done — Slice 5: The mountain and the lake
+- **The mountain**: the world now extends 1000 units north. A snowy mountain sits above the golf course with snowy pines, rocky peaks, a groomed ski run, a trail from the golf club, the **Ski Lodge** (Ingrid) and a **chairlift** with moving chairs and a liftie (Olaf). The rest of the new northern strip is dense forest
+- **Skiing**: rent skis (6, for the day). Downhill time trial from the chairlift: steer through 12 gates, avoid trees, penalties for misses and crashes, prizes and a best-time board. **Ski patrol** job (once per day): rescue 6 stranded skiers on the way down. Hot cocoa at the lodge. Rain days become snow on the mountain
+- **Canoe**: rent at the Bait & Tackle (5, for the day); it waits at the end of the dock. Paddle anywhere on the lake; get out near any shore, the dock or the island
+- **Swimming**: Moss can wade and swim in the shallow ring of the lake (slow, drains stamina; when it runs out he scrambles ashore). Deep water stays off limits
+- **Mystery island** in the middle of the lake (canoe only): Grandpa Root's cairn with his journal, 40 coins and a golden pinecone
+- **Scuba**: buy gear (20). Paddle to the three bubbling dive spots and dive: side-view underwater mini-game with an air meter, lost items to collect, a grumpy pike that steals air, and a sunken treasure chest (60 coins + antique compass). Marge buys lake finds
+- **Story**: search the site office trailer at night for Grube's bribe letter to Dr. Holm, mail it to the Gazette through Iris, and the council vote is delayed a week
+- **The Pinewick Gazette**: a newspaper each morning with a headline built from what happened yesterday (bribe scandal, sabotage, Voss photos, the species review) plus local filler, weather and the countdown
+- **Map (M)**: the whole world with the highway, buildings, trees, discovered places (12 to find), you, Biscuit and your goal star. **Menu (Esc)**: sound volume, newspaper on/off, reread today's paper, save now, start over. Map and Menu buttons sit beside the backpack
+- Save format v5 with migration from all older saves; settings are stored separately
+
+## Next prompt (Slice 6)
 Copy this into the next session:
 
-> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 5: The mountain and the lake**.
-> 1. **Ski hill**: extend the map north of the golf course with a snowy mountain (the 3/4 renderer gets snow ground, snowy pines and a chairlift with moving chairs). Rent skis at a ski lodge; a downhill mini-game (steer through gates, avoid trees, time trial with a best-time board) and a disguised-Moss-only ski patrol job.
-> 2. **Canoe & swimming**: rent a canoe at the Bait & Tackle and paddle around the lake (water becomes walkable while in the canoe); Moss can swim slowly in shallow water with a stamina drain. Hidden island in the lake with a secret.
-> 3. **Scuba diving**: buy scuba gear; dive spots on the lake show an underwater view mini-game (collect lost items, avoid running out of air) with a sunken treasure chest.
-> 4. **Story**: Gideon Grube tries to buy off Dr. Holm; find his bribe letter in the site office at night and mail it to the Pinewick Gazette (via Iris) to turn the town against him. Add a newspaper headline screen each morning showing world events.
-> 5. **Quality of life**: a map screen (M) showing the whole world, the loop road, and discovered places; a save/settings menu with sound volume.
-> Keep the 3/4 diorama renderer, the loop road and traffic, drag-to-eat, art style, HUD, save format (bump to v5 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 6 when done.
+> Continue building Pinecone Prowler in `pinecone-prowler/index.html` (read `ROADMAP.md` first). Add **Slice 6: Town life**.
+> 1. **Two new jobs in Pinewick**: a **doctor's office** (Dr. Patel's clinic: a diagnosis mini-game where you match symptoms to remedies under a timer) and the **police desk** at a new Pinewick police station (sort incoming reports, answer the radio, and quietly "lose" any Bigfoot sighting reports, which lowers how often guards are alerted the next day).
+> 2. **Arcade**: a 1990s arcade on Main Street with 3 playable retro cabinets drawn on canvas (an original snake-style game, a falling-blocks game and a top-down racer), high-score tables with initials, and tokens bought with coins.
+> 3. **Home upgrades**: spend coins to upgrade the den (bigger fridge, a second backpack row, a trophy shelf that shows your best fish, golden pinecone, ski time and golf score, wallpaper and rug choices).
+> 4. **Town reacts to the scandal**: a protest rally against the resort in the town square; townsfolk wear "SAVE HOLLOWPINE" buttons; a petition quest where Moss (disguised) collects 10 signatures from NPCs around the map, each with a small favour.
+> 5. **Story**: Grube tries one last trick: he hires Hank Voss to stake out the den itself. Lead Voss on a wild-goose chase with Biscuit and planted fake footprints so he photographs a moose instead.
+> Keep the 3/4 diorama renderer, the loop road and traffic, the north mountain, drag-to-eat, map/menu/newspaper, art style, HUD, save format (bump to v6 with migration) and touch controls. Test it in a headless browser and give me the prompt for Slice 7 when done.
 
 ## Later slices (ideas)
-- Slice 6: More jobs (doctor's office, police desk), arcade cabinets in town
 - Slice 7: Birdwatching with photo scoring (reuse the camera); badge collection
 - Slice 8: Council vote finale and save Hollowpine

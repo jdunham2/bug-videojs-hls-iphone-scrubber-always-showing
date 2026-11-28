@@ -138,7 +138,13 @@ body.cammode #bottom{visibility:hidden}
 #bag2{color:var(--ink);font-weight:800}
 #fishCv{display:block;width:min(100%,calc((88vh - 230px)*.9));min-width:220px;margin:8px auto 0;aspect-ratio:9/10;border-radius:10px;touch-action:none}
 #fkMsg{font-weight:900;min-height:44px;margin:6px 0 0;color:var(--moss)}
-@media(max-width:640px){#stats{width:165px;padding:6px 10px}#quest{order:3;width:100%;max-width:340px}#eye{min-width:0;flex:1}#clock{font-size:15px}.slot{width:40px;height:40px}.slot svg{width:30px;height:30px}.ing{font-size:13px;padding:4px 6px}.ing kbd{display:none}}
+#skiCv,#diveCv{display:block;width:min(100%,calc((88vh - 240px)*.8));min-width:220px;margin:8px auto 0;border-radius:10px;touch-action:none}
+#skiCv{aspect-ratio:3/4}#diveCv{aspect-ratio:6/7}
+#dvMsg,#skMsg{font-weight:900;min-height:44px;margin:6px 0 0;color:var(--moss)}
+#brow{display:flex;gap:6px;align-items:center;pointer-events:auto}
+.hbtn{color:var(--ink);font:900 13px Nunito,sans-serif;padding:0 10px;height:58px;cursor:pointer}
+.hbtn:active{background:var(--panel2)}
+@media(max-width:640px){.hbtn{padding:0 6px;font-size:12px;height:50px}#stats{width:165px;padding:6px 10px}#quest{order:3;width:100%;max-width:340px}#eye{min-width:0;flex:1}#clock{font-size:15px}.slot{width:36px;height:36px;padding:3px}.slot svg{width:26px;height:26px}.ing{font-size:13px;padding:4px 6px}.ing kbd{display:none}}
 @media(prefers-reduced-motion:reduce){.toast,.plate.shake{animation:none}}
 </style>
 
@@ -170,7 +176,7 @@ body.cammode #bottom{visibility:hidden}
 <div id="bottom">
   <div id="toasts"></div>
   <div id="prompt" class="sign" hidden></div>
-  <div id="slots" class="sign"></div>
+  <div id="brow"><button id="mapBtn" class="sign hbtn" aria-label="Map">Map</button><div id="slots" class="sign"></div><button id="menuBtn" class="sign hbtn" aria-label="Menu">Menu</button></div>
 </div>
 
 <div id="touch" hidden>
@@ -232,7 +238,11 @@ const TOWN={x:2470,y:430,w:1420,h:700};
 const GOLF={x:2560,y:60,w:1300,h:390};
 const EVID=[{k:'prints',n:'Giant footprints',x:1120,y:1290},{k:'nest',n:'Mossy nest',x:560,y:860},{k:'tuft',n:'Fur tuft on fence',x:2150,y:232}];
 const SITE={x:690,y:110,w:360,h:290},BAITZ={x:900,y:1440,w:260,h:160},DOCK={x:800,y:1400,w:44,h:150};
-const clear=[{x:1100,y:180,w:1220,h:1000},{x:1150,y:1140,w:1020,h:420},TOWN,GOLF,SITE,BAITZ];
+const YMIN=-1000,MTN={x:2420,y:-1000,w:1530,h:1060},RUN={x:2980,y:-985,w:560,h:880},LODGEZ={x:2560,y:-330,w:340,h:240},ISLE={x:620,y:1340,rx:58,ry:36};
+const SKITRAIL=[[2700,60],[2700,-100],[2900,-110],[3500,-100]];
+const clear=[{x:1100,y:180,w:1220,h:1000},{x:1150,y:1140,w:1020,h:420},TOWN,GOLF,SITE,BAITZ,MTN];
+const onIsland=(x,y,m)=>((x-ISLE.x)/(ISLE.rx+m))**2+((y-ISLE.y)/(ISLE.ry+m))**2<1;
+const waterFree=(x,y,r)=>inLake(x,y,-r)&&!onIsland(x,y,r*.6)&&!(x>DOCK.x-r&&x<DOCK.x+DOCK.w+r&&y>DOCK.y-r*.5&&y<DOCK.y+DOCK.h);
 const STREET={x:2540,y:734,w:1350,h:72};
 const rects=[],solids=[],trees=[],bushes=[],ints=[],coinSpots=[],props=[];
 const addRect=(x,y,w,h,k,o={})=>{const r={x,y,w,h,k,...o};rects.push(r);return r};
@@ -257,7 +267,8 @@ const B={
  po:addRect(3340,520,200,160,'bld',{style:'po',H:66}),
  golf:addRect(2600,230,190,120,'bld',{style:'golf',H:54}),
  bait:addRect(960,1480,150,90,'bld',{style:'bait',H:50}),
- trailer:addRect(930,160,100,56,'bld',{style:'trailer',H:40})
+ trailer:addRect(930,160,100,56,'bld',{style:'trailer',H:40}),
+ lodge:addRect(2620,-260,200,110,'bld',{style:'lodge',H:58})
 };
 const shop=addInt({k:'shop',x:1325,y:1340});
 const dinerDoor=addInt({k:'diner',x:2750,y:700});
@@ -268,6 +279,8 @@ const baitDoor=addInt({k:'bait',x:1035,y:1594});
 addRect(760,200,110,70,'dozer');const siteKeys=addInt({k:'keys',x:815,y:294});const siteLunch=addInt({k:'lunch',x:980,y:250});
 const denPit={x:320,y:288,r:14,fire:true};solids.push(denPit);addInt({k:'grill',x:320,y:316});
 sites.forEach(s=>addInt({k:'grill',x:s.fire.x,y:s.fire.y+26}));
+const lodgeDoor=addInt({k:'lodge',x:2720,y:-128});addRect(3530,-150,60,40,'liftb');addRect(3530,-985,60,40,'liftt');const liftInt=addInt({k:'lift',x:3560,y:-92});
+const officeInt=addInt({k:'office',x:914,y:196});const secretInt=addInt({k:'secret',x:625,y:1366});
 addRect(2060,226,200,8,'fence',{block:false});
 const tackle=addInt({k:'tackle',x:1000,y:1218});
 addRect(200,300,46,22,'desk');const album=addInt({k:'album',x:223,y:336});
@@ -299,15 +312,19 @@ for(let i=solids.length-1;i>=0;i--){const q=solids[i];if(q.rock&&!q.cave&&dist(q
 const MSPOTS=[];for(let n=0;MSPOTS.length<70&&n<6000;n++){const x=R(60,WW-60),y=R(60,WH-60);if(!inClear(x,y,20)&&!inLake(x,y,40)&&nearPath(x,y)>50&&!nearSolid(x,y,25)&&!trees.some(t=>Math.abs(t.x-x)<30&&dist(x,y,t.x,t.y)<26)&&dist(x,y,den.x,den.y)>220)MSPOTS.push({x,y})}
 const PUDDLES=[];for(let n=0;PUDDLES.length<70&&n<6000;n++){const x=R(60,WW-60),y=R(60,WH-60);if((nearPath(x,y)<12||inClear(x,y,-40))&&!inLake(x,y,30)&&!rects.some(r=>x>r.x-30&&x<r.x+r.w+30&&y>r.y-30&&y<r.y+r.h+30))PUDDLES.push({x,y,r:R(14,30)})}
 const STUMPS=[];for(let n=0;STUMPS.length<12&&n<500;n++){const x=R(SITE.x+20,SITE.x+SITE.w-20),y=R(SITE.y+20,SITE.y+SITE.h-20);if(!rects.some(r=>x>r.x-24&&x<r.x+r.w+24&&y>r.y-24&&y<r.y+r.h+24))STUMPS.push({x,y,r:R(9,14)})}
+trees.push({x:592,y:1326,r:30,tone:.3,round:true},{x:660,y:1334,r:24,tone:.7,round:true});
+{const inR=(x,y,q,m)=>x>q.x-m&&x<q.x+q.w+m&&y>q.y-m&&y<q.y+q.h+m;
+for(let n=0,c=0;c<150&&n<20000;n++){const x=R(MTN.x+20,WW-20),y=R(YMIN+60,40);if(inR(x,y,RUN,30)||inR(x,y,LODGEZ,20)||Math.abs(x-3560)<70||segMin(x,y,SKITRAIL)<50||inR(x,y,GOLF,0))continue;if(trees.some(t=>Math.abs(t.x-x)<64&&dist(x,y,t.x,t.y)<64))continue;trees.push({x,y,r:R(28,42),tone:rnd(),round:false,snow:true});c++}
+for(let n=0,c=0;c<260&&n<20000;n++){const x=R(20,MTN.x-20),y=R(YMIN+20,-10);if(trees.some(t=>Math.abs(t.x-x)<62&&dist(x,y,t.x,t.y)<62))continue;trees.push({x,y,r:R(30,46),tone:rnd(),round:rnd()<.15});c++}}
 for(let n=0;bushes.length<95&&n<6000;n++){const x=R(60,WW-60),y=R(60,WH-60);if(!inLake(x,y,30)&&!trees.some(t=>dist(x,y,t.x,t.y)<44)&&nearPath(x,y)>40&&!nearSolid(x,y,30)&&!inClear(x,y,0))bushes.push({x,y,r:R(24,32),wig:0})}
 const okCoin=(x,y)=>!rects.some(r=>x>r.x-20&&x<r.x+r.w+20&&y>r.y-20&&y<r.y+r.h+20)&&!nearSolid(x,y,20)&&inClear(x,y,0);
 for(let n=0;coinSpots.length<16&&n<4000;n++){const x=R(1120,2280),y=R(200,1540);if(okCoin(x,y))coinSpots.push({x,y,on:true})}
 for(let n=0;coinSpots.length<28&&n<4000;n++){const x=R(2500,3860),y=R(460,1100);if(okCoin(x,y))coinSpots.push({x,y,on:true})}
 
 const blocks=r=>r.block!==false;
-function free(x,y,r){
-  if(x<r||y<r||x>WW-r||y>WH-r)return false;
-  if(inLake(x,y,-6)&&!(x>DOCK.x+4&&x<DOCK.x+DOCK.w-4&&y>DOCK.y&&y<DOCK.y+DOCK.h+40))return false;
+function free(x,y,r,swim){
+  if(x<r||y<YMIN+r||x>WW-r||y>WH-r)return false;
+  if(inLake(x,y,-6)&&!onIsland(x,y,0)&&!(x>DOCK.x+4&&x<DOCK.x+DOCK.w-4&&y>DOCK.y&&y<DOCK.y+DOCK.h+40)&&!(swim&&!inLake(x,y,-62)))return false;
   for(const t of trees)if(Math.abs(t.x-x)<30&&Math.abs(t.y-y)<30&&dist(x,y,t.x,t.y)<r+11)return false;
   for(const s of solids)if(Math.abs(s.x-x)<60&&dist(x,y,s.x,s.y)<r+s.r)return false;
   for(const q of rects){const cx=clamp(x,q.x,q.x+q.w),cy=clamp(y,q.y,q.y+q.h),d2=(x-cx)**2+(y-cy)**2;if(q.k==='bin'||q.k==='cont'?d2<(r*.6)**2:d2<r*r)return false}
@@ -336,9 +353,10 @@ function text(t,x,y,size,col,font){ctx.font=font||`${size}px "Alfa Slab One",Geo
 
 function drawBuilding(q){const {x,y,w,h,H,style}=q,y0=gy(y),y1=gy(y+h),ym=(y0+y1)/2,fy=y1-H;
   shadowBox(x,y,w,h,H+20);
-  const wall={shack:'#c94f3a',station:'#557a43',diner:'#ece5d6',store:'#a8743f',po:'#a65a3e',golf:'#f1ece0',bait:'#7fa3b5',trailer:'#e6e2d6'}[style];
+  const wall={shack:'#c94f3a',station:'#557a43',diner:'#ece5d6',store:'#a8743f',po:'#a65a3e',golf:'#f1ece0',bait:'#7fa3b5',trailer:'#e6e2d6',lodge:'#8a5d36'}[style];
   rect(wall,x,fy,w,H);
   if(style==='bait'){for(let yy=fy+3;yy<y1;yy+=8)rect('#6b8fa1',x,yy,w,2);rect('#3b2614',x+w/2-12,fy+18,24,H-18);[x+14,x+w-50].forEach(wx=>{rect('#f1e6cf',wx-3,fy+12,42,24);rect(winCol(),wx,fy+15,36,18)})}
+  if(style==='lodge'){for(let yy=fy+4;yy<y1;yy+=9)rect('#6b4226',x,yy,w,3);rect('#3b2614',x+w/2-15,fy+20,30,H-20);[x+18,x+w-62].forEach(wx=>{rect('#e9dcc0',wx-3,fy+14,50,28);rect(winCol(),wx,fy+17,44,22)});rect('#8a8a8a',x+w-40,fy-50,16,40)}
   if(style==='trailer'){rect('#c8423a',x,fy+H-12,w,4);rect('#9a9a9a',x+12,fy+10,22,H-10);[x+44,x+72].forEach(wx=>rect(winCol(),wx,fy+10,22,14))}
   if(style==='golf'){for(let yy=fy+4;yy<y1;yy+=10)rect('#e2dccd',x,yy,w,3);rect('#2f6b4a',x+w/2-14,fy+20,28,H-20);[x+16,x+w-60].forEach(wx=>{rect('#2f6b4a',wx-3,fy+14,48,28);rect(winCol(),wx,fy+17,42,22)})}
   if(style==='shack'){for(let yy=fy+4;yy<y1;yy+=10)rect('#a63d2c',x,yy,w,4);rect('#3b2614',x+w/2-38,fy+18,76,26);rect(winCol(),x+w/2-34,fy+21,68,20);poly('#ffbf3c',x+w/2-46,fy+18,x+w/2+46,fy+18,x+w/2+40,fy+8,x+w/2-40,fy+8)}
@@ -348,11 +366,11 @@ function drawBuilding(q){const {x,y,w,h,H,style}=q,y0=gy(y),y1=gy(y+h),ym=(y0+y1
   if(style==='po'){for(let yy=fy+5;yy<y1;yy+=9)for(let xx=x+((yy/9|0)%2)*10;xx<x+w;xx+=20)rect('#8e4a32',xx,yy,18,1.5);rect('#f1e6cf',x,fy,w,6);[x+20,x+w-62].forEach(wx=>{rect('#f1e6cf',wx-3,fy+18,48,30);rect(winCol(),wx,fy+21,42,24)});rect('#f1e6cf',x+w/2-18,fy+16,36,H-16);rect('#2e4a6b',x+w/2-14,fy+20,28,H-20)}
   if(style==='diner'){rect('#c9c2b2',x,y0-H,w,y1-y0);rect('#b4ad9e',x,y0-H,w,6);rect('#8f8a80',x-3,fy-6,w+6,8);
     rect('#3b2614',x+w/2-4,fy-40,8,40);rr('#d8423a',x+w/2-96,fy-70,192,36,8);text("STACK 'EM DINER",x+w/2,fy-52,17,'#fbf3df')}
-  else{const R=style==='shack'?16:26,ov=10,c={shack:'#7a3a2c',station:'#3b4f30',store:'#5c3f2a',po:'#4a4f5c',golf:'#2f6b4a',bait:'#3d5a6b',trailer:'#9a9a9a'}[style];
+  else{const R=style==='shack'?16:26,ov=10,c={shack:'#7a3a2c',station:'#3b4f30',store:'#5c3f2a',po:'#4a4f5c',golf:'#2f6b4a',bait:'#3d5a6b',trailer:'#9a9a9a',lodge:'#e4edf3'}[style];
     poly(shade(c,-.35),x-ov,y0-H,x+w+ov,y0-H,x+w+ov,ym-H-R,x-ov,ym-H-R);
     poly(c,x-ov,fy+6,x+w+ov,fy+6,x+w+ov,ym-H-R,x-ov,ym-H-R);
     ctx.strokeStyle=shade(c,.12);ctx.lineWidth=1.5;for(let i=1;i<6;i++){const yy=fy+6+(ym-H-R-fy-6)*i/6;ctx.beginPath();ctx.moveTo(x-ov,yy);ctx.lineTo(x+w+ov,yy);ctx.stroke()}
-    const label={shack:'SNACK SHACK',station:'RANGER STATION',store:'BRAMBLES GENERAL STORE',po:'POST OFFICE',golf:'PINEWICK GOLF CLUB',bait:'BAIT & TACKLE',trailer:'SITE OFFICE'}[style],sw=Math.min(w-10,label.length*10+24),sc=style==='po'?'#2e4a6b':'#e9dcc0',tc=style==='po'?'#fbf3df':'#3b2614';
+    const label={shack:'SNACK SHACK',station:'RANGER STATION',store:'BRAMBLES GENERAL STORE',po:'POST OFFICE',golf:'PINEWICK GOLF CLUB',bait:'BAIT & TACKLE',trailer:'SITE OFFICE',lodge:'SKI LODGE'}[style],sw=Math.min(w-10,label.length*10+24),sc=style==='po'?'#2e4a6b':'#e9dcc0',tc=style==='po'?'#fbf3df':'#3b2614';
     rr(sc,x+w/2-sw/2,fy-4,sw,22,4);text(label,x+w/2,fy+7,style==='store'||style==='golf'?12.5:14,tc)}
 }
 function drawTent(q){const x0=q.x,x1=q.x+q.w,yb=gy(q.y+q.h),yt=gy(q.y),mx=(x0+x1)/2,H=46;
@@ -371,7 +389,8 @@ function drawPine(tr){const x=tr.x,y=gy(tr.y),r=tr.r;ctx.globalAlpha=tr.fade?.38
   rect('#5e3a20',x-4,y-18,8,18);
   if(tr.round){const c=tr.tone<.5?'#3c7d3a':'#4f8a32';ell(shade(c,-.25),x,y-r*1.25,r*.95,r*.85);ell(c,x-r*.12,y-r*1.38,r*.78,r*.7);ell(shade(c,.18),x-r*.35,y-r*1.6,r*.35,r*.3)}
   else{const c=tr.tone<.5?'#1f5a35':'#24603f',d=tr.tone<.5?'#16472a':'#1a4c33',l=tr.tone<.5?'#2f7646':'#337a52',H=r*2.5;
-    for(let i=0;i<3;i++){const w=r*(1-i*.24),b=y-12-i*H*.22,t=b-H*.42;poly(c,x-w,b,x,t,x+w,b);poly(d,x,t,x+w,b,x,b);poly(l,x,t,x-w*.55,b-H*.08,x-w*.2,b-H*.1)}}
+    for(let i=0;i<3;i++){const w=r*(1-i*.24),b=y-12-i*H*.22,t=b-H*.42;poly(c,x-w,b,x,t,x+w,b);poly(d,x,t,x+w,b,x,b);poly(l,x,t,x-w*.55,b-H*.08,x-w*.2,b-H*.1)}
+    if(tr.snow)for(let i=0;i<3;i++){const w=r*(1-i*.24),b=y-12-i*H*.22,t=b-H*.42;poly('#f4f8fb',x-w*.45,t+H*.2,x,t,x+w*.45,t+H*.2);poly('#d6e2ec',x,t,x+w*.45,t+H*.2,x+w*.12,t+H*.22);poly('#f4f8fb',x-w*.95,b,x-w*.7,b-H*.05,x-w*.4,b)}}
   ctx.globalAlpha=1}
 function drawRock(s){const x=s.x,y=gy(s.y),r=s.r;ell(SH,x+r*.4,y+3,r*1.05,r*.45);
   if(s.cave){ell('#5f584c',x,y-r*.55,r*2.1,r*1.15);ell('#7a7264',x-r*.3,y-r*.9,r*1.5,r*.8);ell('#8f8778',x-r*.6,y-r*1.15,r*.7,r*.35);ell('#1e1a15',x,y-r*.25,r*.75,r*.6);rect('#1e1a15',x-r*.75,y-r*.25,r*1.5,r*.3);return}
@@ -413,8 +432,17 @@ const bg=document.createElement('canvas');bg.width=WW;bg.height=Math.ceil(WH*T);
   const lg=g.createRadialGradient(lake.x-60,lake.y-40,30,lake.x,lake.y,lake.rx);lg.addColorStop(0,'#59b8e0');lg.addColorStop(1,'#2a6f9e');g.fillStyle=lg;g.beginPath();g.ellipse(lake.x,lake.y,lake.rx,lake.ry,0,0,TAU);g.fill();
   g.strokeStyle='rgba(255,255,255,.25)';g.lineWidth=2;for(let i=0;i<26;i++){const a=R(0,TAU),rr=R(.1,.8);const x=lake.x+Math.cos(a)*lake.rx*rr,y=lake.y+Math.sin(a)*lake.ry*rr;g.beginPath();g.moveTo(x-10,y);g.quadraticCurveTo(x,y-4,x+10,y);g.stroke()}
   g.fillStyle='rgba(0,0,0,.25)';g.fillRect(DOCK.x+6,DOCK.y+6,DOCK.w,DOCK.h);g.fillStyle='#8a5d36';g.fillRect(DOCK.x,DOCK.y,DOCK.w,DOCK.h);g.fillStyle='#6b4a2c';for(let y=DOCK.y;y<DOCK.y+DOCK.h;y+=12)g.fillRect(DOCK.x,y,DOCK.w,2);[[0,0],[DOCK.w-8,0],[0,DOCK.h*.5],[DOCK.w-8,DOCK.h*.5]].forEach(([dx,dy])=>{g.fillStyle='#4a2e15';g.fillRect(DOCK.x+dx,DOCK.y+dy,8,8)});
+  g.fillStyle='#d8c48e';g.beginPath();g.ellipse(ISLE.x,ISLE.y,ISLE.rx+10,ISLE.ry+8,0,0,TAU);g.fill();g.fillStyle='#5f9346';g.beginPath();g.ellipse(ISLE.x,ISLE.y,ISLE.rx-4,ISLE.ry-4,0,0,TAU);g.fill();
   g.fillStyle='#5b5345';g.beginPath();g.arc(den.x,den.y,den.r+10,0,TAU);g.fill();g.fillStyle='#6d6453';g.beginPath();g.arc(den.x,den.y,den.r-10,0,TAU);g.fill();
   g.fillStyle='#8c3f2e';g.beginPath();g.ellipse(den.x+10,den.y+20,60,40,0,0,TAU);g.fill();g.fillStyle='#a8573c';g.beginPath();g.ellipse(den.x+10,den.y+20,44,28,0,0,TAU);g.fill();
+})();
+const bgN=document.createElement('canvas');bgN.width=WW;bgN.height=Math.ceil(-YMIN*T);
+(function paintN(){const g=bgN.getContext('2d');g.scale(1,T);g.translate(0,-YMIN);
+  g.fillStyle='#386b34';g.fillRect(0,YMIN,WW,-YMIN);for(let i=0;i<5000;i++){g.fillStyle=rnd()<.5?'rgba(20,50,22,.18)':'rgba(140,190,90,.12)';g.fillRect(R(0,WW),R(YMIN,0),R(2,6),R(2,6))}
+  const sg=g.createLinearGradient(0,YMIN,0,0);sg.addColorStop(0,'#e3edf5');sg.addColorStop(.9,'#f4f8fb');sg.addColorStop(1,'#d7e8d2');g.fillStyle=sg;g.beginPath();g.roundRect(MTN.x,MTN.y,MTN.w,MTN.h+60,140);g.fill();
+  for(let i=0;i<70;i++){g.fillStyle='rgba(140,170,200,.12)';g.beginPath();g.ellipse(R(MTN.x+60,WW),R(YMIN,-40),R(30,130),R(10,34),0,0,TAU);g.fill()}
+  g.fillStyle='#fbfdff';g.beginPath();g.roundRect(RUN.x,RUN.y,RUN.w,RUN.h,60);g.fill();g.fillStyle='rgba(175,200,220,.22)';for(let y=RUN.y+20;y<RUN.y+RUN.h-10;y+=14)g.fillRect(RUN.x+24,y,RUN.w-48,2);
+  g.lineCap='round';g.lineJoin='round';g.strokeStyle='rgba(165,185,205,.55)';g.lineWidth=30;g.beginPath();SKITRAIL.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
 })();
 
 /* ---------- props (y-sorted 3D objects) ---------- */
@@ -441,6 +469,11 @@ prop(980,236,()=>{shadowBox(966,224,30,18,16);box(966,224,30,18,16,'#3d8be0');re
 prop(900,345,()=>{const f=gy(345);ell(SH,914,f+1,14,4);rect('#555555',898,f-96,4,96);rect('#333333',890,f-104,22,10);ell(night>.2?'#fff6c8':'#cccccc',901,f-96,9,3)},120);
 prop(870,402,()=>{const f=gy(402);rect('#6b4a2c',810,f-36,6,36);rect('#6b4a2c',924,f-36,6,36);rr('#d9a72a',796,f-78,148,44,5);text('FUTURE HOME OF',870,f-64,9,'#3b2614','900 9px Nunito,sans-serif');text('GRUBE GRAND RESORT',870,f-48,12,'#3b2614')},90);
 STUMPS.forEach(st=>prop(st.x,st.y,()=>{const x=st.x,f=gy(st.y);ell(SH,x+4,f+1,st.r+3,st.r*.4);rect('#6b4226',x-st.r,f-10,st.r*2,10);ell('#c9a46b',x,f-10,st.r,st.r*.55);ell('#a8854a',x,f-10,st.r*.5,st.r*.28)},20));
+[2560,2860,3160,3460,3760].forEach((px,i)=>prop(px,-1000,()=>{const f=gy(-985),w=170+(i%2)*40,h=230+(i%3)*40;poly('#7a8696',px-w,f,px,f-h,px+w,f);poly('#5f6b7a',px,f-h,px+w,f,px+w*.15,f);poly('#f4f8fb',px-w*.32,f-h*.68,px,f-h,px+w*.32,f-h*.68,px+w*.1,f-h*.6,px-w*.05,f-h*.7,px-w*.18,f-h*.6)},460));
+for(let y=-140;y>-960;y-=110)prop(3560,y,()=>{const f=gy(y);ell(SH,3572,f+1,12,4);rect('#6a6a6a',3557,f-118,6,118);rect('#4a4a4a',3540,f-122,40,5)},140);
+prop(3560,-110,()=>{shadowBox(3530,-150,60,40,40);box(3530,-150,60,40,40,'#c94f3a');rect('#eef4f8',3526,gy(-150)-46,68,8);rect('#3b2614',3548,gy(-110)-30,24,30);rr('#e9dcc0',3528,gy(-110)-52,64,14,3);text('CHAIRLIFT',3560,gy(-110)-45,9,'#3b2614','900 9px Nunito,sans-serif')});
+prop(3560,-945,()=>{shadowBox(3530,-985,60,40,40);box(3530,-985,60,40,40,'#c94f3a');rect('#eef4f8',3526,gy(-985)-46,68,8)});
+prop(625,1350,()=>{const x=625,f=gy(1350);ell(SH,x+4,f+1,16,5);if(!S.secret){ell('#7a7264',x,f-6,14,8);ell('#8f8778',x-2,f-15,10,6);ell('#9a917f',x,f-22,7,5);ell('#4f9a3a',x+4,f-24,4,2)}else{ell('#7a7264',x-10,f-4,8,5);ell('#8f8778',x+10,f-4,7,4);rect('#6b4a2c',x-6,f-10,12,7)}},40);
 prop(2160,234,()=>{const f=gy(232);for(let x=2060;x<=2260;x+=40)rect('#6b4a2c',x-3,f-32,6,32);rect('#8a5d36',2060,f-26,200,4);rect('#8a5d36',2060,f-14,200,4);ell('#7d4b29',2150,f-20,7,5);ell('#5f3519',2154,f-18,4,3);ell('#7d4b29',2146,f-14,4,3)});
 prop(560,860,()=>{const x=560,f=gy(860);ell(SH,x+8,f+2,46,14);ell('#5c3820',x,f-6,44,17);ell('#7a4c2a',x,f-9,38,13);ell('#4f9a3a',x,f-11,30,9);ell('#6fbf4a',x-10,f-13,12,4);ell('#7d4b29',x+12,f-12,7,3);ell('#7d4b29',x-4,f-10,5,2.5)});
 prop(1000,1211,()=>{if(S.side.truck>1)return;shadowBox(988,1197,24,14,12);box(988,1197,24,14,12,'#3f8a4a');rect('#cccccc',996,gy(1197)-14,8,3)});
@@ -449,7 +482,7 @@ prop(223,322,()=>{shadowBox(200,300,46,22,20);box(200,300,46,22,20,'#7a4c2a');co
 
 /* ---------- state ---------- */
 const P={x:330,y:330,r:14,ang:Math.PI/2,moving:false,hidden:false,sprint:false,bob:0,bush:null,vx:0,vy:0};
-let S;const fresh=()=>({v:3,day:1,time:7*60,hunger:70,stam:100,coins:0,inv:[],fridge:[],q:0,owned:[],outfit:'none',pick:'coat',shiftDay:0,deadline:0,side:{parcel:0,truck:0},stats:{raids:0,eaten:0,caught:0,shifts:0,best:0,caddy:0,fish:0},done:false,cam:false,photos:[],ev:{prints:0,nest:0,tuft:0},veh:{bike:null,truck:null},riding:null,golf:{best:0,rounds:0},caddyDay:0,vossDay:0,rod:false,catch:[],fishLog:{},basket:[],guide:{},truffles:0,dog:{friend:0,fed:0,adopted:false,mode:'follow',met:0},rain:false,wday:0,sab:{keys:-1,lunch:-1,won:-1,count:0}});
+let S;const fresh=()=>({v:3,day:1,time:7*60,hunger:70,stam:100,coins:0,inv:[],fridge:[],q:0,owned:[],outfit:'none',pick:'coat',shiftDay:0,deadline:0,side:{parcel:0,truck:0},stats:{raids:0,eaten:0,caught:0,shifts:0,best:0,caddy:0,fish:0},done:false,cam:false,photos:[],ev:{prints:0,nest:0,tuft:0},veh:{bike:null,truck:null,canoe:null},riding:null,golf:{best:0,rounds:0},caddyDay:0,vossDay:0,rod:false,catch:[],fishLog:{},basket:[],guide:{},truffles:0,dog:{friend:0,fed:0,adopted:false,mode:'follow',met:0},rain:false,wday:0,sab:{keys:-1,lunch:-1,won:-1,count:0},ski:{best:0,runs:0,patrolDay:0},skiDay:0,canoeDay:0,scuba:false,loot:[],chest:false,secret:0,letter:0,mailed:0,paperDay:1,seen:{den:1}});
 const has=o=>!!S&&S.owned.includes(o);const disg=()=>S.outfit!=='none';
 let alert=0,paused=true,started=false,lastSave=0,flash=0;
 const npcs=[];
@@ -475,8 +508,10 @@ const voss=mk({kind:'pi',name:'Hank Voss',x:1250,y:250,WP:[[1250,250],[2100,300]
 mk({kind:'walker',name:'Golfer',x:2900,y:200,WP:[[2900,200],[3650,180],[3600,330],[3000,330]],wp:1,col:'#f2f2f2',pants:'#7a8a5a',hair:'#8a8a8a',hat:'brown'});
 mk({kind:'towny',name:'Big Earl',x:800,y:330,hx:800,hy:330,col:'#e86a2a',pants:'#3a4a6a',hair:'#5a3a22',hat:'hard',hours:[7,18],needQ:12});
 mk({kind:'towny',name:'Deb',x:1000,y:300,hx:1000,hy:300,col:'#f2c230',pants:'#3a4a6a',hair:'#2a2a2a',skin:'#c98e62',hat:'hard',hours:[7,18],needQ:12});
+mk({kind:'towny',name:'Olaf',x:3610,y:-100,hx:3610,hy:-100,col:'#3d8be0',pants:'#2a2a3a',hair:'#d9b45a',hat:'brown',hours:[7,19]});
+mk({kind:'walker',name:'Skier',x:2700,y:-60,WP:[[2700,-60],[2900,-110],[3480,-100],[2900,-110]],wp:1,col:'#e86a8a',pants:'#2a2a3a',hair:'#8a4a2a',hat:'brown'});
 const pip={x:420,y:380};
-const PIPAT=[[420,380],[1080,560],[330,360],[1460,1080],[1500,1250],[1790,1500],[2380,700],[2700,760],[3020,560],[3380,770],[1060,1160],[1940,1490],[640,430],[420,380]];
+const PIPAT=[[420,380],[1080,560],[330,360],[1460,1080],[1500,1250],[1790,1500],[2380,700],[2700,760],[3020,560],[3380,770],[1060,1160],[1940,1490],[640,430],[890,440],[3380,770],[420,380]];
 
 function restock(){sites.forEach(s=>{const L=LOOT[s.kind];s.cont.stock=[pick(L),pick(L)];if(rnd()<.6)s.cont.stock.push(pick(L))});sites.forEach(s=>{s.tb.stock=rnd()<.75?[pick(TABLEFOOD)].concat(rnd()<.5?[pick(TABLEFOOD)]:[]):[]});ints.forEach(o=>{if(o.k==='bin')o.stock=1});coinSpots.forEach(c=>c.on=true);dailySpawns()}
 
@@ -495,20 +530,22 @@ const QUESTS=[
  {t:'Photo proof',d:'Photograph evidence without being seen (C to aim, E to snap): giant footprints on the east lakeshore (rain washes them away), your mossy nest in the woods between the den and the lake, and a fur tuft on the Elk Ridge fence.',p:()=>`${evCount()}/3`},
  {t:'Meet the biologist',d:'Dr. Anita Holm visits the Ranger Station from 9 AM to 5 PM. Bring her your photo album, disguised.'},
  {t:'Stop the bulldozers',d:'Grube\'s crew is clearing the woods east of your den. At night (8 PM to 5 AM), sneak past Stu the watchman, hide the bulldozer keys and swap the crew\'s lunch.',p:()=>{const n=nightId();return `Tonight: keys ${S.sab.keys===n?'✓':'✗'} · lunch ${S.sab.lunch===n?'✓':'✗'}`}},
- {t:'Hollowpine holds on',d:'Slice 4 complete! Every full night of sabotage wins back a day. Fish, forage, and dig truffles with Biscuit. More coming soon.'}
+ {t:'Follow the money',d:'Pip heard Grube is trying to buy off Dr. Holm. Search the site office trailer at the bulldozer site at night (8 PM to 5 AM) for proof.'},
+ {t:'Stop the presses',d:'Mail Grube\'s bribe letter to the Pinewick Gazette. Iris at the post office can send it.'},
+ {t:'The town wakes up',d:'Slice 5 complete! Read tomorrow\'s Gazette. Ski the mountain, canoe to the island, dive for treasure. More coming soon.'}
 ];
-const qTarget=()=>{switch(S.q){case 0:return pip;case 1:{let b=null,bd=1e9;sites.forEach(s=>{const d=dist(P.x,P.y,s.cont.x,s.cont.y);if(s.cont.stock.length&&d<bd){bd=d;b=s.cont}});return S.inv.length?null:b}case 2:return fridge;case 3:return has('coat')?null:coat;case 4:{if(S.coins>=5)return shop;let b=null,bd=1e9;ints.forEach(o=>{if(o.k==='bin'&&o.stock&&o.x<2400){const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}});return b||shop}case 5:return board;case 6:return {x:2560,y:770};case 7:return dinerDoor;case 8:return patioBush;case 9:return poDoor;case 10:{let b=null,bd=1e9;EVID.forEach(e=>{if((S.ev[e.k]||0)<40){const d=dist(P.x,P.y,e.x,e.y);if(d<bd){bd=d;b=e}}});return b}case 11:return holm;case 12:return S.sab.keys!==nightId()?siteKeys:siteLunch;default:return null}};
+const qTarget=()=>{switch(S.q){case 0:return pip;case 1:{let b=null,bd=1e9;sites.forEach(s=>{const d=dist(P.x,P.y,s.cont.x,s.cont.y);if(s.cont.stock.length&&d<bd){bd=d;b=s.cont}});return S.inv.length?null:b}case 2:return fridge;case 3:return has('coat')?null:coat;case 4:{if(S.coins>=5)return shop;let b=null,bd=1e9;ints.forEach(o=>{if(o.k==='bin'&&o.stock&&o.x<2400){const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}});return b||shop}case 5:return board;case 6:return {x:2560,y:770};case 7:return dinerDoor;case 8:return patioBush;case 9:return poDoor;case 10:{let b=null,bd=1e9;EVID.forEach(e=>{if((S.ev[e.k]||0)<40){const d=dist(P.x,P.y,e.x,e.y);if(d<bd){bd=d;b=e}}});return b}case 11:return holm;case 12:return S.sab.keys!==nightId()?siteKeys:siteLunch;case 13:return officeInt;case 14:return poDoor;default:return null}};
 function advance(to){if(S.q>=to)return;S.q=to;sfx(660,.12,'triangle',.15);setTimeout(()=>sfx(880,.16,'triangle',.15),110);toast('New goal: '+QUESTS[to].t);save()}
 
 /* ---------- audio ---------- */
 let AC=null;
-function sfx(f,d=.1,type='square',v=.08,slide=0){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,AC.currentTime);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide),AC.currentTime+d);g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.connect(g).connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+function sfx(f,d=.1,type='square',v=.08,slide=0){if(!SET.vol)return;v*=SET.vol/70;try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,AC.currentTime);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide),AC.currentTime+d);g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.connect(g).connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
 
 /* ---------- UI ---------- */
 function toast(t){const el=document.createElement('div');el.className='toast sign';el.textContent=t;$('#toasts').appendChild(el);setTimeout(()=>el.remove(),2600);while($('#toasts').children.length>3)$('#toasts').firstChild.remove()}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let openedAt=0;
-function openModal(html){if(photo){photo=null;$('#vf').hidden=true;document.body.classList.remove('cammode')}$('#card').innerHTML=html;$('#modal').hidden=false;paused=true;openedAt=performance.now()}
+function openModal(html){$('#card').style.width='';if(photo){photo=null;$('#vf').hidden=true;document.body.classList.remove('cammode')}$('#card').innerHTML=html;$('#modal').hidden=false;paused=true;openedAt=performance.now()}
 function closeModal(){$('#modal').hidden=true;$('#card').onclick=null;paused=false}
 function menu(html,on){openModal(html);$('#card').onclick=e=>{const a=e.target.closest('[data-a]');if(!a||a.disabled)return;if(a.dataset.a==='close'){closeModal();return}on(a.dataset.a,a)}}
 function talk(lines,done){let i=0;const show=()=>{const [who,txt]=lines[i];openModal(`${who?`<p><span class="who">${esc(who)}</span></p>`:''}<p>${esc(txt)}</p><div class="btns"><button class="btn" data-a="next">${i<lines.length-1?'Next':'OK'}</button></div>`);
@@ -541,6 +578,11 @@ function toggleCoat(){if(!S.owned.length){toast('You need a disguise first.');re
 function scared(o){o.n=1;say(o,o.kind==='towny'?'EEK! It\'s a BIGFOOT!':'AAAH!')}
 function interact(){const o=nearInt();if(!o)return;
   if(o.k==='dismount'){dismount();return}
+  if(o.k==='dive'){startDive(o.i);return}
+  if(o.k==='office'){searchOffice();return}
+  if(o.k==='secret'){islandSecret();return}
+  if(o.k==='lodge'){if(hour()<7||hour()>=19){toast('The lodge is closed. Open 7 AM to 7 PM.');return}if(!disg()){toast('Ingrid shrieks and drops a tray of cocoa!');report();return}lodgeUI();return}
+  if(o.k==='lift'){if(hour()<7||hour()>=19){toast('The chairlift runs 7 AM to 7 PM.');return}if(!disg()){toast('Olaf the liftie yells "YETI!" and hits the emergency stop.');report();return}if(S.skiDay!==S.day){toast('You need skis. Rent them at the Ski Lodge.');return}startSki('race');return}
   if(o.veh){mount(o.veh);return}
   if(o.k==='table'){if(!o.stock.length){toast('Just crumbs. Tables get new food each morning.');return}caughtStealing();feastUI('table',o);return}
   if(o.k==='tackle'){S.side.truck=2;sfx(700,.12,'triangle',.1);toast('Got Walt\'s tackle box. Smells like worms. Bring it to Walt.');save();return}
@@ -576,7 +618,9 @@ function pipTalk(){const L={0:[['Pip the crow','Moss! Wake up, big guy. The camp
   10:[['Pip the crow','Evidence hunt! Your giant footprints on the east lakeshore, your old mossy nest in the woods between here and the lake, and that tuft of your fur stuck on the Elk Ridge fence.'],['Pip the crow','Press C to aim, E to snap. Centre it, from a few steps away. And don\'t let anyone see you taking them.'],['Pip the crow','Bad news: Grube hired a private eye, Hank Voss. He prowls the campground at dusk with a camera. If he photographs you without a disguise, Grube rushes the vote.']],
   11:[['Pip the crow','Dr. Anita Holm, the provincial biologist, visits the Ranger Station from 9 to 5. Bring her the album from your den. Disguised!']],
   12:[['Pip the crow','Bad news, Moss. Grube hired a bulldozer crew. They\'re clearing the woods east of your den while the review drags on.'],['Pip the crow','They work by day. At night a watchman named Stu patrols with a flashlight. Hide the bulldozer keys AND swap their lunch in one night, and they lose a whole day.'],['Pip the crow','Also: a stray dog named Biscuit hangs around the south end of the campground. Feed her for three days and she\'s yours.']],
-  13:[['Pip the crow','Keep it up! Every full night of sabotage pushes the vote back. Marge at the Bait & Tackle buys fish, and Dot buys mushrooms and truffles.']]}[S.q];
+  13:[['Pip the crow','Moss! I heard Kendra on the patio: Grube is trying to buy off Dr. Holm! He keeps his papers in the site office trailer at the bulldozer site.'],['Pip the crow','Sneak in at night, after 8, and find proof. Mind Stu and his flashlight.'],['Pip the crow','Oh, and the mountain north of the golf course is open for skiing, Marge rents canoes now, and there\'s an island in the lake nobody visits. Just saying.']],
+  14:[['Pip the crow','He wrote it DOWN. Take that letter to Iris at the post office. She\'ll get it to the Pinewick Gazette.']],
+  15:[['Pip the crow','Read the paper tomorrow, Moss. The whole town is going to know what Grube did.']]}[S.q];
   talk(L,()=>{if(S.q===0)advance(1)})}
 function fridgeUI(){const draw=()=>menu(`<h2 class="slab">Den fridge</h2><p>${S.fridge.length} snack${S.fridge.length===1?'':'s'} stored. Click a stored snack to take it back.</p>
   <div class="grid">${S.fridge.map((k,i)=>`<div class="slot" data-a="f${i}" title="${esc(FOOD[k].n)}">${icon(k)}</div>`).join('')||'<p style="grid-column:1/-1;color:var(--dim)">Empty. Sad.</p>'}</div>
@@ -731,9 +775,9 @@ function vossSnap(o){o.n=0;o.state='leave';say(o,'*CLICK* Gotcha, big fella!');f
   if(S.deadline&&S.vossDay!==S.day){S.deadline=Math.max(S.day+1,S.deadline-2);S.vossDay=S.day;toast('Hank Voss photographed you! The council vote moved up 2 days.')}else toast('Hank Voss snapped another photo. Grube will be thrilled.');save()}
 
 /* vehicles */
-const VEH={bike:{sp:290,acc:7,r:14,noise:110},truck:{sp:390,acc:2.6,r:20,noise:180}};
-function mount(k){const v=S.veh[k];if(!v)return;if(!free(v.x,v.y,VEH[k].r)){toast('No room to get on here.');return}S.riding=k;P.x=v.x;P.y=v.y;P.ang=v.a||0;P.vx=P.vy=0;sfx(k==='truck'?90:600,.25,k==='truck'?'sawtooth':'triangle',.08,k==='truck'?60:0);toast(k==='bike'?'Pedal, pedal! Riding undisguised is noisy.':'The truck coughs to life. Driving undisguised turns heads.')}
-function dismount(){const k=S.riding;if(!k)return;S.veh[k]={x:P.x,y:P.y,a:P.ang};S.riding=null;P.vx=P.vy=0;for(const [dx,dy] of [[0,36],[36,0],[-36,0],[0,-36],[0,0]])if(free(P.x+dx,P.y+dy,P.r)){P.x+=dx;P.y+=dy;break}}
+const VEH={bike:{sp:290,acc:7,r:14,noise:110},truck:{sp:390,acc:2.6,r:20,noise:180},canoe:{sp:170,acc:2.2,r:16,noise:40}};
+function mount(k){const v=S.veh[k];if(!v)return;if(!(k==='canoe'?waterFree:free)(v.x,v.y,VEH[k].r)){toast('No room to get on here.');return}S.riding=k;P.x=v.x;P.y=v.y;P.ang=v.a||0;P.vx=P.vy=0;sfx(k==='truck'?90:600,.25,k==='truck'?'sawtooth':'triangle',.08,k==='truck'?60:0);toast(k==='bike'?'Pedal, pedal! Riding undisguised is noisy.':k==='canoe'?'You push off. Paddle around, look for bubbling dive spots, and press E near land to get out.':'The truck coughs to life. Driving undisguised turns heads.')}
+function dismount(){const k=S.riding;if(!k)return;if(k==='canoe'){canoeOut();return}S.veh[k]={x:P.x,y:P.y,a:P.ang};S.riding=null;P.vx=P.vy=0;for(const [dx,dy] of [[0,36],[36,0],[-36,0],[0,-36],[0,0]])if(free(P.x+dx,P.y+dy,P.r)){P.x+=dx;P.y+=dy;break}}
 function honk(){if(!S.riding)return;const t=S.riding==='truck';sfx(t?330:1200,.18,'square',.09);setTimeout(()=>sfx(t?262:1500,.22,'square',.09),150);noise(260)}
 function mossHead(hx,hy){ell('#5f3519',hx,hy+1,14,13);ell('#7d4b29',hx,hy,13,12.5);ell('#c79a6e',hx,hy+3,8,6.5);ctx.fillStyle='#1d120a';ctx.beginPath();ctx.arc(hx-3.5,hy-1,1.8,0,TAU);ctx.arc(hx+3.5,hy-1,1.8,0,TAU);ctx.fill();ell('#2b1609',hx,hy+2.5,2.5,1.6);
   if(S.outfit==='coat'){ell('#3c6e5a',hx,hy-9,16,6);ell('#2f5a49',hx,hy-12,9,5.5)}if(S.outfit==='sweater'){ell('#2f6fb0',hx,hy-9,12,6);ell('#f1e6cf',hx,hy-14,3,3)}if(S.outfit==='vest'){ell('#b08a4f',hx,hy-9,18,5.5);ell('#9a7440',hx,hy-13,8,5)}}
@@ -751,14 +795,15 @@ function drawTruck(x,y,a,rider){const c=Math.cos(a),s=Math.sin(a),col='#4f8a8b';
     rect('#2c4f50',x0+4,gy(by0)-15,W-8,gy(by0+48)-gy(by0)-4);rect(shade(col,-.28),x0,cb-40,W,22);rect(col,x0,ct-40,W,cb-ct);rect('#9fc3d6',x0+5,cb-38,W-10,10);
     ell('#b8662e',x0+12,yb-8,6,3);rect('#1a1a1a',x0+2,yb-6,10,7);rect('#1a1a1a',x0+W-12,yb-6,10,7);if(south){rect('#fff3b0',x0+4,yb-14,8,4);rect('#fff3b0',x0+W-12,yb-14,8,4)}
     if(rider)mossHead(x,ct-50)}}
-function drawVeh(k,x,y,a,rider){if(k==='bike')drawBike(x,y,a,rider);else drawTruck(x,y,a,rider)}
+function drawVeh(k,x,y,a,rider){if(k==='bike')drawBike(x,y,a,rider);else if(k==='canoe')drawCanoe(x,y,a,rider);else drawTruck(x,y,a,rider)}
 
 /* post office, golf club */
 function poUI(){const draw=()=>menu(`<h2 class="slab">Pinewick Post Office</h2><p><span class="who">Iris:</span> "${S.cam?'How\'s that camera treating you?':'Stamps, parcels, and disposable cameras. Very modern.'}" You have <b>${S.coins}</b> coins.</p>
   <div class="row">${CAMSVG}<div><b>Disposable camera</b><br><small>Press C to aim, E to snap. Photos go in the album in your den.</small></div>${S.cam?'<button class="btn alt" disabled>Owned</button>':`<button class="btn" data-a="cam" ${S.coins>=8?'':'disabled'}>8 coins</button>`}</div>
+  ${S.letter===1?`<div class="row"><svg viewBox="0 0 32 32"><rect x="4" y="8" width="24" height="16" rx="2" fill="#f2ead6"/><path d="M4 9l12 9 12-9" stroke="#c9a66b" stroke-width="2" fill="none"/><circle cx="16" cy="20" r="3" fill="#d8423a"/></svg><div><b>Mail Grube's letter to the Gazette</b><br><small>Express post. Free, for something this juicy.</small></div><button class="btn" data-a="mail">Mail it</button></div>`:''}
   <div class="btns"><button class="btn" data-a="talk">Talk to Iris</button><button class="btn alt" data-a="close">Leave</button></div>`,a=>{
     if(a==='cam'&&S.coins>=8&&!S.cam){S.coins-=8;S.cam=true;sfx(990,.1,'triangle',.1);toast('Got a camera! Press C to take photos.');if(S.q===9){advance(10);setTimeout(()=>toast('Pip says: Grube hired a private eye, Hank Voss. Avoid him at dusk!'),900)}save();draw()}
-    if(a==='talk')townTalk(iris)});draw()}
+    if(a==='mail'&&S.letter===1){mailLetter();return}if(a==='talk')townTalk(iris)});draw()}
 function golfBoard(){const rows=[{n:'Gideon Grube',s:9,note:' (he says)'},{n:'Walt Brambles',s:11},{n:'Dot Pickering',s:12},{n:'Deputy Ruiz',s:14}];if(S.golf.best)rows.push({n:'You',s:S.golf.best,me:1});rows.sort((a,b)=>a.s-b.s);
   return rows.map((r,i)=>`<div class="row"><div>${i+1}. ${r.me?'<b>You</b>':esc(r.n)}<small>${r.note||''}</small></div><b>${r.s}</b></div>`).join('')}
 function golfUI(){menu(`<h2 class="slab">Pinewick Golf Club</h2><p><span class="who">Pro shop:</span> "Three holes, five coins. Clubs included, plaid optional." You have <b>${S.coins}</b> coins.</p>
@@ -872,7 +917,7 @@ function drawAuto(x,y,a,col){const c=Math.cos(a),s=Math.sin(a);
 /* weather + daily spawns */
 const MUSH={chanterelle:{n:'Chanterelle',v:4,col:'#f2b632',desc:'Golden trumpet with blunt, forking ridges under the cap. Grows alone on the forest floor.'},morel:{n:'Morel',v:7,col:'#a07850',desc:'Honeycomb cap, hollow inside. Pops up after rain.'},porcini:{n:'Porcini',v:10,col:'#8a5a30',desc:'Fat brown cap on a thick white stalk. Rare and prized by chefs.'},jack:{n:'Jack-o\'-lantern',v:0,col:'#f07a1a',poison:true,desc:'POISONOUS chanterelle look-alike: brighter orange, sharp true gills, grows in clusters. Never sell or eat.'}};
 let mush=[],truffles=[];
-function dailySpawns(){if(S.wday!==S.day){S.wday=S.day;S.rain=S.day>1&&Math.random()<.3}
+function dailySpawns(){dailySpawns5();if(S.wday!==S.day){S.wday=S.day;S.rain=S.day>1&&Math.random()<.3}
   const pool=[...MSPOTS].sort(()=>Math.random()-.5),n=S.rain?13:9;mush=pool.slice(0,n).map(p=>{const r=Math.random();return {x:p.x,y:p.y,k:r<.36?'chanterelle':r<.6?'jack':r<.9?'morel':'porcini'}});
   const rt=trees.filter(t=>t.round&&!inClear(t.x,t.y,30)).sort(()=>Math.random()-.5).slice(0,3);truffles=rt.map(t=>({x:t.x+R2(-30,30),y:t.y+R2(24,44),found:false}))}
 const R2=(a,b)=>a+Math.random()*(b-a);
@@ -977,7 +1022,10 @@ function drawFish(t){const c=$('#fishCv');if(!c||!fishing)return;const g=c.getCo
 function cookFish(){if(!S.catch.length){toast('Nothing to cook. Catch some fish first!');return}let made=0;while(S.catch.length&&S.inv.length<6){const c=S.catch.shift();S.inv.push('fish');made++;if(c.cm>=60&&S.inv.length<6){S.inv.push('fish');made++}}renderSlots();sfx(400,.2,'sawtooth',.04,-100);toast(made?`Cooked ${made} smoked fish. Into the backpack!`:'Backpack full! Eat something first.');save()}
 function baitUI(){const draw=()=>{const tot=S.catch.reduce((a,c)=>a+fishVal(c),0);menu(`<h2 class="slab">Bait &amp; Tackle</h2><p><span class="who">Marge:</span> "${S.rain?'Rain\'s got \'em biting! Catfish and sturgeon love a storm.':'Trout bite at dawn and dusk. Pike lurk out deep, so cast far.'}"</p>
   ${S.catch.map(c=>{const f=FISH.find(x=>x.k===c.k);return `<div class="row">${fishSvg(f)}<div><b>${f.n}</b><br><small>${c.cm} cm</small></div><b>${fishVal(c)} coins</b></div>`}).join('')||'<p style="color:var(--dim)">Your fish bucket is empty.</p>'}
-  <div class="btns"><button class="btn" data-a="sell" ${S.catch.length?'':'disabled'}>Sell all (${tot} coins)</button><button class="btn alt" data-a="log">Fish log</button><button class="btn alt" data-a="close">Leave</button></div>`,a=>{if(a==='sell'){S.coins+=tot;S.catch=[];sfx(1200,.1,'square',.07);toast(`Sold your fish for ${tot} coins.`);save();draw()}if(a==='log')fishLogUI()})};draw()}
+  <div class="row"><svg viewBox="0 0 32 32"><ellipse cx="16" cy="18" rx="14" ry="5" fill="#b8572e"/><ellipse cx="16" cy="17" rx="11" ry="3" fill="#7a3a1c"/><path d="M6 6l20 20" stroke="#d9c69a" stroke-width="2.5"/></svg><div><b>Canoe rental</b><br><small>Tied at the end of the dock for today. Paddle out to the dive spots and the island.</small></div>${S.canoeDay===S.day?'<button class="btn alt" disabled>Rented</button>':`<button class="btn" data-a="canoe" ${S.coins>=5?'':'disabled'}>5 coins</button>`}</div>
+  <div class="row"><svg viewBox="0 0 32 32"><rect x="11" y="6" width="10" height="20" rx="5" fill="#f2c230"/><circle cx="16" cy="12" r="6" fill="none" stroke="#2a2a2a" stroke-width="2.5"/><circle cx="16" cy="12" r="4" fill="#6cd0ff"/></svg><div><b>Scuba gear</b><br><small>Dive at the bubbling spots in the lake (from your canoe). Watch your air!</small></div>${S.scuba?'<button class="btn alt" disabled>Owned</button>':`<button class="btn" data-a="scuba" ${S.coins>=20?'':'disabled'}>20 coins</button>`}</div>
+  ${S.loot.length?`<div class="row"><div><b>Lake finds</b><br><small>${S.loot.map(k=>LOOTV[k].n).join(', ')}</small></div><button class="btn" data-a="loot">Sell (${S.loot.reduce((a,k)=>a+LOOTV[k].v,0)} coins)</button></div>`:''}
+  <div class="btns"><button class="btn" data-a="sell" ${S.catch.length?'':'disabled'}>Sell all (${tot} coins)</button><button class="btn alt" data-a="log">Fish log</button><button class="btn alt" data-a="close">Leave</button></div>`,a=>{if(a==='canoe'&&S.coins>=5){S.coins-=5;S.canoeDay=S.day;S.veh.canoe={x:822,y:1385,a:-Math.PI/2};sfx(990,.1,'triangle',.1);toast('Your canoe is tied at the end of the dock. Press E next to it.');save();draw();return}if(a==='scuba'&&S.coins>=20){S.coins-=20;S.scuba=true;sfx(990,.1,'triangle',.1);toast('Scuba gear! Paddle to a bubbling spot and press E to dive.');save();draw();return}if(a==='loot'){const v=S.loot.reduce((q,k)=>q+LOOTV[k].v,0);S.coins+=v;S.loot=[];sfx(1200,.1,'square',.07);toast(`Sold your lake finds for ${v} coins.`);save();draw();return}if(a==='sell'){S.coins+=tot;S.catch=[];sfx(1200,.1,'square',.07);toast(`Sold your fish for ${tot} coins.`);save();draw()}if(a==='log')fishLogUI()})};draw()}
 function fishLogUI(){menu(`<h2 class="slab">Fish log</h2><p>${Object.keys(S.fishLog).length}/8 species caught.</p>${FISH.map(f=>S.fishLog[f.k]?`<div class="row">${fishSvg(f)}<div><b>${f.n}</b><br><small>Best ${S.fishLog[f.k]} cm · bites ${FISHHINT[f.when]}${f.far?' · cast far':''}${f.rain?' · loves rain':''}</small></div></div>`:`<div class="row"><svg viewBox="0 0 32 32"><ellipse cx="14" cy="16" rx="11" ry="6" fill="#555"/></svg><div><b>???</b><br><small>Hint: bites ${FISHHINT[f.when]}${f.far?', far out':''}${f.rain?', in the rain':''}.</small></div></div>`).join('')}<div class="btns"><button class="btn alt" data-a="close">Close</button></div>`,()=>{})}
 
 /* foraging */
@@ -1002,24 +1050,202 @@ function drawDozer(){const x=760,y=200,w=110,h=70,yb=gy(y+h),yt=gy(y);shadowBox(
   box(x+8,y+8,w-16,h-24,36,'#f2b632');const c0=gy(y+12),c1=gy(y+42);rect(shade('#f2b632',-.3),x+34,c1-70,46,30);rect('#f2b632',x+34,c0-70,46,c1-c0);rect('#9fc3d6',x+39,c1-66,36,14);rect('#444444',x+86,yt-56,6,22);
   rect('#8a8a8a',x-12,yb-30,w+24,18);rect('#6a6a6a',x-12,yb-34,w+24,5);text('GRUBE',x+w/2,yb-21,10,'#3b2614','900 10px Nunito,sans-serif')}
 function endCard4(){openModal(`<h2 class="slab">To be continued…</h2><p>You finished Pinecone Prowler Slice 4: Fishing, foraging and a dog.</p><p>Day ${S.day} · ${S.stats.fish||0} fish caught · ${Object.keys(S.guide).length} guidebook entries · ${S.dog.adopted?'Biscuit adopted':'Biscuit still waiting for a friend'} · ${S.sab.count} night${S.sab.count===1?'':'s'} of sabotage.</p><p style="color:var(--dim)">The council vote is ${S.deadline-S.day} days away. Every full night of sabotage wins back a day.</p><div class="btns"><button class="btn" data-a="go">Keep playing</button></div>`);$('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))closeModal()}}
-function hud4(){const parts=[];if(S.basket.length)parts.push(`Basket ${S.basket.length}`);if(S.catch.length)parts.push(`Fish ${S.catch.length}`);if(S.truffles)parts.push(`Truffles ${S.truffles}`);const b2=$('#bag2');b2.hidden=!parts.length;b2.textContent=parts.join(' · ');
+function hud4(){const parts=[];if(S.basket.length)parts.push(`Basket ${S.basket.length}`);if(S.catch.length)parts.push(`Fish ${S.catch.length}`);if(S.truffles)parts.push(`Truffles ${S.truffles}`);if(S.loot.length)parts.push(`Finds ${S.loot.length}`);const b2=$('#bag2');b2.hidden=!parts.length;b2.textContent=parts.join(' · ');
   const sn=$('#sniff'),on=S.dog.adopted&&S.dog.mode==='sniff';sn.hidden=!on;if(on){const tr=nearestTruffle();if(!tr){sn.textContent='No truffles left today';sn.style.color='var(--dim)'}else{const d=dist(P.x,P.y,tr.x,tr.y),L=d<40?['BURNING HOT! Dig!','#ff5b4a']:d<130?['Hot','#ff8a3a']:d<280?['Warm','#ffbf3c']:d<520?['Cool','#6cd0ff']:['Freezing','#a9c8ff'];sn.textContent='Truffle sniff: '+L[0];sn.style.color=L[1]}}
   const bb=$('#barkBtn');if(bb)bb.style.visibility=S.dog.adopted?'visible':'hidden'}
+
+/* ---------- slice 5: mountain, skiing, canoe, swimming, scuba, newspaper, map, menu ---------- */
+const SET={vol:70,paper:true};try{Object.assign(SET,JSON.parse(localStorage.getItem('pinecone-prowler-settings')||'{}'))}catch(e){}
+function saveSet(){try{localStorage.setItem('pinecone-prowler-settings',JSON.stringify(SET))}catch(e){}}
+FOOD.cocoa={n:'Hot cocoa',h:15,svg:'<path d="M8 10h14v14a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5Z" fill="#e9e4d8"/><path d="M22 13h3a3 3 0 0 1 0 7h-3" stroke="#e9e4d8" stroke-width="2.5" fill="none"/><ellipse cx="15" cy="11" rx="7" ry="2.5" fill="#6b3a1f"/><circle cx="13" cy="10" r="2" fill="#fff"/><circle cx="17" cy="10.5" r="1.6" fill="#fff"/>'};
+FOODCOL.cocoa='#6b3a1f';
+const SKISVG='<svg viewBox="0 0 32 32"><path d="M6 28L14 3M18 28L26 3" stroke="#d8423a" stroke-width="3" stroke-linecap="round"/><path d="M3 22l30-6" stroke="#3b2614" stroke-width="2"/></svg>';
+const CROSSSVG='<svg viewBox="0 0 32 32"><rect x="4" y="4" width="24" height="24" rx="5" fill="#d8423a"/><path d="M16 9v14M9 16h14" stroke="#fff" stroke-width="5"/></svg>';
+const DIVES=[{x:760,y:1250},{x:880,y:1340},{x:720,y:1440}];
+const WLOOT=[{k:'sunglasses',n:'Lost sunglasses',v:4,c:'#222222',w:28},{k:'lure',n:'Antique lure',v:6,c:'#d8423a',w:24},{k:'coin',n:'Old silver coin',v:8,c:'#cfd6dc',w:20},{k:'watch',n:'Waterlogged watch',v:5,c:'#c9a66b',w:20},{k:'ring',n:'Gold ring',v:15,c:'#f2c230',w:8}];
+const LOOTV={compass:{n:'Antique compass',v:20}};WLOOT.forEach(l=>LOOTV[l.k]=l);
+let diveLoot=[[],[],[]];
+function dailySpawns5(){if(S.canoeDay!==S.day&&S.riding!=='canoe')S.veh.canoe=null;
+  diveLoot=DIVES.map(()=>Array.from({length:4},()=>{let r=Math.random()*100,l=WLOOT[0];for(const q of WLOOT){r-=q.w;if(r<=0){l=q;break}}return {x:R2(40,680),y:R2(332,384),k:l.k}}))}
+const onDock=(x,y)=>x>DOCK.x&&x<DOCK.x+DOCK.w&&y>DOCK.y-4&&y<DOCK.y+DOCK.h+40;
+
+/* places + discovery */
+const PLACES=[{k:'den',n:'Your den',x:240,y:250},{k:'camp',n:'Hollowpine Campground',x:1600,y:610},{k:'station',n:'Ranger Station',x:1985,y:1350},{k:'shack',n:'Snack Shack',x:1325,y:1270},{k:'town',n:'Pinewick',x:3100,y:770},{k:'golf',n:'Golf Club',x:3100,y:250},{k:'lake',n:'Hollowpine Lake',x:820,y:1210},{k:'bait',n:'Bait & Tackle',x:1035,y:1530},{k:'site',n:'Bulldozer site',x:870,y:255},{k:'lodge',n:'Ski Lodge',x:2720,y:-200},{k:'lift',n:'Chairlift',x:3560,y:-500},{k:'island',n:'Mystery island',x:620,y:1340,r:170}];
+let discT=0;
+function discover(dt){discT-=dt;if(discT>0)return;discT=.5;for(const p of PLACES){if(S.seen[p.k])continue;if(dist(P.x,P.y,p.x,p.y)<(p.r||360)){S.seen[p.k]=1;toast('Discovered: '+p.n);sfx(780,.1,'triangle',.08);setTimeout(()=>sfx(1040,.12,'triangle',.08),90)}}}
+
+/* swimming + canoe */
+function swimOut(){for(let r=20;r<=220;r+=12)for(let i=0;i<16;i++){const a=i/16*TAU,x=P.x+Math.cos(a)*r,y=P.y+Math.sin(a)*r;if(free(x,y,P.r)&&(!inLake(x,y,-6)||onDock(x,y))){P.x=x;P.y=y;P.swim=false;toast('Too tired to swim! Moss splashes back to shore.');sfx(200,.2,'triangle',.06,-60);return}}}
+function swimDraw(t){const x=P.x,y=gy(P.y),k=(t/800)%1;ctx.strokeStyle=`rgba(255,255,255,${.6*(1-k)})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(x,y-2,16+k*14,(16+k*14)*T*.6,0,0,TAU);ctx.stroke();
+  ell('rgba(30,80,110,.35)',x,y-2,18,7);ell('#5f3519',x,y-6,15,6);mossHead(x+Math.cos(P.ang)*2,y-18);if(P.moving){ell('rgba(255,255,255,.7)',x-12,y-4+Math.sin(t/90)*2,3,2);ell('rgba(255,255,255,.7)',x+12,y-4-Math.sin(t/90)*2,3,2)}}
+function canoeOut(){for(const r of [34,48,62,78])for(let i=0;i<16;i++){const a=i/16*TAU,x=P.x+Math.cos(a)*r,y=P.y+Math.sin(a)*r;if(free(x,y,P.r)&&(!inLake(x,y,-6)||onIsland(x,y,0)||onDock(x,y))){S.veh.canoe={x:P.x,y:P.y,a:P.ang};S.riding=null;P.vx=P.vy=0;P.x=x;P.y=y;sfx(300,.1,'triangle',.06);if(onIsland(x,y,0)&&!S.secret)toast('You land on the little island. Something is stacked between the trees…');return}}toast('Paddle closer to the shore or the dock to get out.')}
+function drawCanoe(x,y,a,rider){const g0=gy(y),t=performance.now();ctx.save();ctx.translate(x,g0);ctx.scale(1,T);ctx.rotate(a);ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.ellipse(-8,0,42,15,0,0,TAU);ctx.fill();ctx.fillStyle='#b8572e';ctx.beginPath();ctx.ellipse(0,0,34,10,0,0,TAU);ctx.fill();ctx.fillStyle='#7a3a1c';ctx.beginPath();ctx.ellipse(0,0,28,6.5,0,0,TAU);ctx.fill();ctx.fillStyle='#d9c69a';ctx.fillRect(-2,-7,4,14);ctx.fillRect(16,-5,3,10);ctx.restore();
+  if(rider){ell('#5f3519',x,g0-6,14,7);mossHead(x,g0-22);const p=Math.sin(t/250);ctx.strokeStyle='#d9c69a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x-18,g0-16+p*5);ctx.lineTo(x+20,g0-2-p*5);ctx.stroke();ell('#d9c69a',x+21,g0-1-p*5,4,2.5)}}
+function islandSecret(){if(S.secret){toast('The cairn is empty now. Grandpa Root would be proud.');return}S.secret=1;S.coins+=40;sfx(660,.12,'triangle',.1);setTimeout(()=>sfx(990,.16,'triangle',.1),120);
+  talk([['','Under the mossy stones you find an old tin box. Inside: a journal, a pouch of old coins and a golden pinecone.'],['Grandpa Root\'s journal','"If you\'re reading this, little one, you found my island. I\'m Root. Your grandpa. I raided these same coolers in 1952."'],['Grandpa Root\'s journal','"The humans built the road, then the town, then the golf course. Every time, the forest got a little smaller. Keep it wild. Love, Root."'],['Moss','…'],['Pip the crow','Your grandpa was a legend, Moss. Forty coins and a golden pinecone! Don\'t eat the pinecone.']],()=>{toast('+40 coins and a golden pinecone!');save()})}
+
+/* chairlift + mountain drawing */
+function drawLift(t){const vh=ch/scale,H=118,yb=-130,yt=-955,L=yb-yt,top=gy(yt)-H-30,bot=gy(yb);if(bot<camY-20||top>camY+vh+20)return;
+  ctx.strokeStyle='#2a2a2a';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(3546,gy(yb)-H);ctx.lineTo(3546,gy(yt)-H);ctx.moveTo(3574,gy(yb)-H);ctx.lineTo(3574,gy(yt)-H);ctx.stroke();
+  for(let i=0;i<10;i++){const s=(t*.035+i*L/10)%L;[[3546,yb-s,1],[3574,yt+s,0]].forEach(([cx,wy,up])=>{const sy=gy(wy)-H;rect('#2a2a2a',cx-1,sy,2,18);rect('#d8423a',cx-8,sy+18,16,4);rect('#d8423a',cx-8,sy+8,3,12);if(up&&i%3===0){ell('#3d8be0',cx,sy+13,4,5);ell('#f0c9a0',cx,sy+6,3,3);ell('#d8423a',cx,sy+4,3.4,2)}})}}
+
+/* ski lodge + downhill mini-game */
+let ski=null;
+function skiBoard(){const rows=[{n:'Gideon Grube',s:44.0,note:' (with a tailwind)'},{n:'Ingrid Lund',s:46.2},{n:'Deputy Ruiz',s:51.7},{n:'Walt Brambles',s:58.9}];if(S.ski.best)rows.push({n:'You',s:S.ski.best,me:1});rows.sort((a,b)=>a.s-b.s);
+  return rows.map((r,i)=>`<div class="row"><div>${i+1}. ${r.me?'<b>You</b>':esc(r.n)}<small>${r.note||''}</small></div><b>${r.s.toFixed(1)} s</b></div>`).join('')}
+function lodgeUI(){const draw=()=>{const rented=S.skiDay===S.day;menu(`<h2 class="slab">Ski Lodge</h2><p><span class="who">Ingrid:</span> "${rented?'Skis are waxed and ready. The chairlift is just east of here.':'Welcome to the mountain! Skis are six coins for the day.'}" You have <b>${S.coins}</b> coins.</p>
+  <div class="row">${SKISVG}<div><b>Ski rental</b><br><small>Good for today. Ride the chairlift and race down the run.</small></div>${rented?'<button class="btn" data-a="run">Ski a run</button>':`<button class="btn" data-a="rent" ${S.coins>=6?'':'disabled'}>6 coins</button>`}</div>
+  <div class="row">${icon('cocoa')}<div><b>Hot cocoa</b><br><small>+15 hunger. Warms the toes.</small></div><button class="btn" data-a="cocoa" ${S.coins>=3&&S.inv.length<6?'':'disabled'}>3 coins</button></div>
+  <div class="row">${CROSSSVG}<div><b>Ski patrol shift</b><br><small>Rescue stranded skiers on the way down. Gear included. Once per day.</small></div><button class="btn" data-a="patrol" ${S.ski.patrolDay===S.day?'disabled':''}>${S.ski.patrolDay===S.day?'Done today':'Work'}</button></div>
+  <h3 class="slab" style="margin:14px 0 2px;color:var(--amber)">Best downhill times</h3>${skiBoard()}
+  <div class="btns"><button class="btn alt" data-a="close">Leave</button></div>`,a=>{
+    if(a==='rent'&&S.coins>=6){S.coins-=6;S.skiDay=S.day;sfx(990,.1,'triangle',.1);toast('Skis rented for today!');save();draw()}
+    else if(a==='cocoa'&&S.coins>=3&&S.inv.length<6){S.coins-=3;S.inv.push('cocoa');renderSlots();sfx(990,.08,'square',.07);draw()}
+    else if(a==='run')startSki('race');else if(a==='patrol')startSki('patrol')})};draw()}
+function startSki(mode){const L=3400,gates=[],trees=[],vic=[];
+  if(mode==='race')for(let y=360;y<L-260;y+=240)gates.push({y,x:R2(90,270),w:80,done:false,ok:false});
+  else for(let i=0;i<6;i++)vic.push({y:420+i*(L-760)/6+R2(-60,60),x:R2(50,310),ok:false});
+  for(let n=0;trees.length<80&&n<3000;n++){const x=R2(15,345),y=R2(260,L-140);if(gates.some(g=>Math.abs(g.y-y)<55&&Math.abs(g.x-x)<g.w/2+34))continue;if(vic.some(v=>dist(v.x,v.y,x,y)<70))continue;if(trees.some(q=>dist(q.x,q.y,x,y)<34))continue;trees.push({x,y,r:R2(13,19),hit:false})}
+  ski={mode,L,x:180,y:0,vx:0,vy:0,t:0,pen:0,stun:0,gates,trees,vic,ph:'count',cd:3,turn:0,last:performance.now(),crash:0,tgt:null,spray:[]};
+  openModal(`<h2 class="slab">${mode==='race'?'Downhill time trial':'Ski patrol'}</h2><div class="ghud"><span>Time <b id="skT">0.0</b> s</span><span>Penalty <b id="skP">0</b> s</span><span>${mode==='race'?'Gates':'Rescued'} <b id="skG">0</b>/${mode==='race'?gates.length:6}</span></div>
+  <canvas id="skiCv" width="360" height="480"></canvas><p id="skMsg">${mode==='race'?'Steer through every pair of flags. Missed gate +3 s, crash +2 s.':'Ski past stranded skiers to rescue them. Avoid the trees!'}</p>
+  <div class="btns gbtns"><button class="btn alt" data-s="l" style="flex:1">◀ Left</button><button class="btn alt" data-s="r" style="flex:1">Right ▶</button><button class="btn alt" data-s="quit">Quit</button></div>`);
+  $('#card').onclick=null;const c=$('#skiCv'),toX=e=>{const r=c.getBoundingClientRect();return (e.clientX-r.left)/r.width*360};
+  c.addEventListener('pointerdown',e=>{if(ski)ski.tgt=toX(e)});c.addEventListener('pointermove',e=>{if(ski&&ski.tgt!=null)ski.tgt=toX(e)});const nd=()=>{if(ski)ski.tgt=null};c.addEventListener('pointerup',nd);c.addEventListener('pointerleave',nd);
+  const bt=$('#card').querySelector('.gbtns');bt.addEventListener('pointerdown',e=>{const b=e.target.closest('[data-s]');if(!b||!ski)return;e.preventDefault();if(b.dataset.s==='quit'){ski=null;closeModal();toast('You unclip your skis and walk down.');return}ski.turn=b.dataset.s==='l'?-1:1});
+  const st=()=>{if(ski)ski.turn=0};bt.addEventListener('pointerup',st);bt.addEventListener('pointerleave',st);bt.addEventListener('pointercancel',st);
+  requestAnimationFrame(skiLoop)}
+function skMsg(t,c){const m=$('#skMsg');if(m){m.textContent=t;m.style.color=c||'var(--moss)'}}
+function skiLoop(now){const K=ski;if(!K)return;const dt=Math.min(.05,(now-K.last)/1000);K.last=now;
+  if(K.ph==='count'){const b=Math.ceil(K.cd);K.cd-=dt;if(Math.ceil(K.cd)!==b&&K.cd>0)sfx(520,.08,'square',.06);if(K.cd<=0){K.ph='run';sfx(880,.15,'square',.08);skMsg('GO!')}}
+  else if(K.ph==='run'){K.t+=dt;let kt=((keys.ArrowLeft||keys.KeyA)?-1:0)+((keys.ArrowRight||keys.KeyD)?1:0)+K.turn;if(K.tgt!=null)kt=clamp((K.tgt-K.x)/40,-1,1);kt=clamp(kt,-1,1);
+    if(K.stun>0){K.stun-=dt;K.vx*=.85}else{K.vx+=(kt*240-K.vx)*Math.min(1,dt*6);K.vy+=(250-Math.abs(kt)*90)*dt}
+    K.vy=clamp(K.vy,0,K.mode==='race'?470:380);K.x=clamp(K.x+K.vx*dt,14,346);const py=K.y;K.y+=K.vy*dt;
+    if(Math.abs(K.vx)>120&&Math.random()<.6)K.spray.push({x:K.x,y:K.y,vx:-K.vx*.3+R2(-30,30),vy:R2(-60,-10),t:.5});
+    for(const tr of K.trees)if(!tr.hit&&dist(K.x,K.y,tr.x,tr.y)<tr.r+9){tr.hit=true;K.pen+=2;K.crash++;K.stun=.7;K.vy=50;sfx(140,.2,'sawtooth',.08,-60);skMsg('Wipeout! +2 s','var(--red)')}
+    for(const g of K.gates)if(!g.done&&py<g.y&&K.y>=g.y){g.done=true;g.ok=Math.abs(K.x-g.x)<g.w/2;if(g.ok){sfx(990,.05,'triangle',.07)}else{K.pen+=3;sfx(200,.12,'sawtooth',.06);skMsg('Missed a gate! +3 s','var(--red)')}}
+    for(const v of K.vic)if(!v.ok&&dist(K.x,K.y,v.x,v.y)<30){v.ok=true;sfx(990,.08,'triangle',.1);setTimeout(()=>sfx(1320,.1,'triangle',.1),80);skMsg('Rescued! "My hero!"')}
+    if(K.y>=K.L){skiDone();return}}
+  K.spray=K.spray.filter(p=>(p.t-=dt)>0);K.spray.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt});
+  drawSki(now);const tt=$('#skT');if(tt){tt.textContent=K.t.toFixed(1);$('#skP').textContent=K.pen;$('#skG').textContent=K.mode==='race'?K.gates.filter(g=>g.ok).length:K.vic.filter(v=>v.ok).length}
+  requestAnimationFrame(skiLoop)}
+function drawSki(t){const c=$('#skiCv');if(!c||!ski)return;const g=c.getContext('2d'),K=ski,cy=K.y-140,E=(x,y,rx,ry,col)=>{g.fillStyle=col;g.beginPath();g.ellipse(x,y,rx,ry,0,0,TAU);g.fill()};
+  g.fillStyle='#f4f8fb';g.fillRect(0,0,360,480);g.fillStyle='rgba(170,195,215,.25)';for(let y=-(cy%26+26)%26;y<480;y+=26)g.fillRect(0,y,360,2);
+  g.fillStyle='#dfe9f1';g.fillRect(0,0,10,480);g.fillRect(350,0,10,480);
+  if(K.L-cy<520){const fy=K.L-cy;for(let x=0;x<360;x+=20){g.fillStyle=(x/20)%2?'#222':'#fff';g.fillRect(x,fy,20,10);g.fillStyle=(x/20)%2?'#fff':'#222';g.fillRect(x,fy+10,20,10)}g.fillStyle='#d8423a';g.font='900 22px Nunito,sans-serif';g.textAlign='center';g.fillText('FINISH',180,fy-14);g.textAlign='left'}
+  K.trees.forEach(tr=>{const y=tr.y-cy;if(y<-40||y>520)return;E(tr.x+6,y+6,tr.r,tr.r*.7,'rgba(90,110,130,.25)');E(tr.x,y,tr.r,tr.r,'#1f5a35');E(tr.x-tr.r*.2,y-tr.r*.2,tr.r*.55,tr.r*.55,'#f4f8fb');E(tr.x+tr.r*.3,y+tr.r*.2,tr.r*.3,tr.r*.3,'#2f7646')});
+  K.gates.forEach((q,i)=>{const y=q.y-cy;if(y<-40||y>520)return;const col=i%2?'#3d8be0':'#d8423a';[q.x-q.w/2,q.x+q.w/2].forEach(x=>{g.fillStyle='#555';g.fillRect(x-1,y-26,2,26);g.fillStyle=q.done?(q.ok?'#6fbf4a':'#999'):col;g.beginPath();g.moveTo(x,y-26);g.lineTo(x+(x<q.x?-14:14),y-21);g.lineTo(x,y-16);g.fill()});g.strokeStyle='rgba(0,0,0,.08)';g.setLineDash([4,6]);g.beginPath();g.moveTo(q.x-q.w/2,y);g.lineTo(q.x+q.w/2,y);g.stroke();g.setLineDash([])});
+  K.vic.forEach(v=>{const y=v.y-cy;if(y<-40||y>520)return;E(v.x,y+4,14,5,'rgba(90,110,130,.25)');g.strokeStyle='#d8423a';g.lineWidth=3;g.beginPath();g.moveTo(v.x-14,y+2);g.lineTo(v.x+14,y-4);g.stroke();E(v.x,y-4,9,6,v.ok?'#6fbf4a':'#e86a8a');E(v.x-10,y-8,4,4,'#f0c9a0');g.strokeStyle='#e86a8a';g.beginPath();g.moveTo(v.x+6,y-6);g.lineTo(v.x+12,y-16+Math.sin(t/120)*3);g.stroke();g.fillStyle=v.ok?'#3a7a2a':'#d8423a';g.font='900 12px Nunito,sans-serif';g.textAlign='center';g.fillText(v.ok?'Thanks!':'HELP!',v.x,y-22);g.textAlign='left'});
+  K.spray.forEach(p=>E(p.x,p.y-cy,2.5,2.5,'rgba(255,255,255,.9)'));
+  const x=K.x,y=140,lean=K.vx/240;g.save();g.translate(x,y);g.rotate(lean*.35);g.strokeStyle='#d8423a';g.lineWidth=3;g.beginPath();g.moveTo(-7,-14);g.lineTo(-7,16);g.moveTo(7,-14);g.lineTo(7,16);g.stroke();
+  E(0,0,13,11,{coat:'#f2c230',sweater:'#c8423a',vest:'#c9b27a'}[S.outfit]||'#7d4b29');E(0,-12,8,8,'#7d4b29');E(0,-10,5,4,'#c79a6e');E(0,-17,8,4,'#2f6fb0');g.restore();
+  if(K.stun>0){g.fillStyle='#ffbf3c';g.font='900 14px Nunito,sans-serif';g.fillText('✶',x+10,y-22)}
+  if(K.ph==='count'){g.fillStyle='rgba(0,0,0,.35)';g.fillRect(0,0,360,480);g.fillStyle='#fff';g.font='900 72px Nunito,sans-serif';g.textAlign='center';g.fillText(Math.ceil(K.cd),180,260);g.textAlign='left'}}
+function skiDone(){const K=ski;ski=null;const time=+(K.t+K.pen).toFixed(1);S.time=Math.min(S.time+60,1439);let body='',prize=0;
+  if(K.mode==='race'){const nb=!S.ski.best||time<S.ski.best;if(nb)S.ski.best=time;S.ski.runs++;prize=time<45?20:time<55?8:0;S.coins+=prize;body=`<p>Run time <b>${K.t.toFixed(1)} s</b> + penalties <b>${K.pen} s</b> = <b>${time} s</b>${nb?' · <b>new personal best!</b>':''}</p><p>Gates: ${K.gates.filter(g=>g.ok).length}/${K.gates.length} · crashes: ${K.crash}</p><div class="row"><div>Prize</div><b>${prize} coins</b></div><h3 class="slab" style="margin:12px 0 2px;color:var(--amber)">Best downhill times</h3>${skiBoard()}`}
+  else{const res=K.vic.filter(v=>v.ok).length;prize=6+res*4+(K.crash===0?5:0);S.coins+=prize;S.ski.patrolDay=S.day;body=`<p>Rescued <b>${res}/6</b> skiers · crashes: ${K.crash}</p><div class="row"><div>Wage</div><b>6</b></div><div class="row"><div>Rescues</div><b>${res*4}</b></div>${K.crash===0?'<div class="row"><div>Clean run bonus</div><b>5</b></div>':''}<div class="row"><div><b>Total</b></div><b>${prize} coins</b></div><p><span class="who">Ingrid:</span> "${res>=5?'You\'re a natural, and very… fuzzy.':'Not bad. The mountain is tricky.'}"</p>`}
+  save();sfx(880,.15,'triangle',.12);openModal(`<h2 class="slab">${K.mode==='race'?'Finish!':'Patrol complete'}</h2>${body}<div class="btns"><button class="btn" data-a="go">Back to the lodge</button></div>`);$('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))closeModal()}}
+
+/* scuba */
+let dive=null;
+function startDive(i){if(!S.scuba){toast('You need scuba gear. Marge sells it at the Bait & Tackle.');return}
+  dive={i,x:120,y:20,vx:0,vy:0,air:1,last:performance.now(),got:[],tx:null,ty:null,hold:false,chestT:0,chest:false,pike:{x:520,y:220,d:-1,hitT:0},fish:Array.from({length:6},()=>({x:R2(0,720),y:R2(80,320),d:Math.random()<.5?1:-1,s:R2(20,50)})),bub:[],t:0,up:false,items:diveLoot[i]};
+  openModal(`<h2 class="slab">Scuba dive</h2><div class="ghud" style="align-items:center"><span>Air</span><div class="bar" style="flex:1;min-width:110px;margin:0"><i id="dvA" style="width:100%;background:var(--sky);transition:none"></i></div><span>Found <b id="dvG">0</b></span></div>
+  <canvas id="diveCv" width="360" height="420"></canvas><p id="dvMsg">Swim with WASD or the arrows, or hold on the water to swim toward that spot. Get back to the surface before your air runs out!</p><div class="btns"><button class="btn alt" id="dvUp">Swim up to the surface</button></div>`);
+  $('#card').onclick=null;const c=$('#diveCv'),toW=e=>{const r=c.getBoundingClientRect();return [(e.clientX-r.left)/r.width*360+clamp(dive.x-180,0,360),(e.clientY-r.top)/r.height*420]};
+  c.addEventListener('pointerdown',e=>{if(!dive)return;dive.hold=true;[dive.tx,dive.ty]=toW(e)});c.addEventListener('pointermove',e=>{if(dive&&dive.hold)[dive.tx,dive.ty]=toW(e)});const nd=()=>{if(dive)dive.hold=false};c.addEventListener('pointerup',nd);c.addEventListener('pointerleave',nd);
+  $('#dvUp').addEventListener('click',()=>{if(dive)dive.up=true});requestAnimationFrame(diveLoop)}
+function dvMsg(t,c){const m=$('#dvMsg');if(m){m.textContent=t;m.style.color=c||'var(--moss)'}}
+function diveLoop(now){const D=dive;if(!D)return;const dt=Math.min(.05,(now-D.last)/1000);D.last=now;D.t+=dt;D.air-=dt/38;
+  let ax=((keys.ArrowRight||keys.KeyD)?1:0)-((keys.ArrowLeft||keys.KeyA)?1:0),ay=((keys.ArrowDown||keys.KeyS)?1:0)-((keys.ArrowUp||keys.KeyW)?1:0);
+  if(D.hold&&D.tx!=null){const dx=D.tx-D.x,dy=D.ty-D.y,d=Math.hypot(dx,dy);if(d>8){ax=dx/d;ay=dy/d}}if(D.up){ax=0;ay=-1}
+  D.vx+=ax*320*dt;D.vy+=ay*320*dt-12*dt;const fr=Math.pow(.15,dt);D.vx*=fr;D.vy*=fr;const sp=Math.hypot(D.vx,D.vy);if(sp>160){D.vx*=160/sp;D.vy*=160/sp}
+  D.x=clamp(D.x+D.vx*dt,15,705);D.y=clamp(D.y+D.vy*dt,0,384);if(Math.random()<dt*3)D.bub.push({x:D.x+6,y:D.y-8,t:2});D.bub=D.bub.filter(b=>(b.t-=dt)>0&&(b.y-=60*dt)>0);
+  for(let j=D.items.length-1;j>=0;j--){const it=D.items[j];if(dist(D.x,D.y,it.x,it.y)<26){D.items.splice(j,1);D.got.push(it.k);sfx(990,.06,'triangle',.08);dvMsg(`Found: ${LOOTV[it.k].n}!`)}}
+  if(D.i===1&&!S.chest&&!D.chest&&dist(D.x,D.y,600,372)<40){D.chestT+=dt;if(D.chestT>1.2){D.chest=true;S.chest=true;D.got.push('compass');S.coins+=60;sfx(660,.1,'triangle',.1);setTimeout(()=>sfx(990,.14,'triangle',.1),100);setTimeout(()=>sfx(1320,.18,'triangle',.1),200);dvMsg('The sunken chest creaks open: 60 coins and an antique compass!','var(--amber)')}else if(D.chestT>.05)dvMsg('Prying the chest open…','var(--amber)')}else D.chestT=0;
+  const pk=D.pike;pk.x+=pk.d*75*dt;if(pk.x<40||pk.x>680)pk.d*=-1;pk.y=220+Math.sin(D.t*.8)*40;pk.hitT-=dt;if(pk.hitT<=0&&dist(D.x,D.y,pk.x,pk.y)<32){pk.hitT=1.5;D.air-=.12;D.vx+=(D.x-pk.x)*4;D.vy+=(D.y-pk.y)*4;sfx(160,.15,'sawtooth',.07);dvMsg('A grumpy pike bumps you! You gasp out some air.','var(--red)')}
+  D.fish.forEach(f=>{f.x+=f.d*f.s*dt;if(f.x<-20)f.x=740;if(f.x>740)f.x=-20});
+  if(D.air<=0){endDive(false);return}if(D.y<=4&&D.t>1.2){endDive(true);return}
+  drawDive(now);const a=$('#dvA');if(a){a.style.width=Math.max(0,D.air*100)+'%';a.style.background=D.air<.25?'var(--red)':'var(--sky)';$('#dvG').textContent=D.got.length}
+  requestAnimationFrame(diveLoop)}
+function drawDive(t){const c=$('#diveCv');if(!c||!dive)return;const g=c.getContext('2d'),D=dive,cx=clamp(D.x-180,0,360),E=(x,y,rx,ry,col)=>{g.fillStyle=col;g.beginPath();g.ellipse(x,y,rx,ry,0,0,TAU);g.fill()};
+  const wg=g.createLinearGradient(0,0,0,420);wg.addColorStop(0,'#3a9cc8');wg.addColorStop(1,'#0e3a55');g.fillStyle=wg;g.fillRect(0,0,360,420);
+  g.fillStyle='rgba(255,255,255,.06)';for(let i=0;i<6;i++){const x=((i*100-cx*.3+Math.sin(t/2000+i)*20)%480+480)%480-60;g.beginPath();g.moveTo(x,0);g.lineTo(x+40,0);g.lineTo(x+110,420);g.lineTo(x+60,420);g.fill()}
+  g.fillStyle='rgba(255,255,255,.35)';g.fillRect(0,0,360,4);
+  g.fillStyle='#c9b27a';g.beginPath();g.moveTo(0,420);for(let x=0;x<=360;x+=20)g.lineTo(x,394+Math.sin((x+cx)/60)*6);g.lineTo(360,420);g.fill();
+  [[80,396,22],[260,400,30],[470,394,26],[640,398,20]].forEach(([x,y,r])=>{E(x-cx,y,r,r*.6,'#6a7480');E(x-cx-r*.3,y-r*.25,r*.5,r*.3,'#8a949e')});
+  g.lineWidth=3;for(let wx=20;wx<720;wx+=45){const x=wx-cx;if(x<-20||x>380)continue;const s=Math.sin(t/700+wx)*8;g.strokeStyle='#2f7a4a';g.beginPath();g.moveTo(x,400);g.quadraticCurveTo(x+s,370,x+s*1.5,340-(wx%3)*10);g.stroke()}
+  D.items.forEach(it=>{const x=it.x-cx,l=LOOTV[it.k];if(x<-20||x>380)return;const gl=.5+Math.sin(t/200+it.x)*.5;E(x,it.y,10+gl*4,10+gl*4,`rgba(255,255,220,${.15+gl*.2})`);E(x,it.y,7,4,l.c);E(x-2,it.y-1,2,1.5,'#ffffff')});
+  if(D.i===1&&!S.chest||D.chest){const x=600-cx;g.fillStyle='#6b4226';g.fillRect(x-18,358,36,22);g.fillStyle=D.chest?'#3b2614':'#8a5d36';g.fillRect(x-18,D.chest?344:352,36,8);g.fillStyle='#f2c230';g.fillRect(x-3,360,6,6);g.fillRect(x-18,366,36,2);if(D.chest)E(x,362,10,4,'#f2c230')}
+  D.fish.forEach(f=>{const x=f.x-cx;E(x,f.y,8,4,'#e0a040');g.fillStyle='#e0a040';g.beginPath();g.moveTo(x-f.d*7,f.y);g.lineTo(x-f.d*13,f.y-4);g.lineTo(x-f.d*13,f.y+4);g.fill()});
+  {const x=D.pike.x-cx,y=D.pike.y,d=D.pike.d;E(x,y,26,6,'#5a7a4a');g.fillStyle='#5a7a4a';g.beginPath();g.moveTo(x-d*24,y);g.lineTo(x-d*36,y-7);g.lineTo(x-d*36,y+7);g.fill();E(x+d*18,y-1,1.8,1.8,'#fff')}
+  D.bub.forEach(b=>{g.strokeStyle='rgba(255,255,255,.7)';g.lineWidth=1;g.beginPath();g.arc(b.x-cx,b.y,2.5,0,TAU);g.stroke()});
+  {const x=D.x-cx,y=D.y,f=D.vx>=0?1:-1;E(x-f*20,y+4,7,3,'#2a2a2a');E(x,y,16,10,'#7d4b29');g.fillStyle='#f2c230';g.fillRect(x-f*6-5,y-14,10,8);E(x+f*12,y-4,9,8,'#7d4b29');E(x+f*16,y-5,5,4,'#6cd0ff');g.strokeStyle='#222';g.lineWidth=1.5;g.beginPath();g.ellipse(x+f*16,y-5,5,4,0,0,TAU);g.stroke()}
+  if(D.air<.25){g.fillStyle=`rgba(255,80,60,${.15+Math.sin(t/120)*.1})`;g.fillRect(0,0,360,420)}}
+function endDive(ok){const D=dive;dive=null;let html;
+  if(ok){S.loot.push(...D.got);html=`<h2 class="slab">Back on the surface</h2>${D.got.length?D.got.map(k=>`<div class="row"><div><b>${LOOTV[k].n}</b></div><b>${LOOTV[k].v} coins</b></div>`).join(''):'<p>Nothing this time. Just weeds and a grumpy pike.</p>'}<p style="color:var(--dim)">Marge at the Bait &amp; Tackle buys lake finds.</p>`}
+  else html=`<h2 class="slab">Out of air!</h2><p>Moss blacks out and bobs to the surface, coughing up lake water. Everything you found slipped away.${D.chest?' (The coins from the chest are safe in your fur.)':''}</p>`;
+  save();openModal(html+'<div class="btns"><button class="btn" data-a="go">Climb back in the canoe</button></div>');$('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))closeModal()}}
+
+/* story: bribe letter + newspaper */
+function searchOffice(){if(S.q<13){toast('A locked trailer full of blueprints. Nothing useful… yet.');return}if(!sabTime()){toast('The crew is inside. Come back after 8 PM.');return}if(S.letter){toast('Just blueprints and an empty coffee pot now.');return}
+  caughtStealing();S.letter=1;sfx(660,.1,'triangle',.1);
+  talk([['','You jiggle the trailer window open and squeeze in. On the desk, under a coffee mug, is a letter on gold-trimmed paper.'],['Grube\'s letter','"Dear Dr. Holm, please accept this $50,000 RESEARCH GRANT. I trust your species review will find nothing but squirrels. Warmly, Gideon Grube. P.S. Burn this."'],['Moss','!!!'],['Pip the crow','He wrote it DOWN? Moss, take that to the post office. Iris can get it to the Pinewick Gazette.']],()=>{if(S.q===13)advance(14);save()})}
+function mailLetter(){S.letter=2;S.mailed=S.day;if(S.deadline)S.deadline+=7;
+  talk([['Iris Okafor','Oh my. OH my. A "research grant"? To bury the review?'],['Iris Okafor','Express post to the Gazette, on the house. Tomorrow morning, the whole town reads this.']],()=>{if(S.q===14)advance(15);toast('The council vote is delayed a week while the town investigates!');save();setTimeout(endCard5,1200)})}
+function headlines(){const y=S.day-1,H=[];
+  if(S.mailed&&S.mailed===y)H.push(['GRUBE CAUGHT BRIBING BIOLOGIST!','Leaked letter offers a "$50,000 research grant" to bury the Hollowpine species review. Council vote delayed a week. Residents furious.']);
+  if(S.sab.won===y)H.push(['RESORT CREW BAFFLED AGAIN','Bulldozer keys found in a hollow log; crew lunch replaced with pinecones. "It\'s the raccoons," insists foreman Big Earl.']);
+  if(S.vossDay===y)H.push(['BLURRY "BIGFOOT" PHOTO SPARKS DEBATE','Private eye Hank Voss calls it proof. Readers call it "a man in a bath mat."']);
+  if(S.q>=12&&S.q<15)H.push(['SPECIES REVIEW CONTINUES','Provincial biologist Dr. Anita Holm calls the Hollowpine evidence "extraordinary." Developer Gideon Grube calls it "squirrels."']);
+  if(S.mailed&&S.mailed<y)H.push(['GRUBE "OUT OF OFFICE"','Developer unavailable for comment since the bribe scandal. His gold car was seen leaving the golf club "at speed."']);
+  const G=[['PIE CONTEST ENDS IN A TIE','Third year running. Judges blame "too much butter."'],['CAMPER LOSES SANDWICH','"It was right there on the table," says Doug, of Pinecone campsite.'],['GOLF CLUB REPAINTS FLAGS','They are now slightly redder.'],['MOOSE SPOTTED NEAR POST OFFICE','Postmaster Iris Okafor "not bothered."'],['FISHING DERBY THIS WEEKEND','Marge at the Bait & Tackle predicts a record sturgeon.'],['SKI LODGE OPENS FOR SEASON','Ingrid Lund promises cocoa "hotter than ever."'],['STRANGE FOOTPRINTS AT THE LAKE','"Probably a very big hiker," says Ranger Hollis.'],['DINER ADDS TRUFFLE FRIES','Dot Pickering will not reveal her supplier.']];
+  for(let i=0;H.length<3;i++)H.push(G[(S.day*3+i)%G.length]);return H}
+function paperUI(){const H=headlines(),d=S.deadline?S.deadline-S.day:0;
+  openModal(`<div style="margin:-18px -20px;padding:18px 20px;background:#f2ead6;color:#2a2218;border-radius:10px"><div style="text-align:center;border-bottom:3px double #2a2218;padding-bottom:6px"><div class="slab" style="font-size:clamp(24px,6vw,34px);letter-spacing:.02em">The Pinewick Gazette</div><div style="font-size:13px;font-weight:800">Day ${S.day} · 25¢ · ${S.rain?'Rain all day':'Sunny spells'}${d>0?` · Council vote in ${d} days`:''}</div></div>
+  <h2 style="font-family:Georgia,serif;font-size:clamp(24px,6vw,32px);line-height:1.05;margin:12px 0 6px;color:#2a2218">${esc(H[0][0])}</h2><p style="margin:0 0 10px">${esc(H[0][1])}</p>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;border-top:1px solid #2a2218;padding-top:8px">${H.slice(1,3).map(h=>`<div><b style="font-family:Georgia,serif">${esc(h[0])}</b><p style="font-size:14px;margin:4px 0 0">${esc(h[1])}</p></div>`).join('')}</div>
+  <div class="btns"><button class="btn" data-a="go">Close the paper</button></div></div>`);$('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))closeModal()}}
+function paperCheck(){if(S.paperDay===S.day||hour()<6)return;S.paperDay=S.day;if(SET.paper&&S.day>1)paperUI()}
+function endCard5(){openModal(`<h2 class="slab">To be continued…</h2><p>You finished Pinecone Prowler Slice 5: The mountain and the lake.</p><p>Day ${S.day} · best downhill ${S.ski.best?S.ski.best.toFixed(1)+' s':'not yet'} · ${S.loot.length} lake finds · ${S.secret?'Grandpa Root\'s secret found':'the island still keeps its secret'} · ${Object.keys(S.seen).length}/${PLACES.length} places discovered.</p><p style="color:var(--dim)">Read tomorrow's Gazette. The council vote is ${S.deadline-S.day} days away.</p><div class="btns"><button class="btn" data-a="go">Keep playing</button></div>`);$('#card').onclick=e=>{if(e.target.closest('[data-a=go]'))closeModal()}}
+
+/* map + menu */
+function mapUI(){const H=Math.round(820*(WH-YMIN)*T/WW);openModal(`<h2 class="slab">Map of Hollowpine</h2><canvas id="mapCv" width="820" height="${H}" style="display:block;width:100%;border-radius:8px;background:#173d22"></canvas><p style="color:var(--dim);font-size:14px;margin:8px 0 0">Discovered ${Object.keys(S.seen).length} of ${PLACES.length} places. The yellow line is the Hollowpine Highway. <b style="color:var(--amber)">★</b> is your goal.</p><div class="btns"><button class="btn alt" data-a="close">Close</button></div>`);
+  $('#card').style.width='min(900px,100%)';$('#card').onclick=e=>{if(e.target.closest('[data-a=close]'))closeModal()};
+  const c=$('#mapCv'),g=c.getContext('2d'),k=820/WW,my=y=>(gy(y)-gy(YMIN))*k;g.drawImage(bgN,0,0,WW,bgN.height,0,0,820,bgN.height*k);g.drawImage(bg,0,0,WW,bg.height,0,bgN.height*k,820,bg.height*k);
+  g.fillStyle='rgba(20,60,30,.55)';trees.forEach(t=>{g.beginPath();g.arc(t.x*k,my(t.y),t.snow?1.6:1.8,0,TAU);g.fill()});
+  g.fillStyle='#7a4c2a';Object.values(B).forEach(q=>g.fillRect(q.x*k,my(q.y),q.w*k,Math.max(2,(q.h*T)*k)));
+  g.strokeStyle='#f2c230';g.lineWidth=3;g.beginPath();LOOP.forEach(([x,y],i)=>i?g.lineTo(x*k,my(y)):g.moveTo(x*k,my(y)));g.stroke();
+  g.font='800 11px Nunito,sans-serif';g.textAlign='center';PLACES.forEach(p=>{const x=p.x*k,y=my(p.y),seen=S.seen[p.k];g.fillStyle=seen?'#fbf3df':'rgba(251,243,223,.5)';g.beginPath();g.arc(x,y,3.5,0,TAU);g.fill();const t=seen?p.n:'?';g.lineWidth=3;g.strokeStyle='rgba(0,0,0,.6)';g.strokeText(t,x,y-7);g.fillText(t,x,y-7)});
+  const tg=qTarget();if(tg){g.fillStyle='#ffbf3c';g.font='900 18px Nunito,sans-serif';g.fillText('★',tg.x*k,my(tg.y)+6)}
+  if(S.dog.adopted){g.fillStyle='#c98a4b';g.beginPath();g.arc(dog.x*k,my(dog.y),3,0,TAU);g.fill()}
+  g.fillStyle='#7d4b29';g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();g.arc(P.x*k,my(P.y),5.5,0,TAU);g.fill();g.stroke();g.fillStyle='#fff';g.font='900 11px Nunito,sans-serif';g.fillText('You',P.x*k,my(P.y)+17);g.textAlign='left'}
+function menuUI(conf){menu(conf?`<h2 class="slab">Start over?</h2><p>This erases your saved game: coins, quests, photos, Biscuit, everything.</p><div class="btns"><button class="btn" data-a="wipe">Yes, start over</button><button class="btn alt" data-a="back">No, keep playing</button></div>`:`<h2 class="slab">Game menu</h2>
+  <div class="row"><div><b>Sound volume</b><br><small id="volV">${SET.vol}%</small></div><input type="range" id="volR" min="0" max="100" value="${SET.vol}" aria-label="Sound volume" style="flex:1;accent-color:#ffbf3c"></div>
+  <div class="row"><div><b>Morning newspaper</b><br><small>Show the Pinewick Gazette each morning.</small></div><button class="btn" data-a="paper">${SET.paper?'On':'Off'}</button></div>
+  <div class="row"><div><b>Today's paper</b><br><small>Read the Gazette again.</small></div><button class="btn alt" data-a="news">Read</button></div>
+  <div class="row"><div><b>Save game</b><br><small>The game also autosaves every 15 seconds and when you sleep.</small></div><button class="btn" data-a="save">Save now</button></div>
+  <div class="row"><div><b>Start over</b><br><small>Erase your save and begin a new game.</small></div><button class="btn alt" data-a="reset">Restart…</button></div>
+  <div class="btns"><button class="btn" data-a="close">Resume</button></div>`,a=>{
+    if(a==='paper'){SET.paper=!SET.paper;saveSet();menuUI()}else if(a==='news')paperUI();else if(a==='save'){save();toast('Game saved.');closeModal()}else if(a==='reset')menuUI(true);else if(a==='back')menuUI();
+    else if(a==='wipe'){try{localStorage.removeItem(KEY)}catch(e){}load(fresh());P.x=330;P.y=330;S.paperDay=1;closeModal();toast('A brand new day in Hollowpine. Walk to Pip and press E.')}});
+  const r=$('#volR');if(r)r.addEventListener('input',()=>{SET.vol=+r.value;$('#volV').textContent=SET.vol+'%';saveSet()}),r.addEventListener('change',()=>sfx(660,.1,'triangle',.1))}
 
 /* ---------- save ---------- */
 const KEY='pinecone-prowler-v1';
 function snapshot(){return {...JSON.parse(JSON.stringify(S)),px:P.x,py:P.y}}
 function save(){if(!started)return;try{localStorage.setItem(KEY,JSON.stringify(snapshot()))}catch(e){}}
-function migrate(d){if(!d.v||d.v<2){d.owned=d.hasCoat?['coat']:[];d.outfit=d.coat?'coat':'none';d.pick='coat';d.v=2;delete d.hasCoat;delete d.coat}if(d.v<3)d.v=3;if(d.v<4)d.v=4;return d}
-function load(d){d=migrate({...d});const f=fresh();S={...f,...d};for(const k of ['stats','side','ev','veh','golf','fishLog','guide','dog','sab'])S[k]={...f[k],...(d[k]||{})};S.photos=Array.isArray(d.photos)?d.photos:[];S.catch=Array.isArray(d.catch)?d.catch:[];S.basket=Array.isArray(d.basket)?d.basket:[];if(S.riding&&!S.veh[S.riding])S.riding=null;S.q=clamp(S.q|0,0,QUESTS.length-1);P.x=d.px??330;P.y=d.py??330;if(!free(P.x,P.y,P.r)){P.x=330;P.y=330}started=true;restock();resetNPCs();renderSlots();pip.x=PIPAT[S.q][0];pip.y=PIPAT[S.q][1];if(S.dog.adopted){dog.x=P.x-30;dog.y=P.y+24}}
+function migrate(d){if(!d.v||d.v<2){d.owned=d.hasCoat?['coat']:[];d.outfit=d.coat?'coat':'none';d.pick='coat';d.v=2;delete d.hasCoat;delete d.coat}if(d.v<3)d.v=3;if(d.v<4)d.v=4;if(d.v<5)d.v=5;return d}
+function load(d){d=migrate({...d});const f=fresh();S={...f,...d};for(const k of ['stats','side','ev','veh','golf','fishLog','guide','dog','sab','ski','seen'])S[k]={...f[k],...(d[k]||{})};S.photos=Array.isArray(d.photos)?d.photos:[];S.catch=Array.isArray(d.catch)?d.catch:[];S.basket=Array.isArray(d.basket)?d.basket:[];S.loot=Array.isArray(d.loot)?d.loot:[];if(!d.v||d.paperDay==null)S.paperDay=S.day;if(S.riding&&!S.veh[S.riding])S.riding=null;S.q=clamp(S.q|0,0,QUESTS.length-1);P.x=d.px??330;P.y=d.py??330;if(!free(P.x,P.y,P.r)){P.x=330;P.y=330}started=true;restock();resetNPCs();renderSlots();pip.x=PIPAT[S.q][0];pip.y=PIPAT[S.q][1];if(S.dog.adopted){dog.x=P.x-30;dog.y=P.y+24}}
 window.claude?.hot?.snapshot?.(()=>started?snapshot():null);
-window.__pp={P,dog,stu,traffic,DOCK,MSPOTS,get mush(){return mush},get truffles(){return truffles},get fishing(){return fishing},fishAct,bark,startFishing,nightId,holm,voss,EVID,snap,camToggle,golfSwing,get golf(){return golf},get caddy(){return caddy},get feast(){return feast},caddyPick,feastEat,feastUI,mount,dismount,rightClub,get photo(){return photo},get S(){return S},npcs,guards,ranger,deputy,grube,sites,interact,eat,load,migrate,cookTap,get cook(){return cook}};
+window.__pp={P,DIVES,ISLE,SET,get ski(){return ski},get dive(){return dive},startSki,startDive,mapUI,menuUI,paperUI,headlines,waterFree,dog,stu,traffic,DOCK,MSPOTS,get mush(){return mush},get truffles(){return truffles},get fishing(){return fishing},fishAct,bark,startFishing,nightId,holm,voss,EVID,snap,camToggle,golfSwing,get golf(){return golf},get caddy(){return caddy},get feast(){return feast},caddyPick,feastEat,feastUI,mount,dismount,rightClub,get photo(){return photo},get S(){return S},npcs,guards,ranger,deputy,grube,sites,interact,eat,load,migrate,cookTap,get cook(){return cook}};
 
 /* ---------- input ---------- */
 const keys={};let joy={x:0,y:0},runBtn=false;
 const MOVE=['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'];
 addEventListener('keydown',e=>{if(e.repeat&&!MOVE.includes(e.code))return;keys[e.code]=true;
   if(cook){const m=/^Digit([1-9])$/.exec(e.code);if(m){e.preventDefault();cookTap(INGS[+m[1]-1].k)}return}
+  if(ski||dive){if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault();return}
   if(fishing){if(['Space','KeyE','Enter'].includes(e.code)){e.preventDefault();fishAct(true)}return}
   if(golf){if(['Space','Enter','KeyE'].includes(e.code)){e.preventDefault();golfSwing()}if(e.code.startsWith('Arrow'))e.preventDefault();return}
   if(caddy){const m=/^Digit([1-6])$/.exec(e.code);if(m){e.preventDefault();caddyPick(CLUBS[+m[1]-1])}return}
@@ -1033,6 +1259,8 @@ addEventListener('keydown',e=>{if(e.repeat&&!MOVE.includes(e.code))return;keys[e
   if(e.code==='KeyC')camToggle();
   if(e.code==='KeyH')honk();
   if(e.code==='KeyB')bark();
+  if(e.code==='KeyM')mapUI();
+  if(e.code==='Escape')menuUI();
   if(e.code.startsWith('Arrow'))e.preventDefault()});
 addEventListener('keyup',e=>{keys[e.code]=false;if(fishing&&['Space','KeyE','Enter'].includes(e.code))fishAct(false)});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
@@ -1043,7 +1271,7 @@ if(matchMedia('(pointer:coarse)').matches){$('#touch').hidden=false;document.bod
  j.addEventListener('pointermove',mv);
  const up=e=>{if(e.pointerId!==id)return;id=null;joy={x:0,y:0};nub.style.transform=''};j.addEventListener('pointerup',up);j.addEventListener('pointercancel',up);
  $('#tbtns').addEventListener('pointerdown',e=>{const k=e.target.dataset.k;if(!k||paused)return;e.preventDefault();if(k==='act'){photo?snap():interact()}if(k==='eat')feastUI('bag');if(k==='coat')toggleCoat();if(k==='cam')camToggle();if(k==='bark')bark();if(k==='run'){if(S.riding)honk();else runBtn=true}});
- $('#vfSnap').addEventListener('click',()=>snap());$('#vfExit').addEventListener('click',()=>camToggle());
+ $('#vfSnap').addEventListener('click',()=>snap());$('#mapBtn').addEventListener('click',()=>{if(!paused)mapUI()});$('#menuBtn').addEventListener('click',()=>{if(!paused)menuUI()});$('#vfExit').addEventListener('click',()=>camToggle());
  addEventListener('pointerup',()=>runBtn=false);}
 
 /* ---------- simulation ---------- */
@@ -1091,15 +1319,15 @@ function updateNPCs(dt){const h=hour(),late=h>=22||h<6,closed=h>=21||h<7,lunch=S
   alert=Math.max(...npcs.map(o=>o.asleep?0:o.n));
   if(S.q===8&&lunch&&dist(P.x,P.y,grube.x,grube.y)<130&&(P.hidden||disg())&&grube.n<.5&&kendra.n<.5&&!guards.some(g=>g.state==='chase'))overhear();
 }
-function nearInt(){if(photo)return null;if(S.riding)return {k:'dismount'};let b=null,bd=48;for(const o of ints){if(o.k==='coat'&&has('coat'))continue;if(o.k==='tackle'&&S.side.truck!==1)continue;const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}
+function nearInt(){if(photo)return null;if(S.riding){if(S.riding==='canoe')for(let i=0;i<DIVES.length;i++)if(dist(P.x,P.y,DIVES[i].x,DIVES[i].y)<50)return {k:'dive',i,x:DIVES[i].x,y:DIVES[i].y};return {k:'dismount'}}let b=null,bd=48;for(const o of ints){if(o.k==='coat'&&has('coat'))continue;if(o.k==='tackle'&&S.side.truck!==1)continue;const d=dist(P.x,P.y,o.x,o.y);if(d<bd){bd=d;b=o}}
   for(const o of npcs){if(o.asleep||!(o.talk||(o===gus&&S.side.parcel===1)))continue;const d=dist(P.x,P.y,o.x,o.y);if(d<bd+4){bd=d;b=o}}
-  {const d=dist(P.x,P.y,dog.x,dog.y);if(d<(S.dog.adopted?30:bd+6)){bd=d;b=dog}}
+  {const d=dist(P.x,P.y,dog.x,dog.y);if(d<(S.dog.adopted?Math.min(30,bd):bd+6)){bd=d;b=dog}}
   for(const m of mush){const d=dist(P.x,P.y,m.x,m.y);if(d<Math.min(bd,34)){bd=d;b={k:'mush',m,x:m.x,y:m.y}}}
   if(S.dog.adopted&&S.dog.mode==='sniff')for(const t of truffles){if(t.found)continue;const d=dist(P.x,P.y,t.x,t.y);if(d<Math.min(bd,34)){bd=d;b={k:'truffle',t,x:t.x,y:t.y}}}
   if((!b||b===dog)&&S.rod){const fx=P.x+Math.cos(P.ang)*40,fy=P.y+Math.sin(P.ang)*40;if(inLake(fx,fy,0)&&!(inLake(P.x,P.y,-6)&&!(P.x>DOCK.x&&P.x<DOCK.x+DOCK.w)))b={k:'fish',x:fx,y:fy}}
-  for(const k of ['bike','truck']){const v=S.veh[k];if(v){const d=dist(P.x,P.y,v.x,v.y);if(d<bd+12){bd=d;b={veh:k,x:v.x,y:v.y}}}}
+  for(const k of ['bike','truck','canoe']){const v=S.veh[k];if(v){const d=dist(P.x,P.y,v.x,v.y);if(d<bd+12){bd=d;b={veh:k,x:v.x,y:v.y}}}}
   if(dist(P.x,P.y,pip.x,pip.y)<56&&(!b||dist(P.x,P.y,pip.x,pip.y)<bd))b=pip;return b}
-const LABEL=o=>{const nd=disg()?'':' (NOT disguised!)';if(o.k==='dismount')return 'Hop off'+(S.riding==='bike'?' the bike':' the truck')+' · H to honk';if(o.veh)return o.veh==='bike'?'Ride bike':'Drive the pickup';if(o.k==='table')return o.stock.length?`Feast at picnic table (${o.stock.length})`:'Picnic table (empty)';if(o.k==='tackle')return 'Pick up Walt\'s tackle box';if(o.k==='album')return 'Open your desk (album, guidebook, fish log)';if(o===dog)return S.dog.adopted?'Command Biscuit':`Give Biscuit a snack (friendship ${S.dog.friend}/3)`;if(o.k==='mush')return S.guide[o.m.k]?'Pick '+MUSH[o.m.k].n:'Pick the mushroom';if(o.k==='truffle')return 'Dig up the truffle!';if(o.k==='fish')return 'Go fishing';if(o.k==='grill')return S.catch.length?`Cook your fish (${S.catch.length})`:'Campfire (catch fish to cook)';if(o.k==='keys')return 'Hide the bulldozer keys';if(o.k==='lunch')return 'Swap the crew\'s lunch';if(o.k==='bait')return 'Enter Bait & Tackle'+nd;if(o.k==='golf')return 'Enter Pinewick Golf Club'+nd;if(o===pip)return 'Talk to Pip';if(o===gus)return 'Deliver the parcel to Gus'+nd;if(o.talk)return 'Talk to '+o.name+nd;
+const LABEL=o=>{const nd=disg()?'':' (NOT disguised!)';if(o.k==='dismount')return (S.riding==='canoe'?'Get out of the canoe (near land)':'Hop off'+(S.riding==='bike'?' the bike':' the truck')+' · H to honk');if(o.veh)return o.veh==='bike'?'Ride bike':o.veh==='canoe'?'Get in the canoe':'Drive the pickup';if(o.k==='table')return o.stock.length?`Feast at picnic table (${o.stock.length})`:'Picnic table (empty)';if(o.k==='tackle')return 'Pick up Walt\'s tackle box';if(o.k==='album')return 'Open your desk (album, guidebook, fish log)';if(o===dog)return S.dog.adopted?'Command Biscuit':`Give Biscuit a snack (friendship ${S.dog.friend}/3)`;if(o.k==='mush')return S.guide[o.m.k]?'Pick '+MUSH[o.m.k].n:'Pick the mushroom';if(o.k==='truffle')return 'Dig up the truffle!';if(o.k==='fish')return 'Go fishing';if(o.k==='grill')return S.catch.length?`Cook your fish (${S.catch.length})`:'Campfire (catch fish to cook)';if(o.k==='dive')return S.scuba?'Dive here (scuba)':'Dive spot (needs scuba gear)';if(o.k==='lodge')return 'Enter the Ski Lodge'+nd;if(o.k==='lift')return 'Ride the chairlift and ski'+nd;if(o.k==='office')return 'Search the site office';if(o.k==='secret')return S.secret?'Grandpa Root\'s cairn':'Look under the mossy stones';if(o.k==='keys')return 'Hide the bulldozer keys';if(o.k==='lunch')return 'Swap the crew\'s lunch';if(o.k==='bait')return 'Enter Bait & Tackle'+nd;if(o.k==='golf')return 'Enter Pinewick Golf Club'+nd;if(o===pip)return 'Talk to Pip';if(o===gus)return 'Deliver the parcel to Gus'+nd;if(o.talk)return 'Talk to '+o.name+nd;
   return {cooler:`Raid cooler (${o.stock?.length} left)`,basket:`Raid basket (${o.stock?.length} left)`,bin:'Rummage in trash bin (noisy!)',fridge:'Open fridge',wardrobe:'Open wardrobe',bed:'Sleep until morning',coat:'Grab the raincoat',shop:'Order food'+nd,board:'Read notice board',diner:'Enter Stack \'Em Diner'+nd,store:'Enter Brambles General Store'+nd,po:'Enter Post Office'+nd}[o.k]||''};
 let noiseT=0;
 function update(dt){
@@ -1109,13 +1337,13 @@ function update(dt){
   const ml=Math.hypot(mx,my);if(ml>1){mx/=ml;my/=ml}
   if(photo){P.moving=false;P.sprint=false;P.hidden=false;S.stam=clamp(S.stam+18*dt,0,100);photo.x+=mx*300*dt;photo.y+=my*300*dt;const dx=photo.x-P.x,dy=photo.y-P.y,d=Math.hypot(dx,dy);if(d>320){photo.x=P.x+dx/d*320;photo.y=P.y+dy/d*320}if(d>4)P.ang=Math.atan2(dy,dx);const tch=document.body.classList.contains('touch'),lo=ch*.24,hi=ch*(tch?.56:.74),sy=(gy(photo.y)-20-camY)*scale,sx=(photo.x-camX)*scale;if(sy<lo)photo.y=(lo/scale+camY+20)/T;if(sy>hi)photo.y=(hi/scale+camY+20)/T;if(sx<120)photo.x=camX+120/scale;if(sx>cw-120)photo.x=camX+(cw-120)/scale}
   else if(S.riding){const v=VEH[S.riding];P.vx+=(mx*v.sp-P.vx)*Math.min(1,dt*v.acc);P.vy+=(my*v.sp-P.vy)*Math.min(1,dt*v.acc);const spd=Math.hypot(P.vx,P.vy);P.moving=spd>20;P.sprint=false;if(P.moving){P.ang=Math.atan2(P.vy,P.vx);P.bob+=dt*8}
-    const nx=P.x+P.vx*dt,ny=P.y+P.vy*dt;if(free(nx,P.y,v.r))P.x=nx;else P.vx*=-.3;if(free(P.x,ny,v.r))P.y=ny;else P.vy*=-.3;S.stam=clamp(S.stam+18*dt,0,100);
+    const nx=P.x+P.vx*dt,ny=P.y+P.vy*dt,vf=S.riding==='canoe'?waterFree:free;if(vf(nx,P.y,v.r))P.x=nx;else P.vx*=-.3;if(vf(P.x,ny,v.r))P.y=ny;else P.vy*=-.3;P.swim=false;S.stam=clamp(S.stam+18*dt,0,100);
     if(P.moving&&!disg()){noiseT-=dt;if(noiseT<=0){noise(v.noise);noiseT=.5}}S.veh[S.riding]={x:P.x,y:P.y,a:P.ang};P.hidden=false;P.bush=null}
   else{
   P.moving=ml>.1;const wantRun=(keys.ShiftLeft||keys.ShiftRight||runBtn)&&P.moving;
-  P.sprint=wantRun&&S.stam>2;S.stam=clamp(S.stam+(P.sprint?-32:18)*dt,0,100);
-  const sp=(P.sprint?240:150)*(S.hunger<=0?.7:1);
-  if(P.moving){P.ang=Math.atan2(my,mx);P.bob+=dt*(P.sprint?16:10);const nx=P.x+mx*sp*dt,ny=P.y+my*sp*dt;if(free(nx,P.y,P.r))P.x=nx;if(free(P.x,ny,P.r))P.y=ny}
+  P.swim=inLake(P.x,P.y,-6)&&!onIsland(P.x,P.y,2)&&!onDock(P.x,P.y);P.sprint=wantRun&&S.stam>2&&!P.swim;S.stam=clamp(S.stam+(P.sprint?-32:P.swim?(P.moving?-9:-4):18)*dt,0,100);if(P.swim&&S.stam<=0)swimOut();
+  const sp=(P.sprint?240:150)*(S.hunger<=0?.7:1)*(P.swim?.45:1);
+  if(P.moving){P.ang=Math.atan2(my,mx);P.bob+=dt*(P.sprint?16:10);const nx=P.x+mx*sp*dt,ny=P.y+my*sp*dt;if(free(nx,P.y,P.r,1))P.x=nx;if(free(P.x,ny,P.r,1))P.y=ny}
   if(P.sprint&&S.outfit!=='sweater'){noiseT-=dt;if(noiseT<=0){noise(110);noiseT=.6}}
   const b=bushes.find(b=>dist(P.x,P.y,b.x,b.y)<b.r-2);if(b&&P.moving)b.wig=1;P.hidden=!!b&&!P.sprint;P.bush=b||null;}
   bushes.forEach(b=>b.wig=Math.max(0,b.wig-dt*2));
@@ -1123,6 +1351,7 @@ function update(dt){
   updateNPCs(dt);updateTraffic(dt);updateDog(dt);
   if(S.q===2&&S.fridge.length>=5)advance(3);if(S.q===3&&has('coat'))advance(4);if(S.q===6&&P.x>2540)advance(7);if(S.q===9&&S.cam)advance(10);if(S.q===10&&evCount()>=3)advance(11);
   const q=PIPAT[S.q];pip.x+=(q[0]-pip.x)*Math.min(1,dt*1.2);pip.y+=(q[1]-pip.y)*Math.min(1,dt*1.2);
+  discover(dt);paperCheck();
   if(performance.now()-lastSave>15000){lastSave=performance.now();save()}
 }
 
@@ -1139,7 +1368,7 @@ function person(o,t){const x=o.x,y=gy(o.y),mv=o.moving?Math.sin(t/85+o.x):0,fx=M
   else ell(o.hair,x,y-37,8.2,7.5);
   if(o.hat==='ranger'){ell('#c9a66b',x,y-42,13,4.5);ell('#a8854a',x,y-45,6.5,4.5)}if(o.hat==='fedora'){ell('#5a4a3a',x,y-42,11,4);ell('#4a3a2a',x,y-45,6.5,4.5)}if(o.hat==='hard'){ell('#f2c230',x,y-42,10,5);ell('#e0a820',x,y-44,7.5,4.5)}if(o.camera){rect('#222222',x+5,y-27,10,7);ell('#6cd0ff',x+10,y-23.5,2,2)}
   const cap={cap:'#1f2f4f',redcap:'#e0533d',brown:'#5c3820'}[o.hat];if(cap){ell(cap,x,y-42,8.5,5);ell(cap,x+fx*6,y-40+fy*2,6,2.5);if(o.hat==='cap')ell('#ffd23f',x,y-44,1.6,1.6)}}
-function moss(t,lift=0){const x=P.x,y=gy(P.y)-lift,mv=P.moving?Math.sin(P.bob):0,b=Math.abs(mv)*1.5,fx=Math.cos(P.ang),fy=Math.sin(P.ang),front=fy>-.4;ctx.globalAlpha=P.hidden?.5:1;
+function moss(t,lift=0){if(P.swim&&!lift&&!S.riding){swimDraw(t);return}const x=P.x,y=gy(P.y)-lift,mv=P.moving?Math.sin(P.bob):0,b=Math.abs(mv)*1.5,fx=Math.cos(P.ang),fy=Math.sin(P.ang),front=fy>-.4;ctx.globalAlpha=P.hidden?.5:1;
   ell(SH,x+4,y+1,19,6.5);
   const fur='#7d4b29',dk='#5f3519';
   rr(dk,x-11,y-18+mv*2,9,18-mv*2,4);rr(dk,x+2,y-18-mv*2,9,18+mv*2,4);
@@ -1168,17 +1397,18 @@ addEventListener('resize',resize);resize();
 function render(t){
   const vw=cw/scale,vh=ch/scale,k=dpr*scale;
   const tx=started?P.x:1550,ty=started?gy(P.y)-30:gy(650);
-  const top=cw<640?-200/scale:-90,cx=clamp(tx-vw/2,0,WW-vw),cy=clamp(ty-vh/2+(cw<640?-40/scale:0),top,bg.height-vh);
+  const top=gy(YMIN)+(cw<640?-200/scale:-90),cx=clamp(tx-vw/2,0,WW-vw),cy=clamp(ty-vh/2+(cw<640?-40/scale:0),top,bg.height-vh);
   if(started){camX+=(cx-camX)*.15;camY+=(cy-camY)*.15}else{camX=cx;camY=cy}
   night=darkness();
   ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#173d22';ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(k,0,0,k,-camX*k,-camY*k);
-  ctx.drawImage(bg,0,0);
+  ctx.drawImage(bg,0,0);ctx.drawImage(bgN,0,gy(YMIN));
   const inView=(x,y,h=120)=>x>camX-140&&x<camX+vw+140&&gy(y)>camY-40&&gy(y)-h<camY+vh+40;
   coinSpots.forEach(c=>{if(!c.on||!inView(c.x,c.y,20))return;const s=Math.abs(Math.sin(t/300+c.x)),y=gy(c.y);ell(SH,c.x,y+1,5,2);ell('#d9a020',c.x,y-8,6*s+1,6.5);ell('#ffcf3c',c.x,y-8,5*s+.6,5.5)});
   ctx.save();ctx.scale(1,T);
   if(!S.rain&&inView(1120,1290,20))[[1170,1300],[1145,1292],[1120,1288],[1095,1280],[1072,1276]].forEach(([x,y],i)=>{ctx.save();ctx.translate(x,y+(i%2?7:-7));ctx.rotate(-.25);ctx.fillStyle='rgba(70,45,20,.6)';ctx.beginPath();ctx.ellipse(0,0,15,8,0,0,TAU);ctx.fill();for(let j=0;j<4;j++){ctx.beginPath();ctx.arc(-17,-6+j*4,2.4,0,TAU);ctx.fill()}ctx.restore()});
   if(S.rain)PUDDLES.forEach(p=>{if(!inView(p.x,p.y,10))return;ctx.fillStyle='rgba(150,190,220,.42)';ctx.beginPath();ctx.ellipse(p.x,p.y,p.r,p.r*.6,0,0,TAU);ctx.fill();const k=(t/900+p.x*.013)%1;ctx.strokeStyle=`rgba(255,255,255,${.55*(1-k)})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(p.x+p.r*.2,p.y,Math.max(.1,p.r*.6*k),Math.max(.1,p.r*.36*k),0,0,TAU);ctx.stroke()});
+  DIVES.forEach(d=>{if(!inView(d.x,d.y,20))return;for(let j=0;j<3;j++){const k=((t/1400)+j/3+d.x*.01)%1;ctx.strokeStyle=`rgba(255,255,255,${.6*(1-k)})`;ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(d.x,d.y,8+k*26,8+k*26,0,0,TAU);ctx.stroke()}});
   ctx.restore();
   ctx.save();ctx.scale(1,T);
   npcs.forEach(o=>{if(o.asleep||o.state==='flee'||!inView(o.x,o.y,300))return;const [vd,fov]=o_vd(o);const chase=o.kind==='guard'&&o.state==='chase';
@@ -1199,18 +1429,18 @@ function render(t){
   for(const c of traffic)if(inView(c.x,c.y,80))list.push({y:c.y,draw:()=>drawAuto(c.x,c.y,c.a,c.col)});
   for(const m of mush)if(inView(m.x,m.y,30))list.push({y:m.y,draw:()=>drawMush(m)});
   if(inView(dog.x,dog.y,40))list.push({y:dog.y,draw:()=>drawDog(t)});
-  for(const k of ['bike','truck']){const v=S.veh[k];if(v&&S.riding!==k&&inView(v.x,v.y,80))list.push({y:v.y,draw:()=>drawVeh(k,v.x,v.y,v.a||0,false)})}
+  for(const k of ['bike','truck','canoe']){const v=S.veh[k];if(v&&S.riding!==k&&inView(v.x,v.y,80))list.push({y:v.y,draw:()=>drawVeh(k,v.x,v.y,v.a||0,false)})}
   if(started){list.push({y:P.hidden&&P.bush?P.bush.y:P.y,draw:()=>S.riding?drawVeh(S.riding,P.x,P.y,P.ang,true):moss(t)});list.push({y:pip.y,draw:()=>crow(t)})}
-  list.sort((a,b)=>a.y-b.y);for(const it of list)it.draw();
+  list.sort((a,b)=>a.y-b.y);for(const it of list)it.draw();drawLift(t);
   ctx.setTransform(1,0,0,1,0,0);
   if(night>0){dctx.setTransform(1,0,0,1,0,0);dctx.globalCompositeOperation='source-over';dctx.clearRect(0,0,dark.width,dark.height);dctx.fillStyle=`rgba(8,12,38,${night})`;dctx.fillRect(0,0,dark.width,dark.height);dctx.globalCompositeOperation='destination-out';
     const sx=x=>(x-camX)*k,sy=y=>(gy(y)-camY)*k;
     const light=(x,y,r,a=1,lift=0)=>{dctx.save();dctx.translate(sx(x),sy(y)-lift*k);dctx.scale(1,T);const g=dctx.createRadialGradient(0,0,0,0,0,r*k);g.addColorStop(0,`rgba(0,0,0,${a})`);g.addColorStop(1,'rgba(0,0,0,0)');dctx.fillStyle=g;dctx.beginPath();dctx.arc(0,0,r*k,0,TAU);dctx.fill();dctx.restore()};
     light(P.x,P.y,110,.7,20);solids.forEach(s=>{if(s.fire)light(s.x,s.y,140,.9);if(s.lamp)light(s.x+13,s.y,150,.85)});light(shop.x,shop.y-10,150,.9);light(1985,1440,140,.85);
-    [B.diner,B.store,B.po].forEach(q=>light(q.x+q.w/2,q.y+q.h+10,q.w*.55,.6));traffic.forEach(c=>{const p=loopPos(c.s+60);light(p.x,p.y,120,.8)});light(900,345,230,.85);light(1035,1595,130,.8);
+    [B.diner,B.store,B.po].forEach(q=>light(q.x+q.w/2,q.y+q.h+10,q.w*.55,.6));traffic.forEach(c=>{const p=loopPos(c.s+60);light(p.x,p.y,120,.8)});light(900,345,230,.85);light(1035,1595,130,.8);light(2720,-140,170,.8);light(3560,-110,130,.8);
     [...guards,voss].filter(g=>!g.asleep).forEach(g=>{const [vd,fov]=o_vd(g);dctx.save();dctx.translate(sx(g.x),sy(g.y));dctx.scale(1,T);dctx.fillStyle='rgba(0,0,0,.85)';dctx.beginPath();dctx.moveTo(0,0);dctx.arc(0,0,vd*k,g.ang-fov/2,g.ang+fov/2);dctx.closePath();dctx.fill();dctx.restore()});
     ctx.drawImage(dark,0,0)}
-  if(started&&S.rain){ctx.save();ctx.scale(dpr,dpr);ctx.strokeStyle='rgba(205,225,255,.38)';ctx.lineWidth=1.2;ctx.beginPath();for(let i=0;i<190;i++){const x=(i*157.7+t*.12)%(cw+40)-20,y=(i*91.3*7+t*.95)%(ch+40)-20;ctx.moveTo(x,y);ctx.lineTo(x-4,y+15)}ctx.stroke();ctx.restore()}
+  if(started&&S.rain&&P.y<40){ctx.save();ctx.scale(dpr,dpr);ctx.fillStyle='rgba(255,255,255,.85)';for(let i=0;i<160;i++){const x=((i*157.7+t*.03+Math.sin(t/900+i)*20)%(cw+40)+cw+40)%(cw+40)-20,y=(i*91.3*7+t*.12)%(ch+40)-20;ctx.beginPath();ctx.arc(x,y,1.6+(i%3)*.6,0,TAU);ctx.fill()}ctx.restore()}else if(started&&S.rain){ctx.save();ctx.scale(dpr,dpr);ctx.strokeStyle='rgba(205,225,255,.38)';ctx.lineWidth=1.2;ctx.beginPath();for(let i=0;i<190;i++){const x=(i*157.7+t*.12)%(cw+40)-20,y=(i*91.3*7+t*.95)%(ch+40)-20;ctx.moveTo(x,y);ctx.lineTo(x-4,y+15)}ctx.stroke();ctx.restore()}
   ctx.setTransform(k,0,0,k,-camX*k,-camY*k);
   if(tg){const by=gy(tg.y)-(tg===pip?38:74)+Math.sin(t/200)*4;poly('#ffbf3c',tg.x-10,by-14,tg.x+10,by-14,tg.x,by);ctx.strokeStyle='#3b2614';ctx.lineWidth=2;ctx.stroke()}
   npcs.forEach(o=>{if(o.asleep||!inView(o.x,o.y,60))return;const by=gy(o.y)-50;if(o.sayT>0)bubble(o.x,by,o.say,'#fff');else if(o.kind==='guard'&&o.state==='chase')bubble(o.x,by,'!','#ff5b4a');else if(o.n>.12)bubble(o.x,by,o.n>.6?'?!':'?',o.n>.6?'#ffbf3c':'#fbf3df');else if(started&&(o.talk||(o===gus&&S.side.parcel===1))&&dist(P.x,P.y,o.x,o.y)<220)bubble(o.x,by,'…','#fbf3df')});
@@ -1230,10 +1460,10 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!paused&&
 /* ---------- boot ---------- */
 function title(){let sv=null;try{sv=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
   openModal(`<h1 class="slab">Pinecone Prowler</h1><p>You are <b>Moss</b>, a shy forest giant with a big appetite. The campers at Hollowpine have coolers, the town of Pinewick has jobs, and a developer named Grube has plans.</p>
-  <div class="keys"><span><kbd>WASD</kbd></span><span>Move · hold <b>Shift</b> to run (noisy)</span><span><kbd>E</kbd></span><span>Raid, talk, use</span><span><kbd>Q</kbd></span><span>Eat: drag food into Moss's mouth</span><span><kbd>G</kbd></span><span>Outfit on or off</span><span><kbd>C</kbd></span><span>Camera (once you have one)</span><span><kbd>H</kbd></span><span>Honk while riding</span><span><kbd>B</kbd></span><span>Tell your dog to bark (once you have one)</span><span>Bushes</span><span>Walk into one to hide from sight cones</span></div>
+  <div class="keys"><span><kbd>WASD</kbd></span><span>Move · hold <b>Shift</b> to run (noisy)</span><span><kbd>E</kbd></span><span>Raid, talk, use</span><span><kbd>Q</kbd></span><span>Eat: drag food into Moss's mouth</span><span><kbd>G</kbd></span><span>Outfit on or off</span><span><kbd>C</kbd></span><span>Camera (once you have one)</span><span><kbd>H</kbd></span><span>Honk while riding</span><span><kbd>B</kbd></span><span>Tell your dog to bark (once you have one)</span><span><kbd>M</kbd> <kbd>Esc</kbd></span><span>Map · game menu</span><span>Bushes</span><span>Walk into one to hide from sight cones</span></div>
   <div class="btns">${sv?'<button class="btn" data-a="cont">Continue (Day '+(+sv.day||1)+')</button>':''}<button class="btn ${sv?'alt':''}" data-a="new">New game</button></div>`);
   $('#card').onclick=e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(!a)return;sfx(520,.1,'triangle',.1);load(a==='cont'?sv:fresh());closeModal();hud();if(a==='new')setTimeout(()=>toast('Walk to Pip the crow and press E'),400)}}
-$('#modal').addEventListener('click',e=>{if(e.target.id==='modal'&&started&&!cook&&!golf&&!caddy&&!fishing&&performance.now()-openedAt>500){const c=$('#card').querySelector('[data-a=close]');if(c)c.click()}});
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal'&&started&&!cook&&!golf&&!caddy&&!fishing&&!ski&&!dive&&performance.now()-openedAt>500){const c=$('#card').querySelector('[data-a=close]');if(c)c.click()}});
 const boot=d=>{S=fresh();restock();renderSlots();if(d&&d.day){load(d);closeModal()}else title();requestAnimationFrame(frame)};
 window.claude?.hot?.ready?window.claude.hot.ready(boot):boot(window.claude?.hot?.data??null);
 }
